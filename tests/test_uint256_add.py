@@ -61,21 +61,4 @@ def test_uint256_add_direct():
     print("    ✓ Symbolic addition passed")
     
     print("\n✓ All Uint256.add_semantics() tests passed")
-    return True
-
-
-if __name__ == "__main__":
-    print("=" * 70)
-    print("Testing Uint256.add_semantics() Method")
-    print("=" * 70)
-    try:
-        test_uint256_add_direct()
-        print("\n" + "=" * 70)
-        print("All tests passed! ✓")
-        print("=" * 70)
-    except Exception as e:
-        print(f"\n✗ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
 

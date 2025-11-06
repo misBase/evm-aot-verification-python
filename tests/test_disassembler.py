@@ -233,37 +233,4 @@ def test_disassemble_hex_invalid():
     print("  ✓ Invalid hex string handling passed")
 
 
-def run_all_tests():
-    """Run all disassembler tests."""
-    print("=" * 60)
-    print("Testing x86-64 Disassembler")
-    print("=" * 60)
-    
-    try:
-        test_disassemble_hex_basic()
-        test_disassemble_hex_multiple()
-        test_disassemble_hex_add_sequence()
-        test_disassemble_hex_r14_fix()
-        test_parse_operands_mov_reg_mem()
-        test_parse_operands_add_reg_mem()
-        test_parse_operands_positive_offset()
-        test_parse_operands_decimal_offset()
-        test_parse_operands_all_registers()
-        test_disassemble_hex_various_formats()
-        test_disassemble_hex_invalid()
-        
-        print("\n" + "=" * 60)
-        print("✓ All disassembler tests passed!")
-        print("=" * 60)
-        
-    except AssertionError as e:
-        print(f"\n✗ Test failed: {e}")
-        raise
-    except Exception as e:
-        print(f"\n✗ Unexpected error: {e}")
-        raise
-
-
-if __name__ == "__main__":
-    run_all_tests()
 

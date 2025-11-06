@@ -81,29 +81,4 @@ def test_refinement_checker():
     print("✓ Refinement checker test passed")
 
 
-def main():
-    """Run all tests."""
-    print("=" * 70)
-    print("Testing Refactored Code Structure")
-    print("=" * 70)
-    
-    try:
-        test_basic_imports()
-        test_add_semantics()
-        test_refinement_checker()
-        
-        print("\n" + "=" * 70)
-        print("All tests passed! ✓")
-        print("=" * 70)
-        return True
-    except Exception as e:
-        print(f"\n✗ Test failed with error: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
-if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
 
