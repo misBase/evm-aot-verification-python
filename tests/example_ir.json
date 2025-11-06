@@ -1,0 +1,42 @@
+{
+  "control_frames": [
+    {
+      "pc": 0,
+      "stack_depth": 2,
+      "min_depth": 0,
+      "max_depth": 2,
+      "static_gas": 6,
+      "is_jump_target": false,
+      "is_inner_block": false,
+      "is_stop": true,
+      "operations": [
+        {
+          "kind": "TAG",
+          "pc": 0,
+          "param": 1
+        },
+        {
+          "kind": "PUSH",
+          "pc": 0,
+          "immediate": 96,
+          "param": 1
+        },
+        {
+          "kind": "PUSH",
+          "pc": 2,
+          "immediate": 16,
+          "param": 1
+        },
+        {
+          "kind": "ADD",
+          "pc": 4
+        },
+        {
+          "kind": "STOP",
+          "pc": 5
+        }
+      ]
+    }
+  ]
+}
+
