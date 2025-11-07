@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """Test Uint256.add_semantics() method directly (similar to Go's y.Add(&x, y))."""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
 from common.uint256 import Uint256
 from z3 import BitVecVal, simplify
 

@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Test EVM IR JSON parsing."""
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.semantics import EVMIRSemantics

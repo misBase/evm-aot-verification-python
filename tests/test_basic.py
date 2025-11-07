@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """Basic tests for the refactored code structure."""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
 from common.uint256 import Uint256
 from evm_ir.semantics import EVMIRSemantics, EVMOperationSemantics
 from x86_64.semantics import X86SemanticsModel

@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """Tests for x86-64 disassembler."""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
 from x86_64.disassembler import disassemble_hex, parse_operands
 from x86_64.models import Register, X86Instruction
 

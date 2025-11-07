@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """Test the main verifier."""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
 from verifier import TranslationVerifier
 from z3 import simplify, BitVecVal
 
