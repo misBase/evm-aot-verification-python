@@ -30,10 +30,17 @@ class EvmOperator:
         Returns:
             EvmOperator instance
         """
+        # Handle immediate value: now always string from Go side, but support int for backward compatibility
+        immediate = data.get('immediate')
+        if immediate is not None:
+            # Convert to int (Python 3 int supports arbitrary precision)
+            # Go side now always uses string, but we support int for backward compatibility
+            immediate = int(immediate)
+        
         return cls(
             kind=data.get('kind', ''),
             pc=data.get('pc', 0),
-            immediate=data.get('immediate'),
+            immediate=immediate,
             param=data.get('param'),
             is_static=data.get('is_static', False),
             block=block
