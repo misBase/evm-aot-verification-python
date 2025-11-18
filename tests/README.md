@@ -47,7 +47,9 @@ python3 tests/test_verifier.py
 
 ## 测试数据
 
-- `example_ir.json`: 示例EVM IR JSON文件，包含一个ADD操作的块
+测试数据文件统一存放在 `data/` 目录下：
+
+- `data/example_ir.json`: 示例EVM IR JSON文件，包含一个ADD操作的块
 
 ## 测试覆盖率
 

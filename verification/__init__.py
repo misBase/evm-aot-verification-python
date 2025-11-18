@@ -1,10 +1,10 @@
-"""Verification modules for block equivalence checking."""
+"""Verification modules for program-level equivalence checking."""
 
 from .refinement_checker import RefinementChecker
-from .block_verifier import BlockEquivalenceChecker
+from .program_verifier import ProgramEquivalenceChecker
 
 __all__ = [
     'RefinementChecker',
-    'BlockEquivalenceChecker',
+    'ProgramEquivalenceChecker',
 ]
 

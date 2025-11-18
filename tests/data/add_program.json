@@ -1,0 +1,34 @@
+{
+  "control_frames": [
+    {
+      "is_inner_block": false,
+      "is_jump_target": false,
+      "is_stop": false,
+      "max_depth": 1025,
+      "min_depth": 2,
+      "operations": [
+        {
+          "kind": "TAG",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "kind": "ADD",
+          "pc": 0
+        },
+        {
+          "kind": "BLOCKEND",
+          "pc": 0
+        },
+        {
+          "kind": "STOP",
+          "pc": 0
+        }
+      ],
+      "pc": 0,
+      "stack_depth": -1,
+      "static_gas": 3
+    }
+  ]
+}
+

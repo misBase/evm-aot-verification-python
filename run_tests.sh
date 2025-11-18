@@ -8,14 +8,9 @@ echo "Running EVM AOT Verification Tests"
 echo "=========================================="
 echo ""
 
-# Run all tests using pytest
+# Run all tests using pytest with python3
 # -v: verbose output
 # -s: show print statements
 # --tb=short: shorter traceback format
-pytest tests/ -v -s --tb=short
-
-echo ""
-echo "=========================================="
-echo "All tests passed! ✓"
-echo "=========================================="
+python3 -m pytest tests/ -v -s --tb=short
 

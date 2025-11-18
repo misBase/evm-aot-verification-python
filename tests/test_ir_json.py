@@ -10,54 +10,43 @@ from z3 import BitVecVal, simplify
 
 
 def test_json_parsing():
-    """Test parsing EVM IR from JSON."""
-    print("Testing EVM IR JSON parsing...")
-    
+    """Test parsing EVM IR from JSON and semantic modeling."""
     # Get the path to the example IR file
     test_dir = os.path.dirname(__file__)
-    ir_file = os.path.join(test_dir, "example_ir.json")
+    ir_file = os.path.join(test_dir, "data", "example_ir.json")
     
     # Load IR from JSON
     ir_result = load_ir_from_json(ir_file)
     
-    print(f"  Loaded {len(ir_result.blocks)} block(s)")
+    assert len(ir_result.blocks) > 0, "IR should contain at least one block"
     
-    for i, block in enumerate(ir_result.blocks):
-        print(f"\n  Block {i}:")
-        print(f"    PC: {block.pc}")
-        print(f"    Stack depth: {block.stack_depth}")
-        print(f"    Operations: {len(block.operations)}")
-        for op in block.operations:
-            print(f"      - {op.kind} (pc={op.pc})")
+    # Verify block structure
+    block = ir_result.blocks[0]
+    assert hasattr(block, 'pc'), "Block should have PC attribute"
+    assert hasattr(block, 'stack_depth'), "Block should have stack_depth attribute"
+    assert hasattr(block, 'operations'), "Block should have operations attribute"
+    assert len(block.operations) > 0, "Block should have at least one operation"
     
-    # Test semantic modeling
-    print("\n  Testing semantic modeling...")
+    # Test semantic modeling with symbolic inputs
     semantics = EVMIRSemantics()
-    
-    # Create symbolic inputs
     val1 = Uint256.symbolic("test_val1")
     val2 = Uint256.symbolic("test_val2")
     input_stack = [val1.to_bv256(), val2.to_bv256()]
     
-    # Build semantics for the block
-    result = semantics.build_block_semantics(ir_result.blocks[0], input_stack)
+    result = semantics.build_block_semantics(block, input_stack)
     
-    print(f"    Output stack size: {result['output_count']}")
-    print(f"    Semantic formula type: {type(result['semantic_formula'])}")
+    assert 'output_count' in result, "Result should contain output_count"
+    assert 'semantic_formula' in result, "Result should contain semantic_formula"
     
     # Test with concrete values
-    print("\n  Testing with concrete values...")
     val1_concrete = Uint256.from_int(0x60)
     val2_concrete = Uint256.from_int(0x10)
     input_stack_concrete = [val1_concrete.to_bv256(), val2_concrete.to_bv256()]
     
-    result_concrete = semantics.build_block_semantics(ir_result.blocks[0], input_stack_concrete)
+    result_concrete = semantics.build_block_semantics(block, input_stack_concrete)
     result_value = simplify(result_concrete['semantic_formula'])
     expected = BitVecVal(0x70, 256)
     
-    print(f"    Result: {result_value}")
-    print(f"    Expected: {expected}")
-    assert simplify(result_value == expected), "Semantic result mismatch"
-    
-    print("\n✓ EVM IR JSON parsing test passed")
+    assert simplify(result_value == expected), \
+        f"Semantic result mismatch: expected {expected}, got {result_value}"
 

@@ -1,21 +1,21 @@
 # EVM AOT Translation Verification
 
-This project implements **translation verification** for EVM (Ethereum Virtual Machine) AOT (Ahead-of-Time) compilation to x86-64 machine code using the **Z3 SMT solver**. It formally proves that the compiled machine code has semantically equivalent behavior to the original EVM bytecode.
+This project implements **program-level translation verification** for EVM (Ethereum Virtual Machine) AOT (Ahead-of-Time) compilation to x86-64 machine code using the **Z3 SMT solver**. It formally proves that the compiled machine code has semantically equivalent behavior to the original EVM bytecode.
 
 ## Overview
 
-The system verifies that:
+The system verifies **entire programs** (not just individual blocks) with:
 ```
-EVM_Bytecode(inputs) ≡ x86_64_AOT_Code(inputs)
-```
-
-This system performs **logical semantics modeling** (Alive2-style) using Z3 SMT solver to prove:
-```
-∀ a, b ∈ Uint256. EVM_ADD(a, b) ≡ x86_64_AOT_ADD(a, b)
+EVM_Program(inputs) ≡ x86_64_AOT_Program(inputs)
 ```
 
-- **EVM operation**: ADD instruction (pops two 256-bit values, pushes sum)
-- **x86-64 machine code**: AOT-compiled ADD with stack-based 256-bit arithmetic
+This system performs **program-level logical semantics modeling** (Alive2-style) using Z3 SMT solver to prove:
+```
+∀ a, b ∈ Uint256. x86_ADD_Program(a, b) ≡ EVM_ADD_Program(a, b)
+```
+
+- **EVM program**: Sequence of IR blocks including ADD operations
+- **x86-64 machine code**: Complete AOT-compiled program with stack-based 256-bit arithmetic
 - **Result**: FORMALLY PROVEN equivalent for ALL possible inputs ✓
 
 ## Installation
@@ -30,9 +30,14 @@ This system performs **logical semantics modeling** (Alive2-style) using Z3 SMT 
 # Clone or navigate to the project directory
 cd evm-aot-verification-python
 
-# Install dependencies (including Z3)
+# Install dependencies (Z3 SMT solver, Capstone disassembler, pytest)
 pip install -r requirements.txt
 ```
+
+**Main Dependencies:**
+- `z3-solver>=4.12.0`: SMT solver for formal verification
+- `capstone>=5.0.0`: x86-64 instruction disassembler
+- `pytest>=7.0.0`: Testing framework
 
 或者在运行之前先开启代理：
 ```bash
@@ -44,28 +49,27 @@ pip install -r requirements.txt
 
 ### Quick Start
 
-Run the complete verification suite:
+Verify EVM IR and x86-64 machine code:
 ```bash
-python3 main.py
+python3 main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose]
 ```
 
-Or run the verifier directly:
+Or run the test suite:
 ```bash
-python3 verifier.py
+python3 -m tests.test_verifier
 ```
 
 ### Command-Line Options
 
 ```bash
-# Run with verbose Z3 output
-python3 main.py --verbose
+# Basic verification
+python3 main.py tests/data/example_ir.json 498b46c0490346e0...
 
-# Set custom timeout (in milliseconds)
-python3 main.py --timeout 30000
+# With base address
+python3 main.py contract.ir.json 498b46c0... --base-addr 0x6c
 
-# Verify a single ADD operation
-python3 main.py --single 0x60 0x10
-python3 main.py --single 0xFF 0xFF
+# With custom timeout and verbose output
+python3 main.py contract.ir.json 498b46c0... --timeout 30000 --verbose
 
 # Run all tests
 ./run_tests.sh
@@ -74,6 +78,9 @@ python3 main.py --single 0xFF 0xFF
 python3 tests/test_basic.py
 python3 tests/test_ir_json.py
 python3 tests/test_verifier.py
+python3 tests/test_disassembler.py
+python3 tests/test_add_carry.py
+python3 tests/test_uint256_add.py
 ```
 
 ## Project Structure
@@ -87,26 +94,33 @@ evm-aot-verification-python/
 ├── evm_ir/                    # EVM IR相关模块
 │   ├── models.py             # EVM IR数据模型（Block, Operator）
 │   ├── json_parser.py        # JSON格式IR解析器
-│   └── semantics.py          # EVM IR语义建模（调用Uint256方法）
+│   ├── semantics.py          # EVM IR语义建模（调用Uint256方法）
+│   └── program.py            # EVM程序级模型（整个程序的语义建模）
 │
 ├── x86_64/                    # x86-64相关模块
 │   ├── models.py             # x86-64数据模型（Block, Instruction, Register）
-│   └── semantics.py          # x86-64指令语义建模（MOV, ADD, ADC等）
+│   ├── disassembler.py       # x86-64机器码反汇编器（使用Capstone）
+│   ├── execution_state.py    # x86-64执行状态管理（寄存器、内存、标志位）
+│   ├── inst_executor.py      # x86-64指令执行器
+│   ├── semantics.py          # x86-64指令语义建模（MOV, ADD, ADC等）
+│   └── program.py            # x86程序级模型（整个程序的语义建模）
 │
 ├── verification/              # 验证相关模块
-│   ├── refinement_checker.py # 精化关系检查器
-│   └── block_verifier.py     # 块等价性验证器
+│   ├── refinement_checker.py # 精化关系检查器（使用Z3验证x86精化EVM）
+│   └── program_verifier.py   # 程序等价性验证器（主要验证接口）
 │
 ├── tests/                     # 测试目录
 │   ├── test_basic.py         # 基础功能测试
 │   ├── test_ir_json.py       # EVM IR JSON解析测试
 │   ├── test_verifier.py      # 验证器测试
+│   ├── test_program_verifier.py # 程序级验证器测试
+│   ├── test_disassembler.py  # x86-64反汇编器测试
 │   ├── test_add_carry.py     # 进位传播测试
 │   ├── test_uint256_add.py   # Uint256.add_semantics()直接测试
-│   └── example_ir.json       # 示例EVM IR JSON文件
+│   └── data/                 # 测试数据目录
+│       └── example_ir.json   # 示例EVM IR JSON文件
 │
-├── verifier.py                # 主验证器
-├── main.py                    # 主入口程序
+├── main.py                    # 主入口程序（使用 ProgramEquivalenceChecker）
 ├── run_tests.sh               # 测试运行脚本
 └── requirements.txt           # Python依赖
 ```
@@ -151,20 +165,43 @@ def add_semantics(self, a: BitVec, b: BitVec) -> BitVec:
 - **`semantics.py`**: Semantic modeling for EVM operations
   - `EVMOperationSemantics.add_semantics()`: Delegates to `Uint256.add_semantics()`
   - `EVMIRSemantics.build_block_semantics()`: Builds block-level semantics
+- **`program.py`**: **Program-level** semantic modeling (NEW)
+  - `EVMProgram`: Wraps CompilerEVMResult for whole-program verification
+  - `build_program_semantics()`: Builds semantics for entire IR sequence
+  - `build_program_semantics_for_operation()`: Focuses on specific operations
 
 #### 3. `x86_64/` - x86-64 Instruction Modeling
-- **`models.py`**: Data models for x86 blocks and instructions
+- **`models.py`**: Data models for x86 blocks, instructions, and registers
+- **`disassembler.py`**: Disassembles hex-encoded machine code into X86Instruction objects using Capstone
+  - Handles various hex string formats
+  - Fixes R14 register identification issues
+  - Parses operands into structured format
+- **`execution_state.py`**: Manages execution state (registers, memory, flags) during instruction execution
+- **`inst_executor.py`**: Executes instruction sequences using semantic modeling
+  - Supports MOV, ADD, ADC instructions
+  - Updates execution state accordingly
 - **`semantics.py`**: Semantic modeling for x86-64 instructions
   - Implements MOV, ADD, ADC instruction semantics
   - Models the exact AOT-compiled instruction sequence
+  - Builds semantic formulas from instruction sequences
+- **`program.py`**: **Program-level** semantic modeling (NEW)
+  - `X86Program`: Represents complete x86-64 programs
+  - `build_program_semantics()`: Builds semantics for entire instruction sequence
+  - `build_program_semantics_from_limbs()`: Convenience method for 256-bit inputs
 
 #### 4. `verification/` - Verification Engine
 - **`refinement_checker.py`**: Uses Z3 to check refinement relation (x86 refines EVM)
-- **`block_verifier.py`**: Verifies equivalence between EVM and x86 blocks
+- **`program_verifier.py`**: **Program-level** verification (MAIN INTERFACE)
+  - `ProgramEquivalenceChecker`: Verifies entire programs
+  - `verify_program_pair()`: Main verification entry point
+  - `verify_operation_across_programs()`: Verifies specific operations
 
-#### 5. `verifier.py` - Main Verifier
-- Coordinates the verification process
-- Provides high-level verification API
+#### 5. `tests/test_verifier.py` - Verification Test Cases
+- Contains test cases for ADD operation verification
+- `test_verify_add_symbolic()`: Formal proof using symbolic execution (∀ inputs)
+- `test_verify_add_concrete()`: Verification with concrete values
+- `test_verify_add_concrete_large()`: Verification with large values and carry
+- Uses `ProgramEquivalenceChecker` for program-level verification
 
 ## Verification Approach
 
@@ -283,7 +320,7 @@ from evm_ir.semantics import EVMIRSemantics
 from common.uint256 import Uint256
 
 # Load IR from JSON (exported by Go compiler)
-ir_result = load_ir_from_json("tests/example_ir.json")
+ir_result = load_ir_from_json("tests/data/example_ir.json")
 
 # Build semantics for a block
 semantics = EVMIRSemantics()
@@ -298,15 +335,38 @@ input_stack = [val1.to_bv256(), val2.to_bv256()]
 result = semantics.build_block_semantics(block, input_stack)
 ```
 
-### Example 3: Block Verification
+### Example 3: x86-64 Disassembly
 
 ```python
-from verification.block_verifier import BlockEquivalenceChecker
-from evm_ir.models import EVMBlock
-from x86_64.models import X86Block
+from x86_64.disassembler import disassemble_hex
+from x86_64.models import Register
 
-checker = BlockEquivalenceChecker()
-verified, msg = checker.verify_block_pair(evm_block, x86_block)
+# Disassemble hex-encoded machine code
+hex_code = "498b46c0490346e0"  # mov rax, [r14-0x40]; add rax, [r14-0x20]
+instructions = disassemble_hex(hex_code, base_addr=0x6c)
+
+for insn in instructions:
+    print(f"{insn.addr:04x}: {insn.mnemonic} {insn.op_str}")
+```
+
+### Example 4: Program-Level Verification
+
+```python
+from evm_ir.json_parser import load_ir_from_json
+from evm_ir.program import EVMProgram
+from x86_64.program import X86Program
+from verification.program_verifier import ProgramEquivalenceChecker
+
+# Load EVM program from JSON
+compiler_result = load_ir_from_json("contract_ir.json")
+evm_program = EVMProgram(compiler_result)
+
+# Create x86 program from compiled machine code
+x86_program = X86Program.from_hex(hex_code, base_addr=0x0)
+
+# Verify program equivalence
+checker = ProgramEquivalenceChecker()
+verified, msg = checker.verify_program_pair(evm_program, x86_program)
 ```
 
 ## Testing
@@ -321,8 +381,9 @@ This runs:
 1. Basic functionality tests
 2. EVM IR JSON parsing tests
 3. Verifier tests
-4. ADD with carry propagation tests
-5. Uint256.add_semantics() direct tests
+4. x86-64 disassembler tests
+5. ADD with carry propagation tests
+6. Uint256.add_semantics() direct tests
 
 ### Run Individual Tests
 
@@ -330,6 +391,7 @@ This runs:
 python3 tests/test_basic.py
 python3 tests/test_ir_json.py
 python3 tests/test_verifier.py
+python3 tests/test_disassembler.py
 python3 tests/test_add_carry.py
 python3 tests/test_uint256_add.py
 ```
@@ -387,21 +449,29 @@ This system uses **logical semantics modeling** (Alive2-style):
 - No execution state tracking
 - More efficient for verification
 
-### 3. Block-Based Verification
+### 3. Program-Level Verification
 
-The system is designed for block-level verification:
-- EVM IR is parsed into blocks
-- x86-64 code is segmented into blocks
-- Each block pair is verified independently
+The system is designed for **program-level verification**:
+- **EVM IR**: Parsed as complete programs (sequences of blocks)
+- **x86-64 code**: Treated as complete instruction sequences
+- **Verification**: Proves equivalence of entire programs
+
+#### Key Advantages:
+1. **Whole-Program Reasoning**: Captures inter-block control flow
+2. **Scalable**: Can verify programs of arbitrary size
+3. **Compositional**: Can focus on specific operations within programs
+4. **Flexible**: Supports both symbolic and concrete inputs
 
 ## Future Extensions
 
-1. **More EVM Operations**: MUL, SUB, DIV, MOD, bitwise operations
-2. **More x86-64 Instructions**: Support for more instruction patterns
-3. **Control Flow Verification**: JUMP, JUMPI verification
-4. **x86 Block Parser**: Automatic extraction of blocks from machine code
-5. **Block Alignment**: Automatic alignment of EVM and x86 blocks
-6. **Full Contract Verification**: End-to-end verification of complete contracts
+1. **More EVM Operations**: MUL, SUB, DIV, MOD, bitwise operations (XOR, AND, OR, NOT)
+2. **More x86-64 Instructions**: Support for more instruction patterns (SUB, MUL, shifts, etc.)
+3. **Control Flow Verification**: JUMP, JUMPI verification with inter-block control flow
+4. **Full Contract Verification**: End-to-end verification of complete smart contracts
+5. **Performance Optimization**: Parallel verification of multiple programs
+6. **Enhanced Program Analysis**: Automatic program segmentation and alignment
+7. **Call Graph Analysis**: Verification across function boundaries
+8. **Memory Model Verification**: Formal verification of memory operations
 
 ## References
 

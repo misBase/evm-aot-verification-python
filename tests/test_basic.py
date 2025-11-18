@@ -15,13 +15,12 @@ X86_ADD_BASE_ADDR = 0x6c
 
 def test_basic_imports():
     """Test that all modules can be imported."""
-    print("✓ All modules imported successfully")
+    # If imports fail, an exception will be raised automatically
+    pass
 
 
 def test_add_semantics():
-    """Test ADD semantics."""
-    print("\nTesting ADD semantics...")
-    
+    """Test ADD semantics for both EVM and x86-64."""
     # Test EVM ADD semantics
     evm_op = EVMOperationSemantics()
     val1 = Uint256.from_int(0x60)
@@ -30,9 +29,8 @@ def test_add_semantics():
     result = evm_op.add_semantics(val1.to_bv256(), val2.to_bv256())
     expected = BitVecVal(0x70, 256)
     
-    print(f"  EVM ADD: 0x60 + 0x10 = {simplify(result)}")
-    print(f"  Expected: {expected}")
-    assert simplify(result == expected), "EVM ADD result mismatch"
+    assert simplify(result == expected), \
+        f"EVM ADD failed: expected {expected}, got {simplify(result)}"
     
     # Test x86 ADD semantics
     x86_model = X86SemanticsModel()
@@ -46,16 +44,12 @@ def test_add_semantics():
         base_addr=X86_ADD_BASE_ADDR,
         result_registers=[Register.RBX, Register.RDX, Register.RCX, Register.RAX]
     )
-    print(f"  x86 ADD: {simplify(x86_result)}")
-    assert simplify(x86_result == expected), "x86 ADD result mismatch"
-    
-    print("✓ ADD semantics test passed")
+    assert simplify(x86_result == expected), \
+        f"x86 ADD failed: expected {expected}, got {simplify(x86_result)}"
 
 
 def test_refinement_checker():
     """Test refinement checker with concrete values."""
-    print("\nTesting refinement checker...")
-    
     checker = RefinementChecker(timeout_ms=5000, verbose=False)
     
     # Test with equivalent values
@@ -63,18 +57,15 @@ def test_refinement_checker():
     x86_result = BitVecVal(0x70, 256)
     
     verified, msg = checker.check_refinement(evm_result, x86_result)
-    print(f"  Equivalent values: {verified}")
-    assert verified, "Equivalent values should verify"
+    assert verified, f"Equivalent values should verify, but got: {msg}"
     
     # Test with different values
     evm_result2 = BitVecVal(0x70, 256)
     x86_result2 = BitVecVal(0x71, 256)
     
     verified2, msg2 = checker.check_refinement(evm_result2, x86_result2)
-    print(f"  Different values: {verified2}")
-    assert not verified2, "Different values should not verify"
-    
-    print("✓ Refinement checker test passed")
+    assert not verified2, \
+        f"Different values should not verify (0x70 != 0x71), but verification passed: {msg2}"
 
 
 
