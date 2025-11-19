@@ -42,6 +42,11 @@ from verification.program_verifier import ProgramEquivalenceChecker
 X86_ADD_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
 X86_ADD_BASE_ADDR = 0x6c
 
+# Full ADD program sequence with control flow (addresses 0x0-0xac)
+# Includes initialization, error handling, and ADD operation
+X86_ADD_FULL_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b45704883f80372234883e80349894570498b45304883f8407222483d21800000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c3498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed841c685e00000000249c74528fcffffffc3"
+X86_ADD_FULL_BASE_ADDR = 0x0
+
 
 # ===========================
 # Pytest Fixtures
@@ -148,4 +153,37 @@ def test_verify_add_program_pair():
     assert verified, (
         f"Program pair verification failed. "
         f"EVM program from {ir_path} and x86 program should be equivalent. Error: {msg}"
+    )
+
+
+def test_verify_add_program_pair_full():
+    """Test program-level verification using add_program.json and full x86 hex sequence.
+    
+    This test verifies the equivalence between an EVM program loaded from add_program.json
+    (which contains TAG, ADD, BLOCKEND, STOP operations) and the full x86-64 program
+    sequence that includes control flow, error handling, and the ADD operation.
+    
+    This test uses:
+    - add_program.json: EVM IR JSON file containing TAG, ADD, BLOCKEND, STOP operations
+    - X86_ADD_FULL_HEX_SEQUENCE: Full x86-64 machine code with control flow
+    - ProgramEquivalenceChecker: Program-level verifier
+    """
+    # Get the test data directory path
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "data", "add_program.json")
+    
+    # Load EVM program from JSON
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+    
+    # Create x86 program from full hex sequence
+    x86_program = X86Program.from_hex(X86_ADD_FULL_HEX_SEQUENCE, base_addr=X86_ADD_FULL_BASE_ADDR)
+    
+    # Verify program pair using ProgramEquivalenceChecker
+    checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=True)
+    verified, msg = checker.verify_program_pair(evm_program, x86_program)
+    
+    assert verified, (
+        f"Full program pair verification failed. "
+        f"EVM program from {ir_path} and full x86 program should be equivalent. Error: {msg}"
     )

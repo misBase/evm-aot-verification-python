@@ -123,6 +123,8 @@ def parse_operands(op_str: str) -> dict:
         - 'base_reg': Register enum (if memory operand with base)
         - 'offset': int (if memory operand with offset)
         - 'is_memory': bool (if operand is memory access)
+        - 'immediate': int (if operand is immediate value)
+        - 'jump_target': int (if operand is jump target address)
         
     Example:
         >>> parse_operands("rax, qword ptr [r14 - 0x40]")
@@ -133,7 +135,9 @@ def parse_operands(op_str: str) -> dict:
         'src_reg': None,
         'base_reg': None,
         'offset': 0,
-        'is_memory': False
+        'is_memory': False,
+        'immediate': None,
+        'jump_target': None
     }
     
     # Split by comma to get operands
@@ -144,6 +148,9 @@ def parse_operands(op_str: str) -> dict:
     
     # Parse first operand
     first_str = parts[0]
+    
+    # Remove size prefixes like "byte ptr", "word ptr", "qword ptr"
+    first_str = first_str.replace('byte ptr', '').replace('word ptr', '').replace('qword ptr', '').replace('dword ptr', '').strip()
     
     # Check if first operand is a memory operand: [base +/- offset]
     if '[' in first_str and ']' in first_str:
@@ -191,13 +198,25 @@ def parse_operands(op_str: str) -> dict:
                 offset_val = int(offset_str)
             result['offset'] = sign * offset_val
         
-        # If there's a second operand, it's the source register (for MOV [mem], reg)
+        # If there's a second operand, it could be a register or immediate
         if len(parts) > 1:
             src_str = parts[1].strip()
+            # Try to parse as register first
+            found_reg = False
             for reg_name, reg_enum in [(r.value, r) for r in Register]:
                 if src_str == reg_name:
                     result['src_reg'] = reg_enum
+                    found_reg = True
                     break
+            # If not a register, try to parse as immediate
+            if not found_reg:
+                try:
+                    if src_str.startswith('0x') or src_str.startswith('0X'):
+                        result['immediate'] = int(src_str, 16)
+                    else:
+                        result['immediate'] = int(src_str)
+                except ValueError:
+                    pass
     else:
         # First operand is a register (destination)
         for reg_name, reg_enum in [(r.value, r) for r in Register]:
@@ -255,6 +274,43 @@ def parse_operands(op_str: str) -> dict:
                     if src_str == reg_name:
                         result['src_reg'] = reg_enum
                         break
+                # If not a register, check if it's an immediate value
+                if result['src_reg'] is None:
+                    try:
+                        # Try to parse as immediate value
+                        if src_str.startswith('0x') or src_str.startswith('0X'):
+                            result['immediate'] = int(src_str, 16)
+                        else:
+                            result['immediate'] = int(src_str)
+                    except ValueError:
+                        pass
+    
+    # Check if first operand is an immediate (for instructions like CMP rax, 0x3)
+    if result['dest_reg'] is None and not result['is_memory'] and len(parts) > 0:
+        first_str = parts[0].strip()
+        # Check if it's not a register
+        is_reg = False
+        for reg_name, reg_enum in [(r.value, r) for r in Register]:
+            if first_str == reg_name:
+                is_reg = True
+                break
+        if not is_reg:
+            try:
+                if first_str.startswith('0x') or first_str.startswith('0X'):
+                    result['immediate'] = int(first_str, 16)
+                else:
+                    result['immediate'] = int(first_str)
+            except ValueError:
+                pass
+    
+    # Check for jump target (hex address like 0x39)
+    if len(parts) == 1:
+        target_str = parts[0].strip()
+        if target_str.startswith('0x') or target_str.startswith('0X'):
+            try:
+                result['jump_target'] = int(target_str, 16)
+            except ValueError:
+                pass
     
     return result
 

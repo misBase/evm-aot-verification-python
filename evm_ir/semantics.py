@@ -127,6 +127,10 @@ class EVMIRSemantics:
                 # TAG is a no-op for semantics (just marks block entry)
                 continue
             
+            elif kind == "BLOCKEND":
+                # BLOCKEND is a no-op for semantics (just marks block end)
+                continue
+            
             elif kind == "ADD":
                 if len(stack) < 2:
                     raise ValueError(f"Stack underflow in ADD operation at pc={op.pc}")
