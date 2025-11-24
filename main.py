@@ -102,7 +102,8 @@ def verify_programs(ir_json_path: str, x86_hex: str, base_addr: int, timeout_ms:
     
     # Verify using ProgramEquivalenceChecker
     checker = ProgramEquivalenceChecker(timeout_ms=timeout_ms, verbose=verbose)
-    return checker.verify_program_pair(evm_program, x86_program)
+    initial_state = ProgramEquivalenceChecker.create_default_initial_state()
+    return checker.verify_program_pair(evm_program, x86_program, initial_state)
 
 
 def main():

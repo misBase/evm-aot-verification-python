@@ -148,7 +148,8 @@ def test_verify_add_program_pair():
     
     # Verify program pair using ProgramEquivalenceChecker
     checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=False)
-    verified, msg = checker.verify_program_pair(evm_program, x86_program)
+    initial_state = ProgramEquivalenceChecker.create_default_initial_state()
+    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
     
     assert verified, (
         f"Program pair verification failed. "
@@ -181,7 +182,8 @@ def test_verify_add_program_pair_full():
     
     # Verify program pair using ProgramEquivalenceChecker
     checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=True)
-    verified, msg = checker.verify_program_pair(evm_program, x86_program)
+    initial_state = ProgramEquivalenceChecker.create_default_initial_state()
+    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
     
     assert verified, (
         f"Full program pair verification failed. "

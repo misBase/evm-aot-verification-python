@@ -168,7 +168,6 @@ def add_semantics(self, a: BitVec, b: BitVec) -> BitVec:
 - **`program.py`**: **Program-level** semantic modeling (NEW)
   - `EVMProgram`: Wraps CompilerEVMResult for whole-program verification
   - `build_program_semantics()`: Builds semantics for entire IR sequence
-  - `build_program_semantics_for_operation()`: Focuses on specific operations
 
 #### 3. `x86_64/` - x86-64 Instruction Modeling
 - **`models.py`**: Data models for x86 blocks, instructions, and registers
@@ -193,8 +192,8 @@ def add_semantics(self, a: BitVec, b: BitVec) -> BitVec:
 - **`refinement_checker.py`**: Uses Z3 to check refinement relation (x86 refines EVM)
 - **`program_verifier.py`**: **Program-level** verification (MAIN INTERFACE)
   - `ProgramEquivalenceChecker`: Verifies entire programs
+  - `create_default_initial_state()`: Creates default initial SMT state with symbolic inputs
   - `verify_program_pair()`: Main verification entry point
-  - `verify_operation_across_programs()`: Verifies specific operations
 
 #### 5. `tests/test_verifier.py` - Verification Test Cases
 - Contains test cases for ADD operation verification
@@ -366,7 +365,8 @@ x86_program = X86Program.from_hex(hex_code, base_addr=0x0)
 
 # Verify program equivalence
 checker = ProgramEquivalenceChecker()
-verified, msg = checker.verify_program_pair(evm_program, x86_program)
+initial_state = ProgramEquivalenceChecker.create_default_initial_state()
+verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
 ```
 
 ## Testing

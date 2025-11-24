@@ -4,9 +4,12 @@ x86-64 data models.
 This module defines data structures for representing x86-64 blocks and instructions.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from dataclasses import dataclass, field
 from enum import Enum
+
+if TYPE_CHECKING:
+    from ir.smt_state import SMTState
 
 
 class Register(Enum):
@@ -41,6 +44,22 @@ class X86Instruction:
         """Set size if not provided."""
         if self.size == 0:
             self.size = len(self.bytes)
+    
+    def to_z3(self, state: 'SMTState') -> 'SMTState':
+        """Convert this instruction to Z3 formula, updating state.
+        
+        This is the Alive2-style direct formula construction method.
+        Delegates to the semantics module for actual implementation.
+        
+        Args:
+            state: Current SMT state (will be modified)
+            
+        Returns:
+            Updated SMT state
+        """
+        # Import here to avoid circular dependency
+        from x86_64.semantics import x86_instruction_to_z3
+        return x86_instruction_to_z3(self, state)
 
 
 @dataclass

@@ -5,11 +5,13 @@ This module provides program-level semantics for x86-64 machine code,
 operating on entire programs (sequences of blocks) rather than individual blocks.
 """
 
-from typing import List, Dict, Any, Optional
-from z3 import BitVec, BitVecVal, Concat
+from typing import List, Dict, Any, Optional, Tuple
+from z3 import BitVec, BitVecVal, Concat, If, BoolVal, And, Not
 from .models import X86Block, X86Instruction, Register
 from .semantics import X86SemanticsModel
 from .disassembler import disassemble_hex
+from .cfg import build_x86_cfg, identify_basic_blocks
+from ir.smt_state import SMTState
 
 
 class X86Program:
@@ -191,6 +193,186 @@ class X86Program:
             result['semantic_formula'] = Concat(*reg_values)
         
         return result
+    
+    def to_z3(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
+        """Build Z3 formula for the entire program using path-aware execution.
+        
+        This method identifies all execution paths, executes each path symbolically,
+        and merges results using Z3 If expressions.
+        
+        Args:
+            state: Initial SMT state with inputs already prepared
+        
+        Returns:
+            Tuple of (final_state, result_dict) where:
+            - final_state: Final SMT state after program execution
+            - result_dict: Dictionary with merged return values (offset, length, memory, base_addr, has_return)
+        """
+        # Get instructions to execute
+        instructions_to_execute = self.instructions if self.instructions else []
+        if not instructions_to_execute:
+            # Extract from blocks
+            for block in self.blocks:
+                instructions_to_execute.extend(block.instructions)
+        
+        if not instructions_to_execute:
+            # No instructions: return default result
+            from z3 import BitVecVal, Ne
+            r15_value = state.x86_registers.get_register(Register.R15)
+            result = {
+                'offset': BitVecVal(0, 64),
+                'length': BitVecVal(0, 64),
+                'memory': state.x86_memory.Memory,
+                'base_addr': r15_value,
+                'has_return': BoolVal(False)
+            }
+            return state, result
+        
+        # Build CFG from instructions
+        cfg = build_x86_cfg(instructions_to_execute)
+        
+        # Find all paths from entry to return blocks
+        entry = cfg.get_entry_block()
+        terminals = cfg.get_return_blocks()
+        paths = cfg.find_all_paths(entry, terminals)
+        
+        if not paths:
+            # Fallback: if no paths found, use simple sequential execution
+            return self._to_z3_sequential(state, instructions_to_execute)
+        
+        # Execute each path and collect results
+        path_results = []
+        for path_blocks, path_condition in paths:
+            # Execute path
+            path_state = state.copy()
+            
+            # Execute all instructions in the path (in order)
+            for block in path_blocks:
+                for insn in block.instructions:
+                    path_state = insn.to_z3(path_state)
+            
+            # Extract result for this path
+            from z3 import Ne, BitVecVal
+            r15_value = path_state.x86_registers.get_register(Register.R15)
+            has_return = Ne(path_state.return_length, BitVecVal(0, 64))
+            
+            path_result = {
+                'offset': path_state.return_offset,
+                'length': path_state.return_length,
+                'memory': path_state.x86_memory.Memory,
+                'base_addr': r15_value,
+                'has_return': has_return
+            }
+            
+            path_results.append((path_condition, path_result))
+        
+        # Merge all path results using If expressions
+        merged_result = self._merge_path_results(path_results)
+        
+        # Create final state (use state from last path as base, but results are merged)
+        final_state = state.copy()
+        final_state.return_offset = merged_result['offset']
+        final_state.return_length = merged_result['length']
+        final_state.x86_memory.Memory = merged_result['memory']
+        # Update R15 if needed (though it's usually constant)
+        
+        return final_state, merged_result
+    
+    def _to_z3_sequential(self, state: SMTState, instructions: List[X86Instruction]) -> Tuple[SMTState, Dict[str, Any]]:
+        """Fallback: sequential execution without path analysis.
+        
+        Args:
+            state: Initial SMT state
+            instructions: Instructions to execute
+            
+        Returns:
+            Tuple of (final_state, result_dict)
+        """
+        # Process each instruction
+        for insn in instructions:
+            state = insn.to_z3(state)
+        
+        # Extract result
+        from z3 import Ne, BitVecVal
+        r15_value = state.x86_registers.get_register(Register.R15)
+        has_return = Ne(state.return_length, BitVecVal(0, 64))
+        
+        result = {
+            'offset': state.return_offset,
+            'length': state.return_length,
+            'memory': state.x86_memory.Memory,
+            'base_addr': r15_value,
+            'has_return': has_return
+        }
+        
+        return state, result
+    
+    def _merge_path_results(self, path_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
+        """Merge path results using nested If expressions.
+        
+        Args:
+            path_results: List of (condition, result_dict) tuples
+            
+        Returns:
+            Merged result dictionary
+        """
+        if not path_results:
+            # Default result if no paths
+            from z3 import BitVecVal
+            from .models import Register
+            r15_default = BitVecVal(0, 64)  # Default R15 value
+            return {
+                'offset': BitVecVal(0, 64),
+                'length': BitVecVal(0, 64),
+                'memory': None,  # Will be set by caller
+                'base_addr': r15_default,
+                'has_return': BoolVal(False)
+            }
+        
+        if len(path_results) == 1:
+            # Single path: return its result
+            _, result = path_results[0]
+            return result
+        
+        # Build nested If expressions for each field
+        def build_nested_if(field_name: str, default_value):
+            """Build nested If expression for a field."""
+            expr = default_value
+            # Build from last to first (right-associative)
+            for i in range(len(path_results) - 1, -1, -1):
+                condition, result = path_results[i]
+                field_value = result.get(field_name, default_value)
+                expr = If(condition, field_value, expr)
+            return expr
+        
+        from z3 import BitVecVal, Array
+        from ir.smt_state import X86MemoryState
+        from .models import Register
+        
+        # Get memory array type from first path result
+        first_memory = path_results[0][1]['memory']
+        if first_memory is None:
+            # Create default memory array
+            mem_state = X86MemoryState()
+            first_memory = mem_state.Memory
+        
+        # Get default base_addr
+        first_base_addr = path_results[0][1].get('base_addr', BitVecVal(0, 64))
+        
+        # Merge each field
+        merged_offset = build_nested_if('offset', BitVecVal(0, 64))
+        merged_length = build_nested_if('length', BitVecVal(0, 64))
+        merged_memory = build_nested_if('memory', first_memory)
+        merged_base_addr = build_nested_if('base_addr', first_base_addr)
+        merged_has_return = build_nested_if('has_return', BoolVal(False))
+        
+        return {
+            'offset': merged_offset,
+            'length': merged_length,
+            'memory': merged_memory,
+            'base_addr': merged_base_addr,
+            'has_return': merged_has_return
+        }
     
     def __repr__(self):
         return f"X86Program(blocks={len(self.blocks)}, instructions={len(self.instructions)}, base_addr=0x{self.base_addr:x})"

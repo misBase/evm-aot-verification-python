@@ -4,8 +4,11 @@ EVM IR data models.
 This module defines the data structures for representing EVM IR blocks and operations.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from dataclasses import dataclass, field
+
+if TYPE_CHECKING:
+    from ir.smt_state import SMTState
 
 
 @dataclass
@@ -63,6 +66,22 @@ class EvmOperator:
         if self.is_static:
             result['is_static'] = self.is_static
         return result
+    
+    def to_z3(self, state: 'SMTState') -> 'SMTState':
+        """Convert this operator to Z3 formula, updating state.
+        
+        This is the Alive2-style direct formula construction method.
+        Delegates to the semantics module for actual implementation.
+        
+        Args:
+            state: Current SMT state (will be modified)
+            
+        Returns:
+            Updated SMT state
+        """
+        # Import here to avoid circular dependency
+        from evm_ir.semantics import evm_operator_to_z3
+        return evm_operator_to_z3(self, state)
 
 
 @dataclass

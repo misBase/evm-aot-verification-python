@@ -4,13 +4,20 @@ x86-64 instruction semantic modeling.
 This module provides semantic modeling for x86-64 instructions using Z3.
 """
 
-from z3 import BitVec, BitVecVal, Concat, Extract
+from z3 import BitVec, BitVecVal, Concat, Extract, If
 from typing import List, Dict, Optional, Any, Tuple
 from .models import X86Block, X86Instruction, Register
 from .execution_state import ExecutionState
 from .inst_executor import InstructionExecutor
-from .disassembler import disassemble_hex
+from .disassembler import disassemble_hex, parse_operands
 from common.uint256 import Uint256
+from ir.smt_state import SMTState
+
+# Constants for RETURN instruction
+EVM_NATIVE_CALL_STATUS_CODE_RETURNED = 0  # evmNativeCallStatusCodeReturned = iota
+EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = 200  # 168 + 8 + 8 + 8 + 32
+AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE = Register.R13  # Pointer to callEngine instance
+AMD64_RESERVED_REGISTER_FOR_MEMORY = Register.R15  # Pointer to EVM memory (memoryElement0Address)
 
 
 class X86InstructionSemantics:
@@ -299,4 +306,361 @@ class X86SemanticsModel:
             'semantic_formula': BitVecVal(0, 256),
             'output_count': 0
         }
+
+
+def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
+    """Convert x86-64 instruction to Z3 formula, updating state.
+    
+    This is the Alive2-style direct formula construction method.
+    Each instruction directly builds Z3 expressions without execution simulation.
+    
+    Args:
+        insn: x86-64 instruction to convert
+        state: Current SMT state (will be modified)
+        
+    Returns:
+        Updated SMT state
+    """
+    mnemonic = insn.mnemonic.lower()
+    operands = parse_operands(insn.op_str)
+    
+    if mnemonic == 'mov':
+        # MOV: move value from source to destination
+        if operands['is_memory'] and operands['dest_reg']:
+            # MOV reg, [base+offset]
+            base_reg = operands['base_reg']
+            offset = operands['offset']
+            dest_reg = operands['dest_reg']
+            
+            if base_reg in [Register.R14, Register.R13]:
+                # Load from x86 memory (R14 = stack base, R13 = callEngine pointer)
+                # offset can be int (concrete) or BitVec (symbolic)
+                # If there's an index register, compute: base_offset + index_reg
+                memory_offset = offset
+                if 'index_reg' in operands and operands['index_reg']:
+                    # Support [base+index] addressing mode
+                    index_reg = operands['index_reg']
+                    index_val = state.x86_registers.get_register(index_reg)
+                    # Convert concrete offset to BitVec if needed
+                    if isinstance(offset, int):
+                        offset_bv = BitVecVal(offset, 64)
+                    else:
+                        offset_bv = offset
+                    memory_offset = offset_bv + index_val
+                
+                mem_val = state.x86_memory.load_limb(memory_offset)
+                state.x86_registers.set_register(dest_reg, mem_val)
+            else:
+                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
+        
+        elif operands['is_memory'] and operands['src_reg']:
+            # MOV [base+offset], reg
+            base_reg = operands['base_reg']
+            offset = operands['offset']
+            src_reg = operands['src_reg']
+            
+            if base_reg in [Register.R14, Register.R13]:
+                # Store to x86 memory (R14 = stack base, R13 = callEngine pointer)
+                # offset can be int (concrete) or BitVec (symbolic)
+                # If there's an index register, compute: base_offset + index_reg
+                memory_offset = offset
+                if 'index_reg' in operands and operands['index_reg']:
+                    # Support [base+index] addressing mode
+                    index_reg = operands['index_reg']
+                    index_val = state.x86_registers.get_register(index_reg)
+                    # Convert concrete offset to BitVec if needed
+                    if isinstance(offset, int):
+                        offset_bv = BitVecVal(offset, 64)
+                    else:
+                        offset_bv = offset
+                    memory_offset = offset_bv + index_val
+                
+                reg_val = state.x86_registers.get_register(src_reg)
+                new_memory_state = state.x86_memory.store_limb(memory_offset, reg_val)
+                state.x86_memory = new_memory_state
+            else:
+                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
+        
+        elif operands['dest_reg'] and operands['src_reg']:
+            # MOV reg1, reg2
+            dest_reg = operands['dest_reg']
+            src_reg = operands['src_reg']
+            src_val = state.x86_registers.get_register(src_reg)
+            state.x86_registers.set_register(dest_reg, src_val)
+        
+        elif operands['dest_reg'] and operands['immediate'] is not None:
+            # MOV reg, immediate
+            dest_reg = operands['dest_reg']
+            immediate = operands['immediate']
+            imm_val = BitVecVal(immediate, 64)
+            state.x86_registers.set_register(dest_reg, imm_val)
+        
+        elif operands['is_memory'] and operands['immediate'] is not None:
+            # MOV [base+offset], immediate (byte operation)
+            base_reg = operands['base_reg']
+            offset = operands['offset']
+            immediate = operands['immediate']
+            
+            if base_reg in [Register.R14, Register.R13]:
+                # Store immediate to memory (R14 = stack base, R13 = callEngine pointer)
+                imm_val = BitVecVal(immediate & 0xFF, 64)  # Byte operation
+                new_memory_state = state.x86_memory.store_limb(offset, imm_val)
+                state.x86_memory = new_memory_state
+            else:
+                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
+        
+        return state
+    
+    elif mnemonic == 'add':
+        # ADD: add source to destination, set carry flag
+        if not operands['dest_reg']:
+            raise ValueError(f"ADD instruction must have register destination: {operands}")
+        
+        dest_reg = operands['dest_reg']
+        reg_val = state.x86_registers.get_register(dest_reg)
+        
+        if operands['is_memory']:
+            # ADD reg, [base+offset]
+            base_reg = operands['base_reg']
+            offset = operands['offset']
+            
+            if base_reg in [Register.R14, Register.R13]:
+                # ADD with memory (R14 = stack base, R13 = callEngine pointer)
+                # offset can be int (concrete) or BitVec (symbolic)
+                # If there's an index register, compute: base_offset + index_reg
+                memory_offset = offset
+                if 'index_reg' in operands and operands['index_reg']:
+                    index_reg = operands['index_reg']
+                    index_val = state.x86_registers.get_register(index_reg)
+                    if isinstance(offset, int):
+                        offset_bv = BitVecVal(offset, 64)
+                    else:
+                        offset_bv = offset
+                    memory_offset = offset_bv + index_val
+                
+                mem_val = state.x86_memory.load_limb(memory_offset)
+                
+                # Perform addition (64-bit with carry generation)
+                reg_ext = Concat(BitVecVal(0, 1), reg_val)
+                mem_ext = Concat(BitVecVal(0, 1), mem_val)
+                sum_ext = reg_ext + mem_ext
+                
+                # Extract result and carry
+                result = Extract(63, 0, sum_ext)
+                carry_out = Extract(64, 64, sum_ext)
+                
+                # Update register and carry flag
+                state.x86_registers.set_register(dest_reg, result)
+                state.x86_registers.set_flag('CF', carry_out)
+            else:
+                raise ValueError(f"Unsupported base register for ADD: {base_reg}")
+        
+        elif operands['src_reg']:
+            # ADD reg, reg
+            src_reg = operands['src_reg']
+            src_val = state.x86_registers.get_register(src_reg)
+            
+            # Perform addition
+            reg_ext = Concat(BitVecVal(0, 1), reg_val)
+            src_ext = Concat(BitVecVal(0, 1), src_val)
+            sum_ext = reg_ext + src_ext
+            
+            result = Extract(63, 0, sum_ext)
+            carry_out = Extract(64, 64, sum_ext)
+            
+            state.x86_registers.set_register(dest_reg, result)
+            state.x86_registers.set_flag('CF', carry_out)
+        
+        return state
+    
+    elif mnemonic == 'adc':
+        # ADC: add with carry
+        if not operands['dest_reg'] or not operands['is_memory']:
+            raise ValueError(f"ADC instruction must have register destination and memory source: {operands}")
+        
+        dest_reg = operands['dest_reg']
+        base_reg = operands['base_reg']
+        offset = operands['offset']
+        
+        if base_reg not in [Register.R14, Register.R13]:
+            raise ValueError(f"Unsupported base register for ADC: {base_reg}")
+        
+        reg_val = state.x86_registers.get_register(dest_reg)
+        # offset can be int (concrete) or BitVec (symbolic)
+        # If there's an index register, compute: base_offset + index_reg
+        memory_offset = offset
+        if 'index_reg' in operands and operands['index_reg']:
+            index_reg = operands['index_reg']
+            index_val = state.x86_registers.get_register(index_reg)
+            if isinstance(offset, int):
+                offset_bv = BitVecVal(offset, 64)
+            else:
+                offset_bv = offset
+            memory_offset = offset_bv + index_val
+        
+        mem_val = state.x86_memory.load_limb(memory_offset)
+        carry_in = state.x86_registers.get_flag('CF')
+        
+        # Perform addition with carry
+        reg_ext = Concat(BitVecVal(0, 1), reg_val)
+        mem_ext = Concat(BitVecVal(0, 1), mem_val)
+        carry_ext = Concat(BitVecVal(0, 64), carry_in)
+        sum_ext = reg_ext + mem_ext + carry_ext
+        
+        result = Extract(63, 0, sum_ext)
+        carry_out = Extract(64, 64, sum_ext)
+        
+        state.x86_registers.set_register(dest_reg, result)
+        state.x86_registers.set_flag('CF', carry_out)
+        
+        return state
+    
+    elif mnemonic == 'sub':
+        # SUB: subtract source from destination
+        if not operands['dest_reg']:
+            raise ValueError(f"SUB instruction must have register destination: {operands}")
+        
+        dest_reg = operands['dest_reg']
+        reg_val = state.x86_registers.get_register(dest_reg)
+        
+        if operands['immediate'] is not None:
+            # SUB reg, immediate
+            imm_val = BitVecVal(operands['immediate'], 64)
+            result = reg_val - imm_val
+            state.x86_registers.set_register(dest_reg, result)
+        
+        return state
+    
+    elif mnemonic == 'cmp':
+        # CMP: compare and set flags (doesn't modify operands)
+        if not operands['dest_reg']:
+            raise ValueError(f"CMP instruction must have register operand: {operands}")
+        
+        dest_reg = operands['dest_reg']
+        reg_val = state.x86_registers.get_register(dest_reg)
+        
+        if operands['immediate'] is not None:
+            # CMP reg, immediate
+            imm_val = BitVecVal(operands['immediate'], 64)
+            result = reg_val - imm_val
+            
+            # Set flags
+            reg_ext = Concat(BitVecVal(0, 1), reg_val)
+            imm_ext = Concat(BitVecVal(0, 1), imm_val)
+            diff_ext = reg_ext - imm_ext
+            cf = Extract(64, 64, diff_ext)
+            state.x86_registers.set_flag('CF', cf)
+            
+            # ZF (zero flag)
+            zf_bool = (reg_val == imm_val)
+            zf = If(zf_bool, BitVecVal(1, 1), BitVecVal(0, 1))
+            state.x86_registers.set_flag('ZF', zf)
+        
+        return state
+    
+    elif mnemonic == 'ret':
+        # RET instruction: check exit status code and extract return data if needed
+        # Read status code from x86 memory: [R13 + evmCallEngineExitContextNativeCallStatusCodeOffset]
+        
+        # Get R13 register value (callEngine pointer)
+        r13_value = state.x86_registers.get_register(AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE)
+        
+        # Calculate status code memory address
+        status_code_offset = BitVecVal(EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET, 64)
+        status_code_addr = r13_value + status_code_offset
+        
+        # Read status code from x86 memory (8-bit byte)
+        status_code = state.x86_memory.load_byte(status_code_addr)
+        
+        # Check if status code is RETURNED (0)
+        # IMPORTANT: Only when status_code == RETURNED should we set return values
+        # Other status codes (REVERTED, STOPPED, INVALID, etc.) have different behaviors
+        status_code_is_returned = (status_code == BitVecVal(EVM_NATIVE_CALL_STATUS_CODE_RETURNED, 8))
+        
+        # Only extract return data if status code is RETURNED
+        # For other status codes, we don't set return_offset/return_length
+        # This matches Go code: only case evmNativeCallStatusCodeReturned sets return values
+        
+        # IMPORTANT: x86-64 does NOT operate on evm_stack or evm_memory directly
+        # x86-64 uses x86 memory (via R14 for stack, R15 for EVM memory)
+        # Get offset and length from x86 memory (EVM stack is stored in x86 memory via R14)
+        # Go code: offset, size := c.PopUint64(), c.PopUint64()
+        # This means: first pop size (stack[0]), then pop offset (stack[1])
+        # Stack layout in x86 memory: stack[0] at R14-0x40, stack[1] at R14-0x20
+        
+        # Get R14 register value (stack base pointer)
+        r14_value = state.x86_registers.get_register(Register.R14)
+        
+        # Extract stack values from x86 memory using absolute addresses
+        # stack[0] (top) = size (length) at R14-0x40, stack[1] = offset at R14-0x20
+        # We need to load 256-bit values (4×64-bit limbs) from x86 memory
+        
+        # Stack[0] (size/length): load from R14-0x40 (4×64-bit limbs)
+        stack0_base = r14_value + BitVecVal(-0x40, 64)
+        size_z0 = state.x86_memory.load_64bit(stack0_base)
+        size_z1 = state.x86_memory.load_64bit(stack0_base + BitVecVal(8, 64))
+        size_z2 = state.x86_memory.load_64bit(stack0_base + BitVecVal(16, 64))
+        size_z3 = state.x86_memory.load_64bit(stack0_base + BitVecVal(24, 64))
+        size_stack_value = Concat(size_z3, size_z2, size_z1, size_z0)  # 256-bit value
+        
+        # Stack[1] (offset): load from R14-0x20 (4×64-bit limbs)
+        stack1_base = r14_value + BitVecVal(-0x20, 64)
+        offset_z0 = state.x86_memory.load_64bit(stack1_base)
+        offset_z1 = state.x86_memory.load_64bit(stack1_base + BitVecVal(8, 64))
+        offset_z2 = state.x86_memory.load_64bit(stack1_base + BitVecVal(16, 64))
+        offset_z3 = state.x86_memory.load_64bit(stack1_base + BitVecVal(24, 64))
+        offset_stack_value = Concat(offset_z3, offset_z2, offset_z1, offset_z0)  # 256-bit value
+        
+        # Truncate 256-bit stack values to 64-bit for offset and length
+        # Go code uses PopUint64(), so we need 64-bit values
+        from z3 import Extract as Z3Extract
+        if size_stack_value.size() == 256:
+            length_bv = Z3Extract(63, 0, size_stack_value)  # Extract lower 64 bits
+        elif size_stack_value.size() == 64:
+            length_bv = size_stack_value
+        else:
+            raise ValueError(f"Unexpected size value size: {size_stack_value.size()}")
+        
+        if offset_stack_value.size() == 256:
+            offset_bv = Z3Extract(63, 0, offset_stack_value)  # Extract lower 64 bits
+        elif offset_stack_value.size() == 64:
+            offset_bv = offset_stack_value
+        else:
+            raise ValueError(f"Unexpected offset value size: {offset_stack_value.size()}")
+        
+        # IMPORTANT: Use conditional symbolic values for return_offset and return_length
+        # Only set return values if status_code == RETURNED
+        # Different status codes have different behaviors (from Go code):
+        # - RETURNED (0): Returns data (offset, size) - this is what we verify
+        # - REVERTED: Returns error data (different semantic, not a successful return)
+        # - STOPPED: Returns nil, nil (no return data)
+        # - INVALID: Returns error (no return data)
+        # 
+        # Use If expression to conditionally set return values:
+        # - If status_code == RETURNED: use extracted offset and length
+        # - Otherwise: use 0 (no return value)
+        
+        # R15 register points to EVM memory base address (memoryElement0Address)
+        r15_value = state.x86_registers.get_register(AMD64_RESERVED_REGISTER_FOR_MEMORY)
+        
+        # Conditionally set return values using If expression
+        # This allows handling multiple paths symbolically
+        zero_64 = BitVecVal(0, 64)
+        
+        # Only set return values if status_code == RETURNED
+        # Otherwise, keep them as 0 (no return value)
+        state.return_offset = If(status_code_is_returned, offset_bv, zero_64)
+        state.return_length = If(status_code_is_returned, length_bv, zero_64)
+        
+        return state
+    
+    elif mnemonic in ['jb', 'jae', 'jmp']:
+        # Control flow instructions - return state as-is
+        # These will be handled at the control flow level
+        return state
+    
+    else:
+        # Unknown instruction - return state unchanged
+        # TODO: Implement more instructions
+        return state
 

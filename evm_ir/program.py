@@ -5,11 +5,13 @@ This module provides program-level semantics for EVM IR, operating on
 entire programs (sequences of blocks) rather than individual blocks.
 """
 
-from typing import List, Dict, Any, Optional
-from z3 import BitVec, BitVecVal, Solver
+from typing import List, Dict, Any, Optional, Tuple
+from z3 import BitVec, BitVecVal, Solver, If, BoolVal, And
 from .models import EVMBlock
-from .semantics import EVMIRSemantics
+from .semantics import EVMIRSemantics, execute_block_with_tag
 from .json_parser import CompilerEVMResult
+from .cfg import build_ir_cfg
+from ir.smt_state import SMTState
 
 
 class EVMProgram:
@@ -55,33 +57,80 @@ class EVMProgram:
         """
         return self.blocks_by_pc.get(pc)
     
-    def build_program_semantics(self, initial_stack: List[BitVec]) -> Dict[str, Any]:
-        """Build semantic formula for the entire program.
+    def to_z3(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
+        """Build Z3 formula for the entire program using two-level path-aware execution.
         
-        This executes all blocks in sequence starting from the entrypoint,
-        following control flow through jumps and branches.
-        
-        For now, we support straight-line execution (no branches).
-        Future versions will support control flow analysis.
+        Level 1: Execute each block with TAG path merging (3 paths per block)
+        Level 2: Execute CFG paths and merge at CFG level
         
         Args:
-            initial_stack: Initial stack state (list of 256-bit BitVecs)
+            state: Initial SMT state with inputs already prepared
+        
+        Returns:
+            Tuple of (final_state, result_dict) where:
+            - final_state: Final SMT state after program execution
+            - result_dict: Dictionary with merged return values (offset, length, memory, has_return)
+        """
+        # Build CFG
+        cfg = build_ir_cfg(self.blocks)
+        
+        # Find all paths from entry to terminals
+        entry = cfg.get_entry_block()
+        terminals = cfg.get_terminal_blocks()
+        paths = cfg.find_all_paths(entry, terminals)
+        
+        if not paths:
+            # Fallback: if no paths found, use simple sequential execution
+            return self._to_z3_sequential(state)
+        
+        # Execute each path and collect results
+        path_results = []
+        for path_blocks, path_condition in paths:
+            # Execute path: Level 1 (block-level) + Level 2 (CFG-level)
+            path_state = state.copy()
+            
+            # Execute each block in the path (Level 1: TAG merging happens in each block)
+            for block in path_blocks:
+                path_state, _ = execute_block_with_tag(block, path_state)
+            
+            # Extract result for this path
+            from z3 import Ne, BitVecVal
+            has_return = Ne(path_state.return_length, BitVecVal(0, 64))
+            
+            path_result = {
+                'offset': path_state.return_offset,
+                'length': path_state.return_length,
+                'memory': path_state.evm_memory.Memory,
+                'base_addr': None,
+                'has_return': has_return
+            }
+            
+            path_results.append((path_condition, path_result))
+        
+        # Merge all path results using If expressions (Level 2: CFG-level merging)
+        merged_result = self._merge_path_results(path_results)
+        
+        # Create final state (use state from last path as base, but results are merged)
+        final_state = state.copy()
+        final_state.return_offset = merged_result['offset']
+        final_state.return_length = merged_result['length']
+        final_state.evm_memory.Memory = merged_result['memory']
+        
+        return final_state, merged_result
+    
+    def _to_z3_sequential(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
+        """Fallback: sequential execution without path analysis.
+        
+        Args:
+            state: Initial SMT state
             
         Returns:
-            Dictionary containing:
-            - output_stack: Final stack state after program execution
-            - semantic_formula: Overall semantic formula for the program
-            - executed_blocks: List of blocks that were executed
+            Tuple of (final_state, result_dict)
         """
-        current_stack = list(initial_stack)
-        executed_blocks = []
-        
-        # For now, execute all blocks in sequence (straight-line execution)
-        # TODO: Add control flow analysis for JUMP/JUMPI
+        # Process all blocks in sequence
         for block in self.blocks:
-            result = self.semantics.build_block_semantics(block, current_stack)
-            current_stack = result['output_stack']
-            executed_blocks.append(block)
+            # Execute block with TAG path merging (Level 1)
+            state, _ = execute_block_with_tag(block, state)
             
             # Check if block ends with a terminating instruction
             if block.operations:
@@ -89,80 +138,80 @@ class EVMProgram:
                 if last_op.kind.upper() in ['STOP', 'RETURN', 'REVERT', 'SELFDESTRUCT']:
                     break
         
-        # The final semantic formula is the top of the stack
-        if current_stack:
-            semantic_formula = current_stack[-1]
-        else:
-            semantic_formula = BitVecVal(0, 256)
+        # Extract result
+        from z3 import Ne, BitVecVal
+        has_return = Ne(state.return_length, BitVecVal(0, 64))
         
-        return {
-            'output_stack': current_stack,
-            'semantic_formula': semantic_formula,
-            'executed_blocks': executed_blocks,
-            'output_count': len(current_stack)
+        result = {
+            'offset': state.return_offset,
+            'length': state.return_length,
+            'memory': state.evm_memory.Memory,
+            'base_addr': None,
+            'has_return': has_return
         }
-    
-    def build_program_semantics_for_operation(self, 
-                                              operation_kind: str,
-                                              input_stack: Optional[List[BitVec]] = None) -> Dict[str, Any]:
-        """Build program semantics focusing on a specific operation type.
         
-        This is useful for verifying specific operations like ADD across
-        the entire program.
+        return state, result
+    
+    def _merge_path_results(self, path_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
+        """Merge path results using nested If expressions.
         
         Args:
-            operation_kind: The operation kind to focus on (e.g., "ADD")
-            input_stack: Optional input stack. If None, creates symbolic inputs
-                        or empty stack depending on whether the block has PUSH ops.
+            path_results: List of (condition, result_dict) tuples
             
         Returns:
-            Dictionary containing semantic formula and metadata
+            Merged result dictionary
         """
-        from common.uint256 import Uint256
+        if not path_results:
+            # Default result if no paths
+            from z3 import BitVecVal
+            return {
+                'offset': BitVecVal(0, 64),
+                'length': BitVecVal(0, 64),
+                'memory': None,  # Will be set by caller
+                'base_addr': None,
+                'has_return': BoolVal(False)
+            }
         
-        # Find blocks containing the target operation
-        target_blocks = []
-        for block in self.blocks:
-            for op in block.operations:
-                if op.kind.upper() == operation_kind.upper():
-                    target_blocks.append(block)
-                    break
+        if len(path_results) == 1:
+            # Single path: return its result
+            _, result = path_results[0]
+            return result
         
-        if not target_blocks:
-            raise ValueError(f"No blocks found with {operation_kind} operation")
+        # Build nested If expressions for each field
+        # Structure: If(path1_cond, path1_result, If(path2_cond, path2_result, ...))
+        def build_nested_if(field_name: str, default_value):
+            """Build nested If expression for a field."""
+            expr = default_value
+            # Build from last to first (right-associative)
+            for i in range(len(path_results) - 1, -1, -1):
+                condition, result = path_results[i]
+                field_value = result.get(field_name, default_value)
+                expr = If(condition, field_value, expr)
+            return expr
         
-        # For single-operation programs (like ADD), we can directly
-        # build semantics for the relevant block
-        if len(target_blocks) == 1:
-            block = target_blocks[0]
-            
-            # Check if block has PUSH operations before the target operation
-            has_push_before_target = False
-            for op in block.operations:
-                if op.kind.upper() == operation_kind.upper():
-                    break
-                if op.kind.upper().startswith("PUSH"):
-                    has_push_before_target = True
-                    break
-            
-            if input_stack is None:
-                # If block has PUSH operations, start with empty stack
-                # Otherwise, create symbolic inputs
-                if has_push_before_target:
-                    input_stack = []
-                else:
-                    # Create symbolic inputs based on operation requirements
-                    if operation_kind.upper() == "ADD":
-                        val1 = Uint256.symbolic(f"program_val1")
-                        val2 = Uint256.symbolic(f"program_val2")
-                        input_stack = [val1.to_bv256(), val2.to_bv256()]
-                    else:
-                        raise NotImplementedError(f"Default inputs for {operation_kind} not implemented")
-            
-            return self.semantics.build_block_semantics(block, input_stack)
+        from z3 import BitVecVal, Array
+        from ir.smt_state import EVMMemoryState
         
-        # For multi-block operations, execute in sequence
-        return self.build_program_semantics(input_stack)
+        # Get memory array type from first path result
+        first_memory = path_results[0][1]['memory']
+        if first_memory is None:
+            # Create default memory array
+            mem_state = EVMMemoryState()
+            first_memory = mem_state.Memory
+        
+        # Merge each field
+        merged_offset = build_nested_if('offset', BitVecVal(0, 64))
+        merged_length = build_nested_if('length', BitVecVal(0, 64))
+        merged_memory = build_nested_if('memory', first_memory)
+        merged_has_return = build_nested_if('has_return', BoolVal(False))
+        
+        return {
+            'offset': merged_offset,
+            'length': merged_length,
+            'memory': merged_memory,
+            'base_addr': None,
+            'has_return': merged_has_return
+        }
     
     def __repr__(self):
         return f"EVMProgram(blocks={len(self.blocks)})"
