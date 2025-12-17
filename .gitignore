@@ -26,6 +26,9 @@ ENV/
 env/
 .venv
 
+# Poetry
+# Note: poetry.lock should be committed for applications
+
 # IDEs
 .vscode/
 .idea/

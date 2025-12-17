@@ -22,28 +22,57 @@ This system performs **program-level logical semantics modeling** (Alive2-style)
 
 ### Prerequisites
 - Python 3.8 or higher
-- pip
+- Poetry
 
-### Setup
+### Install Poetry
+
+If you don't have Poetry installed, you can install it using one of the following methods:
+
+**Official installer (recommended):**
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+**Using pip (alternative):**
+```bash
+pip install poetry
+```
+
+**Using Homebrew (macOS):**
+```bash
+brew install poetry
+```
+
+After installation, add Poetry to your PATH. For the official installer, add the following to your shell configuration file (`~/.zshrc` for zsh or `~/.bashrc` for bash):
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+For more installation options, see the [official Poetry documentation](https://python-poetry.org/docs/#installation).
+
+### Setup Project
 
 ```bash
 # Clone or navigate to the project directory
 cd evm-aot-verification-python
 
-# Install dependencies (Z3 SMT solver, Capstone disassembler, pytest)
-pip install -r requirements.txt
+# Install dependencies and create virtual environment
+poetry install
+
+# Activate the virtual environment
+poetry shell
+```
+
+或者在运行之前先开启代理：
+```bash
+proxyold
+poetry install
 ```
 
 **Main Dependencies:**
 - `z3-solver>=4.12.0`: SMT solver for formal verification
 - `capstone>=5.0.0`: x86-64 instruction disassembler
-- `pytest>=7.0.0`: Testing framework
-
-或者在运行之前先开启代理：
-```bash
-proxyold
-pip install -r requirements.txt
-```
+- `pytest>=7.0.0`: Testing framework (dev dependency)
 
 ## Usage
 
@@ -51,36 +80,30 @@ pip install -r requirements.txt
 
 Verify EVM IR and x86-64 machine code:
 ```bash
-python3 main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose]
+poetry run python main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose]
 ```
 
 Or run the test suite:
 ```bash
-python3 -m tests.test_verifier
+poetry run pytest
 ```
 
 ### Command-Line Options
 
 ```bash
 # Basic verification
-python3 main.py tests/data/example_ir.json 498b46c0490346e0...
+poetry run python main.py tests/data/example_ir.json 498b46c0490346e0...
 
 # With base address
-python3 main.py contract.ir.json 498b46c0... --base-addr 0x6c
+poetry run python main.py contract.ir.json 498b46c0... --base-addr 0x6c
 
 # With custom timeout and verbose output
-python3 main.py contract.ir.json 498b46c0... --timeout 30000 --verbose
+poetry run python main.py contract.ir.json 498b46c0... --timeout 30000 --verbose
 
 # Run all tests
-./run_tests.sh
+poetry run pytest
 
-# Run individual tests
-python3 tests/test_basic.py
-python3 tests/test_ir_json.py
-python3 tests/test_verifier.py
-python3 tests/test_disassembler.py
-python3 tests/test_add_carry.py
-python3 tests/test_uint256_add.py
+# Or run individual tests (see Testing section below)
 ```
 
 ## Project Structure
@@ -121,8 +144,8 @@ evm-aot-verification-python/
 │       └── example_ir.json   # 示例EVM IR JSON文件
 │
 ├── main.py                    # 主入口程序（使用 ProgramEquivalenceChecker）
-├── run_tests.sh               # 测试运行脚本
-└── requirements.txt           # Python依赖
+├── pyproject.toml             # Poetry 项目配置文件
+└── requirements.txt           # Python依赖（保留用于兼容性）
 ```
 
 ## Architecture
@@ -374,7 +397,7 @@ verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_st
 ### Run All Tests
 
 ```bash
-./run_tests.sh
+poetry run pytest
 ```
 
 This runs:
@@ -388,12 +411,12 @@ This runs:
 ### Run Individual Tests
 
 ```bash
-python3 tests/test_basic.py
-python3 tests/test_ir_json.py
-python3 tests/test_verifier.py
-python3 tests/test_disassembler.py
-python3 tests/test_add_carry.py
-python3 tests/test_uint256_add.py
+poetry run pytest tests/test_basic.py
+poetry run pytest tests/test_ir_json.py
+poetry run pytest tests/test_verifier.py
+poetry run pytest tests/test_disassembler.py
+poetry run pytest tests/test_add_carry.py
+poetry run pytest tests/test_uint256_add.py
 ```
 
 ## Example Output
