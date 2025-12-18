@@ -217,7 +217,7 @@ class X86Program:
         
         if not instructions_to_execute:
             # No instructions: return default result
-            from z3 import BitVecVal, Ne
+            from z3 import BitVecVal
             r15_value = state.x86_registers.get_register(Register.R15)
             result = {
                 'offset': BitVecVal(0, 64),
@@ -252,9 +252,9 @@ class X86Program:
                     path_state = insn.to_z3(path_state)
             
             # Extract result for this path
-            from z3 import Ne, BitVecVal
+            from z3 import BitVecVal
             r15_value = path_state.x86_registers.get_register(Register.R15)
-            has_return = Ne(path_state.return_length, BitVecVal(0, 64))
+            has_return = path_state.return_length != BitVecVal(0, 64)
             
             path_result = {
                 'offset': path_state.return_offset,
@@ -293,9 +293,9 @@ class X86Program:
             state = insn.to_z3(state)
         
         # Extract result
-        from z3 import Ne, BitVecVal
+        from z3 import BitVecVal
         r15_value = state.x86_registers.get_register(Register.R15)
-        has_return = Ne(state.return_length, BitVecVal(0, 64))
+        has_return = state.return_length != BitVecVal(0, 64)
         
         result = {
             'offset': state.return_offset,

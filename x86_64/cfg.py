@@ -24,14 +24,14 @@ class X86CFG:
         
         # Build CFG: block -> list of (successor_block, condition) tuples
         # condition is BoolRef (True for unconditional, symbolic for conditional)
-        self.successors: Dict[X86Block, List[Tuple[X86Block, BoolRef]]] = {}
+        self.successors: Dict[int, List[Tuple[X86Block, BoolRef]]] = {}
         self._build_cfg()
     
     def _build_cfg(self):
         """Build control flow graph from blocks."""
         # Initialize successors for all blocks
         for block in self.blocks:
-            self.successors[block] = []
+            self.successors[block.start_addr] = []
         
         # Find successors based on jump instructions
         for i, block in enumerate(self.blocks):
@@ -47,7 +47,7 @@ class X86CFG:
                 if target is not None:
                     target_block = self._find_block_by_addr(target)
                     if target_block:
-                        self.successors[block].append((target_block, BoolVal(True)))
+                        self.successors[block.start_addr].append((target_block, BoolVal(True)))
             
             elif mnemonic in ['jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
                 # Conditional jump: two successors (taken and fall-through)
@@ -58,14 +58,14 @@ class X86CFG:
                 if target is not None:
                     target_block = self._find_block_by_addr(target)
                     if target_block:
-                        self.successors[block].append((target_block, condition))
+                        self.successors[block.start_addr].append((target_block, condition))
                 
                 # Fall-through path: next block
                 if i + 1 < len(self.blocks):
                     next_block = self.blocks[i + 1]
                     # Negate condition for fall-through
-                    fall_through_condition = Not(condition) if condition != BoolVal(True) else BoolVal(False)
-                    self.successors[block].append((next_block, fall_through_condition))
+                    fall_through_condition = Not(condition)
+                    self.successors[block.start_addr].append((next_block, fall_through_condition))
             
             elif mnemonic == 'ret':
                 # Return: no successors
@@ -75,7 +75,7 @@ class X86CFG:
                 # Normal instruction: fall through to next block
                 if i + 1 < len(self.blocks):
                     next_block = self.blocks[i + 1]
-                    self.successors[block].append((next_block, BoolVal(True)))
+                    self.successors[block.start_addr].append((next_block, BoolVal(True)))
     
     def _extract_jump_target(self, insn: X86Instruction) -> Optional[int]:
         """Extract jump target address from instruction.
@@ -196,7 +196,7 @@ class X86CFG:
                 return
             
             # Explore successors
-            for successor, succ_condition in self.successors.get(current, []):
+            for successor, succ_condition in self.successors.get(current.start_addr, []):
                 # Combine conditions: current condition AND successor condition
                 new_condition = And(condition, succ_condition)
                 dfs(successor, current_path, new_condition)
@@ -215,7 +215,7 @@ class X86CFG:
         Returns:
             List of (successor_block, condition) tuples
         """
-        return self.successors.get(block, [])
+        return self.successors.get(block.start_addr, [])
 
 
 def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:

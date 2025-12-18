@@ -347,8 +347,8 @@ def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, 
     merged_state.evm_stack = path3_state.evm_stack
     
     # Build result dictionary
-    from z3 import Ne
-    has_return = Ne(merged_state.return_length, BitVecVal(0, 64))
+    from z3 import BitVecVal
+    has_return = merged_state.return_length != BitVecVal(0, 64)
     
     result = {
         'offset': merged_state.return_offset,
