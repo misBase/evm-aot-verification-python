@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Test translation verification using program-level logical semantics.
+Test refinement checker for translation verification.
 
 This module contains tests that verify the refinement relation between 
-EVM bytecode and AOT-compiled x86-64 machine code. These tests focus on
-verification logic, including symbolic proofs and concrete value tests.
+EVM bytecode and AOT-compiled x86-64 machine code using the RefinementChecker.
+These tests focus on verification logic, including symbolic proofs and concrete value tests.
 """
 
 from __future__ import annotations
@@ -137,7 +137,7 @@ def test_verify_add_program_pair():
     """
     # Get the test data directory path
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "data", "add_ir.json")
+    ir_path = os.path.join(test_dir, "..", "data", "add_ir.json")
     
     # Load EVM program from JSON
     compiler_result = load_ir_from_json(ir_path)
@@ -171,7 +171,7 @@ def test_verify_add_program_pair_full():
     """
     # Get the test data directory path
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "data", "add_program.json")
+    ir_path = os.path.join(test_dir, "..", "data", "add_program.json")
     
     # Load EVM program from JSON
     compiler_result = load_ir_from_json(ir_path)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test EVM IR JSON parsing."""
+"""Test EVM IR JSON parser."""
 
 import os
 
@@ -10,7 +10,7 @@ def test_json_parsing():
     """Test parsing EVM IR from JSON file."""
     # Get the path to the example IR file
     test_dir = os.path.dirname(__file__)
-    ir_file = os.path.join(test_dir, "data", "example_ir.json")
+    ir_file = os.path.join(test_dir, "..", "data", "example_ir.json")
     
     # Load IR from JSON
     ir_result = load_ir_from_json(ir_file)

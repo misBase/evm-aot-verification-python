@@ -8,7 +8,7 @@ from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And,
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
-from ir.smt_state import SMTState, EVMStackState, EVMMemoryState
+from state.smt_state import SMTState, EVMStackState, EVMMemoryState
 
 # Constants for RETURN instruction
 MAX_RETURN_DATA_SIZE = 256  # Maximum return data size in bytes (256 bytes = 2048 bits)

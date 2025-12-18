@@ -11,7 +11,7 @@ from .models import X86Block, X86Instruction, Register
 from .semantics import X86SemanticsModel
 from .disassembler import disassemble_hex
 from .cfg import build_x86_cfg, identify_basic_blocks
-from ir.smt_state import SMTState
+from state.smt_state import SMTState
 
 
 class X86Program:
@@ -346,7 +346,7 @@ class X86Program:
             return expr
         
         from z3 import BitVecVal, Array
-        from ir.smt_state import X86MemoryState
+        from state.smt_state import X86MemoryState
         from .models import Register
         
         # Get memory array type from first path result

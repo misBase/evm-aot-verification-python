@@ -11,7 +11,7 @@ from .models import EVMBlock
 from .semantics import EVMIRSemantics, execute_block_with_tag
 from .json_parser import CompilerEVMResult
 from .cfg import build_ir_cfg
-from ir.smt_state import SMTState
+from state.smt_state import SMTState
 
 
 class EVMProgram:
@@ -190,7 +190,7 @@ class EVMProgram:
             return expr
         
         from z3 import BitVecVal, Array
-        from ir.smt_state import EVMMemoryState
+        from state.smt_state import EVMMemoryState
         
         # Get memory array type from first path result
         first_memory = path_results[0][1]['memory']

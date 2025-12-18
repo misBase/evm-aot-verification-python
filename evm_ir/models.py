@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
-    from ir.smt_state import SMTState
+    from state.smt_state import SMTState
 
 
 @dataclass

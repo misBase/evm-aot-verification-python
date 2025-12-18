@@ -10,7 +10,7 @@ from typing import Tuple, Optional
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
 from .refinement_checker import RefinementChecker
-from ir.smt_state import SMTState
+from state.smt_state import SMTState
 from verification.memory_mapping import StackMemoryMapper
 from common.uint256 import Uint256
 

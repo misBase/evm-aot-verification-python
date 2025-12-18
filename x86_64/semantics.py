@@ -11,7 +11,7 @@ from .execution_state import ExecutionState
 from .inst_executor import InstructionExecutor
 from .disassembler import disassemble_hex, parse_operands
 from common.uint256 import Uint256
-from ir.smt_state import SMTState
+from state.smt_state import SMTState
 
 # Constants for RETURN instruction
 EVM_NATIVE_CALL_STATUS_CODE_RETURNED = 0  # evmNativeCallStatusCodeReturned = iota

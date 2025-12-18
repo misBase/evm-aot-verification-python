@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 if TYPE_CHECKING:
-    from ir.smt_state import SMTState
+    from state.smt_state import SMTState
 
 
 class Register(Enum):

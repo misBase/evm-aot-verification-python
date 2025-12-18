@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Basic tests for the refactored code structure."""
+"""Test EVM and x86-64 operation semantics."""
 
 from common.uint256 import Uint256
 from evm_ir.semantics import EVMIRSemantics, EVMOperationSemantics

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test program-level verification."""
+"""Test program-level equivalence verification."""
 
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
@@ -18,7 +18,7 @@ def test_evm_program_from_json():
     """Test EVM program creation from JSON."""
     # Get the test IR file path
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "data", "example_ir.json")
+    ir_path = os.path.join(test_dir, "..", "data", "example_ir.json")
     
     # Load and create program
     compiler_result = load_ir_from_json(ir_path)
@@ -48,7 +48,7 @@ def test_program_add_operation_verification():
     """
     # Get the test IR file path
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "data", "example_ir.json")
+    ir_path = os.path.join(test_dir, "..", "data", "example_ir.json")
     
     # Load EVM program
     compiler_result = load_ir_from_json(ir_path)

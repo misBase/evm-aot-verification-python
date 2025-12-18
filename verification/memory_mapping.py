@@ -8,7 +8,7 @@ and x86-64 memory layout for verification purposes.
 from typing import List, Dict
 from z3 import BitVec, Concat, Extract
 from common.uint256 import Uint256
-from ir.smt_state import SMTState, EVMStackState, X86MemoryState
+from state.smt_state import SMTState, EVMStackState, X86MemoryState
 
 
 class StackMemoryMapper:

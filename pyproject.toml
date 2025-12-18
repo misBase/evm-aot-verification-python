@@ -8,7 +8,8 @@ license = "MIT"
 packages = [
     { include = "common" },
     { include = "evm_ir" },
-    { include = "ir" },
+    { include = "state" },
+    { include = "utils" },
     { include = "verification" },
     { include = "x86_64" },
 ]
