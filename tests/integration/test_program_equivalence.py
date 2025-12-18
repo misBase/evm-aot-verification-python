@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test program-level equivalence verification."""
+"""测试程序级等价性验证。"""
 
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
@@ -9,18 +9,18 @@ import os
 
 
 def test_program_verifier_import():
-    """Test that program verifier can be imported."""
-    # If import fails, an exception will be raised automatically
+    """测试程序验证器是否可以导入。"""
+    # 如果导入失败，将自动抛出异常
     pass
 
 
 def test_evm_program_from_json():
-    """Test EVM program creation from JSON."""
-    # Get the test IR file path
+    """测试从JSON创建EVM程序。"""
+    # 获取测试IR文件路径
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "example_ir.json")
     
-    # Load and create program
+    # 加载并创建程序
     compiler_result = load_ir_from_json(ir_path)
     evm_program = EVMProgram(compiler_result)
     
@@ -29,8 +29,8 @@ def test_evm_program_from_json():
 
 
 def test_x86_program_from_hex():
-    """Test x86 program creation from hex."""
-    # ADD operation hex sequence
+    """测试从十六进制创建x86程序。"""
+    # ADD操作的十六进制序列
     hex_sequence = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
     base_addr = 0x6c
     
@@ -41,24 +41,24 @@ def test_x86_program_from_hex():
 
 
 def test_program_add_operation_verification():
-    """Test EVM program structure and operation detection.
+    """测试EVM程序结构和操作检测。
     
-    This test verifies that we can correctly parse and inspect EVM program
-    structure, including finding specific operations within blocks.
+    此测试验证我们可以正确解析和检查EVM程序结构，
+    包括在块内查找特定操作。
     """
-    # Get the test IR file path
+    # 获取测试IR文件路径
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "example_ir.json")
     
-    # Load EVM program
+    # 加载EVM程序
     compiler_result = load_ir_from_json(ir_path)
     evm_program = EVMProgram(compiler_result)
     
-    # Verify program structure
+    # 验证程序结构
     assert len(evm_program.blocks) > 0, \
         f"EVM program should have at least one block, got {len(evm_program.blocks)}"
     
-    # Test that we can find the ADD operation
+    # 测试我们可以找到ADD操作
     has_add = False
     add_count = 0
     for block in evm_program.blocks:
@@ -74,7 +74,7 @@ def test_program_add_operation_verification():
 
 
 if __name__ == "__main__":
-    # When running directly, use pytest to run tests
+    # 直接运行时，使用pytest运行测试
     import pytest
     pytest.main([__file__, "-v"])
 

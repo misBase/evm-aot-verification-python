@@ -1,8 +1,8 @@
 """
-State management module for SMT state modeling.
+用于SMT状态建模的状态管理模块。
 
-This module provides unified state management for EVM IR and x86-64 programs,
-modeling stack, memory, and registers as symbolic variables.
+本模块为EVM IR和x86-64程序提供统一的状态管理，
+将栈、内存和寄存器建模为符号变量。
 """
 
 from .smt_state import (

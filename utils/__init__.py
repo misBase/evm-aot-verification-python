@@ -1,7 +1,7 @@
 """
-Utility modules for verification tool.
+验证工具的实用模块。
 
-This package contains utility classes and helper functions.
+本包包含实用类和辅助函数。
 """
 
 from .config import VerificationConfig

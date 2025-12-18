@@ -1,4 +1,4 @@
-"""EVM IR processing and semantic modeling."""
+"""EVM IR处理和语义建模。"""
 
 from .json_parser import load_ir_from_json, CompilerEVMResult
 from .models import EVMBlock, EvmOperator

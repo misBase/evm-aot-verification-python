@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Test refinement checker for translation verification.
+翻译验证的精化检查器测试。
 
-This module contains tests that verify the refinement relation between 
-EVM bytecode and AOT-compiled x86-64 machine code using the RefinementChecker.
-These tests focus on verification logic, including symbolic proofs and concrete value tests.
+本模块包含使用RefinementChecker验证EVM字节码和AOT编译的x86-64机器码之间
+精化关系的测试。这些测试专注于验证逻辑，包括符号证明和具体值测试。
 """
 
 from __future__ import annotations
@@ -21,68 +20,68 @@ from verification.refinement_checker import RefinementChecker
 from verification.program_verifier import ProgramEquivalenceChecker
 
 
-# x86-64 machine code sequences for EVM operations
-# These are extracted from the AOT compiler output
+# x86-64机器码序列，用于EVM操作
+# 这些是从AOT编译器输出中提取的
 
-# ADD operation sequence (addresses 0x6c-0x9b)
-# Includes: 8 compute instructions + 4 store instructions
-# Instructions:
-#   mov rax, [r14-0x40]   ; Load val1.z0
-#   add rax, [r14-0x20]   ; Add val2.z0, set carry
-#   mov rcx, [r14-0x38]   ; Load val1.z1
-#   adc rcx, [r14-0x18]   ; Add val2.z1 + carry
-#   mov rdx, [r14-0x30]   ; Load val1.z2
-#   adc rdx, [r14-0x10]   ; Add val2.z2 + carry
-#   mov rbx, [r14-0x28]   ; Load val1.z3
-#   adc rbx, [r14-0x08]   ; Add val2.z3 + carry
-#   mov [r14-0x40], rax   ; Store result.z0
-#   mov [r14-0x38], rcx   ; Store result.z1
-#   mov [r14-0x30], rdx   ; Store result.z2
-#   mov [r14-0x28], rbx   ; Store result.z3
+# ADD操作序列（地址0x6c-0x9b）
+# 包括：8条计算指令 + 4条存储指令
+# 指令：
+#   mov rax, [r14-0x40]   ; 加载 val1.z0
+#   add rax, [r14-0x20]   ; 加上 val2.z0，设置进位
+#   mov rcx, [r14-0x38]   ; 加载 val1.z1
+#   adc rcx, [r14-0x18]   ; 加上 val2.z1 + 进位
+#   mov rdx, [r14-0x30]   ; 加载 val1.z2
+#   adc rdx, [r14-0x10]   ; 加上 val2.z2 + 进位
+#   mov rbx, [r14-0x28]   ; 加载 val1.z3
+#   adc rbx, [r14-0x08]   ; 加上 val2.z3 + 进位
+#   mov [r14-0x40], rax   ; 存储 result.z0
+#   mov [r14-0x38], rcx   ; 存储 result.z1
+#   mov [r14-0x30], rdx   ; 存储 result.z2
+#   mov [r14-0x28], rbx   ; 存储 result.z3
 X86_ADD_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
 X86_ADD_BASE_ADDR = 0x6c
 
-# Full ADD program sequence with control flow (addresses 0x0-0xac)
-# Includes initialization, error handling, and ADD operation
+# 完整的ADD程序序列，包含控制流（地址0x0-0xac）
+# 包括初始化、错误处理和ADD操作
 X86_ADD_FULL_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b45704883f80372234883e80349894570498b45304883f8407222483d21800000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c3498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed841c685e00000000249c74528fcffffffc3"
 X86_ADD_FULL_BASE_ADDR = 0x0
 
 
 # ===========================
-# Pytest Fixtures
+# Pytest 测试夹具
 # ===========================
 
 @pytest.fixture
 def evm_semantics() -> EVMIRSemantics:
-    """Fixture providing EVM IR semantics instance."""
+    """提供EVM IR语义实例的测试夹具。"""
     return EVMIRSemantics()
 
 
 @pytest.fixture
 def x86_add_program() -> X86Program:
-    """Fixture providing x86-64 ADD program."""
+    """提供x86-64 ADD程序的测试夹具。"""
     return X86Program.from_hex(X86_ADD_HEX_SEQUENCE, base_addr=X86_ADD_BASE_ADDR)
 
 
 @pytest.fixture
 def refinement_checker() -> RefinementChecker:
-    """Fixture providing refinement checker with default timeout."""
+    """提供具有默认超时的精化检查器的测试夹具。"""
     return RefinementChecker(timeout_ms=10000, verbose=False)
 
 
 @pytest.fixture
 def refinement_checker_verbose() -> RefinementChecker:
-    """Fixture providing refinement checker with verbose output for symbolic tests."""
+    """提供具有详细输出的精化检查器的测试夹具，用于符号测试。"""
     return RefinementChecker(timeout_ms=60000, verbose=True)
 
 
 # ===========================
-# Test Functions
+# 测试函数
 # ===========================
 
 def test_verifier_import():
-    """Test that verifier modules can be imported."""
-    # If import fails, an exception will be raised automatically
+    """测试验证器模块是否可以导入。"""
+    # 如果导入失败，将自动抛出异常
     pass
 
 
@@ -91,30 +90,30 @@ def test_verify_add_symbolic(
     x86_add_program: X86Program,
     refinement_checker_verbose: RefinementChecker
 ):
-    """Test symbolic ADD verification - proves correctness for all inputs.
+    """测试符号ADD验证 - 证明对所有输入的正确性。
     
-    This is a formal proof that the x86 ADD implementation is semantically
-    equivalent to the EVM ADD operation for all possible 256-bit inputs.
+    这是一个形式化证明，证明x86 ADD实现在语义上等价于EVM ADD操作，
+    适用于所有可能的256位输入。
     
-    This test proves: ∀ a, b ∈ Uint256. x86_ADD_Program(a, b) ≡ EVM_ADD_Program(a, b)
+    此测试证明：∀ a, b ∈ Uint256. x86_ADD_Program(a, b) ≡ EVM_ADD_Program(a, b)
     """
-    # Create symbolic inputs
+    # 创建符号输入
     evm_val1 = Uint256.symbolic("evm_val1")
     evm_val2 = Uint256.symbolic("evm_val2")
     
-    # Build EVM ADD semantic formula
+    # 构建EVM ADD语义公式
     evm_a_bv = evm_val1.to_bv256()
     evm_b_bv = evm_val2.to_bv256()
     evm_result = evm_semantics.op_semantics.add_semantics(evm_a_bv, evm_b_bv)
     
-    # Build x86 program semantics using the same symbolic values
+    # 使用相同的符号值构建x86程序语义
     x86_result_dict = x86_add_program.build_program_semantics_from_limbs(
         [evm_val1.z0, evm_val1.z1, evm_val1.z2, evm_val1.z3],
         [evm_val2.z0, evm_val2.z1, evm_val2.z2, evm_val2.z3]
     )
     x86_result = x86_result_dict['semantic_formula']
     
-    # Check refinement relation (proves equivalence for all inputs)
+    # 检查精化关系（证明对所有输入的等价性）
     verified, msg = refinement_checker_verbose.check_refinement(evm_result, x86_result)
     
     assert verified, (
@@ -124,29 +123,28 @@ def test_verify_add_symbolic(
 
 
 def test_verify_add_program_pair():
-    """Test program-level verification using JSON IR and x86 hex sequence.
+    """使用JSON IR和x86十六进制序列测试程序级验证。
     
-    This test verifies the equivalence between an EVM program loaded from JSON
-    and an x86-64 program created from hex sequence, similar to the main.py
-    verification workflow.
+    此测试验证从JSON加载的EVM程序与从十六进制序列创建的x86-64程序之间的等价性，
+    类似于main.py中的验证工作流。
     
-    This test uses:
-    - add_ir.json: EVM IR JSON file containing ADD operation
-    - X86_ADD_HEX_SEQUENCE: x86-64 machine code for ADD operation
-    - ProgramEquivalenceChecker: Program-level verifier
+    此测试使用：
+    - add_ir.json: 包含ADD操作的EVM IR JSON文件
+    - X86_ADD_HEX_SEQUENCE: ADD操作的x86-64机器码
+    - ProgramEquivalenceChecker: 程序级验证器
     """
-    # Get the test data directory path
+    # 获取测试数据目录路径
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "add_ir.json")
     
-    # Load EVM program from JSON
+    # 从JSON加载EVM程序
     compiler_result = load_ir_from_json(ir_path)
     evm_program = EVMProgram(compiler_result)
     
-    # Create x86 program from hex sequence
+    # 从十六进制序列创建x86程序
     x86_program = X86Program.from_hex(X86_ADD_HEX_SEQUENCE, base_addr=X86_ADD_BASE_ADDR)
     
-    # Verify program pair using ProgramEquivalenceChecker
+    # 使用ProgramEquivalenceChecker验证程序对
     checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=False)
     initial_state = ProgramEquivalenceChecker.create_default_initial_state()
     verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
@@ -159,29 +157,28 @@ def test_verify_add_program_pair():
 
 @pytest.mark.skip
 def test_verify_add_program_pair_full():
-    """Test program-level verification using add_program.json and full x86 hex sequence.
+    """使用add_program.json和完整x86十六进制序列测试程序级验证。
     
-    This test verifies the equivalence between an EVM program loaded from add_program.json
-    (which contains TAG, ADD, BLOCKEND, STOP operations) and the full x86-64 program
-    sequence that includes control flow, error handling, and the ADD operation.
+    此测试验证从add_program.json加载的EVM程序（包含TAG、ADD、BLOCKEND、STOP操作）
+    与包含控制流、错误处理和ADD操作的完整x86-64程序序列之间的等价性。
     
-    This test uses:
-    - add_program.json: EVM IR JSON file containing TAG, ADD, BLOCKEND, STOP operations
-    - X86_ADD_FULL_HEX_SEQUENCE: Full x86-64 machine code with control flow
-    - ProgramEquivalenceChecker: Program-level verifier
+    此测试使用：
+    - add_program.json: 包含TAG、ADD、BLOCKEND、STOP操作的EVM IR JSON文件
+    - X86_ADD_FULL_HEX_SEQUENCE: 包含控制流的完整x86-64机器码
+    - ProgramEquivalenceChecker: 程序级验证器
     """
-    # Get the test data directory path
+    # 获取测试数据目录路径
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "add_program.json")
     
-    # Load EVM program from JSON
+    # 从JSON加载EVM程序
     compiler_result = load_ir_from_json(ir_path)
     evm_program = EVMProgram(compiler_result)
     
-    # Create x86 program from full hex sequence
+    # 从完整十六进制序列创建x86程序
     x86_program = X86Program.from_hex(X86_ADD_FULL_HEX_SEQUENCE, base_addr=X86_ADD_FULL_BASE_ADDR)
     
-    # Verify program pair using ProgramEquivalenceChecker
+    # 使用ProgramEquivalenceChecker验证程序对
     checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=True)
     initial_state = ProgramEquivalenceChecker.create_default_initial_state()
     verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)

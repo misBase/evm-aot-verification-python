@@ -1,8 +1,8 @@
 """
-x86-64 program-level models.
+x86-64程序级模型。
 
-This module provides program-level semantics for x86-64 machine code,
-operating on entire programs (sequences of blocks) rather than individual blocks.
+本模块为x86-64机器码提供程序级语义，
+操作整个程序（块序列）而不是单个块。
 """
 
 from typing import List, Dict, Any, Optional, Tuple
@@ -15,29 +15,28 @@ from state.smt_state import SMTState
 
 
 class X86Program:
-    """Represents a complete x86-64 program with multiple blocks.
+    """表示包含多个块的完整x86-64程序。
     
-    This provides program-level verification capabilities for entire
-    compiled machine code sequences.
+    这为整个编译的机器码序列提供程序级验证能力。
     """
     
     def __init__(self, 
                  blocks: Optional[List[X86Block]] = None,
                  hex_sequence: Optional[str] = None,
                  base_addr: int = 0):
-        """Initialize the x86 program.
+        """初始化x86程序。
         
         Args:
-            blocks: List of pre-parsed X86Block objects (optional)
-            hex_sequence: Hex-encoded machine code string (optional)
-            base_addr: Base address for the program (default: 0)
+            blocks: 预解析的X86Block对象列表（可选）
+            hex_sequence: 十六进制编码的机器码字符串（可选）
+            base_addr: 程序的基址（默认：0）
         """
         self.blocks = blocks or []
         self.hex_sequence = hex_sequence
         self.base_addr = base_addr
         self.semantics = X86SemanticsModel()
         
-        # If hex_sequence is provided but no blocks, disassemble it
+        # 如果提供了hex_sequence但没有块，则反汇编它
         if hex_sequence and not blocks:
             self.instructions = disassemble_hex(hex_sequence, base_addr=base_addr)
         else:
@@ -45,89 +44,88 @@ class X86Program:
             for block in self.blocks:
                 self.instructions.extend(block.instructions)
         
-        # Build a block lookup table by start address
+        # 按起始地址构建块查找表
         self.blocks_by_addr: Dict[int, X86Block] = {}
         for block in self.blocks:
             self.blocks_by_addr[block.start_addr] = block
     
     @classmethod
     def from_hex(cls, hex_sequence: str, base_addr: int = 0) -> 'X86Program':
-        """Create an X86Program from hex-encoded machine code.
+        """从十六进制编码的机器码创建X86Program。
         
         Args:
-            hex_sequence: Hex-encoded machine code string
-            base_addr: Base address for the program
+            hex_sequence: 十六进制编码的机器码字符串
+            base_addr: 程序的基址
             
         Returns:
-            X86Program instance
+            X86Program实例
         """
         return cls(hex_sequence=hex_sequence, base_addr=base_addr)
     
     @classmethod
     def from_blocks(cls, blocks: List[X86Block]) -> 'X86Program':
-        """Create an X86Program from a list of blocks.
+        """从块列表创建X86Program。
         
         Args:
-            blocks: List of X86Block objects
+            blocks: X86Block对象列表
             
         Returns:
-            X86Program instance
+            X86Program实例
         """
         return cls(blocks=blocks)
     
     def get_entrypoint(self) -> Optional[X86Block]:
-        """Get the program entrypoint (first block).
+        """获取程序入口点（第一个块）。
         
         Returns:
-            The first block in the program, or None if no blocks
+            程序中的第一个块，如果没有块则返回None
         """
         if len(self.blocks) == 0:
             return None
         return self.blocks[0]
     
     def get_block_by_addr(self, addr: int) -> Optional[X86Block]:
-        """Get a block by its start address.
+        """通过起始地址获取块。
         
         Args:
-            addr: Block start address
+            addr: 块起始地址
             
         Returns:
-            The block at the given address, or None if not found
+            给定地址处的块，如果未找到则返回None
         """
         return self.blocks_by_addr.get(addr)
     
     def build_program_semantics(self, initial_memory: Dict[int, BitVec]) -> Dict[str, Any]:
-        """Build semantic formula for the entire program.
+        """为整个程序构建语义公式。
         
-        This executes all instructions in sequence, building up a complete
-        semantic model of the program's behavior.
+        此方法按顺序执行所有指令，构建程序行为的完整语义模型。
         
-        For now, we support straight-line execution (no branches).
-        Future versions will support control flow analysis.
+        目前，我们支持直线执行（无分支）。
+        未来版本将支持控制流分析。
         
         Args:
-            initial_memory: Initial memory state (dict mapping offsets to BitVec values)
+            initial_memory: 初始内存状态（将偏移量映射到BitVec值的字典）
             
         Returns:
-            Dictionary containing:
-            - output_memory: Final memory state
-            - semantic_formula: Overall semantic formula for the program
-            - executed_instructions: List of instructions that were executed
+            包含以下内容的字典：
+            - output_memory: 最终内存状态
+            - semantic_formula: 程序的总体语义公式
+            - executed_instructions: 已执行指令的列表
         """
         from .execution_state import ExecutionState
         
-        # Create execution state
+        # 创建执行状态
         state = ExecutionState(initial_memory=initial_memory.copy())
         
-        # Execute all instructions
+        # 执行所有指令
         if self.instructions:
             self.semantics.executor.execute_sequence(state, self.instructions)
         else:
-            # Execute instructions from blocks
+            # 从块中执行指令
             for block in self.blocks:
                 self.semantics.executor.execute_sequence(state, block.instructions)
         
-        # Extract result from default registers (for 256-bit results)
+        # 从默认寄存器中提取结果（用于256位结果）
         result_registers = [Register.RBX, Register.RDX, Register.RCX, Register.RAX]
         reg_values = [state.get_register(reg) for reg in result_registers]
         semantic_formula = Concat(*reg_values)
@@ -144,19 +142,18 @@ class X86Program:
                                           val1_limbs: List[BitVec],
                                           val2_limbs: List[BitVec],
                                           result_registers: Optional[List[Register]] = None) -> Dict[str, Any]:
-        """Build program semantics with inputs as limb lists.
+        """使用limb列表作为输入构建程序语义。
         
-        Convenience method that creates memory variable mapping from limbs and
-        executes the entire program.
+        便利方法，从limb创建内存变量映射并执行整个程序。
         
         Args:
-            val1_limbs: [z0, z1, z2, z3] for first operand (each 64-bit)
-            val2_limbs: [z0, z1, z2, z3] for second operand (each 64-bit)
-            result_registers: List of registers to extract result from (in order from high to low).
-                            If None, defaults to [RBX, RDX, RCX, RAX] for 256-bit results.
+            val1_limbs: 第一个操作数的[z0, z1, z2, z3]（每个64位）
+            val2_limbs: 第二个操作数的[z0, z1, z2, z3]（每个64位）
+            result_registers: 要从中提取结果的寄存器列表（从高到低顺序）。
+                            如果为None，对于256位结果默认为[RBX, RDX, RCX, RAX]。
             
         Returns:
-            Dictionary containing semantic formula and metadata
+            包含语义公式和元数据的字典
         """
         if len(val1_limbs) != 4 or len(val2_limbs) != 4:
             raise ValueError("Expected 4 limbs for 256-bit value")
@@ -175,10 +172,10 @@ class X86Program:
         if result_registers is None:
             result_registers = [Register.RBX, Register.RDX, Register.RCX, Register.RAX]
         
-        # Build semantics for the entire program
+        # 为整个程序构建语义
         result = self.build_program_semantics(initial_memory)
         
-        # Re-extract with specified registers if different
+        # 如果不同，使用指定寄存器重新提取
         if result_registers != [Register.RBX, Register.RDX, Register.RCX, Register.RAX]:
             from .execution_state import ExecutionState
             state = ExecutionState(initial_memory=initial_memory.copy())
@@ -195,28 +192,28 @@ class X86Program:
         return result
     
     def to_z3(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
-        """Build Z3 formula for the entire program using path-aware execution.
+        """使用路径感知执行为整个程序构建Z3公式。
         
-        This method identifies all execution paths, executes each path symbolically,
-        and merges results using Z3 If expressions.
+        此方法识别所有执行路径，符号地执行每条路径，
+        并使用Z3 If表达式合并结果。
         
         Args:
-            state: Initial SMT state with inputs already prepared
+            state: 已准备好输入的初始SMT状态
         
         Returns:
-            Tuple of (final_state, result_dict) where:
-            - final_state: Final SMT state after program execution
-            - result_dict: Dictionary with merged return values (offset, length, memory, base_addr, has_return)
+            (final_state, result_dict)元组，其中：
+            - final_state: 程序执行后的最终SMT状态
+            - result_dict: 包含合并返回值的字典（offset, length, memory, base_addr, has_return）
         """
-        # Get instructions to execute
+        # 获取要执行的指令
         instructions_to_execute = self.instructions if self.instructions else []
         if not instructions_to_execute:
-            # Extract from blocks
+            # 从块中提取
             for block in self.blocks:
                 instructions_to_execute.extend(block.instructions)
         
         if not instructions_to_execute:
-            # No instructions: return default result
+            # 无指令：返回默认结果
             from z3 import BitVecVal
             r15_value = state.x86_registers.get_register(Register.R15)
             result = {
@@ -228,30 +225,30 @@ class X86Program:
             }
             return state, result
         
-        # Build CFG from instructions
+        # 从指令构建CFG
         cfg = build_x86_cfg(instructions_to_execute)
         
-        # Find all paths from entry to return blocks
+        # 查找从入口到返回块的所有路径
         entry = cfg.get_entry_block()
         terminals = cfg.get_return_blocks()
         paths = cfg.find_all_paths(entry, terminals)
         
         if not paths:
-            # Fallback: if no paths found, use simple sequential execution
+            # 回退：如果未找到路径，使用简单的顺序执行
             return self._to_z3_sequential(state, instructions_to_execute)
         
-        # Execute each path and collect results
+        # 执行每条路径并收集结果
         path_results = []
         for path_blocks, path_condition in paths:
-            # Execute path
+            # 执行路径
             path_state = state.copy()
             
-            # Execute all instructions in the path (in order)
+            # 按顺序执行路径中的所有指令
             for block in path_blocks:
                 for insn in block.instructions:
                     path_state = insn.to_z3(path_state)
             
-            # Extract result for this path
+            # 提取此路径的结果
             from z3 import BitVecVal
             r15_value = path_state.x86_registers.get_register(Register.R15)
             has_return = path_state.return_length != BitVecVal(0, 64)
@@ -266,33 +263,33 @@ class X86Program:
             
             path_results.append((path_condition, path_result))
         
-        # Merge all path results using If expressions
+        # 使用If表达式合并所有路径结果
         merged_result = self._merge_path_results(path_results)
         
-        # Create final state (use state from last path as base, but results are merged)
+        # 创建最终状态（使用最后一条路径的状态作为基础，但结果是合并的）
         final_state = state.copy()
         final_state.return_offset = merged_result['offset']
         final_state.return_length = merged_result['length']
         final_state.x86_memory.Memory = merged_result['memory']
-        # Update R15 if needed (though it's usually constant)
+        # 如果需要则更新R15（尽管它通常是常量）
         
         return final_state, merged_result
     
     def _to_z3_sequential(self, state: SMTState, instructions: List[X86Instruction]) -> Tuple[SMTState, Dict[str, Any]]:
-        """Fallback: sequential execution without path analysis.
+        """回退：无路径分析的顺序执行。
         
         Args:
-            state: Initial SMT state
-            instructions: Instructions to execute
+            state: 初始SMT状态
+            instructions: 要执行的指令
             
         Returns:
-            Tuple of (final_state, result_dict)
+            (final_state, result_dict)元组
         """
-        # Process each instruction
+        # 处理每条指令
         for insn in instructions:
             state = insn.to_z3(state)
         
-        # Extract result
+        # 提取结果
         from z3 import BitVecVal
         r15_value = state.x86_registers.get_register(Register.R15)
         has_return = state.return_length != BitVecVal(0, 64)
@@ -308,37 +305,37 @@ class X86Program:
         return state, result
     
     def _merge_path_results(self, path_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
-        """Merge path results using nested If expressions.
+        """使用嵌套If表达式合并路径结果。
         
         Args:
-            path_results: List of (condition, result_dict) tuples
+            path_results: (condition, result_dict)元组列表
             
         Returns:
-            Merged result dictionary
+            合并的结果字典
         """
         if not path_results:
-            # Default result if no paths
+            # 如果没有路径，返回默认结果
             from z3 import BitVecVal
             from .models import Register
-            r15_default = BitVecVal(0, 64)  # Default R15 value
+            r15_default = BitVecVal(0, 64)  # 默认R15值
             return {
                 'offset': BitVecVal(0, 64),
                 'length': BitVecVal(0, 64),
-                'memory': None,  # Will be set by caller
+                'memory': None,  # 将由调用者设置
                 'base_addr': r15_default,
                 'has_return': BoolVal(False)
             }
         
         if len(path_results) == 1:
-            # Single path: return its result
+            # 单条路径：返回其结果
             _, result = path_results[0]
             return result
         
-        # Build nested If expressions for each field
+        # 为每个字段构建嵌套If表达式
         def build_nested_if(field_name: str, default_value):
-            """Build nested If expression for a field."""
+            """为字段构建嵌套If表达式。"""
             expr = default_value
-            # Build from last to first (right-associative)
+            # 从后往前构建（右结合）
             for i in range(len(path_results) - 1, -1, -1):
                 condition, result = path_results[i]
                 field_value = result.get(field_name, default_value)
@@ -349,17 +346,17 @@ class X86Program:
         from state.smt_state import X86MemoryState
         from .models import Register
         
-        # Get memory array type from first path result
+        # 从第一条路径结果获取内存数组类型
         first_memory = path_results[0][1]['memory']
         if first_memory is None:
-            # Create default memory array
+            # 创建默认内存数组
             mem_state = X86MemoryState()
             first_memory = mem_state.Memory
         
-        # Get default base_addr
+        # 获取默认base_addr
         first_base_addr = path_results[0][1].get('base_addr', BitVecVal(0, 64))
         
-        # Merge each field
+        # 合并每个字段
         merged_offset = build_nested_if('offset', BitVecVal(0, 64))
         merged_length = build_nested_if('length', BitVecVal(0, 64))
         merged_memory = build_nested_if('memory', first_memory)

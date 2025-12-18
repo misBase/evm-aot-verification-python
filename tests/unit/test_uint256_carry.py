@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test ADD operation with carry propagation."""
+"""测试带进位传播的ADD操作。"""
 
 from common.uint256 import Uint256
 from evm_ir.semantics import EVMOperationSemantics
@@ -8,18 +8,18 @@ from x86_64.models import Register
 from verification.refinement_checker import RefinementChecker
 from z3 import BitVecVal, simplify
 
-# x86-64 ADD operation hex sequence (from AOT compiler output)
+# x86-64 ADD操作十六进制序列（来自AOT编译器输出）
 X86_ADD_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
 X86_ADD_BASE_ADDR = 0x6c
 
 
 def test_add_with_carry():
-    """Test ADD with values that cause carry propagation."""
+    """测试导致进位传播的值的ADD。"""
     evm_op = EVMOperationSemantics()
     x86_model = X86SemanticsModel()
     checker = RefinementChecker(timeout_ms=10000, verbose=False)
     
-    # Test case 1: Max uint64 + 1 (should cause carry)
+    # 测试用例1：最大uint64 + 1（应导致进位）
     val1 = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
     val2 = Uint256.from_int(0x01)
     
@@ -35,12 +35,12 @@ def test_add_with_carry():
         result_registers=[Register.RBX, Register.RDX, Register.RCX, Register.RAX]
     )
     
-    # Check equivalence
+    # 检查等价性
     verified, msg = checker.check_refinement(evm_result, x86_result)
     assert verified, \
         f"ADD with carry should verify (0xFFFFFFFFFFFFFFFF + 0x01), but got: {msg}"
     
-    # Test case 2: Large values with multiple carries
+    # 测试用例2：具有多个进位的大值
     val3 = Uint256.from_int(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
     val4 = Uint256.from_int(0x01)
     

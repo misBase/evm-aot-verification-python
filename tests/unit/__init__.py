@@ -1,10 +1,10 @@
 """
-Unit tests for individual components.
+单个组件的单元测试。
 
-This package contains unit tests for:
-- Common utilities (uint256, evm_stack)
-- EVM IR parsing and models
-- x86-64 disassembly
-- Individual operation semantics
+本包包含以下单元测试：
+- 通用工具（uint256、evm_stack）
+- EVM IR解析和模型
+- x86-64反汇编
+- 单个操作语义
 """
 

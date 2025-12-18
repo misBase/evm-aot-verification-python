@@ -1,9 +1,9 @@
 """
-Integration tests for verification system.
+验证系统的集成测试。
 
-This package contains integration tests for:
-- Program-level verification
-- End-to-end verification workflows
-- Refinement checking
+本包包含以下集成测试：
+- 程序级验证
+- 端到端验证工作流
+- 精化检查
 """
 

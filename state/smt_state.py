@@ -1,8 +1,8 @@
 """
-SMT State Management for Z3 formula modeling.
+用于Z3公式建模的SMT状态管理。
 
-This module provides unified state management for EVM IR and x86-64 programs,
-modeling stack, memory, and registers as symbolic variables.
+本模块为EVM IR和x86-64程序提供统一的状态管理，
+将栈、内存和寄存器建模为符号变量。
 """
 
 from typing import Dict, Optional, List, TYPE_CHECKING
@@ -13,20 +13,20 @@ if TYPE_CHECKING:
 
 
 class EVMStackState:
-    """EVM stack state representation.
+    """EVM栈状态表示。
     
-    Models the EVM stack using Z3 Array: Stack : Array[Int, BitVec[256]]
-    Stack pointer SP : Int (range 0-1024)
-    Stack top element: Stack[SP-1]
+    使用Z3 Array对EVM栈建模：Stack : Array[Int, BitVec[256]]
+    栈指针SP : Int（范围0-1024）
+    栈顶元素：Stack[SP-1]
     """
     
     def __init__(self, initial_depth: int = 0, stack_array: Optional[Array] = None, sp: Optional[Int] = None):
-        """Initialize EVM stack state.
+        """初始化EVM栈状态。
         
         Args:
-            initial_depth: Initial stack depth (for backward compatibility)
-            stack_array: Optional existing Stack array
-            sp: Optional existing SP pointer
+            initial_depth: 初始栈深度（用于向后兼容）
+            stack_array: 可选的现有Stack数组
+            sp: 可选的现有SP指针
         """
         # Stack : Array[Int, BitVec[256]]
         if stack_array is None:
@@ -34,25 +34,25 @@ class EVMStackState:
         else:
             self.Stack = stack_array
         
-        # SP : Int (stack pointer, range 0-1024)
+        # SP : Int（栈指针，范围0-1024）
         if sp is None:
             self.SP = Int('SP')
         else:
             self.SP = sp
         
-        # For backward compatibility, track depth
+        # 为了向后兼容，跟踪深度
         self.depth = initial_depth
     
     def push(self, value: BitVec) -> 'EVMStackState':
-        """Push a value onto the stack.
+        """将值推送到栈上。
         
-        PUSH operation: SP' = SP + 1, Stack' = Store(Stack, SP, value)
+        PUSH操作：SP' = SP + 1, Stack' = Store(Stack, SP, value)
         
         Args:
-            value: 256-bit BitVec value to push
+            value: 要推送的256位BitVec值
             
         Returns:
-            New EVMStackState with updated Stack and SP
+            具有更新Stack和SP的新EVMStackState
         """
         if value.size() != 256:
             raise ValueError(f"Stack value must be 256 bits, got {value.size()}")
@@ -62,141 +62,141 @@ class EVMStackState:
         # Stack' = Store(Stack, SP, value)
         new_stack = Store(self.Stack, self.SP, value)
         
-        # Create new state
+        # 创建新状态
         new_state = EVMStackState(initial_depth=self.depth + 1, stack_array=new_stack, sp=new_sp)
         return new_state
     
     def pop(self) -> tuple[BitVec, 'EVMStackState']:
-        """Pop a value from the stack.
+        """从栈中弹出一个值。
         
-        POP operation: value = Select(Stack, SP-1), SP' = SP - 1
+        POP操作：value = Select(Stack, SP-1), SP' = SP - 1
         
         Returns:
-            Tuple of (popped_value, new_state)
+            (popped_value, new_state)元组
         """
         # value = Select(Stack, SP-1)
         value = Select(self.Stack, self.SP - 1)
         # SP' = SP - 1
         new_sp = self.SP - 1
-        # Stack remains the same (we don't modify it, just change SP)
+        # Stack保持不变（我们不修改它，只更改SP）
         
         new_state = EVMStackState(initial_depth=max(0, self.depth - 1), stack_array=self.Stack, sp=new_sp)
         return value, new_state
     
     def peek(self, index: int = 0) -> BitVec:
-        """Peek at a stack value without popping.
+        """查看栈值而不弹出。
         
         Args:
-            index: Stack index (0 = top of stack, 1 = second from top, etc.)
+            index: 栈索引（0 = 栈顶，1 = 次栈顶，等等）
             
         Returns:
-            256-bit BitVec value at index
+            索引处的256位BitVec值
         """
-        # Stack index 0 is at SP-1, index 1 is at SP-2, etc.
+        # 栈索引0在SP-1，索引1在SP-2，等等
         stack_index = self.SP - 1 - index
         return Select(self.Stack, stack_index)
     
     @property
     def top(self) -> BitVec:
-        """Get the top element of the stack (Stack[SP-1]).
+        """获取栈的顶部元素（Stack[SP-1]）。
         
         Returns:
-            256-bit BitVec value at stack top
+            栈顶的256位BitVec值
         """
         return Select(self.Stack, self.SP - 1)
     
     def back(self, n: int) -> BitVec:
-        """Get the value at back(n) position in the stack.
+        """获取栈中back(n)位置的值。
         
-        back(0) is the top of stack (Stack[SP-1])
-        back(1) is the second from top (Stack[SP-2])
-        etc.
+        back(0)是栈顶（Stack[SP-1]）
+        back(1)是次栈顶（Stack[SP-2]）
+        等等
         
         Args:
-            n: Stack index (0 = top of stack, 1 = second from top, etc.)
+            n: 栈索引（0 = 栈顶，1 = 次栈顶，等等）
             
         Returns:
-            256-bit BitVec value at back(n) position
+            back(n)位置的256位BitVec值
         """
         # back(n) = Stack[SP-1-n]
         stack_index = self.SP - 1 - n
         return Select(self.Stack, stack_index)
     
     def copy(self) -> 'EVMStackState':
-        """Create a copy of the stack state.
+        """创建栈状态的副本。
         
         Returns:
-            New EVMStackState instance with same Stack and SP
+            具有相同Stack和SP的新EVMStackState实例
         """
-        # Note: In Z3, arrays and integers are immutable expressions,
-        # so we can reuse them directly
+        # 注意：在Z3中，数组和整数是不可变表达式，
+        # 所以我们可以直接重用它们
         new_state = EVMStackState(initial_depth=self.depth, stack_array=self.Stack, sp=self.SP)
         return new_state
 
 
 class EVMMemoryState:
-    """EVM memory state representation.
+    """EVM内存状态表示。
     
-    Models EVM memory using Z3 Array: Memory : Array[BitVec[64], BitVec[8]]
-    Memory size: MSize : BitVec[64] (tracks maximum accessed address)
+    使用Z3 Array对EVM内存建模：Memory : Array[BitVec[64], BitVec[8]]
+    内存大小：MSize : BitVec[64]（跟踪最大访问地址）
     
-    Note: Although EVM theoretically supports 256-bit addresses, in practice
-    AOT-compiled code uses 64-bit addresses, and actual EVM programs never
-    use addresses >= 2^64. Using 64-bit addresses simplifies verification
-    and improves Z3 solver performance.
+    注意：虽然EVM理论上支持256位地址，但在实践中
+    AOT编译的代码使用64位地址，实际的EVM程序从不
+    使用地址 >= 2^64。使用64位地址简化了验证
+    并提高了Z3求解器性能。
     """
     
     def __init__(self, memory_array: Optional[Array] = None, msize: Optional[BitVec] = None):
-        """Initialize EVM memory state.
+        """初始化EVM内存状态。
         
         Args:
-            memory_array: Optional existing Memory array
-            msize: Optional existing MSize variable
+            memory_array: 可选的现有Memory数组
+            msize: 可选的现有MSize变量
         """
-        # Memory : Array[BitVec[64], BitVec[8]] - address is 64-bit, value is 8-bit (byte)
+        # Memory : Array[BitVec[64], BitVec[8]] - 地址是64位，值是8位（字节）
         if memory_array is None:
             self.Memory = Array('Memory', BitVecSort(64), BitVecSort(8))
         else:
             self.Memory = memory_array
         
-        # MSize : BitVec[64] - tracks maximum accessed address (memory size)
+        # MSize : BitVec[64] - 跟踪最大访问地址（内存大小）
         if msize is None:
             self.MSize = BitVec('MSize', 64)
         else:
             self.MSize = msize
     
     def load_256bit(self, offset: BitVec) -> tuple[BitVec, 'EVMMemoryState']:
-        """Load 32 bytes (256 bits) from memory.
+        """从内存加载32字节（256位）。
         
-        MLOAD operation: reads 32 bytes starting at offset
-        Memory layout: big-endian (byte at offset is MSB)
+        MLOAD操作：从偏移量开始读取32字节
+        内存布局：大端序（偏移量处的字节是MSB）
         
         Args:
-            offset: 64-bit or 256-bit BitVec memory offset (256-bit will be truncated)
+            offset: 64位或256位BitVec内存偏移量（256位将被截断）
             
         Returns:
-            Tuple of (256-bit value, new_state with updated MSize)
+            (256位值, 具有更新MSize的新状态)元组
         """
         from z3 import Concat, If, UGE, Extract as Z3Extract
         
-        # If offset is 256-bit, truncate to 64-bit (take lower 64 bits)
+        # 如果偏移量是256位，截断为64位（取低64位）
         if offset.size() == 256:
             offset = Z3Extract(63, 0, offset)
         elif offset.size() != 64:
             raise ValueError(f"Offset must be 64 or 256 bits, got {offset.size()}")
         
-        # Load 32 bytes: Memory[offset], Memory[offset+1], ..., Memory[offset+31]
-        # Concatenate in big-endian order: [byte0|byte1|...|byte31] where byte0 is MSB
+        # 加载32字节：Memory[offset], Memory[offset+1], ..., Memory[offset+31]
+        # 按大端序连接：[byte0|byte1|...|byte31]，其中byte0是MSB
         bytes_list = []
         for i in range(32):
             byte_offset = offset + BitVecVal(i, 64)
             byte_val = Select(self.Memory, byte_offset)
             bytes_list.append(byte_val)
         
-        # Concatenate: [byte0|byte1|...|byte31] = 256-bit value
+        # 连接：[byte0|byte1|...|byte31] = 256位值
         value = Concat(*bytes_list)
         
-        # Update MSize: MSize' = If(offset + 32 > MSize, offset + 32, MSize)
+        # 更新MSize：MSize' = If(offset + 32 > MSize, offset + 32, MSize)
         new_msize = If(UGE(offset + BitVecVal(32, 64), self.MSize), 
                        offset + BitVecVal(32, 64), 
                        self.MSize)
@@ -205,39 +205,39 @@ class EVMMemoryState:
         return value, new_state
     
     def store_256bit(self, offset: BitVec, value: BitVec) -> 'EVMMemoryState':
-        """Store 32 bytes (256 bits) to memory.
+        """将32字节（256位）存储到内存。
         
-        MSTORE operation: writes 32 bytes starting at offset
-        Memory layout: big-endian (byte at offset is MSB)
+        MSTORE操作：从偏移量开始写入32字节
+        内存布局：大端序（偏移量处的字节是MSB）
         
         Args:
-            offset: 64-bit or 256-bit BitVec memory offset (256-bit will be truncated)
-            value: 256-bit BitVec value to store
+            offset: 64位或256位BitVec内存偏移量（256位将被截断）
+            value: 要存储的256位BitVec值
             
         Returns:
-            New EVMMemoryState with updated Memory and MSize
+            具有更新Memory和MSize的新EVMMemoryState
         """
         from z3 import Extract, If, UGE, Extract as Z3Extract
         
         if value.size() != 256:
             raise ValueError(f"Value must be 256 bits, got {value.size()}")
         
-        # If offset is 256-bit, truncate to 64-bit (take lower 64 bits)
+        # 如果偏移量是256位，截断为64位（取低64位）
         if offset.size() == 256:
             offset = Z3Extract(63, 0, offset)
         elif offset.size() != 64:
             raise ValueError(f"Offset must be 64 or 256 bits, got {offset.size()}")
         
-        # Extract 32 bytes from value: byte0 (MSB) to byte31 (LSB)
-        # Store them at Memory[offset], Memory[offset+1], ..., Memory[offset+31]
+        # 从值中提取32字节：byte0（MSB）到byte31（LSB）
+        # 将它们存储在Memory[offset], Memory[offset+1], ..., Memory[offset+31]
         new_memory = self.Memory
         for i in range(32):
-            # Extract byte i: bits [255-8*i : 248-8*i] (byte0 is MSB)
+            # 提取字节i：位[255-8*i : 248-8*i]（byte0是MSB）
             byte_val = Extract(255 - 8*i, 248 - 8*i, value)
             byte_offset = offset + BitVecVal(i, 64)
             new_memory = Store(new_memory, byte_offset, byte_val)
         
-        # Update MSize: MSize' = If(offset + 32 > MSize, offset + 32, MSize)
+        # 更新MSize：MSize' = If(offset + 32 > MSize, offset + 32, MSize)
         new_msize = If(UGE(offset + BitVecVal(32, 64), self.MSize), 
                        offset + BitVecVal(32, 64), 
                        self.MSize)
@@ -246,17 +246,17 @@ class EVMMemoryState:
         return new_state
     
     def get_byte(self, offset: BitVec) -> BitVec:
-        """Get a single byte from memory.
+        """从内存获取单个字节。
         
         Args:
-            offset: 64-bit or 256-bit BitVec memory offset (256-bit will be truncated)
+            offset: 64位或256位BitVec内存偏移量（256位将被截断）
             
         Returns:
-            8-bit BitVec value
+            8位BitVec值
         """
         from z3 import Extract as Z3Extract
         
-        # If offset is 256-bit, truncate to 64-bit
+        # 如果偏移量是256位，截断为64位
         if offset.size() == 256:
             offset = Z3Extract(63, 0, offset)
         elif offset.size() != 64:
@@ -265,21 +265,21 @@ class EVMMemoryState:
         return Select(self.Memory, offset)
     
     def set_byte(self, offset: BitVec, value: BitVec) -> 'EVMMemoryState':
-        """Set a single byte in memory.
+        """在内存中设置单个字节。
         
         Args:
-            offset: 64-bit or 256-bit BitVec memory offset (256-bit will be truncated)
-            value: 8-bit BitVec value
+            offset: 64位或256位BitVec内存偏移量（256位将被截断）
+            value: 8位BitVec值
             
         Returns:
-            New EVMMemoryState with updated Memory and MSize
+            具有更新Memory和MSize的新EVMMemoryState
         """
         from z3 import If, UGE, Extract as Z3Extract
         
         if value.size() != 8:
             raise ValueError(f"Memory byte must be 8 bits, got {value.size()}")
         
-        # If offset is 256-bit, truncate to 64-bit
+        # 如果偏移量是256位，截断为64位
         if offset.size() == 256:
             offset = Z3Extract(63, 0, offset)
         elif offset.size() != 64:
@@ -287,7 +287,7 @@ class EVMMemoryState:
         
         new_memory = Store(self.Memory, offset, value)
         
-        # Update MSize: MSize' = If(offset + 1 > MSize, offset + 1, MSize)
+        # 更新MSize：MSize' = If(offset + 1 > MSize, offset + 1, MSize)
         new_msize = If(UGE(offset + BitVecVal(1, 64), self.MSize), 
                        offset + BitVecVal(1, 64), 
                        self.MSize)
@@ -296,48 +296,48 @@ class EVMMemoryState:
         return new_state
     
     def copy(self) -> 'EVMMemoryState':
-        """Create a copy of the memory state.
+        """创建内存状态的副本。
         
         Returns:
-            New EVMMemoryState instance with same Memory and MSize
+            具有相同Memory和MSize的新EVMMemoryState实例
         """
         new_state = EVMMemoryState(memory_array=self.Memory, msize=self.MSize)
         return new_state
 
 
 class X86MemoryState:
-    """x86-64 memory state representation.
+    """x86-64内存状态表示。
     
-    Models x86-64 memory using Z3 Array: Memory : Array[BitVec[64], BitVec[8]]
-    Supports symbolic indexing (e.g., [r14+rax] where offset is symbolic)
-    Uses byte-level addressing for precise memory modeling.
+    使用Z3 Array对x86-64内存建模：Memory : Array[BitVec[64], BitVec[8]]
+    支持符号索引（例如，[r14+rax]，其中偏移量是符号的）
+    使用字节级寻址进行精确的内存建模。
     """
     
     def __init__(self, memory_array: Optional[Array] = None):
-        """Initialize x86-64 memory state.
+        """初始化x86-64内存状态。
         
         Args:
-            memory_array: Optional existing Memory array
+            memory_array: 可选的现有Memory数组
         """
-        # Memory : Array[BitVec[64], BitVec[8]] - offset is 64-bit, value is 8-bit (byte)
+        # Memory : Array[BitVec[64], BitVec[8]] - 偏移量是64位，值是8位（字节）
         if memory_array is None:
             self.Memory = Array('X86Memory', BitVecSort(64), BitVecSort(8))
         else:
             self.Memory = memory_array
     
     def load_byte(self, offset: BitVec) -> BitVec:
-        """Load a single byte from memory.
+        """从内存加载单个字节。
         
-        Supports symbolic offsets (e.g., base_offset + reg_value)
+        支持符号偏移量（例如，base_offset + reg_value）
         
         Args:
-            offset: 64-bit BitVec memory offset (can be symbolic)
+            offset: 64位BitVec内存偏移量（可以是符号的）
             
         Returns:
-            8-bit BitVec value
+            8位BitVec值
         """
         if isinstance(offset, int):
-            # Convert int to BitVec for backward compatibility
+            # 将int转换为BitVec以向后兼容
             offset = BitVecVal(offset, 64)
         elif offset.size() != 64:
             raise ValueError(f"Memory offset must be 64 bits, got {offset.size()}")
@@ -345,19 +345,19 @@ class X86MemoryState:
         return Select(self.Memory, offset)
     
     def store_byte(self, offset: BitVec, value: BitVec) -> 'X86MemoryState':
-        """Store a single byte to memory.
+        """将单个字节存储到内存。
         
-        Supports symbolic offsets (e.g., base_offset + reg_value)
+        支持符号偏移量（例如，base_offset + reg_value）
         
         Args:
-            offset: 64-bit BitVec memory offset (can be symbolic)
-            value: 8-bit BitVec value
+            offset: 64位BitVec内存偏移量（可以是符号的）
+            value: 8位BitVec值
             
         Returns:
-            New X86MemoryState with updated Memory
+            具有更新Memory的新X86MemoryState
         """
         if isinstance(offset, int):
-            # Convert int to BitVec for backward compatibility
+            # 将int转换为BitVec以向后兼容
             offset = BitVecVal(offset, 64)
         elif offset.size() != 64:
             raise ValueError(f"Memory offset must be 64 bits, got {offset.size()}")
@@ -370,13 +370,13 @@ class X86MemoryState:
         return new_state
     
     def load_64bit(self, offset: BitVec) -> BitVec:
-        """Load a 64-bit value from memory (little-endian).
+        """从内存加载64位值（小端序）。
         
         Args:
-            offset: 64-bit BitVec memory offset
+            offset: 64位BitVec内存偏移量
             
         Returns:
-            64-bit BitVec value
+            64位BitVec值
         """
         from z3 import Concat
         
@@ -385,26 +385,26 @@ class X86MemoryState:
         elif offset.size() != 64:
             raise ValueError(f"Memory offset must be 64 bits, got {offset.size()}")
         
-        # Load 8 bytes in little-endian order: [byte0|byte1|...|byte7]
-        # where byte0 is at offset (LSB), byte7 is at offset+7 (MSB)
+        # 按小端序加载8字节：[byte0|byte1|...|byte7]
+        # 其中byte0在offset（LSB），byte7在offset+7（MSB）
         bytes_list = []
         for i in range(8):
             byte_offset = offset + BitVecVal(i, 64)
             byte_val = Select(self.Memory, byte_offset)
             bytes_list.append(byte_val)
         
-        # Concatenate in little-endian order: [byte7|byte6|...|byte0]
+        # 按小端序连接：[byte7|byte6|...|byte0]
         return Concat(*reversed(bytes_list))
     
     def store_64bit(self, offset: BitVec, value: BitVec) -> 'X86MemoryState':
-        """Store a 64-bit value to memory (little-endian).
+        """将64位值存储到内存（小端序）。
         
         Args:
-            offset: 64-bit BitVec memory offset
-            value: 64-bit BitVec value
+            offset: 64位BitVec内存偏移量
+            value: 64位BitVec值
             
         Returns:
-            New X86MemoryState with updated Memory
+            具有更新Memory的新X86MemoryState
         """
         from z3 import Extract
         
@@ -416,10 +416,10 @@ class X86MemoryState:
         if value.size() != 64:
             raise ValueError(f"Value must be 64 bits, got {value.size()}")
         
-        # Store 8 bytes in little-endian order
+        # 按小端序存储8字节
         new_memory = self.Memory
         for i in range(8):
-            # Extract byte i: bits [8*i+7 : 8*i] (byte0 is LSB)
+            # 提取字节i：位[8*i+7 : 8*i]（byte0是LSB）
             byte_val = Extract(8*i+7, 8*i, value)
             byte_offset = offset + BitVecVal(i, 64)
             new_memory = Store(new_memory, byte_offset, byte_val)
@@ -428,64 +428,64 @@ class X86MemoryState:
         return new_state
     
     def load_limb(self, offset: BitVec) -> BitVec:
-        """Load a 64-bit limb from memory (backward compatibility).
+        """从内存加载64位limb（向后兼容）。
         
-        This is an alias for load_64bit() to maintain backward compatibility.
+        这是load_64bit()的别名，以保持向后兼容性。
         
         Args:
-            offset: 64-bit BitVec memory offset (can be symbolic)
+            offset: 64位BitVec内存偏移量（可以是符号的）
             
         Returns:
-            64-bit BitVec value
+            64位BitVec值
         """
         return self.load_64bit(offset)
     
     def store_limb(self, offset: BitVec, value: BitVec) -> 'X86MemoryState':
-        """Store a 64-bit limb to memory (backward compatibility).
+        """将64位limb存储到内存（向后兼容）。
         
-        This is an alias for store_64bit() to maintain backward compatibility.
+        这是store_64bit()的别名，以保持向后兼容性。
         
         Args:
-            offset: 64-bit BitVec memory offset (can be symbolic)
-            value: 64-bit BitVec value
+            offset: 64位BitVec内存偏移量（可以是符号的）
+            value: 64位BitVec值
             
         Returns:
-            New X86MemoryState with updated Memory
+            具有更新Memory的新X86MemoryState
         """
         return self.store_64bit(offset, value)
     
     def load_256bit(self, base_offset: BitVec) -> BitVec:
-        """Load a 256-bit value from memory (4×64-bit limbs, little-endian).
+        """从内存加载256位值（4×64位limb，小端序）。
         
         Args:
-            base_offset: 64-bit BitVec base offset for the 256-bit value (LSB offset)
+            base_offset: 256位值的64位BitVec基址偏移量（LSB偏移量）
             
         Returns:
-            256-bit BitVec
+            256位BitVec
         """
         from z3 import Concat
         
         if isinstance(base_offset, int):
             base_offset = BitVecVal(base_offset, 64)
         
-        # Load 4 limbs: z0 (LSB) at base_offset, z1 at base_offset+8, etc.
+        # 加载4个limb：z0（LSB）在base_offset，z1在base_offset+8，等等
         z0 = self.load_64bit(base_offset)
         z1 = self.load_64bit(base_offset + BitVecVal(8, 64))
         z2 = self.load_64bit(base_offset + BitVecVal(16, 64))
         z3 = self.load_64bit(base_offset + BitVecVal(24, 64))
         
-        # Concatenate: [z3|z2|z1|z0] for 256-bit value
+        # 连接：[z3|z2|z1|z0]用于256位值
         return Concat(z3, z2, z1, z0)
     
     def store_256bit(self, base_offset: BitVec, value: BitVec) -> 'X86MemoryState':
-        """Store a 256-bit value to memory (4×64-bit limbs, little-endian).
+        """将256位值存储到内存（4×64位limb，小端序）。
         
         Args:
-            base_offset: 64-bit BitVec base offset for the 256-bit value (LSB offset)
-            value: 256-bit BitVec
+            base_offset: 256位值的64位BitVec基址偏移量（LSB偏移量）
+            value: 256位BitVec
             
         Returns:
-            New X86MemoryState with updated Memory
+            具有更新Memory的新X86MemoryState
         """
         from z3 import Extract
         
@@ -495,13 +495,13 @@ class X86MemoryState:
         if value.size() != 256:
             raise ValueError(f"Value must be 256 bits, got {value.size()}")
         
-        # Extract 4 limbs: z0 (LSB), z1, z2, z3 (MSB)
+        # 提取4个limb：z0（LSB）、z1、z2、z3（MSB）
         z0 = Extract(63, 0, value)
         z1 = Extract(127, 64, value)
         z2 = Extract(191, 128, value)
         z3 = Extract(255, 192, value)
         
-        # Store limbs (each store returns a new state)
+        # 存储limb（每次存储返回新状态）
         new_state = self.store_64bit(base_offset, z0)
         new_state = new_state.store_64bit(base_offset + BitVecVal(8, 64), z1)
         new_state = new_state.store_64bit(base_offset + BitVecVal(16, 64), z2)
@@ -510,88 +510,88 @@ class X86MemoryState:
         return new_state
     
     def copy(self) -> 'X86MemoryState':
-        """Create a copy of the memory state.
+        """创建内存状态的副本。
         
         Returns:
-            New X86MemoryState instance with same Memory
+            具有相同Memory的新X86MemoryState实例
         """
         new_state = X86MemoryState(memory_array=self.Memory)
         return new_state
 
 
 class X86RegisterState:
-    """x86-64 register state representation.
+    """x86-64寄存器状态表示。
     
-    Models x86-64 registers as 64-bit symbolic variables.
+    将x86-64寄存器建模为64位符号变量。
     """
     
     def __init__(self):
-        """Initialize x86-64 register state."""
-        # Registers: reg[Register] is a 64-bit BitVec
-        # Use string keys to avoid circular import
+        """初始化x86-64寄存器状态。"""
+        # 寄存器：reg[Register]是64位BitVec
+        # 使用字符串键以避免循环导入
         self._registers: Dict[str, BitVec] = {}
-        # Flags: flags[name] is a 1-bit BitVec
+        # 标志：flags[name]是1位BitVec
         self._flags: Dict[str, BitVec] = {}
-        # CF (carry flag) starts at 0
+        # CF（进位标志）从0开始
         self._flags['CF'] = BitVecVal(0, 1)
     
     def get_register(self, reg) -> BitVec:
-        """Get register value.
+        """获取寄存器值。
         
         Args:
-            reg: Register to get (Register enum or string)
+            reg: 要获取的寄存器（Register枚举或字符串）
             
         Returns:
-            64-bit BitVec
+            64位BitVec
         """
-        # Convert Register enum to string key
+        # 将Register枚举转换为字符串键
         reg_key = reg.value if hasattr(reg, 'value') else str(reg)
         if reg_key not in self._registers:
             self._registers[reg_key] = BitVec(f"{reg_key}_init", 64)
         return self._registers[reg_key]
     
     def set_register(self, reg, value: BitVec) -> None:
-        """Set register value.
+        """设置寄存器值。
         
         Args:
-            reg: Register to set (Register enum or string)
-            value: 64-bit BitVec
+            reg: 要设置的寄存器（Register枚举或字符串）
+            value: 64位BitVec
         """
         if value.size() != 64:
             raise ValueError(f"Register value must be 64 bits, got {value.size()}")
-        # Convert Register enum to string key
+        # 将Register枚举转换为字符串键
         reg_key = reg.value if hasattr(reg, 'value') else str(reg)
         self._registers[reg_key] = value
     
     def get_flag(self, flag_name: str) -> BitVec:
-        """Get flag value.
+        """获取标志值。
         
         Args:
-            flag_name: Flag name (e.g., 'CF')
+            flag_name: 标志名称（例如，'CF'）
             
         Returns:
-            1-bit BitVec
+            1位BitVec
         """
         if flag_name not in self._flags:
             self._flags[flag_name] = BitVecVal(0, 1)
         return self._flags[flag_name]
     
     def set_flag(self, flag_name: str, value: BitVec) -> None:
-        """Set flag value.
+        """设置标志值。
         
         Args:
-            flag_name: Flag name
-            value: 1-bit BitVec
+            flag_name: 标志名称
+            value: 1位BitVec
         """
         if value.size() != 1:
             raise ValueError(f"Flag value must be 1 bit, got {value.size()}")
         self._flags[flag_name] = value
     
     def copy(self) -> 'X86RegisterState':
-        """Create a copy of the register state.
+        """创建寄存器状态的副本。
         
         Returns:
-            New X86RegisterState instance
+            新X86RegisterState实例
         """
         new_state = X86RegisterState()
         new_state._registers = self._registers.copy()
@@ -600,31 +600,31 @@ class X86RegisterState:
 
 
 class SMTState:
-    """Unified SMT state for program verification.
+    """用于程序验证的统一SMT状态。
     
-    Manages all symbolic state: EVM stack/memory, x86 memory/registers.
+    管理所有符号状态：EVM栈/内存、x86内存/寄存器。
     """
     
     def __init__(self):
-        """Initialize unified SMT state."""
+        """初始化统一SMT状态。"""
         self.evm_stack = EVMStackState()
         self.evm_memory = EVMMemoryState()
         self.x86_memory = X86MemoryState()
         self.x86_registers = X86RegisterState()
         
-        # RETURN instruction tracking
-        # Store offset and length instead of extracting Array
-        # This allows direct memory comparison without max_bytes limitation
-        # Use conditional symbolic values: 0 means no return value
+        # RETURN指令跟踪
+        # 存储偏移量和长度而不是提取Array
+        # 这允许直接内存比较，没有max_bytes限制
+        # 使用条件符号值：0表示无返回值
         from z3 import BitVecVal
-        self.return_offset: BitVec = BitVecVal(0, 64)  # Return offset (64-bit), 0 = no return
-        self.return_length: BitVec = BitVecVal(0, 64)  # Return length (64-bit), 0 = no return
+        self.return_offset: BitVec = BitVecVal(0, 64)  # 返回偏移量（64位），0 = 无返回
+        self.return_length: BitVec = BitVecVal(0, 64)  # 返回长度（64位），0 = 无返回
     
     def copy(self) -> 'SMTState':
-        """Create a copy of the state.
+        """创建状态的副本。
         
         Returns:
-            New SMTState instance
+            新SMTState实例
         """
         new_state = SMTState()
         new_state.evm_stack = self.evm_stack.copy()

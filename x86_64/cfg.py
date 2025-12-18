@@ -1,7 +1,7 @@
 """
-x86-64 Control Flow Graph (CFG) construction and path analysis.
+x86-64控制流图（CFG）构建和路径分析。
 
-This module provides basic block identification and CFG construction for x86-64 programs.
+本模块为x86-64程序提供基本块识别和CFG构建。
 """
 
 from typing import List, Dict, Set, Tuple, Optional
@@ -11,29 +11,29 @@ from .disassembler import parse_operands
 
 
 class X86CFG:
-    """Control Flow Graph for x86-64 programs."""
+    """x86-64程序的控制流图。"""
     
     def __init__(self, blocks: List[X86Block]):
-        """Initialize CFG from blocks.
+        """从块初始化CFG。
         
         Args:
-            blocks: List of x86-64 blocks
+            blocks: x86-64块列表
         """
         self.blocks = blocks
         self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
         
-        # Build CFG: block -> list of (successor_block, condition) tuples
-        # condition is BoolRef (True for unconditional, symbolic for conditional)
+        # 构建CFG：块 -> (successor_block, condition)元组列表
+        # condition是BoolRef（无条件为True，条件为符号）
         self.successors: Dict[int, List[Tuple[X86Block, BoolRef]]] = {}
         self._build_cfg()
     
     def _build_cfg(self):
-        """Build control flow graph from blocks."""
-        # Initialize successors for all blocks
+        """从块构建控制流图。"""
+        # 为所有块初始化后继节点
         for block in self.blocks:
             self.successors[block.start_addr] = []
         
-        # Find successors based on jump instructions
+        # 基于跳转指令查找后继节点
         for i, block in enumerate(self.blocks):
             if not block.instructions:
                 continue
@@ -42,7 +42,7 @@ class X86CFG:
             mnemonic = last_insn.mnemonic.lower()
             
             if mnemonic == 'jmp':
-                # Unconditional jump
+                # 无条件跳转
                 target = self._extract_jump_target(last_insn)
                 if target is not None:
                     target_block = self._find_block_by_addr(target)
@@ -50,41 +50,41 @@ class X86CFG:
                         self.successors[block.start_addr].append((target_block, BoolVal(True)))
             
             elif mnemonic in ['jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
-                # Conditional jump: two successors (taken and fall-through)
+                # 条件跳转：两个后继节点（跳转路径和顺序执行路径）
                 target = self._extract_jump_target(last_insn)
                 condition = self._build_jump_condition(last_insn, mnemonic)
                 
-                # Taken path: jump to target
+                # 跳转路径：跳转到目标
                 if target is not None:
                     target_block = self._find_block_by_addr(target)
                     if target_block:
                         self.successors[block.start_addr].append((target_block, condition))
                 
-                # Fall-through path: next block
+                # 顺序执行路径：下一个块
                 if i + 1 < len(self.blocks):
                     next_block = self.blocks[i + 1]
-                    # Negate condition for fall-through
+                    # 对顺序执行路径取反条件
                     fall_through_condition = Not(condition)
                     self.successors[block.start_addr].append((next_block, fall_through_condition))
             
             elif mnemonic == 'ret':
-                # Return: no successors
+                # 返回：无后继节点
                 pass
             
             else:
-                # Normal instruction: fall through to next block
+                # 普通指令：顺序执行到下一个块
                 if i + 1 < len(self.blocks):
                     next_block = self.blocks[i + 1]
                     self.successors[block.start_addr].append((next_block, BoolVal(True)))
     
     def _extract_jump_target(self, insn: X86Instruction) -> Optional[int]:
-        """Extract jump target address from instruction.
+        """从指令中提取跳转目标地址。
         
         Args:
-            insn: Jump instruction
+            insn: 跳转指令
             
         Returns:
-            Target address, or None if not found
+            目标地址，如果未找到则返回None
         """
         operands = parse_operands(insn.op_str)
         if operands.get('jump_target') is not None:
@@ -92,39 +92,39 @@ class X86CFG:
         return None
     
     def _build_jump_condition(self, insn: X86Instruction, mnemonic: str) -> BoolRef:
-        """Build symbolic condition for conditional jump.
+        """为条件跳转构建符号条件。
         
         Args:
-            insn: Jump instruction
-            mnemonic: Instruction mnemonic (jb, jae, etc.)
+            insn: 跳转指令
+            mnemonic: 指令助记符（jb、jae等）
             
         Returns:
-            Symbolic condition (BoolRef)
+            符号条件（BoolRef）
         """
-        # For now, return a symbolic condition
-        # In a full implementation, we would extract the condition from the previous CMP instruction
-        # and build the appropriate condition based on the jump type
+        # 目前，返回一个符号条件
+        # 在完整实现中，我们将从先前的CMP指令中提取条件
+        # 并根据跳转类型构建适当的条件
         
-        # Create a symbolic condition variable
-        # This will be enhanced to track actual CMP conditions
+        # 创建符号条件变量
+        # 这将增强以跟踪实际的CMP条件
         from z3 import Bool
         condition_var = Bool(f"jump_cond_{insn.addr:x}")
         return condition_var
     
     def _find_block_by_addr(self, addr: int) -> Optional[X86Block]:
-        """Find block containing or starting at given address.
+        """查找包含或起始于给定地址的块。
         
         Args:
-            addr: Address to find
+            addr: 要查找的地址
             
         Returns:
-            Block containing the address, or None
+            包含该地址的块，如果未找到则返回None
         """
-        # First try exact match
+        # 首先尝试精确匹配
         if addr in self.blocks_by_addr:
             return self.blocks_by_addr[addr]
         
-        # Find block containing the address
+        # 查找包含该地址的块
         for block in self.blocks:
             if block.start_addr <= addr < block.end_addr:
                 return block
@@ -132,18 +132,18 @@ class X86CFG:
         return None
     
     def get_entry_block(self) -> Optional[X86Block]:
-        """Get the entry block (first block).
+        """获取入口块（第一个块）。
         
         Returns:
-            Entry block, or None if no blocks
+            入口块，如果没有块则返回None
         """
         return self.blocks[0] if self.blocks else None
     
     def get_return_blocks(self) -> List[X86Block]:
-        """Get all blocks ending with ret instruction.
+        """获取所有以ret指令结尾的块。
         
         Returns:
-            List of return blocks
+            返回块列表
         """
         ret_blocks = []
         for block in self.blocks:
@@ -156,16 +156,16 @@ class X86CFG:
     
     def find_all_paths(self, entry: Optional[X86Block] = None,
                       terminals: Optional[List[X86Block]] = None) -> List[Tuple[List[X86Block], BoolRef]]:
-        """Find all paths from entry to terminal blocks.
+        """查找从入口到终端块的所有路径。
         
         Args:
-            entry: Entry block (default: first block)
-            terminals: Terminal blocks (default: all return blocks)
+            entry: 入口块（默认：第一个块）
+            terminals: 终端块（默认：所有返回块）
             
         Returns:
-            List of (path, condition) tuples where:
-            - path: List of blocks in execution order
-            - condition: Symbolic condition for this path (conjunction of jump conditions)
+            (path, condition)元组列表，其中：
+            - path: 按执行顺序排列的块列表
+            - condition: 此路径的符号条件（跳转条件的合取）
         """
         if entry is None:
             entry = self.get_entry_block()
@@ -176,102 +176,102 @@ class X86CFG:
             terminals = self.get_return_blocks()
         
         if not terminals:
-            # If no explicit terminals, use last block
+            # 如果没有显式终端，使用最后一个块
             terminals = [self.blocks[-1]] if self.blocks else []
         
         all_paths = []
         visited = set()
         
         def dfs(current: X86Block, path: List[X86Block], condition: BoolRef):
-            """Depth-first search to find all paths."""
-            # Avoid cycles (simple check)
+            """深度优先搜索以查找所有路径。"""
+            # 避免循环（简单检查）
             if current in path:
                 return
             
             current_path = path + [current]
             
-            # Check if we reached a terminal
+            # 检查是否到达终端
             if current in terminals:
                 all_paths.append((current_path, condition))
                 return
             
-            # Explore successors
+            # 探索后继节点
             for successor, succ_condition in self.successors.get(current.start_addr, []):
-                # Combine conditions: current condition AND successor condition
+                # 合并条件：当前条件AND后继条件
                 new_condition = And(condition, succ_condition)
                 dfs(successor, current_path, new_condition)
         
-        # Start DFS from entry
+        # 从入口开始DFS
         dfs(entry, [], BoolVal(True))
         
         return all_paths
     
     def get_successors(self, block: X86Block) -> List[Tuple[X86Block, BoolRef]]:
-        """Get successor blocks with conditions for a given block.
+        """获取给定块的后继块及其条件。
         
         Args:
-            block: Block to get successors for
+            block: 要获取后继节点的块
             
         Returns:
-            List of (successor_block, condition) tuples
+            (successor_block, condition)元组列表
         """
         return self.successors.get(block.start_addr, [])
 
 
 def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
-    """Identify basic blocks from instruction sequence.
+    """从指令序列中识别基本块。
     
-    Basic block boundaries:
-    - Start: program entry, jump target, instruction after ret
-    - End: jmp, conditional jump (jb/jae), ret
+    基本块边界：
+    - 开始：程序入口、跳转目标、ret后的指令
+    - 结束：jmp、条件跳转（jb/jae）、ret
     
     Args:
-        instructions: List of x86-64 instructions
+        instructions: x86-64指令列表
         
     Returns:
-        List of X86Block objects
+        X86Block对象列表
     """
     if not instructions:
         return []
     
-    # Find block start addresses
-    block_starts: Set[int] = {instructions[0].addr}  # Program entry
+    # 查找块起始地址
+    block_starts: Set[int] = {instructions[0].addr}  # 程序入口
     
-    # Find jump targets and instructions after ret
+    # 查找跳转目标和ret后的指令
     for i, insn in enumerate(instructions):
         mnemonic = insn.mnemonic.lower()
         
         if mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
-            # Jump instruction: extract target
+            # 跳转指令：提取目标
             operands = parse_operands(insn.op_str)
             target = operands.get('jump_target')
             if target is not None:
                 block_starts.add(target)
             
-            # Instruction after jump is also a block start (fall-through)
+            # 跳转后的指令也是块起始（顺序执行）
             if i + 1 < len(instructions):
                 block_starts.add(instructions[i + 1].addr)
         
         elif mnemonic == 'ret':
-            # Instruction after ret is a block start
+            # ret后的指令是块起始
             if i + 1 < len(instructions):
                 block_starts.add(instructions[i + 1].addr)
     
-    # Sort block starts
+    # 排序块起始地址
     sorted_starts = sorted(block_starts)
     
-    # Create blocks
+    # 创建块
     blocks = []
     for i, start_addr in enumerate(sorted_starts):
-        # Find end address (next block start or end of program)
+        # 查找结束地址（下一个块起始或程序结束）
         if i + 1 < len(sorted_starts):
             end_addr = sorted_starts[i + 1]
         else:
-            # Last block: end at last instruction
+            # 最后一个块：在最后一条指令处结束
             last_insn = instructions[-1]
             end_addr = last_insn.addr + last_insn.size
         
-        # Collect instructions in this block
+        # 收集此块中的指令
         block_instructions = []
         for insn in instructions:
             if start_addr <= insn.addr < end_addr:
@@ -282,7 +282,7 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
                 start_addr=start_addr,
                 end_addr=end_addr,
                 instructions=block_instructions,
-                is_jump_target=(start_addr != instructions[0].addr)  # All except first are jump targets
+                is_jump_target=(start_addr != instructions[0].addr)  # 除第一个外都是跳转目标
             )
             blocks.append(block)
     
@@ -290,13 +290,13 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
 
 
 def build_x86_cfg(instructions: List[X86Instruction]) -> X86CFG:
-    """Build CFG from x86-64 instructions.
+    """从x86-64指令构建CFG。
     
     Args:
-        instructions: List of x86-64 instructions
+        instructions: x86-64指令列表
         
     Returns:
-        X86CFG instance
+        X86CFG实例
     """
     blocks = identify_basic_blocks(instructions)
     return X86CFG(blocks)

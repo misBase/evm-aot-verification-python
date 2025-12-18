@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Tests for x86-64 disassembler."""
+"""x86-64反汇编器的测试。"""
 
 from x86_64.disassembler import disassemble_hex, parse_operands
 from x86_64.models import Register, X86Instruction
 
 
 def test_disassemble_hex_basic():
-    """Test basic hex disassembly."""
-    # Test 1: Simple MOV instruction
+    """测试基本十六进制反汇编。"""
+    # 测试1：简单MOV指令
     hex_code = "488b46c0"  # mov rax, [r14-0x40]
     instructions = disassemble_hex(hex_code, base_addr=0x6c)
     
@@ -21,8 +21,8 @@ def test_disassemble_hex_basic():
 
 
 def test_disassemble_hex_multiple():
-    """Test disassembling multiple instructions."""
-    # Test ADD sequence: mov rax, [r14-0x40]; add rax, [r14-0x20]
+    """测试反汇编多条指令。"""
+    # 测试ADD序列：mov rax, [r14-0x40]; add rax, [r14-0x20]
     hex_code = "488b46c0 480346e0"
     instructions = disassemble_hex(hex_code, base_addr=0x6c)
     
@@ -34,20 +34,20 @@ def test_disassemble_hex_multiple():
 
 
 def test_disassemble_hex_add_sequence():
-    """Test disassembling full ADD sequence."""
-    # Full ADD sequence: 8 instructions
+    """测试反汇编完整ADD序列。"""
+    # 完整ADD序列：8条指令
     hex_code = "488b46c0 480346e0 488b4ec8 48134ee8 488b56d0 481356f0 488b5ed8 48135ef8"
     instructions = disassemble_hex(hex_code, base_addr=0x6c)
     
     assert len(instructions) == 8, f"Expected 8 instructions, got {len(instructions)}"
     
-    # Check instruction types
+    # 检查指令类型
     expected_mnemonics = ["mov", "add", "mov", "adc", "mov", "adc", "mov", "adc"]
     for i, (insn, expected) in enumerate(zip(instructions, expected_mnemonics)):
         assert insn.mnemonic == expected, \
             f"Instruction {i}: expected '{expected}', got '{insn.mnemonic}'"
     
-    # Check addresses are sequential
+    # 检查地址是顺序的
     for i in range(1, len(instructions)):
         expected_addr = instructions[i-1].addr + instructions[i-1].size
         assert instructions[i].addr == expected_addr, \
@@ -55,21 +55,21 @@ def test_disassemble_hex_add_sequence():
 
 
 def test_disassemble_hex_r14_fix():
-    """Test that R14 register is correctly identified (not RSI)."""
-    # This instruction uses R14, but Capstone might decode it as RSI
+    """测试R14寄存器被正确识别（不是RSI）。"""
+    # 此指令使用R14，但Capstone可能将其解码为RSI
     hex_code = "488b46c0"  # mov rax, [r14-0x40]
     instructions = disassemble_hex(hex_code, base_addr=0x6c)
     
     assert len(instructions) == 1
     op_str = instructions[0].op_str.lower()
-    # Should contain r14, not rsi (after our fix)
+    # 应包含r14，不是rsi（在我们的修复之后）
     assert "r14" in op_str, f"Expected R14 in operands, got '{instructions[0].op_str}'"
     assert "rsi" not in op_str or op_str.count("r14") > op_str.count("rsi"), \
         f"Operands should use R14, not RSI: '{instructions[0].op_str}'"
 
 
 def test_parse_operands_mov_reg_mem():
-    """Test parsing MOV reg, [base+offset] operands."""
+    """测试解析MOV reg, [base+offset]操作数。"""
     op_str = "rax, qword ptr [r14 - 0x40]"
     result = parse_operands(op_str)
     
@@ -84,7 +84,7 @@ def test_parse_operands_mov_reg_mem():
 
 
 def test_parse_operands_add_reg_mem():
-    """Test parsing ADD reg, [base+offset] operands."""
+    """测试解析ADD reg, [base+offset]操作数。"""
     op_str = "rax, qword ptr [r14 - 0x20]"
     result = parse_operands(op_str)
     
@@ -99,7 +99,7 @@ def test_parse_operands_add_reg_mem():
 
 
 def test_parse_operands_positive_offset():
-    """Test parsing operands with positive offset."""
+    """测试解析带正偏移量的操作数。"""
     op_str = "rax, qword ptr [r14 + 0x10]"
     result = parse_operands(op_str)
     
@@ -114,7 +114,7 @@ def test_parse_operands_positive_offset():
 
 
 def test_parse_operands_decimal_offset():
-    """Test parsing operands with decimal offset."""
+    """测试解析带十进制偏移量的操作数。"""
     op_str = "rax, qword ptr [r14 - 64]"
     result = parse_operands(op_str)
     
@@ -129,7 +129,7 @@ def test_parse_operands_decimal_offset():
 
 
 def test_parse_operands_all_registers():
-    """Test parsing operands with different registers."""
+    """测试解析不同寄存器的操作数。"""
     registers_to_test = [
         (Register.RAX, "rax"),
         (Register.RCX, "rcx"),
@@ -146,12 +146,12 @@ def test_parse_operands_all_registers():
 
 
 def test_disassemble_hex_various_formats():
-    """Test disassembling hex strings in various formats."""
+    """测试反汇编各种格式的十六进制字符串。"""
     hex_variations = [
-        "488b46c0",           # No spaces
-        "48 8b 46 c0",        # With spaces
-        "0x488b46c0",         # With 0x prefix
-        "0x48 0x8b 0x46 0xc0", # With 0x prefix and spaces
+        "488b46c0",           # 无空格
+        "48 8b 46 c0",        # 带空格
+        "0x488b46c0",         # 带0x前缀
+        "0x48 0x8b 0x46 0xc0", # 带0x前缀和空格
     ]
     
     for hex_code in hex_variations:
@@ -163,25 +163,25 @@ def test_disassemble_hex_various_formats():
 
 
 def test_disassemble_hex_invalid():
-    """Test disassembling invalid hex strings."""
+    """测试反汇编无效的十六进制字符串。"""
     invalid_hex = [
         "invalid",
-        "48g8b46c0",  # Invalid hex character
-        "",            # Empty string
+        "48g8b46c0",  # 无效的十六进制字符
+        "",            # 空字符串
     ]
     
     for hex_code in invalid_hex:
         try:
             instructions = disassemble_hex(hex_code, base_addr=0x6c)
-            # If no exception, check if result is empty (for empty string)
+            # 如果没有异常，检查结果是否为空（对于空字符串）
             if hex_code == "":
                 assert len(instructions) == 0, \
                     f"Expected empty list for empty hex string, got {len(instructions)}"
         except ValueError:
-            # Expected for invalid hex
+            # 对于无效的十六进制，这是预期的
             pass
         except Exception as e:
-            # Other exceptions are also acceptable
+            # 其他异常也是可以接受的
             pass
 
 

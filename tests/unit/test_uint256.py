@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Test Uint256.add_semantics() method directly (similar to Go's y.Add(&x, y))."""
+"""直接测试Uint256.add_semantics()方法（类似于Go的y.Add(&x, y)）。"""
 
 from common.uint256 import Uint256
 from z3 import BitVecVal, simplify
 
 
 def test_uint256_add_direct():
-    """Test Uint256.add_semantics() method directly, similar to Go's y.Add(&x, y)."""
-    # Test case 1: Simple addition
+    """直接测试Uint256.add_semantics()方法，类似于Go的y.Add(&x, y)。"""
+    # 测试用例1：简单加法
     val1 = Uint256.from_int(0x60)
     val2 = Uint256.from_int(0x10)
     
-    # Call add_semantics directly (similar to Go's y.Add(&x, y))
+    # 直接调用add_semantics（类似于Go的y.Add(&x, y)）
     result = val1.add_semantics(val2)
     
     expected = Uint256.from_int(0x70)
@@ -24,19 +24,19 @@ def test_uint256_add_direct():
     assert simplify(result.z3 == expected.z3), \
         f"z3 mismatch: expected {simplify(expected.z3)}, got {simplify(result.z3)}"
     
-    # Test case 2: Addition with carry
+    # 测试用例2：带进位的加法
     val3 = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
     val4 = Uint256.from_int(0x01)
     
     result2 = val3.add_semantics(val4)
     
-    # Should have z0=0, z1=1 (carry propagated)
+    # 应该有z0=0, z1=1（进位传播）
     assert simplify(result2.z0 == 0), \
         f"z0 should be 0 after carry, got {simplify(result2.z0)}"
     assert simplify(result2.z1 == 1), \
         f"z1 should be 1 after carry, got {simplify(result2.z1)}"
     
-    # Test case 3: Symbolic addition
+    # 测试用例3：符号加法
     val5 = Uint256.symbolic("a")
     val6 = Uint256.symbolic("b")
     

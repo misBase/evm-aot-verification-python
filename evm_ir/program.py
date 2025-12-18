@@ -1,8 +1,7 @@
 """
-EVM IR program-level models.
+EVM IR程序级模型。
 
-This module provides program-level semantics for EVM IR, operating on
-entire programs (sequences of blocks) rather than individual blocks.
+本模块为EVM IR提供程序级语义，操作整个程序（块序列）而不是单个块。
 """
 
 from typing import List, Dict, Any, Optional, Tuple, Set
@@ -15,83 +14,82 @@ from state.smt_state import SMTState
 
 
 class EVMProgram:
-    """Represents a complete EVM program with multiple blocks.
+    """表示包含多个块的完整EVM程序。
     
-    This wraps CompilerEVMResult and provides program-level verification
-    capabilities for the entire IR sequence.
+    这包装了CompilerEVMResult并为整个IR序列提供程序级验证能力。
     """
     
     def __init__(self, compiler_result: CompilerEVMResult):
-        """Initialize the EVM program.
+        """初始化EVM程序。
         
         Args:
-            compiler_result: The compilation result containing all blocks
+            compiler_result: 包含所有块的编译结果
         """
         self.compiler_result = compiler_result
         self.blocks = compiler_result.blocks
         self.semantics = EVMIRSemantics()
         
-        # Build a block lookup table by PC
+        # 按PC构建块查找表
         self.blocks_by_pc: Dict[int, EVMBlock] = {}
         for block in self.blocks:
             self.blocks_by_pc[block.pc] = block
     
     def get_entrypoint(self) -> EVMBlock:
-        """Get the program entrypoint (first block).
+        """获取程序入口点（第一个块）。
         
         Returns:
-            The first block in the program (entrypoint)
+            程序中的第一个块（入口点）
         """
         if len(self.blocks) == 0:
             raise ValueError("Program has no blocks")
         return self.blocks[0]
     
     def get_block_by_pc(self, pc: int) -> Optional[EVMBlock]:
-        """Get a block by its PC value.
+        """通过PC值获取块。
         
         Args:
-            pc: Program counter value
+            pc: 程序计数器值
             
         Returns:
-            The block at the given PC, or None if not found
+            给定PC处的块，如果未找到则返回None
         """
         return self.blocks_by_pc.get(pc)
     
     def to_z3(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
-        """Build Z3 formula for the entire program using CFG-based symbolic execution.
+        """使用基于CFG的符号执行为整个程序构建Z3公式。
         
-        This method uses symbolic execution instead of path enumeration:
-        - Level 1: Execute each block with TAG path merging (3 paths per block)
-        - Level 2: Execute CFG-based symbolic execution, merging branches with If expressions
+        此方法使用符号执行而不是路径枚举：
+        - 级别1：使用TAG路径合并执行每个块（每个块3条路径）
+        - 级别2：执行基于CFG的符号执行，使用If表达式合并分支
         
         Args:
-            state: Initial SMT state with inputs already prepared
+            state: 已准备好输入的初始SMT状态
         
         Returns:
-            Tuple of (final_state, result_dict) where:
-            - final_state: Final SMT state after program execution (merged from all paths)
-            - result_dict: Dictionary with merged return values (offset, length, memory, has_return)
+            (final_state, result_dict)元组，其中：
+            - final_state: 程序执行后的最终SMT状态（从所有路径合并）
+            - result_dict: 包含合并返回值的字典（offset, length, memory, has_return）
         """
-        # Build CFG
+        # 构建CFG
         cfg = build_ir_cfg(self.blocks)
         
-        # Validate loops (detect and reject unsupported loops)
+        # 验证循环（检测并拒绝不支持的循环）
         try:
             cfg.validate_loops()
         except Exception as e:
-            # Re-raise the exception (could be UnsupportedLoopError)
+            # 重新抛出异常（可能是UnsupportedLoopError）
             raise e
         
-        # Get entry and terminal blocks
+        # 获取入口和终止块
         entry = cfg.get_entry_block()
         terminals = cfg.get_terminal_blocks()
         
-        # Execute symbolically: from entry, merge branches with If expressions
+        # 符号执行：从入口开始，使用If表达式合并分支
         merged_state = self._execute_symbolic_with_cfg(
             entry, state, cfg, terminals
         )
         
-        # Extract result from merged state
+        # 从合并状态中提取结果
         from z3 import BitVecVal
         has_return = merged_state.return_length != BitVecVal(0, 64)
         
@@ -106,26 +104,26 @@ class EVMProgram:
         return merged_state, result
     
     def _to_z3_sequential(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
-        """Fallback: sequential execution without path analysis.
+        """回退：无路径分析的顺序执行。
         
         Args:
-            state: Initial SMT state
+            state: 初始SMT状态
         
         Returns:
-            Tuple of (final_state, result_dict)
+            (final_state, result_dict)元组
         """
-        # Process all blocks in sequence
+        # 按顺序处理所有块
         for block in self.blocks:
-            # Execute block with TAG path merging (Level 1)
+            # 使用TAG路径合并执行块（级别1）
             state, _ = execute_block_with_tag(block, state)
             
-            # Check if block ends with a terminating instruction
+            # 检查块是否以终止指令结束
             if block.operations:
                 last_op = block.operations[-1]
                 if last_op.kind.upper() in ['STOP', 'RETURN', 'REVERT', 'SELFDESTRUCT']:
                     break
         
-        # Extract result
+        # 提取结果
         from z3 import BitVecVal
         has_return = state.return_length != BitVecVal(0, 64)
         
@@ -147,79 +145,79 @@ class EVMProgram:
         terminals: List[EVMBlock],
         visited: Optional[Set[int]] = None
     ) -> SMTState:
-        """Based on CFG symbolic execution: merge branches with If expressions when encountering branches.
+        """基于CFG的符号执行：遇到分支时使用If表达式合并分支。
         
-        This is not path enumeration, but:
-        - When encountering conditional branches, recursively execute both branches, then merge with If expressions
-        - Use CFG's successors information to guide execution direction
+        这不是路径枚举，而是：
+        - 遇到条件分支时，递归执行两个分支，然后使用If表达式合并
+        - 使用CFG的后继信息指导执行方向
         
         Args:
-            start_block: Starting block
-            state: Current state
-            cfg: Control flow graph
-            terminals: List of terminal blocks
-            visited: Set of visited block PCs (for loop detection)
+            start_block: 起始块
+            state: 当前状态
+            cfg: 控制流图
+            terminals: 终止块列表
+            visited: 已访问的块PC集合（用于循环检测）
         
         Returns:
-            Merged state (contains information from all possible paths via If expressions)
+            合并后的状态（通过If表达式包含所有可能路径的信息）
         """
         from z3 import BoolVal
         
         if visited is None:
             visited = set()
         
-        # Detect loops: if block is already in visited, we've detected a loop
+        # 检测循环：如果块已在visited中，我们检测到了循环
         if start_block.pc in visited:
-            # This is a loop! For now, we'll raise an error
-            # In the future, we can handle static bounded loops by unrolling
+            # 这是一个循环！目前，我们将抛出错误
+            # 将来，我们可以通过展开来处理静态有界循环
             raise ValueError(
-                f"Loop detected during execution at block PC={start_block.pc}. "
-                "Loop detection should be done before symbolic execution via validate_loops()."
+                f"Loop detected while executing block PC={start_block.pc}. "
+                "Loop detection should be completed via validate_loops() before symbolic execution."
             )
         
         visited.add(start_block.pc)
         
-        # Execute current block (Level 1: TAG path merging)
+        # 执行当前块（级别1：TAG路径合并）
         executed_state, _ = execute_block_with_tag(start_block, state)
         
-        # Check if this is a terminal block
+        # 检查这是否是终止块
         if start_block in terminals:
-            # Reached terminal block: return current state (already contains all path information)
+            # 到达终止块：返回当前状态（已包含所有路径信息）
             return executed_state
         
-        # Get successor blocks
+        # 获取后继块
         successors = cfg.get_successors(start_block)
         
         if len(successors) == 0:
-            # No successors: return current state
+            # 无后继：返回当前状态
             return executed_state
         
         elif len(successors) == 1:
-            # Unconditional jump or sequential execution: continue to next block
+            # 无条件跳转或顺序执行：继续到下一个块
             next_block = successors[0]
             return self._execute_symbolic_with_cfg(
                 next_block, executed_state, cfg, terminals, visited.copy()
             )
         
         elif len(successors) == 2:
-            # Conditional jump (JUMPI): recursively execute both branches, then merge with If
-            # Assume successors[0] is jump target, successors[1] is fall-through
+            # 条件跳转（JUMPI）：递归执行两个分支，然后使用If合并
+            # 假设successors[0]是跳转目标，successors[1]是顺序执行
             jump_target = successors[0]
             fallthrough_target = successors[1]
             
-            # Extract condition from JUMPI instruction
-            # Note: JUMPI doesn't modify state, so condition should still be at stack top
-            # after block execution
+            # 从JUMPI指令中提取条件
+            # 注意：JUMPI不修改状态，所以条件应该仍在栈顶
+            # 在块执行之后
             condition = self._extract_jumpi_condition(start_block, executed_state)
             
-            # IMPORTANT: Each branch must start from an independent copy of the state
-            # This ensures that modifications in one branch don't affect the other
-            # Even though Z3 expressions are symbolic, we need separate state objects
-            # to ensure proper merging with If expressions
+            # 重要：每个分支必须从状态的独立副本开始
+            # 这确保一个分支中的修改不会影响另一个分支
+            # 尽管Z3表达式是符号的，我们需要独立的状态对象
+            # 以确保与If表达式正确合并
             jump_state_input = executed_state.copy()
             fallthrough_state_input = executed_state.copy()
             
-            # Recursively execute both branches, each returns a merged state
+            # 递归执行两个分支，每个返回一个合并状态
             jump_state = self._execute_symbolic_with_cfg(
                 jump_target, jump_state_input, cfg, terminals, visited.copy()
             )
@@ -228,7 +226,7 @@ class EVMProgram:
                 fallthrough_target, fallthrough_state_input, cfg, terminals, visited.copy()
             )
             
-            # Merge two branch states with If expression, return a merged state
+            # 使用If表达式合并两个分支状态，返回合并状态
             merged_state = self._merge_states_with_if(
                 condition, jump_state, fallthrough_state
             )
@@ -236,108 +234,108 @@ class EVMProgram:
             return merged_state
         
         else:
-            # Multiple successors (shouldn't happen)
+            # 多个后继（不应该发生）
             raise ValueError(f"Block {start_block.pc} has {len(successors)} successors")
     
     def _extract_jumpi_condition(self, block: EVMBlock, state: SMTState):
-        """Extract condition from JUMPI instruction.
+        """从JUMPI指令中提取条件。
         
-        JUMPI pops two values from stack: condition (top) and target address (second).
-        Condition is at stack top, target address is at second from top.
+        JUMPI从栈中弹出两个值：条件（栈顶）和目标地址（次栈顶）。
+        条件在栈顶，目标地址在次栈顶。
         
         Args:
-            block: Block containing JUMPI instruction
-            state: State before JUMPI execution (condition should be at stack top)
+            block: 包含JUMPI指令的块
+            state: JUMPI执行前的状态（条件应在栈顶）
         
         Returns:
-            BoolRef: Condition expression (non-zero = True, zero = False)
+            BoolRef: 条件表达式（非零 = True，零 = False）
         """
         from z3 import BitVecVal
         
-        # Find JUMPI instruction in block
-        # JUMPI should be the last operation in the block
+        # 在块中查找JUMPI指令
+        # JUMPI应该是块中的最后一个操作
         if not block.operations:
             return BoolVal(True)
         
         last_op = block.operations[-1]
         if last_op.kind.upper() != "JUMPI":
-            # Not a JUMPI block, return True (unconditional)
+            # 不是JUMPI块，返回True（无条件）
             return BoolVal(True)
         
-        # Before JUMPI executes, condition should be at stack top
-        # Get condition value from stack top
-        condition_value = state.evm_stack.peek(0)  # Stack top value
+        # 在JUMPI执行之前，条件应该在栈顶
+        # 从栈顶获取条件值
+        condition_value = state.evm_stack.peek(0)  # 栈顶值
         
-        # Convert condition value to BoolRef: non-zero = True, zero = False
+        # 将条件值转换为BoolRef：非零 = True，零 = False
         zero = BitVecVal(0, 256)
         condition = condition_value != zero
         
         return condition
     
     def _merge_states_with_if(self, condition, state1: SMTState, state2: SMTState) -> SMTState:
-        """Merge two states with If expression, return a merged state.
+        """使用If表达式合并两个状态，返回合并状态。
         
         Args:
-            condition: BoolRef condition (True -> use state1, False -> use state2)
-            state1: First state (when condition is True)
-            state2: Second state (when condition is False)
+            condition: BoolRef条件（True -> 使用state1，False -> 使用state2）
+            state1: 第一个状态（当条件为True时）
+            state2: 第二个状态（当条件为False时）
         
         Returns:
-            Merged state with all fields merged using If expressions
+            使用If表达式合并所有字段的合并状态
         """
         from z3 import If
         
         merged = state1.copy()
         
-        # Merge simple fields
+        # 合并简单字段
         merged.return_offset = If(condition, state1.return_offset, state2.return_offset)
         merged.return_length = If(condition, state1.return_length, state2.return_length)
         
-        # Merge Array types (Memory and Stack)
+        # 合并Array类型（Memory和Stack）
         merged.evm_memory.Memory = If(condition, state1.evm_memory.Memory, state2.evm_memory.Memory)
         merged.evm_memory.MSize = If(condition, state1.evm_memory.MSize, state2.evm_memory.MSize)
         
-        # Stack merging: need to merge Stack array and SP pointer
+        # 栈合并：需要合并Stack数组和SP指针
         merged.evm_stack.Stack = If(condition, state1.evm_stack.Stack, state2.evm_stack.Stack)
         merged.evm_stack.SP = If(condition, state1.evm_stack.SP, state2.evm_stack.SP)
         
-        # Note: Other state fields (x86_memory, x86_registers) are not used in EVM execution
-        # but we should merge them for completeness
+        # 注意：其他状态字段（x86_memory, x86_registers）在EVM执行中不使用
+        # 但为了完整性，我们应该合并它们
         merged.x86_memory.Memory = If(condition, state1.x86_memory.Memory, state2.x86_memory.Memory)
         
         return merged
     
     def _merge_path_results(self, path_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
-        """Merge path results using nested If expressions.
+        """使用嵌套If表达式合并路径结果。
         
         Args:
-            path_results: List of (condition, result_dict) tuples
+            path_results: (condition, result_dict)元组列表
             
         Returns:
-            Merged result dictionary
+            合并后的结果字典
         """
         if not path_results:
-            # Default result if no paths
+            # 如果没有路径，返回默认结果
             from z3 import BitVecVal
             return {
                 'offset': BitVecVal(0, 64),
                 'length': BitVecVal(0, 64),
-                'memory': None,  # Will be set by caller
+                'memory': None,  # 将由调用者设置
                 'base_addr': None,
                 'has_return': BoolVal(False)
             }
         
         if len(path_results) == 1:
-            # Single path: return its result
+            # 单一路径：返回其结果
             _, result = path_results[0]
             return result
         
-        # Build nested If expressions for each field
-        # Structure: If(path1_cond, path1_result, If(path2_cond, path2_result, ...))
+        # 为每个字段构建嵌套If表达式
+        # 结构：If(path1_cond, path1_result, If(path2_cond, path2_result, ...))
         def build_nested_if(field_name: str, default_value):
-            """Build nested If expression for a field."""
+            """为字段构建嵌套If表达式。"""
             expr = default_value
-            # Build from last to first (right-associative)
+            # 从后往前构建（右结合）
             for i in range(len(path_results) - 1, -1, -1):
                 condition, result = path_results[i]
                 field_value = result.get(field_name, default_value)
@@ -347,14 +345,14 @@ class EVMProgram:
         from z3 import BitVecVal, Array
         from state.smt_state import EVMMemoryState
         
-        # Get memory array type from first path result
+        # 从第一个路径结果获取内存数组类型
         first_memory = path_results[0][1]['memory']
         if first_memory is None:
-            # Create default memory array
+            # 创建默认内存数组
             mem_state = EVMMemoryState()
             first_memory = mem_state.Memory
         
-        # Merge each field
+        # 合并每个字段
         merged_offset = build_nested_if('offset', BitVecVal(0, 64))
         merged_length = build_nested_if('length', BitVecVal(0, 64))
         merged_memory = build_nested_if('memory', first_memory)

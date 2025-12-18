@@ -1,5 +1,5 @@
 """
-EVM Stack: Models the EVM stack for verification.
+EVM栈：为验证建模EVM栈。
 """
 
 from typing import List
@@ -7,51 +7,51 @@ from .uint256 import Uint256
 
 
 class EVMStack:
-    """Models the EVM stack."""
+    """建模EVM栈。"""
     
     def __init__(self):
-        """Initialize an empty stack."""
+        """初始化空栈。"""
         self.items: List[Uint256] = []
     
     def push(self, value: Uint256):
-        """Push a 256-bit value onto the stack.
+        """将256位值推送到栈上。
         
         Args:
-            value: Uint256 value to push
+            value: 要推送的Uint256值
         """
         self.items.append(value)
     
     def pop(self) -> Uint256:
-        """Pop a 256-bit value from the stack.
+        """从栈中弹出256位值。
         
         Returns:
-            Uint256 value from the top of the stack
+            栈顶的Uint256值
             
         Raises:
-            IndexError: If stack is empty
+            IndexError: 如果栈为空
         """
         if not self.items:
             raise IndexError("Stack underflow")
         return self.items.pop()
     
     def peek(self, index: int = 0) -> Uint256:
-        """Peek at a value on the stack without popping.
+        """查看栈上的值而不弹出。
         
         Args:
-            index: Index from top (0 = top element)
+            index: 从顶部开始的索引（0 = 顶部元素）
             
         Returns:
-            Uint256 value at the specified index
+            指定索引处的Uint256值
             
         Raises:
-            IndexError: If index is out of range
+            IndexError: 如果索引超出范围
         """
         if index >= len(self.items):
             raise IndexError("Stack index out of range")
         return self.items[-(index + 1)]
     
     def __len__(self):
-        """Return the number of items on the stack."""
+        """返回栈上的项目数。"""
         return len(self.items)
     
     def __repr__(self):

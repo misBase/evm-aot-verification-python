@@ -1,8 +1,7 @@
 """
-x86-64 execution state management.
+x86-64执行状态管理。
 
-This module provides ExecutionState class to maintain register, memory, and flag state
-during instruction sequence execution.
+本模块提供ExecutionState类，用于在指令序列执行期间维护寄存器、内存和标志状态。
 """
 
 from z3 import BitVec, BitVecVal
@@ -11,103 +10,103 @@ from .models import Register
 
 
 class ExecutionState:
-    """Maintains execution state for x86-64 instruction execution.
+    """维护x86-64指令执行的执行状态。
     
-    Tracks:
-    - Registers: 64-bit values for each register
-    - Memory: Values at memory offsets (relative to R14 base register)
-    - Flags: CPU flags (CF, ZF, SF, etc.) - 1-bit values
+    跟踪：
+    - 寄存器：每个寄存器的64位值
+    - 内存：内存偏移量处的值（相对于R14基址寄存器）
+    - 标志：CPU标志（CF、ZF、SF等）- 1位值
     """
     
     def __init__(self, initial_memory: Optional[Dict[int, BitVec]] = None):
-        """Initialize execution state.
+        """初始化执行状态。
         
         Args:
-            initial_memory: Initial memory state (dict mapping offsets to BitVec values)
+            initial_memory: 初始内存状态（将偏移量映射到BitVec值的字典）
         """
-        # Initialize all registers to symbolic variables (will be set on first use)
+        # 将所有寄存器初始化为符号变量（将在首次使用时设置）
         self.registers: Dict[Register, BitVec] = {}
         
-        # Initialize memory from provided initial state
+        # 从提供的初始状态初始化内存
         self.memory: Dict[int, BitVec] = {}
         if initial_memory:
             self.memory.update(initial_memory)
         
-        # Initialize flags (CF = carry flag, most important for ADD/ADC)
+        # 初始化标志（CF = 进位标志，对ADD/ADC最重要）
         self.flags: Dict[str, BitVec] = {}
-        # CF starts at 0
+        # CF从0开始
         self.flags['CF'] = BitVecVal(0, 1)
     
     def get_register(self, reg: Register) -> BitVec:
-        """Get register value, initializing if not present.
+        """获取寄存器值，如果不存在则初始化。
         
         Args:
-            reg: Register to get
+            reg: 要获取的寄存器
             
         Returns:
-            Current register value (64-bit BitVec)
+            当前寄存器值（64位BitVec）
         """
         if reg not in self.registers:
-            # Initialize with symbolic variable
+            # 使用符号变量初始化
             self.registers[reg] = BitVec(f"{reg.value}_init", 64)
         return self.registers[reg]
     
     def set_register(self, reg: Register, value: BitVec) -> None:
-        """Set register value.
+        """设置寄存器值。
         
         Args:
-            reg: Register to set
-            value: Value to set (must be 64-bit BitVec)
+            reg: 要设置的寄存器
+            value: 要设置的值（必须是64位BitVec）
         """
         if value.size() != 64:
             raise ValueError(f"Register value must be 64 bits, got {value.size()}")
         self.registers[reg] = value
     
     def load_memory(self, offset: int) -> BitVec:
-        """Load value from memory at given offset (relative to R14).
+        """从给定偏移量（相对于R14）的内存加载值。
         
         Args:
-            offset: Memory offset (e.g., -0x40)
+            offset: 内存偏移量（例如，-0x40）
             
         Returns:
-            Value at memory location (64-bit BitVec)
+            内存位置的值（64位BitVec）
         """
         if offset not in self.memory:
-            # Create symbolic variable if not present
+            # 如果不存在则创建符号变量
             self.memory[offset] = BitVec(f"mem_{offset:+d}", 64)
         return self.memory[offset]
     
     def store_memory(self, offset: int, value: BitVec) -> None:
-        """Store value to memory at given offset (relative to R14).
+        """将值存储到给定偏移量（相对于R14）的内存。
         
         Args:
-            offset: Memory offset
-            value: Value to store (must be 64-bit BitVec)
+            offset: 内存偏移量
+            value: 要存储的值（必须是64位BitVec）
         """
         if value.size() != 64:
             raise ValueError(f"Memory value must be 64 bits, got {value.size()}")
         self.memory[offset] = value
     
     def get_flag(self, flag_name: str) -> BitVec:
-        """Get flag value, initializing if not present.
+        """获取标志值，如果不存在则初始化。
         
         Args:
-            flag_name: Flag name (e.g., 'CF')
+            flag_name: 标志名称（例如，'CF'）
             
         Returns:
-            Flag value (1-bit BitVec)
+            标志值（1位BitVec）
         """
         if flag_name not in self.flags:
-            # Initialize with 0
+            # 使用0初始化
             self.flags[flag_name] = BitVecVal(0, 1)
         return self.flags[flag_name]
     
     def set_flag(self, flag_name: str, value: BitVec) -> None:
-        """Set flag value.
+        """设置标志值。
         
         Args:
-            flag_name: Flag name (e.g., 'CF')
-            value: Flag value (must be 1-bit BitVec)
+            flag_name: 标志名称（例如，'CF'）
+            value: 标志值（必须是1位BitVec）
         """
         if value.size() != 1:
             raise ValueError(f"Flag value must be 1 bit, got {value.size()}")

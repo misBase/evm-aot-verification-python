@@ -1,8 +1,8 @@
 """
-EVM IR Control Flow Graph (CFG) construction and path analysis.
+EVM IR控制流图（CFG）构建和路径分析。
 
-This module provides CFG construction and path finding for EVM IR programs.
-Level 2: CFG-level path merging.
+本模块为EVM IR程序提供CFG构建和路径查找。
+级别2：CFG级路径合并。
 """
 
 from typing import List, Dict, Set, Tuple, Optional
@@ -11,30 +11,30 @@ from z3 import BoolRef, BoolVal, And, Or, Not
 
 
 class IRCFG:
-    """Control Flow Graph for EVM IR blocks."""
+    """EVM IR块的控制流图。"""
     
     def __init__(self, blocks: List[EVMBlock]):
-        """Initialize CFG from blocks.
+        """从块初始化CFG。
         
         Args:
-            blocks: List of EVM blocks
+            blocks: EVM块列表
         """
         self.blocks = blocks
         self.blocks_by_pc: Dict[int, EVMBlock] = {block.pc: block for block in blocks}
         
-        # Build CFG: block -> list of successor blocks
+        # 构建CFG：块 -> 后继块列表
         self.successors: Dict[int, List[EVMBlock]] = {}
         self._build_cfg()
     
     def _build_cfg(self):
-        """Build control flow graph from blocks."""
-        # Initialize successors for all blocks
+        """从块构建控制流图。"""
+        # 初始化所有块的后继
         for block in self.blocks:
             self.successors[block.pc] = []
         
-        # Find successors based on JUMP/JUMPI operations
+        # 基于JUMP/JUMPI操作查找后继
         for i, block in enumerate(self.blocks):
-            # Check last operation in block
+            # 检查块中的最后一个操作
             if not block.operations:
                 continue
             
@@ -42,47 +42,47 @@ class IRCFG:
             kind = last_op.kind.upper()
             
             if kind == "JUMP":
-                # Unconditional jump: find target block
-                # JUMP pops a value from stack, which should be a TAG param
-                # For now, we'll need to track this symbolically
-                # For simplicity, assume sequential execution if no explicit target
+                # 无条件跳转：查找目标块
+                # JUMP从栈中弹出一个值，应该是TAG参数
+                # 目前，我们需要符号地跟踪这个值
+                # 为简单起见，如果没有明确目标，假设顺序执行
                 if i + 1 < len(self.blocks):
                     self.successors[block.pc].append(self.blocks[i + 1])
             
             elif kind == "JUMPI":
-                # Conditional jump: two successors (taken and fall-through)
-                # JUMPI pops condition and target from stack
-                # Taken: jump to target
-                # Fall-through: next block
+                # 条件跳转：两个后继（跳转和顺序执行）
+                # JUMPI从栈中弹出条件和目标
+                # 跳转：跳转到目标
+                # 顺序执行：下一个块
                 if i + 1 < len(self.blocks):
                     self.successors[block.pc].append(self.blocks[i + 1])
-                # Note: Actual jump target would need to be resolved from stack
-                # For now, we assume sequential execution
+                # 注意：实际的跳转目标需要从栈中解析
+                # 目前，我们假设顺序执行
             
             elif kind in ["STOP", "RETURN", "REVERT", "SELFDESTRUCT"]:
-                # Terminal block: no successors
+                # 终止块：无后继
                 pass
             
             else:
-                # Normal block: fall through to next block
+                # 普通块：顺序执行到下一个块
                 if i + 1 < len(self.blocks):
                     self.successors[block.pc].append(self.blocks[i + 1])
     
     def get_entry_block(self) -> EVMBlock:
-        """Get the entry block (first block).
+        """获取入口块（第一个块）。
         
         Returns:
-            Entry block
+            入口块
         """
         if not self.blocks:
             raise ValueError("No blocks in CFG")
         return self.blocks[0]
     
     def get_terminal_blocks(self) -> List[EVMBlock]:
-        """Get all terminal blocks (blocks ending with STOP/RETURN/REVERT).
+        """获取所有终止块（以STOP/RETURN/REVERT结尾的块）。
         
         Returns:
-            List of terminal blocks
+            终止块列表
         """
         terminals = []
         for block in self.blocks:
@@ -95,16 +95,16 @@ class IRCFG:
     
     def find_all_paths(self, entry: Optional[EVMBlock] = None, 
                       terminals: Optional[List[EVMBlock]] = None) -> List[Tuple[List[EVMBlock], BoolRef]]:
-        """Find all paths from entry to terminal blocks.
+        """查找从入口到终止块的所有路径。
         
         Args:
-            entry: Entry block (default: first block)
-            terminals: Terminal blocks (default: all terminal blocks)
+            entry: 入口块（默认：第一个块）
+            terminals: 终止块（默认：所有终止块）
             
         Returns:
-            List of (path, condition) tuples where:
-            - path: List of blocks in execution order
-            - condition: Symbolic condition for this path (from JUMPI operations)
+            (path, condition)元组列表，其中：
+            - path: 按执行顺序排列的块列表
+            - condition: 此路径的符号条件（来自JUMPI操作）
         """
         if entry is None:
             entry = self.get_entry_block()
@@ -112,60 +112,60 @@ class IRCFG:
             terminals = self.get_terminal_blocks()
         
         if not terminals:
-            # If no explicit terminals, use last block
+            # 如果没有明确的终止块，使用最后一个块
             terminals = [self.blocks[-1]] if self.blocks else []
         
         all_paths = []
         visited = set()
         
         def dfs(current: EVMBlock, path: List[EVMBlock], condition: BoolRef):
-            """Depth-first search to find all paths."""
-            # Avoid cycles (simple check)
+            """深度优先搜索以查找所有路径。"""
+            # 避免循环（简单检查）
             if current in path:
                 return
             
             current_path = path + [current]
             
-            # Check if we reached a terminal
+            # 检查是否到达终止块
             if current in terminals:
                 all_paths.append((current_path, condition))
                 return
             
-            # Explore successors
+            # 探索后继
             for successor in self.successors.get(current.pc, []):
-                # For now, condition is always True (we'll enhance this with JUMPI conditions later)
+                # 目前，条件始终为True（我们稍后将使用JUMPI条件增强此功能）
                 dfs(successor, current_path, condition)
         
-        # Start DFS from entry
+        # 从入口开始DFS
         dfs(entry, [], BoolVal(True))
         
         return all_paths
     
     def get_successors(self, block: EVMBlock) -> List[EVMBlock]:
-        """Get successor blocks for a given block.
+        """获取给定块的后继块。
         
         Args:
-            block: Block to get successors for
+            block: 要获取后继的块
             
         Returns:
-            List of successor blocks
+            后继块列表
         """
         return self.successors.get(block.pc, [])
     
     def detect_loops(self) -> List[Tuple[List[EVMBlock], str]]:
-        """Detect all loops in the CFG and classify them.
+        """检测CFG中的所有循环并分类。
         
         Returns:
-            List of (loop_blocks, loop_type) tuples where:
-            - loop_blocks: List of blocks in the loop
-            - loop_type: "static_bounded", "dynamically_bounded", or "unbounded"
+            (loop_blocks, loop_type)元组列表，其中：
+            - loop_blocks: 循环中的块列表
+            - loop_type: "static_bounded"、"dynamically_bounded"或"unbounded"
         """
-        # Find strongly connected components (SCCs) which represent loops
+        # 查找强连通分量（SCC），它们表示循环
         sccs = self._find_strongly_connected_components()
         
         loops = []
         for scc in sccs:
-            # A loop is an SCC with more than one block, or a self-loop
+            # 循环是包含多个块的SCC，或者是自循环
             if len(scc) > 1 or self._is_self_loop(scc[0]):
                 loop_type = self._classify_loop(scc)
                 loops.append((scc, loop_type))
@@ -173,13 +173,13 @@ class IRCFG:
         return loops
     
     def validate_loops(self):
-        """Validate loops, raise exception for unsupported loop types.
+        """验证循环，对不支持的循环类型抛出异常。
         
-        This should be called before symbolic execution to detect and reject
-        unsupported loops (unbounded and dynamically bounded).
+        这应在符号执行之前调用，以检测并拒绝不支持的循环
+        （无界和动态有界）。
         
         Raises:
-            UnsupportedLoopError: If unbounded or dynamically bounded loops are detected
+            UnsupportedLoopError: 如果检测到无界或动态有界循环
         """
         from utils.exceptions import UnsupportedLoopError
         
@@ -198,61 +198,61 @@ class IRCFG:
                 raise UnsupportedLoopError(
                     "dynamically_bounded",
                     loop_info,
-                    "Dynamically bounded loops are not yet supported. Only static bounded loops are supported."
+                    "Dynamically bounded loops are not yet supported. Only statically bounded loops are supported."
                 )
-            # static_bounded loops are supported, no error needed
+            # 静态有界循环受支持，无需错误
     
     def _find_strongly_connected_components(self) -> List[List[EVMBlock]]:
-        """Find all strongly connected components (SCCs) using Tarjan's algorithm.
+        """使用Tarjan算法查找所有强连通分量（SCC）。
         
-        SCCs represent loops: if a set of blocks form an SCC, they can reach each other.
+        SCC表示循环：如果一组块形成SCC，它们可以相互到达。
         
         Returns:
-            List of SCCs, where each SCC is a list of blocks
+            SCC列表，其中每个SCC是一个块列表
         """
-        # TODO: Implement Tarjan's algorithm for finding SCCs
-        # For now, return empty list (no loops detected)
-        # Algorithm outline:
-        # 1. Use depth-first search with index and lowlink tracking
-        # 2. When a node's lowlink equals its index, it's the root of an SCC
-        # 3. Pop all nodes from stack until the root to form the SCC
+        # TODO: 实现用于查找SCC的Tarjan算法
+        # 目前，返回空列表（未检测到循环）
+        # 算法概述：
+        # 1. 使用深度优先搜索，跟踪索引和lowlink
+        # 2. 当节点的lowlink等于其索引时，它是SCC的根
+        # 3. 从栈中弹出所有节点直到根，形成SCC
         
         return []
     
     def _is_self_loop(self, block: EVMBlock) -> bool:
-        """Check if a block is a self-loop (jumps to itself).
+        """检查块是否是自循环（跳转到自身）。
         
         Args:
-            block: Block to check
+            block: 要检查的块
             
         Returns:
-            True if block jumps to itself, False otherwise
+            如果块跳转到自身则返回True，否则返回False
         """
-        # Check if block is in its own successors
+        # 检查块是否在自己的后继中
         return block in self.successors.get(block.pc, [])
     
     def _classify_loop(self, loop_blocks: List[EVMBlock]) -> str:
-        """Classify loop type: static bounded, dynamically bounded, or unbounded.
+        """分类循环类型：静态有界、动态有界或无界。
         
-        Classification strategy:
-        1. Check if loop exit condition is constant or compile-time determinable
-        2. Check if loop has explicit iteration variable and bound
+        分类策略：
+        1. 检查循环退出条件是否为常量或编译时可确定
+        2. 检查循环是否有显式迭代变量和界限
         
         Args:
-            loop_blocks: List of blocks in the loop
+            loop_blocks: 循环中的块列表
             
         Returns:
-            "static_bounded", "dynamically_bounded", or "unbounded"
+            "static_bounded"、"dynamically_bounded"或"unbounded"
         """
-        # TODO: Implement loop classification algorithm
-        # For now, return "unbounded" as a conservative default
-        # Algorithm outline:
-        # 1. Analyze exit conditions in loop blocks (JUMPI instructions)
-        # 2. Check if exit condition is constant (static bounded)
-        # 3. Check if exit condition has symbolic but bounded variable (dynamically bounded)
-        # 4. Otherwise, classify as unbounded
+        # TODO: 实现循环分类算法
+        # 目前，保守地返回"unbounded"作为默认值
+        # 算法概述：
+        # 1. 分析循环块中的退出条件（JUMPI指令）
+        # 2. 检查退出条件是否为常量（静态有界）
+        # 3. 检查退出条件是否有符号但有界的变量（动态有界）
+        # 4. 否则，分类为无界
         
-        # Check for exit conditions
+        # 检查退出条件
         exit_conditions = []
         for block in loop_blocks:
             if not block.operations:
@@ -262,51 +262,51 @@ class IRCFG:
                 exit_conditions.append(block)
         
         if not exit_conditions:
-            # No exit conditions found, likely unbounded
+            # 未找到退出条件，可能是无界
             return "unbounded"
         
-        # Check if loop has iteration counter
+        # 检查循环是否有迭代计数器
         has_counter = self._has_iteration_counter(loop_blocks)
         
         if has_counter:
-            # Has iteration counter, but need to check if bound is constant
-            # For now, conservatively classify as dynamically bounded
+            # 有迭代计数器，但需要检查界限是否为常量
+            # 目前，保守地分类为动态有界
             return "dynamically_bounded"
         
-        # No clear iteration pattern, classify as unbounded
+        # 没有清晰的迭代模式，分类为无界
         return "unbounded"
     
     def _has_iteration_counter(self, loop_blocks: List[EVMBlock]) -> bool:
-        """Check if loop has an iteration counter.
+        """检查循环是否有迭代计数器。
         
-        This is a simplified check. A more sophisticated implementation would:
-        - Look for PUSH, ADD, SUB operations that form a counter pattern
-        - Track variable modifications within the loop
+        这是一个简化的检查。更复杂的实现将：
+        - 查找形成计数器模式的PUSH、ADD、SUB操作
+        - 跟踪循环内的变量修改
         
         Args:
-            loop_blocks: List of blocks in the loop
+            loop_blocks: 循环中的块列表
             
         Returns:
-            True if loop appears to have an iteration counter, False otherwise
+            如果循环似乎有迭代计数器则返回True，否则返回False
         """
-        # TODO: Implement iteration counter detection
-        # For now, return False (cannot determine)
-        # Algorithm outline:
-        # 1. Look for operations that increment/decrement a value (ADD/SUB with constant)
-        # 2. Check if this value is used in exit condition
-        # 3. Pattern: PUSH initial_value, loop: ADD/SUB constant, compare with bound
+        # TODO: 实现迭代计数器检测
+        # 目前，返回False（无法确定）
+        # 算法概述：
+        # 1. 查找递增/递减值的操作（带常量的ADD/SUB）
+        # 2. 检查此值是否用于退出条件
+        # 3. 模式：PUSH initial_value，循环：ADD/SUB常量，与界限比较
         
         return False
 
 
 def build_ir_cfg(blocks: List[EVMBlock]) -> IRCFG:
-    """Build CFG from IR blocks.
+    """从IR块构建CFG。
     
     Args:
-        blocks: List of EVM blocks
+        blocks: EVM块列表
         
     Returns:
-        IRCFG instance
+        IRCFG实例
     """
     return IRCFG(blocks)
 

@@ -1,2 +1,2 @@
-"""Tests for EVM AOT verification system."""
+"""EVM AOT验证系统的测试。"""
 

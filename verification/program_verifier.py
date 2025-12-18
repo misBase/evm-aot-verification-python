@@ -1,8 +1,8 @@
 """
-Program equivalence verifier.
+程序等价性验证器。
 
-This module provides program-level verification functionality,
-operating on entire programs rather than individual blocks.
+本模块提供程序级验证功能，
+操作整个程序而不是单个块。
 """
 
 from z3 import BitVec, IntVal
@@ -16,44 +16,44 @@ from common.uint256 import Uint256
 
 
 class ProgramEquivalenceChecker:
-    """Verifies equivalence between EVM and x86 programs."""
+    """验证EVM和x86程序之间的等价性。"""
     
     def __init__(self, timeout_ms: int = 60000, verbose: bool = False):
-        """Initialize the program equivalence checker.
+        """初始化程序等价性检查器。
         
         Args:
-            timeout_ms: SMT solver timeout in milliseconds
-            verbose: Enable verbose output
+            timeout_ms: SMT求解器超时（毫秒）
+            verbose: 启用详细输出
         """
         self.refinement_checker = RefinementChecker(timeout_ms=timeout_ms, verbose=verbose)
         self.verbose = verbose
     
     @staticmethod
     def create_default_initial_state() -> SMTState:
-        """Create a default initial SMT state with symbolic inputs.
+        """创建具有符号输入的默认初始SMT状态。
         
-        Creates a new state with:
-        - Two symbolic 256-bit values on EVM stack
-        - EVM stack mapped to x86 memory layout
+        创建一个新状态，包含：
+        - EVM栈上的两个符号256位值
+        - 映射到x86内存布局的EVM栈
         
         Returns:
-            Initialized SMTState with symbolic inputs
+            具有符号输入的已初始化SMTState
         """
         initial_state = SMTState()
         
-        # Create symbolic inputs for EVM stack
+        # 为EVM栈创建符号输入
         val1 = Uint256.symbolic("program_val1")
         val2 = Uint256.symbolic("program_val2")
         input_stack = [val1.to_bv256(), val2.to_bv256()]
         
-        # Initialize EVM stack with SP = 0
+        # 使用SP = 0初始化EVM栈
         initial_state.evm_stack.SP = IntVal(0)
         
-        # Push initial stack values
+        # 推送初始栈值
         for stack_val in input_stack:
             initial_state.evm_stack = initial_state.evm_stack.push(stack_val)
         
-        # Map EVM stack inputs to x86 memory layout
+        # 将EVM栈输入映射到x86内存布局
         for stack_index, stack_value in enumerate(input_stack):
             layout = StackMemoryMapper.stack_to_memory_layout(stack_value, stack_index)
             for offset, limb in layout.items():
@@ -65,27 +65,27 @@ class ProgramEquivalenceChecker:
                            evm_program: EVMProgram,
                            x86_program: X86Program,
                            initial_state: SMTState) -> Tuple[bool, Optional[str]]:
-        """Verify that an EVM program and x86 program are semantically equivalent.
+        """验证EVM程序和x86程序在语义上等价。
         
-        This performs whole-program verification using Alive2-style direct formula construction:
-        1. Formula building: Use to_z3() to build Z3 formulas for both programs
-        2. Output extraction: Extract results from EVM stack and x86 registers/memory
-        3. Equivalence checking: Use Z3 to prove equivalence
+        使用Alive2风格的直接公式构建执行全程序验证：
+        1. 公式构建：使用to_z3()为两个程序构建Z3公式
+        2. 输出提取：从EVM栈和x86寄存器/内存中提取结果
+        3. 等价性检查：使用Z3证明等价性
         
         Args:
-            evm_program: EVM program to verify
-            x86_program: Corresponding x86 program
-            initial_state: Initial SMT state with inputs already prepared
+            evm_program: 要验证的EVM程序
+            x86_program: 对应的x86程序
+            initial_state: 已准备好输入的初始SMT状态
             
         Returns:
-            (verified, message) where verified is True if programs are equivalent
+            (verified, message)，如果程序等价则verified为True
         """
         if self.verbose:
             print(f"\n=== Program-Level Verification (Alive2-style) ===")
             print(f"EVM Program: {evm_program}")
             print(f"x86 Program: {x86_program}")
         
-        # Step 1: Formula building - EVM (two-level path-aware)
+        # 步骤1：公式构建 - EVM（两级路径感知）
         if self.verbose:
             print("\n[1] Building EVM program formula (two-level path-aware)...")
             print("    Level 1: Block-level TAG path merging (3 paths per block)")
@@ -100,7 +100,7 @@ class ProgramEquivalenceChecker:
             print(f"    EVM return condition: length != 0 (symbolic, merged from all paths)")
             print(f"    EVM formula built (all paths merged)")
         
-        # Step 2: Formula building - x86 (single-level path-aware)
+        # 步骤2：公式构建 - x86（单级路径感知）
         if self.verbose:
             print("\n[2] Building x86 program formula (path-aware)...")
             print("    Identifying basic blocks and CFG paths")
@@ -113,7 +113,7 @@ class ProgramEquivalenceChecker:
             print(f"    x86 return condition: length != 0 (symbolic, merged from all paths)")
             print(f"    x86 formula built (all paths merged)")
         
-        # Step 3: Output extraction (already done in to_z3, but verify)
+        # 步骤3：输出提取（已在to_z3中完成，但验证）
         if self.verbose:
             print("\n[3] Extracting outputs...")
             if isinstance(evm_result, dict):
@@ -131,7 +131,7 @@ class ProgramEquivalenceChecker:
             else:
                 print(f"    x86 result: {x86_result.size()}-bit BitVec")
         
-        # Step 4: Equivalence checking
+        # 步骤4：等价性检查
         if self.verbose:
             print("\n[4] Checking program equivalence with Z3...")
             print("    Comparing merged results from all paths (1-to-1 semantic matching)")

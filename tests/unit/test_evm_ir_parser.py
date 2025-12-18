@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test EVM IR JSON parser."""
+"""测试EVM IR JSON解析器。"""
 
 import os
 
@@ -7,38 +7,38 @@ from evm_ir.json_parser import load_ir_from_json
 
 
 def test_json_parsing():
-    """Test parsing EVM IR from JSON file."""
-    # Get the path to the example IR file
+    """测试从JSON文件解析EVM IR。"""
+    # 获取示例IR文件的路径
     test_dir = os.path.dirname(__file__)
     ir_file = os.path.join(test_dir, "..", "data", "example_ir.json")
     
-    # Load IR from JSON
+    # 从JSON加载IR
     ir_result = load_ir_from_json(ir_file)
     
-    # Verify parsing result structure
+    # 验证解析结果结构
     assert ir_result is not None, "IR result should not be None"
     assert len(ir_result.blocks) > 0, "IR should contain at least one block"
     
-    # Verify block structure
+    # 验证块结构
     block = ir_result.blocks[0]
     assert hasattr(block, 'pc'), "Block should have PC attribute"
     assert hasattr(block, 'stack_depth'), "Block should have stack_depth attribute"
     assert hasattr(block, 'operations'), "Block should have operations attribute"
     assert len(block.operations) > 0, "Block should have at least one operation"
     
-    # Verify operation structure
+    # 验证操作结构
     for op in block.operations:
         assert hasattr(op, 'kind'), "Operation should have kind attribute"
         assert hasattr(op, 'pc'), "Operation should have pc attribute"
     
-    # Verify specific operations from example_ir.json
+    # 验证example_ir.json中的特定操作
     operation_kinds = [op.kind.upper() for op in block.operations]
     assert 'TAG' in operation_kinds, "Should contain TAG operation"
     assert 'PUSH' in operation_kinds, "Should contain PUSH operation"
     assert 'ADD' in operation_kinds, "Should contain ADD operation"
     assert 'STOP' in operation_kinds, "Should contain STOP operation"
     
-    # Verify PUSH operations have immediate values
+    # 验证PUSH操作有立即值
     push_ops = [op for op in block.operations if op.kind.upper().startswith('PUSH')]
     for push_op in push_ops:
         assert push_op.immediate is not None, f"PUSH operation at pc={push_op.pc} should have immediate value"

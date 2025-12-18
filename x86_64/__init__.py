@@ -1,4 +1,4 @@
-"""x86-64 instruction semantic modeling."""
+"""x86-64指令语义建模。"""
 
 from .semantics import X86SemanticsModel, X86InstructionSemantics
 from .models import X86Block, X86Instruction, Register

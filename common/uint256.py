@@ -1,49 +1,49 @@
 """
-Uint256: Represents a 256-bit unsigned integer as 4x64-bit limbs.
+Uint256：将256位无符号整数表示为4x64位limb。
 
-This module provides utilities for working with 256-bit values in the verification system.
+本模块提供在验证系统中处理256位值的实用工具。
 """
 
 from z3 import BitVec, BitVecVal, Concat, Extract
 
 
 class Uint256:
-    """Represents a 256-bit unsigned integer as 4x64-bit limbs.
+    """将256位无符号整数表示为4x64位limb。
     
-    Layout: [z3 (bits 192-255) | z2 (bits 128-191) | z1 (bits 64-127) | z0 (bits 0-63)]
+    布局：[z3 (位192-255) | z2 (位128-191) | z1 (位64-127) | z0 (位0-63)]
     """
     
     def __init__(self, z0, z1, z2, z3):
-        """Initialize with 4x64-bit limbs.
+        """使用4x64位limb初始化。
         
         Args:
-            z0: Least significant 64 bits
-            z1: Bits 64-127
-            z2: Bits 128-191
-            z3: Most significant 64 bits (bits 192-255)
+            z0: 最低有效64位
+            z1: 位64-127
+            z2: 位128-191
+            z3: 最高有效64位（位192-255）
         """
-        self.z0 = z0  # Least significant limb
+        self.z0 = z0  # 最低有效limb
         self.z1 = z1
         self.z2 = z2
-        self.z3 = z3  # Most significant limb
+        self.z3 = z3  # 最高有效limb
     
     def to_bv256(self):
-        """Convert to a single 256-bit bitvector.
+        """转换为单个256位位向量。
         
         Returns:
-            Z3 BitVec of size 256
+            大小为256的Z3 BitVec
         """
         return Concat(self.z3, self.z2, self.z1, self.z0)
     
     @staticmethod
     def from_bv256(bv):
-        """Create Uint256 from a 256-bit bitvector.
+        """从256位位向量创建Uint256。
         
         Args:
-            bv: Z3 BitVec of size 256
+            bv: 大小为256的Z3 BitVec
             
         Returns:
-            Uint256 instance
+            Uint256实例
         """
         z0 = Extract(63, 0, bv)
         z1 = Extract(127, 64, bv)
@@ -53,26 +53,26 @@ class Uint256:
     
     @staticmethod
     def from_int(value):
-        """Create Uint256 from a Python integer.
+        """从Python整数创建Uint256。
         
         Args:
-            value: Python int (will be truncated to 256 bits)
+            value: Python int（将被截断为256位）
             
         Returns:
-            Uint256 instance
+            Uint256实例
         """
         bv = BitVecVal(value, 256)
         return Uint256.from_bv256(bv)
     
     @staticmethod
     def symbolic(name):
-        """Create a symbolic Uint256 variable.
+        """创建符号Uint256变量。
         
         Args:
-            name: Base name for the symbolic variables (will create name_z0, name_z1, etc.)
+            name: 符号变量的基础名称（将创建name_z0、name_z1等）
             
         Returns:
-            Uint256 with symbolic limbs
+            具有符号limb的Uint256
         """
         z0 = BitVec(f"{name}_z0", 64)
         z1 = BitVec(f"{name}_z1", 64)
@@ -81,21 +81,21 @@ class Uint256:
         return Uint256(z0, z1, z2, z3)
     
     def add_semantics(self, other: 'Uint256') -> 'Uint256':
-        """Add two Uint256 values with carry propagation (semantic modeling).
+        """将两个Uint256值相加，带进位传播（语义建模）。
         
-        This implements EVM ADD semantics using 4x64-bit limb addition with carry.
-        The implementation matches the x86-64 AOT compiler's approach.
+        这使用4x64位limb加法和进位实现EVM ADD语义。
+        实现与x86-64 AOT编译器的方法匹配。
         
         Args:
-            other: Another Uint256 value to add
+            other: 要相加的另一个Uint256值
             
         Returns:
-            New Uint256 instance representing the sum (a + b) mod 2^256
+            表示和(a + b) mod 2^256的新Uint256实例
         """
         from z3 import BitVecVal, Concat, Extract
         
-        # Perform 4x64-bit additions with carry propagation
-        # This matches the x86-64 implementation
+        # 执行4x64位加法，带进位传播
+        # 这与x86-64实现匹配
         
         # Limb 0: result_z0 = self.z0 + other.z0
         # Extend to 65 bits to capture carry

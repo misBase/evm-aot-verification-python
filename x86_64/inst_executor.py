@@ -1,8 +1,7 @@
 """
-x86-64 instruction executor.
+x86-64指令执行器。
 
-This module provides InstructionExecutor class to execute instruction sequences
-using the instruction semantics and execution state.
+本模块提供InstructionExecutor类，使用指令语义和执行状态执行指令序列。
 """
 
 from typing import List
@@ -13,23 +12,23 @@ from .disassembler import parse_operands
 
 
 class InstructionExecutor:
-    """Executes x86-64 instruction sequences using semantic modeling."""
+    """使用语义建模执行x86-64指令序列。"""
     
     def __init__(self):
-        """Initialize the instruction executor."""
+        """初始化指令执行器。"""
         pass
     
     def execute_instruction(self, state: ExecutionState, instruction: X86Instruction) -> None:
-        """Execute a single instruction, updating the execution state.
+        """执行单个指令，更新执行状态。
         
         Args:
-            state: Current execution state
-            instruction: Instruction to execute
+            state: 当前执行状态
+            instruction: 要执行的指令
         """
         mnemonic = instruction.mnemonic.lower()
         op_str = instruction.op_str
         
-        # Parse operands
+        # 解析操作数
         operands = parse_operands(op_str)
         
         if mnemonic == 'mov':
@@ -43,26 +42,26 @@ class InstructionExecutor:
         elif mnemonic == 'cmp':
             self._execute_cmp(state, operands)
         elif mnemonic in ['jb', 'jae', 'jmp']:
-            # Conditional/unconditional jumps - for now, we continue execution
-            # In a full implementation, we would track control flow
-            # For verification purposes, we assume we take the success path
+            # 条件/无条件跳转 - 目前，我们继续执行
+            # 在完整实现中，我们将跟踪控制流
+            # 为了验证目的，我们假设采用成功路径
             pass
         elif mnemonic == 'ret':
-            # RET instruction - for now, we just continue
-            # In a full implementation, we would return from function
+            # RET指令 - 目前，我们只是继续
+            # 在完整实现中，我们将从函数返回
             pass
         else:
             raise ValueError(f"Unsupported instruction: {mnemonic}")
     
     def _execute_mov(self, state: ExecutionState, operands: dict) -> None:
-        """Execute MOV instruction.
+        """执行MOV指令。
         
-        Supports:
-        - MOV reg, [base+offset]  (load from memory)
-        - MOV [base+offset], reg  (store to memory)
-        - MOV reg1, reg2          (register to register)
-        - MOV reg, immediate      (load immediate)
-        - MOV [base+offset], immediate  (store immediate to memory)
+        支持：
+        - MOV reg, [base+offset]  （从内存加载）
+        - MOV [base+offset], reg  （存储到内存）
+        - MOV reg1, reg2          （寄存器到寄存器）
+        - MOV reg, immediate      （加载立即值）
+        - MOV [base+offset], immediate  （将立即值存储到内存）
         """
         if operands['is_memory'] and operands['dest_reg']:
             # MOV reg, [base+offset]
@@ -73,7 +72,7 @@ class InstructionExecutor:
             if base_reg not in [Register.R14, Register.R13]:
                 raise ValueError(f"Unsupported base register for MOV: {base_reg}")
             
-            # Load from memory
+            # 从内存加载
             mem_val = state.load_memory(offset)
             state.set_register(dest_reg, mem_val)
             
@@ -86,12 +85,12 @@ class InstructionExecutor:
             if base_reg not in [Register.R14, Register.R13]:
                 raise ValueError(f"Unsupported base register for MOV: {base_reg}")
             
-            # Store to memory
+            # 存储到内存
             reg_val = state.get_register(src_reg)
             state.store_memory(offset, reg_val)
             
         elif operands['is_memory'] and operands['immediate'] is not None:
-            # MOV [base+offset], immediate (e.g., MOV BYTE PTR [r13+0xe0], 0xc)
+            # MOV [base+offset], immediate（例如，MOV BYTE PTR [r13+0xe0], 0xc）
             base_reg = operands['base_reg']
             offset = operands['offset']
             immediate = operands['immediate']
@@ -99,9 +98,9 @@ class InstructionExecutor:
             if base_reg not in [Register.R14, Register.R13]:
                 raise ValueError(f"Unsupported base register for MOV: {base_reg}")
             
-            # Store immediate to memory (sign-extend or zero-extend based on size)
-            # For byte operations, we'll store as 64-bit with proper extension
-            imm_val = BitVecVal(immediate & 0xFF, 64)  # Byte operation
+            # 将立即值存储到内存（根据大小进行符号扩展或零扩展）
+            # 对于字节操作，我们将存储为64位，并进行适当的扩展
+            imm_val = BitVecVal(immediate & 0xFF, 64)  # 字节操作
             state.store_memory(offset, imm_val)
             
         elif operands['dest_reg'] and operands['src_reg']:
@@ -117,18 +116,18 @@ class InstructionExecutor:
             dest_reg = operands['dest_reg']
             immediate = operands['immediate']
             
-            # Sign-extend immediate to 64 bits
+            # 将立即值符号扩展到64位
             imm_val = BitVecVal(immediate, 64)
             state.set_register(dest_reg, imm_val)
         else:
             raise ValueError(f"Unsupported MOV operand combination: {operands}")
     
     def _execute_add(self, state: ExecutionState, operands: dict) -> None:
-        """Execute ADD instruction.
+        """执行ADD指令。
         
-        Supports:
-        - ADD reg, [base+offset]  (add memory to register)
-        - ADD reg, reg            (add register to register)
+        支持：
+        - ADD reg, [base+offset]  （将内存加到寄存器）
+        - ADD reg, reg            （将寄存器加到寄存器）
         """
         if not operands['dest_reg']:
             raise ValueError(f"ADD instruction must have register destination: {operands}")
@@ -144,22 +143,22 @@ class InstructionExecutor:
             if base_reg not in [Register.R14, Register.R13]:
                 raise ValueError(f"Unsupported base register for ADD: {base_reg}")
             
-            # Load memory value
+            # 加载内存值
             mem_val = state.load_memory(offset)
             
-            # Perform addition (64-bit with carry generation)
+            # 执行加法（64位，带进位生成）
             reg_ext = Concat(BitVecVal(0, 1), reg_val)
             mem_ext = Concat(BitVecVal(0, 1), mem_val)
             sum_ext = reg_ext + mem_ext
             
-            # Extract result and carry
+            # 提取结果和进位
             result = Extract(63, 0, sum_ext)
             carry_out = Extract(64, 64, sum_ext)
             
-            # Update register
+            # 更新寄存器
             state.set_register(dest_reg, result)
             
-            # Update carry flag
+            # 更新进位标志
             state.set_flag('CF', carry_out)
             
         elif operands['src_reg']:
@@ -167,28 +166,28 @@ class InstructionExecutor:
             src_reg = operands['src_reg']
             src_val = state.get_register(src_reg)
             
-            # Perform addition (64-bit with carry generation)
+            # 执行加法（64位，带进位生成）
             reg_ext = Concat(BitVecVal(0, 1), reg_val)
             src_ext = Concat(BitVecVal(0, 1), src_val)
             sum_ext = reg_ext + src_ext
             
-            # Extract result and carry
+            # 提取结果和进位
             result = Extract(63, 0, sum_ext)
             carry_out = Extract(64, 64, sum_ext)
             
-            # Update register
+            # 更新寄存器
             state.set_register(dest_reg, result)
             
-            # Update carry flag
+            # 更新进位标志
             state.set_flag('CF', carry_out)
         else:
             raise ValueError(f"Unsupported ADD operand combination: {operands}")
     
     def _execute_adc(self, state: ExecutionState, operands: dict) -> None:
-        """Execute ADC (add with carry) instruction.
+        """执行ADC（带进位加法）指令。
         
-        Supports:
-        - ADC reg, [base+offset]  (add memory and carry to register)
+        支持：
+        - ADC reg, [base+offset]  （将内存和进位加到寄存器）
         """
         if not operands['dest_reg'] or not operands['is_memory']:
             raise ValueError(f"ADC instruction must have register destination and memory source: {operands}")
@@ -200,36 +199,36 @@ class InstructionExecutor:
         if base_reg != Register.R14:
             raise ValueError(f"Unsupported base register for ADC: {base_reg}")
         
-        # Get current register value
+        # 获取当前寄存器值
         reg_val = state.get_register(dest_reg)
         
-        # Load memory value
+        # 加载内存值
         mem_val = state.load_memory(offset)
         
-        # Get carry flag
+        # 获取进位标志
         carry_in = state.get_flag('CF')
         
-        # Perform addition with carry (64-bit with carry generation)
+        # 执行带进位加法（64位，带进位生成）
         reg_ext = Concat(BitVecVal(0, 1), reg_val)
         mem_ext = Concat(BitVecVal(0, 1), mem_val)
         carry_ext = Concat(BitVecVal(0, 64), carry_in)
         sum_ext = reg_ext + mem_ext + carry_ext
         
-        # Extract result and carry
+        # 提取结果和进位
         result = Extract(63, 0, sum_ext)
         carry_out = Extract(64, 64, sum_ext)
         
-        # Update register
+        # 更新寄存器
         state.set_register(dest_reg, result)
         
-        # Update carry flag
+        # 更新进位标志
         state.set_flag('CF', carry_out)
     
     def _execute_sub(self, state: ExecutionState, operands: dict) -> None:
-        """Execute SUB instruction.
+        """执行SUB指令。
         
-        Supports:
-        - SUB reg, immediate  (subtract immediate from register)
+        支持：
+        - SUB reg, immediate  （从寄存器减去立即值）
         """
         if not operands['dest_reg']:
             raise ValueError(f"SUB instruction must have register destination: {operands}")
@@ -246,11 +245,11 @@ class InstructionExecutor:
             raise ValueError(f"Unsupported SUB operand combination: {operands}")
     
     def _execute_cmp(self, state: ExecutionState, operands: dict) -> None:
-        """Execute CMP instruction.
+        """执行CMP指令。
         
-        CMP sets flags based on comparison but doesn't modify operands.
-        Supports:
-        - CMP reg, immediate  (compare register with immediate)
+        CMP根据比较设置标志，但不修改操作数。
+        支持：
+        - CMP reg, immediate  （将寄存器与立即值比较）
         """
         if not operands['dest_reg']:
             raise ValueError(f"CMP instruction must have register operand: {operands}")
@@ -261,22 +260,22 @@ class InstructionExecutor:
         if operands['immediate'] is not None:
             # CMP reg, immediate
             imm_val = BitVecVal(operands['immediate'], 64)
-            # Compute result for flag setting
+            # 计算用于设置标志的结果
             result = reg_val - imm_val
             
-            # Set flags based on comparison
-            # CF (carry flag): set if unsigned subtraction would borrow
-            # For now, we'll compute it symbolically
+            # 根据比较设置标志
+            # CF（进位标志）：如果无符号减法会借位则设置
+            # 目前，我们将符号地计算它
             reg_ext = Concat(BitVecVal(0, 1), reg_val)
             imm_ext = Concat(BitVecVal(0, 1), imm_val)
             diff_ext = reg_ext - imm_ext
             cf = Extract(64, 64, diff_ext)
             state.set_flag('CF', cf)
             
-            # ZF (zero flag): set if result is zero
-            # reg_val == imm_val returns a BoolRef, convert to 1-bit BitVec
+            # ZF（零标志）：如果结果为零则设置
+            # reg_val == imm_val返回BoolRef，转换为1位BitVec
             zf_bool = (reg_val == imm_val)
-            # Convert BoolRef to 1-bit BitVec: IfThenElse(condition, 1, 0)
+            # 将BoolRef转换为1位BitVec：IfThenElse(condition, 1, 0)
             from z3 import If
             zf = If(zf_bool, BitVecVal(1, 1), BitVecVal(0, 1))
             state.set_flag('ZF', zf)
@@ -284,11 +283,11 @@ class InstructionExecutor:
             raise ValueError(f"Unsupported CMP operand combination: {operands}")
     
     def execute_sequence(self, state: ExecutionState, instructions: List[X86Instruction]) -> None:
-        """Execute a sequence of instructions.
+        """执行指令序列。
         
         Args:
-            state: Initial execution state (will be modified)
-            instructions: List of instructions to execute
+            state: 初始执行状态（将被修改）
+            instructions: 要执行的指令列表
         """
         for instruction in instructions:
             self.execute_instruction(state, instruction)

@@ -1,4 +1,4 @@
-"""Verification modules for program-level equivalence checking."""
+"""用于程序级等价性检查的验证模块。"""
 
 from .refinement_checker import RefinementChecker
 from .program_verifier import ProgramEquivalenceChecker
