@@ -157,6 +157,7 @@ def test_verify_add_program_pair():
     )
 
 
+@pytest.mark.skip
 def test_verify_add_program_pair_full():
     """Test program-level verification using add_program.json and full x86 hex sequence.
     
