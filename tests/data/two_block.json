@@ -1,0 +1,105 @@
+{
+    "control_frames": [
+        {
+            "is_inner_block": false,
+            "is_jump_target": false,
+            "is_stop": false,
+            "max_depth": 1022,
+            "min_depth": 0,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 1,
+                    "pc": 0
+                },
+                {
+                    "immediate": "80",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 0
+                },
+                {
+                    "immediate": "40",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 2
+                },
+                {
+                    "kind": "ADD",
+                    "pc": 0
+                },
+                {
+                    "immediate": "100",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 5
+                },
+                {
+                    "kind": "MSTORE",
+                    "pc": 0
+                },
+                {
+                    "immediate": "5",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 8
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 0
+                },
+                {
+                    "immediate": "13",
+                    "is_static": true,
+                    "kind": "JUMPI",
+                    "param": 1,
+                    "pc": 0
+                }
+            ],
+            "pc": 0,
+            "stack_depth": 0,
+            "static_gas": 31
+        },
+        {
+            "is_inner_block": false,
+            "is_jump_target": true,
+            "is_stop": true,
+            "max_depth": 1022,
+            "min_depth": 0,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 2,
+                    "pc": 0
+                },
+                {
+                    "immediate": "32",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 14
+                },
+                {
+                    "immediate": "100",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 16
+                },
+                {
+                    "kind": "RETURN",
+                    "pc": 0
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 0
+                },
+                {
+                    "kind": "STOP",
+                    "pc": 0
+                }
+            ],
+            "pc": 13,
+            "stack_depth": 0,
+            "static_gas": 7
+        }
+    ]
+}
