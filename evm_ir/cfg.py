@@ -43,21 +43,45 @@ class IRCFG:
             
             if kind == "JUMP":
                 # 无条件跳转：查找目标块
-                # JUMP从栈中弹出一个值，应该是TAG参数
-                # 目前，我们需要符号地跟踪这个值
-                # 为简单起见，如果没有明确目标，假设顺序执行
-                if i + 1 < len(self.blocks):
-                    self.successors[block.pc].append(self.blocks[i + 1])
-            
+                # 如果JUMP有immediate值（静态跳转），使用它作为目标PC
+                if last_op.immediate is not None and last_op.is_static:
+                    target_pc = last_op.immediate
+                    target_block = self.blocks_by_pc.get(target_pc)
+                    if target_block:
+                        self.successors[block.pc].append(target_block)
+                    else:
+                        # 静态跳转但找不到目标块：这是逻辑错误
+                        from utils.exceptions import LogicError
+                        error_msg = f"Static JUMP at pc={last_op.pc} in block pc={block.pc} targets pc={target_pc}, but target block not found in CFG"
+                        raise LogicError(error_msg)
+                else:
+                    # 动态跳转：不支持
+                    from utils.exceptions import UnsupportedJumpError
+                    jump_info = f"Dynamic JUMP at pc={last_op.pc} in block pc={block.pc}"
+                    raise UnsupportedJumpError("dynamic_jump", jump_info, "Dynamic jumps are not supported by this framework")
+
             elif kind == "JUMPI":
                 # 条件跳转：两个后继（跳转和顺序执行）
-                # JUMPI从栈中弹出条件和目标
-                # 跳转：跳转到目标
-                # 顺序执行：下一个块
+                # 跳转目标：如果JUMPI有immediate值（静态跳转），使用它作为目标PC
+                if last_op.immediate is not None and last_op.is_static:
+                    target_pc = last_op.immediate
+                    target_block = self.blocks_by_pc.get(target_pc)
+                    if target_block:
+                        self.successors[block.pc].append(target_block)
+                    else:
+                        # 静态跳转但找不到目标块：这是逻辑错误
+                        from utils.exceptions import LogicError
+                        error_msg = f"Static JUMPI at pc={last_op.pc} in block pc={block.pc} targets pc={target_pc}, but target block not found in CFG"
+                        raise LogicError(error_msg)
+                else:
+                    # 动态条件跳转：不支持
+                    from utils.exceptions import UnsupportedJumpError
+                    jump_info = f"Dynamic JUMPI at pc={last_op.pc} in block pc={block.pc}"
+                    raise UnsupportedJumpError("dynamic_jumpi", jump_info, "Dynamic conditional jumps are not supported by this framework")
+
+                # 顺序执行：下一个块（条件为False时）
                 if i + 1 < len(self.blocks):
                     self.successors[block.pc].append(self.blocks[i + 1])
-                # 注意：实际的跳转目标需要从栈中解析
-                # 目前，我们假设顺序执行
             
             elif kind in ["STOP", "RETURN", "REVERT", "SELFDESTRUCT"]:
                 # 终止块：无后继
