@@ -26,7 +26,7 @@
                 },
                 {
                     "kind": "MSTORE",
-                    "pc": 0
+                    "pc": 4
                 },
                 {
                     "immediate": "1",
@@ -42,7 +42,7 @@
                 },
                 {
                     "kind": "MSTORE",
-                    "pc": 0
+                    "pc": 9
                 },
                 {
                     "immediate": "8",
@@ -52,18 +52,18 @@
                 },
                 {
                     "kind": "BLOCKEND",
-                    "pc": 0
+                    "pc": 14
                 },
                 {
                     "immediate": "21",
                     "is_static": true,
                     "kind": "JUMPI",
                     "param": 1,
-                    "pc": 0
+                    "pc": 14
                 },
                 {
                     "kind": "TAG",
-                    "pc": 0
+                    "pc": 14
                 },
                 {
                     "immediate": "1",
@@ -79,21 +79,21 @@
                 },
                 {
                     "kind": "ADD",
-                    "pc": 0
+                    "pc": 19
                 },
                 {
                     "kind": "RETURN",
-                    "pc": 0
+                    "pc": 20
                 },
                 {
                     "kind": "BLOCKEND",
-                    "pc": 0
+                    "pc": 21
                 },
                 {
                     "immediate": "21",
                     "is_static": true,
                     "kind": "JUMP",
-                    "pc": 0
+                    "pc": 21
                 }
             ],
             "pc": 0,
@@ -110,7 +110,7 @@
                 {
                     "kind": "TAG",
                     "param": 2,
-                    "pc": 0
+                    "pc": 21
                 },
                 {
                     "immediate": "1",
@@ -126,15 +126,15 @@
                 },
                 {
                     "kind": "RETURN",
-                    "pc": 0
+                    "pc": 26
                 },
                 {
                     "kind": "BLOCKEND",
-                    "pc": 0
+                    "pc": 26
                 },
                 {
                     "kind": "STOP",
-                    "pc": 0
+                    "pc": 27
                 }
             ],
             "pc": 21,
