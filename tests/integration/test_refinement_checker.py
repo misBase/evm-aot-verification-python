@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import os
 import pytest
-from z3 import BitVecVal
+from typing import List, Dict
+from z3 import BitVecVal, BitVec
 from common.uint256 import Uint256
 from evm_ir.semantics import EVMIRSemantics
 from evm_ir.json_parser import load_ir_from_json
@@ -18,9 +19,12 @@ from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
 from verification.refinement_checker import RefinementChecker
 from verification.program_verifier import ProgramEquivalenceChecker
+from state.smt_state import SMTState
 
 
-# x86-64机器码序列，用于EVM操作
+# ===========================
+# x86-64 机器码常量
+# ===========================
 # 这些是从AOT编译器输出中提取的
 
 # ADD操作序列（地址0x6c-0x9b）
@@ -76,6 +80,41 @@ def refinement_checker_verbose() -> RefinementChecker:
 
 
 # ===========================
+# 测试辅助函数
+# ===========================
+
+def _build_memory_for_add_operation(
+    val1_limbs: List[BitVec],
+    val2_limbs: List[BitVec]
+) -> Dict[int, BitVec]:
+    """构建用于x86-64 ADD操作的初始内存映射。
+
+    根据AOT编译器的调用约定，将256位操作数的limb映射到栈帧中。
+    这是编译器特定的栈帧布局实现细节。
+
+    Args:
+        val1_limbs: 第一个操作数的 [z0, z1, z2, z3]（每个64位）
+        val2_limbs: 第二个操作数的 [z0, z1, z2, z3]（每个64位）
+
+    Returns:
+        内存偏移量到BitVec值的字典
+    """
+    if len(val1_limbs) != 4 or len(val2_limbs) != 4:
+        raise ValueError("Expected 4 limbs for each 256-bit value")
+
+    return {
+        -0x40: val1_limbs[0],  # val1.z0 (LSB)
+        -0x38: val1_limbs[1],  # val1.z1
+        -0x30: val1_limbs[2],  # val1.z2
+        -0x28: val1_limbs[3],  # val1.z3 (MSB)
+        -0x20: val2_limbs[0],  # val2.z0 (LSB)
+        -0x18: val2_limbs[1],  # val2.z1
+        -0x10: val2_limbs[2],  # val2.z2
+        -0x08: val2_limbs[3],  # val2.z3 (MSB)
+    }
+
+
+# ===========================
 # 测试函数
 # ===========================
 
@@ -91,31 +130,35 @@ def test_verify_add_symbolic(
     refinement_checker_verbose: RefinementChecker
 ):
     """测试符号ADD验证 - 证明对所有输入的正确性。
-    
+
     这是一个形式化证明，证明x86 ADD实现在语义上等价于EVM ADD操作，
     适用于所有可能的256位输入。
-    
+
     此测试证明：∀ a, b ∈ Uint256. x86_ADD_Program(a, b) ≡ EVM_ADD_Program(a, b)
     """
     # 创建符号输入
     evm_val1 = Uint256.symbolic("evm_val1")
     evm_val2 = Uint256.symbolic("evm_val2")
-    
+
     # 构建EVM ADD语义公式
     evm_a_bv = evm_val1.to_bv256()
     evm_b_bv = evm_val2.to_bv256()
     evm_result = evm_semantics.op_semantics.add_semantics(evm_a_bv, evm_b_bv)
-    
-    # 使用相同的符号值构建x86程序语义
-    x86_result_dict = x86_add_program.build_program_semantics_from_limbs(
+
+    # 使用辅助函数构建x86程序的初始内存
+    # 这是AOT编译器使用的栈帧布局（调用约定细节）
+    initial_memory = _build_memory_for_add_operation(
         [evm_val1.z0, evm_val1.z1, evm_val1.z2, evm_val1.z3],
         [evm_val2.z0, evm_val2.z1, evm_val2.z2, evm_val2.z3]
     )
+
+    # 构建x86程序语义
+    x86_result_dict = x86_add_program.build_program_semantics(initial_memory)
     x86_result = x86_result_dict['semantic_formula']
-    
+
     # 检查精化关系（证明对所有输入的等价性）
     verified, msg = refinement_checker_verbose.check_refinement(evm_result, x86_result)
-    
+
     assert verified, (
         f"Symbolic ADD verification failed. "
         f"This should prove equivalence for all 256-bit inputs. Error: {msg}"
@@ -146,7 +189,7 @@ def test_verify_add_program_pair():
     
     # 使用ProgramEquivalenceChecker验证程序对
     checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=False)
-    initial_state = ProgramEquivalenceChecker.create_default_initial_state()
+    initial_state = SMTState.create_initial_state(2)
     verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
     
     assert verified, (
@@ -180,7 +223,7 @@ def test_verify_add_program_pair_full():
     
     # 使用ProgramEquivalenceChecker验证程序对
     checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=True)
-    initial_state = ProgramEquivalenceChecker.create_default_initial_state()
+    initial_state = SMTState.create_initial_state(2)
     verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
     
     assert verified, (

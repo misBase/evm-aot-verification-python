@@ -215,10 +215,14 @@ def add_semantics(self, a: BitVec, b: BitVec) -> BitVec:
 - **`refinement_checker.py`**: Uses Z3 to check refinement relation (x86 refines EVM)
 - **`program_verifier.py`**: **Program-level** verification (MAIN INTERFACE)
   - `ProgramEquivalenceChecker`: Verifies entire programs
-  - `create_default_initial_state()`: Creates default initial SMT state with symbolic inputs
   - `verify_program_pair()`: Main verification entry point
 
-#### 5. `tests/test_verifier.py` - Verification Test Cases
+#### 5. `state/` - State Management
+- **`smt_state.py`**: Unified SMT state for Z3 formula modeling
+  - `SMTState`: Manages all symbolic states (EVM stack/memory/storage/gas, x86 memory/registers)
+  - `create_initial_state(num_inputs)`: Creates initial SMT state with specified number of symbolic inputs
+
+#### 6. `tests/test_verifier.py` - Verification Test Cases
 - Contains test cases for ADD operation verification
 - `test_verify_add_symbolic()`: Formal proof using symbolic execution (∀ inputs)
 - `test_verify_add_concrete()`: Verification with concrete values
@@ -378,6 +382,7 @@ from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
 from verification.program_verifier import ProgramEquivalenceChecker
+from state.smt_state import SMTState
 
 # Load EVM program from JSON
 compiler_result = load_ir_from_json("contract_ir.json")
@@ -388,7 +393,7 @@ x86_program = X86Program.from_hex(hex_code, base_addr=0x0)
 
 # Verify program equivalence
 checker = ProgramEquivalenceChecker()
-initial_state = ProgramEquivalenceChecker.create_default_initial_state()
+initial_state = SMTState.create_initial_state(2)  # 2 symbolic inputs for binary operations
 verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
 ```
 

@@ -15,6 +15,7 @@ from evm_ir.program import EVMProgram
 from evm_ir.json_parser import load_ir_from_json
 from x86_64.program import X86Program
 from verification.program_verifier import ProgramEquivalenceChecker
+from state.smt_state import SMTState
 
 
 def parse_args():
@@ -102,7 +103,8 @@ def verify_programs(ir_json_path: str, x86_hex: str, base_addr: int, timeout_ms:
     
     # 使用ProgramEquivalenceChecker验证
     checker = ProgramEquivalenceChecker(timeout_ms=timeout_ms, verbose=verbose)
-    initial_state = ProgramEquivalenceChecker.create_default_initial_state()
+    # TODO: should be delete later
+    initial_state = SMTState.create_initial_state(2)
     return checker.verify_program_pair(evm_program, x86_program, initial_state)
 
 

@@ -11,56 +11,21 @@ from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
 from .refinement_checker import RefinementChecker
 from state.smt_state import SMTState
-from verification.memory_mapping import StackMemoryMapper
-from common.uint256 import Uint256
 
 
 class ProgramEquivalenceChecker:
     """验证EVM和x86程序之间的等价性。"""
-    
+
     def __init__(self, timeout_ms: int = 60000, verbose: bool = False):
         """初始化程序等价性检查器。
-        
+
         Args:
             timeout_ms: SMT求解器超时（毫秒）
             verbose: 启用详细输出
         """
         self.refinement_checker = RefinementChecker(timeout_ms=timeout_ms, verbose=verbose)
         self.verbose = verbose
-    
-    @staticmethod
-    def create_default_initial_state() -> SMTState:
-        """创建具有符号输入的默认初始SMT状态。
-        
-        创建一个新状态，包含：
-        - EVM栈上的两个符号256位值
-        - 映射到x86内存布局的EVM栈
-        
-        Returns:
-            具有符号输入的已初始化SMTState
-        """
-        initial_state = SMTState()
-        
-        # 为EVM栈创建符号输入
-        val1 = Uint256.symbolic("program_val1")
-        val2 = Uint256.symbolic("program_val2")
-        input_stack = [val1.to_bv256(), val2.to_bv256()]
-        
-        # 使用SP = 0初始化EVM栈
-        initial_state.evm_stack.SP = IntVal(0)
-        
-        # 推送初始栈值
-        for stack_val in input_stack:
-            initial_state.evm_stack = initial_state.evm_stack.push(stack_val)
-        
-        # 将EVM栈输入映射到x86内存布局
-        for stack_index, stack_value in enumerate(input_stack):
-            layout = StackMemoryMapper.stack_to_memory_layout(stack_value, stack_index)
-            for offset, limb in layout.items():
-                initial_state.x86_memory = initial_state.x86_memory.store_limb(offset, limb)
-        
-        return initial_state
-    
+
     def verify_program_pair(self,
                            evm_program: EVMProgram,
                            x86_program: X86Program,

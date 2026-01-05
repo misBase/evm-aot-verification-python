@@ -14,15 +14,15 @@ if TYPE_CHECKING:
 
 class EVMStackState:
     """EVM栈状态表示。
-    
+
     使用Z3 Array对EVM栈建模：Stack : Array[Int, BitVec[256]]
     栈指针SP : Int（范围0-1024）
     栈顶元素：Stack[SP-1]
     """
-    
+
     def __init__(self, initial_depth: int = 0, stack_array: Optional[Array] = None, sp: Optional[Int] = None):
         """初始化EVM栈状态。
-        
+
         Args:
             initial_depth: 初始栈深度（用于向后兼容）
             stack_array: 可选的现有Stack数组
@@ -33,15 +33,68 @@ class EVMStackState:
             self.Stack = Array('Stack', IntSort(), BitVecSort(256))
         else:
             self.Stack = stack_array
-        
+
         # SP : Int（栈指针，范围0-1024）
         if sp is None:
             self.SP = Int('SP')
         else:
             self.SP = sp
-        
+
         # 为了向后兼容，跟踪深度
         self.depth = initial_depth
+
+    def dup(self, n: int) -> 'EVMStackState':
+        """DUP操作：复制栈上的第n个元素到栈顶。
+
+        DUP1复制栈顶元素，DUP2复制次栈顶元素，以此类推。
+
+        Args:
+            n: DUP编号（1-16），DUP1复制Stack[SP-1]，DUP2复制Stack[SP-2]
+
+        Returns:
+            具有更新Stack和SP的新EVMStackState
+        """
+        if not 1 <= n <= 16:
+            raise ValueError(f"DUP number must be 1-16, got {n}")
+
+        # 获取要复制的值：Stack[SP-n]
+        value = Select(self.Stack, self.SP - n)
+
+        # 推送到栈顶：SP' = SP + 1, Stack' = Store(Stack, SP, value)
+        new_sp = self.SP + 1
+        new_stack = Store(self.Stack, self.SP, value)
+
+        new_state = EVMStackState(initial_depth=self.depth + 1, stack_array=new_stack, sp=new_sp)
+        return new_state
+
+    def swap(self, n: int) -> 'EVMStackState':
+        """SWAP操作：交换栈顶元素和第n个元素。
+
+        SWAP1交换Stack[SP-1]和Stack[SP-2]，SWAP2交换Stack[SP-1]和Stack[SP-3]，以此类推。
+
+        Args:
+            n: SWAP编号（1-16），SWAP1交换栈顶和次栈顶
+
+        Returns:
+            具有更新Stack的新EVMStackState（SP不变）
+        """
+        if not 1 <= n <= 16:
+            raise ValueError(f"SWAP number must be 1-16, got {n}")
+
+        # 获取栈顶元素：Stack[SP-1]
+        top_value = Select(self.Stack, self.SP - 1)
+
+        # 获取要交换的元素：Stack[SP-1-n]
+        other_value = Select(self.Stack, self.SP - 1 - n)
+
+        # 存储到交换位置：Stack[SP-1-n] = top_value
+        new_stack = Store(self.Stack, self.SP - 1 - n, top_value)
+
+        # 存储栈顶：Stack[SP-1] = other_value
+        new_stack = Store(new_stack, self.SP - 1, other_value)
+
+        new_state = EVMStackState(initial_depth=self.depth, stack_array=new_stack, sp=self.SP)
+        return new_state
     
     def push(self, value: BitVec) -> 'EVMStackState':
         """将值推送到栈上。
@@ -601,17 +654,19 @@ class X86RegisterState:
 
 class SMTState:
     """用于程序验证的统一SMT状态。
-    
-    管理所有符号状态：EVM栈/内存、x86内存/寄存器。
+
+    管理所有符号状态：EVM栈/内存/Storage/Gas、x86内存/寄存器。
     """
-    
+
     def __init__(self):
         """初始化统一SMT状态。"""
         self.evm_stack = EVMStackState()
         self.evm_memory = EVMMemoryState()
+        self.evm_storage = EVMStorageState()
+        self.evm_gas = EVMGasState()
         self.x86_memory = X86MemoryState()
         self.x86_registers = X86RegisterState()
-        
+
         # RETURN指令跟踪
         # 存储偏移量和长度而不是提取Array
         # 这允许直接内存比较，没有max_bytes限制
@@ -619,19 +674,220 @@ class SMTState:
         from z3 import BitVecVal
         self.return_offset: BitVec = BitVecVal(0, 64)  # 返回偏移量（64位），0 = 无返回
         self.return_length: BitVec = BitVecVal(0, 64)  # 返回长度（64位），0 = 无返回
-    
+
+        # PC（程序计数器）
+        self.pc: int = 0
+
     def copy(self) -> 'SMTState':
         """创建状态的副本。
-        
+
         Returns:
             新SMTState实例
         """
         new_state = SMTState()
         new_state.evm_stack = self.evm_stack.copy()
         new_state.evm_memory = self.evm_memory.copy()
+        new_state.evm_storage = self.evm_storage.copy()
+        new_state.evm_gas = self.evm_gas.copy()
         new_state.x86_memory = self.x86_memory.copy()
         new_state.x86_registers = self.x86_registers.copy()
         new_state.return_offset = self.return_offset
         new_state.return_length = self.return_length
+        new_state.pc = self.pc
+        return new_state
+
+    @staticmethod
+    def create_initial_state(num_inputs: int = 2) -> 'SMTState':
+        """创建具有符号输入的初始SMT状态。
+
+        创建一个新状态，包含：
+        - EVM栈上的指定数量的符号256位值
+        - 映射到x86内存布局的EVM栈
+
+        Args:
+            num_inputs: 要创建的符号输入数量（默认2，适用于二元操作如ADD、SUB等）
+
+        Returns:
+            具有符号输入的已初始化SMTState
+
+        Raises:
+            ValueError: 如果num_inputs为负数或过大（>1024）
+        """
+        # Lazy imports to avoid circular dependencies
+        from common.uint256 import Uint256
+        from verification.memory_mapping import StackMemoryMapper
+        from z3 import IntVal
+
+        # 验证输入数量
+        if num_inputs < 0:
+            raise ValueError(f"num_inputs must be non-negative, got {num_inputs}")
+        if num_inputs > 1024:
+            raise ValueError(f"num_inputs must be <= 1024 (EVM stack limit), got {num_inputs}")
+
+        # 创建基础状态
+        initial_state = SMTState()
+
+        # 使用SP = 0初始化EVM栈
+        initial_state.evm_stack = EVMStackState(initial_depth=0, sp=IntVal(0))
+
+        # 如果没有输入，直接返回空状态
+        if num_inputs == 0:
+            return initial_state
+
+        # 为EVM栈创建符号输入
+        input_stack = []
+        for i in range(num_inputs):
+            val = Uint256.symbolic(f"program_input_{i}")
+            input_stack.append(val.to_bv256())
+
+        # 推送初始栈值
+        for stack_val in input_stack:
+            initial_state.evm_stack = initial_state.evm_stack.push(stack_val)
+
+        # 将EVM栈输入映射到x86内存布局
+        for stack_index, stack_value in enumerate(input_stack):
+            layout = StackMemoryMapper.stack_to_memory_layout(stack_value, stack_index)
+            for offset, limb in layout.items():
+                initial_state.x86_memory = initial_state.x86_memory.store_limb(offset, limb)
+
+        return initial_state
+
+
+class EVMStorageState:
+    """EVM存储状态表示。
+
+    使用Z3 Array对EVM存储建模：Storage : Array[BitVec[256], BitVec[256]]
+    键值对存储，256位地址到256位值。
+    """
+
+    def __init__(self, storage_array: Optional[Array] = None):
+        """初始化EVM存储状态。
+
+        Args:
+            storage_array: 可选的现有Storage数组
+        """
+        # Storage : Array[BitVec[256], BitVec[256]]
+        if storage_array is None:
+            self.Storage = Array('Storage', BitVecSort(256), BitVecSort(256))
+        else:
+            self.Storage = storage_array
+
+    def sload(self, key: BitVec) -> BitVec:
+        """从存储中加载值。
+
+        Args:
+            key: 256位存储键
+
+        Returns:
+            256位存储值
+        """
+        if key.size() != 256:
+            raise ValueError(f"Storage key must be 256 bits, got {key.size()}")
+
+        return Select(self.Storage, key)
+
+    def sstore(self, key: BitVec, value: BitVec) -> 'EVMStorageState':
+        """存储值到存储中。
+
+        Args:
+            key: 256位存储键
+            value: 256位要存储的值
+
+        Returns:
+            具有更新Storage的新EVMStorageState
+        """
+        if key.size() != 256:
+            raise ValueError(f"Storage key must be 256 bits, got {key.size()}")
+        if value.size() != 256:
+            raise ValueError(f"Storage value must be 256 bits, got {value.size()}")
+
+        new_storage = Store(self.Storage, key, value)
+        new_state = EVMStorageState(storage_array=new_storage)
+        return new_state
+
+    def copy(self) -> 'EVMStorageState':
+        """创建存储状态的副本。
+
+        Returns:
+            具有相同Storage的新EVMStorageState实例
+        """
+        new_state = EVMStorageState(storage_array=self.Storage)
+        return new_state
+
+
+class EVMGasState:
+    """EVM Gas状态表示。
+
+    跟踪Gas消耗：Gas : BitVec[64]
+    支持静态Gas和动态Gas计算。
+    """
+
+    def __init__(self, initial_gas: Optional[BitVec] = None):
+        """初始化EVM Gas状态。
+
+        Args:
+            initial_gas: 可选的初始Gas值
+        """
+        # Gas : BitVec[64]
+        if initial_gas is None:
+            self.Gas = BitVec('Gas', 64)
+        else:
+            self.Gas = initial_gas
+
+    def consume_static(self, amount: int) -> 'EVMGasState':
+        """消耗静态Gas。
+
+        Args:
+            amount: 要消耗的Gas数量
+
+        Returns:
+            具有更新Gas的新EVMGasState
+        """
+        from z3 import BitVecVal, If, UGT
+        amount_bv = BitVecVal(amount, 64)
+
+        # 检查Gas溢出：如果Gas < amount，设为0（out of gas）
+        new_gas = If(UGT(amount_bv, self.Gas),
+                     BitVecVal(0, 64),
+                     self.Gas - amount_bv)
+
+        new_state = EVMGasState(initial_gas=new_gas)
+        return new_state
+
+    def consume_dynamic(self, cost: BitVec) -> 'EVMGasState':
+        """消耗动态Gas。
+
+        Args:
+            cost: 动态Gas成本（符号表达式）
+
+        Returns:
+            具有更新Gas的新EVMGasState
+        """
+        from z3 import If, UGT
+
+        # 检查Gas溢出：如果Gas < cost，设为0（out of gas）
+        new_gas = If(UGT(cost, self.Gas),
+                     BitVecVal(0, 64),
+                     self.Gas - cost)
+
+        new_state = EVMGasState(initial_gas=new_gas)
+        return new_state
+
+    def is_out_of_gas(self) -> 'BoolRef':
+        """检查是否耗尽Gas。
+
+        Returns:
+            BoolRef：如果Gas == 0则为True
+        """
+        from z3 import BitVecVal
+        return self.Gas == BitVecVal(0, 64)
+
+    def copy(self) -> 'EVMGasState':
+        """创建Gas状态的副本。
+
+        Returns:
+            具有相同Gas的新EVMGasState实例
+        """
+        new_state = EVMGasState(initial_gas=self.Gas)
         return new_state
 

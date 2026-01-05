@@ -125,7 +125,213 @@ class Uint256:
         result_z3 = Extract(63, 0, sum3_ext)
         
         return Uint256(result_z0, result_z1, result_z2, result_z3)
-    
+
+    def sub_semantics(self, other: 'Uint256') -> 'Uint256':
+        """将两个Uint256值相减，带借位传播（语义建模）。
+
+        这使用4x64位limb减法和借位实现EVM SUB语义。
+        计算 (a - b) mod 2^256。
+
+        Args:
+            other: 要减去的另一个Uint256值
+
+        Returns:
+            表示差(a - b) mod 2^256的新Uint256实例
+        """
+        from z3 import BitVecVal, Concat, Extract, ZeroExt
+
+        # 执行4x64位减法，带借位传播
+
+        # Limb 0: result_z0 = self.z0 - other.z0
+        # Extend to 65 bits to capture borrow
+        diff0_ext = Concat(BitVecVal(0, 1), self.z0) - Concat(BitVecVal(0, 1), other.z0)
+        result_z0 = Extract(63, 0, diff0_ext)
+        borrow0 = Extract(64, 64, diff0_ext)
+
+        # Limb 1: result_z1 = self.z1 - other.z1 - borrow0
+        # 将 1-bit borrow 扩展为 65-bit: Concat(0, ZeroExt(63, borrow0))
+        diff1_ext = (Concat(BitVecVal(0, 1), self.z1) -
+                     Concat(BitVecVal(0, 1), other.z1) -
+                     Concat(BitVecVal(0, 1), ZeroExt(63, borrow0)))
+        result_z1 = Extract(63, 0, diff1_ext)
+        borrow1 = Extract(64, 64, diff1_ext)
+
+        # Limb 2: result_z2 = self.z2 - other.z2 - borrow1
+        diff2_ext = (Concat(BitVecVal(0, 1), self.z2) -
+                     Concat(BitVecVal(0, 1), other.z2) -
+                     Concat(BitVecVal(0, 1), ZeroExt(63, borrow1)))
+        result_z2 = Extract(63, 0, diff2_ext)
+        borrow2 = Extract(64, 64, diff2_ext)
+
+        # Limb 3: result_z3 = self.z3 - other.z3 - borrow2
+        # borrow3 is discarded (underflow wraps around)
+        diff3_ext = (Concat(BitVecVal(0, 1), self.z3) -
+                     Concat(BitVecVal(0, 1), other.z3) -
+                     Concat(BitVecVal(0, 1), ZeroExt(63, borrow2)))
+        result_z3 = Extract(63, 0, diff3_ext)
+
+        return Uint256(result_z0, result_z1, result_z2, result_z3)
+
+    def mul_semantics(self, other: 'Uint256') -> 'Uint256':
+        """将两个Uint256值相乘（语义建模）。
+
+        计算 (a * b) mod 2^256。
+        简化实现：使用256位直接相乘然后截断。
+
+        Args:
+            other: 要相乘的另一个Uint256值
+
+        Returns:
+            表示积(a * b) mod 2^256的新Uint256实例
+        """
+        from z3 import BitVecVal
+
+        # 直接使用256位乘法然后截断
+        a_256 = self.to_bv256()
+        b_256 = other.to_bv256()
+
+        # 256位乘法会溢出，这正是我们想要的（模2^256）
+        product_256 = a_256 * b_256
+
+        # 将结果转换回Uint256
+        return Uint256.from_bv256(product_256)
+
+    def and_semantics(self, other: 'Uint256') -> 'Uint256':
+        """按位与操作（语义建模）。
+
+        Args:
+            other: 另一个Uint256值
+
+        Returns:
+            a & b 的新Uint256实例
+        """
+        return Uint256(
+            self.z0 & other.z0,
+            self.z1 & other.z1,
+            self.z2 & other.z2,
+            self.z3 & other.z3
+        )
+
+    def or_semantics(self, other: 'Uint256') -> 'Uint256':
+        """按位或操作（语义建模）。
+
+        Args:
+            other: 另一个Uint256值
+
+        Returns:
+            a | b 的新Uint256实例
+        """
+        return Uint256(
+            self.z0 | other.z0,
+            self.z1 | other.z1,
+            self.z2 | other.z2,
+            self.z3 | other.z3
+        )
+
+    def xor_semantics(self, other: 'Uint256') -> 'Uint256':
+        """按位异或操作（语义建模）。
+
+        Args:
+            other: 另一个Uint256值
+
+        Returns:
+            a ^ b 的新Uint256实例
+        """
+        return Uint256(
+            self.z0 ^ other.z0,
+            self.z1 ^ other.z1,
+            self.z2 ^ other.z2,
+            self.z3 ^ other.z3
+        )
+
+    def not_semantics(self) -> 'Uint256':
+        """按位非操作（语义建模）。
+
+        Returns:
+            ~a 的新Uint256实例
+        """
+        from z3 import BitVecVal
+        return Uint256(
+            self.z0 ^ BitVecVal(0xFFFFFFFFFFFFFFFF, 64),
+            self.z1 ^ BitVecVal(0xFFFFFFFFFFFFFFFF, 64),
+            self.z2 ^ BitVecVal(0xFFFFFFFFFFFFFFFF, 64),
+            self.z3 ^ BitVecVal(0xFFFFFFFFFFFFFFFF, 64)
+        )
+
+    def lt_semantics(self, other: 'Uint256'):
+        """无符号小于比较（语义建模）。
+
+        Args:
+            other: 另一个Uint256值
+
+        Returns:
+            BoolRef：如果 a < b 则为True
+        """
+        from z3 import Or, And, ULT
+
+        # 比较从最高位limb开始
+        high_lt = ULT(self.z3, other.z3)
+        high_eq = self.z3 == other.z3
+
+        mid2_lt = ULT(self.z2, other.z2)
+        mid2_eq = self.z2 == other.z2
+
+        mid1_lt = ULT(self.z1, other.z1)
+        mid1_eq = self.z1 == other.z1
+
+        low_lt = ULT(self.z0, other.z0)
+
+        result = Or(
+            high_lt,
+            And(high_eq, mid2_lt),
+            And(high_eq, mid2_eq, mid1_lt),
+            And(high_eq, mid2_eq, mid1_eq, low_lt)
+        )
+
+        return result
+
+    def gt_semantics(self, other: 'Uint256'):
+        """无符号大于比较（语义建模）。
+
+        Args:
+            other: 另一个Uint256值
+
+        Returns:
+            BoolRef：如果 a > b 则为True
+        """
+        return other.lt_semantics(self)
+
+    def eq_semantics(self, other: 'Uint256'):
+        """等于比较（语义建模）。
+
+        Args:
+            other: 另一个Uint256值
+
+        Returns:
+            BoolRef：如果 a == b 则为True
+        """
+        from z3 import And
+        return And(
+            self.z0 == other.z0,
+            self.z1 == other.z1,
+            self.z2 == other.z2,
+            self.z3 == other.z3
+        )
+
+    def iszero_semantics(self):
+        """是否为零检查（语义建模）。
+
+        Returns:
+            BoolRef：如果 a == 0 则为True
+        """
+        from z3 import And, BitVecVal
+        return And(
+            self.z0 == BitVecVal(0, 64),
+            self.z1 == BitVecVal(0, 64),
+            self.z2 == BitVecVal(0, 64),
+            self.z3 == BitVecVal(0, 64)
+        )
+
     def __repr__(self):
         return f"Uint256(z0={self.z0}, z1={self.z1}, z2={self.z2}, z3={self.z3})"
 

@@ -1,49 +1,442 @@
 #!/usr/bin/env python3
-"""直接测试Uint256.add_semantics()方法（类似于Go的y.Add(&x, y)）。"""
+"""
+Uint256 单元测试 - 测试所有语义操作的正确性。
 
-from common.uint256 import Uint256
+这些测试使用具体数值验证 Uint256 的语义操作与 Go 的 holiman/uint256 实现一致。
+"""
+
+import pytest
 from z3 import BitVecVal, simplify
 
+from common.uint256 import Uint256
 
-def test_uint256_add_direct():
-    """直接测试Uint256.add_semantics()方法，类似于Go的y.Add(&x, y)。"""
-    # 测试用例1：简单加法
-    val1 = Uint256.from_int(0x60)
-    val2 = Uint256.from_int(0x10)
-    
-    # 直接调用add_semantics（类似于Go的y.Add(&x, y)）
-    result = val1.add_semantics(val2)
-    
-    expected = Uint256.from_int(0x70)
-    assert simplify(result.z0 == expected.z0), \
-        f"z0 mismatch: expected {simplify(expected.z0)}, got {simplify(result.z0)}"
-    assert simplify(result.z1 == expected.z1), \
-        f"z1 mismatch: expected {simplify(expected.z1)}, got {simplify(result.z1)}"
-    assert simplify(result.z2 == expected.z2), \
-        f"z2 mismatch: expected {simplify(expected.z2)}, got {simplify(result.z2)}"
-    assert simplify(result.z3 == expected.z3), \
-        f"z3 mismatch: expected {simplify(expected.z3)}, got {simplify(result.z3)}"
-    
-    # 测试用例2：带进位的加法
-    val3 = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
-    val4 = Uint256.from_int(0x01)
-    
-    result2 = val3.add_semantics(val4)
-    
-    # 应该有z0=0, z1=1（进位传播）
-    assert simplify(result2.z0 == 0), \
-        f"z0 should be 0 after carry, got {simplify(result2.z0)}"
-    assert simplify(result2.z1 == 1), \
-        f"z1 should be 1 after carry, got {simplify(result2.z1)}"
-    
-    # 测试用例3：符号加法
-    val5 = Uint256.symbolic("a")
-    val6 = Uint256.symbolic("b")
-    
-    result3 = val5.add_semantics(val6)
-    
-    assert hasattr(result3, 'z0') and hasattr(result3, 'z1'), \
-        "Result should have correct structure (z0, z1, z2, z3 attributes)"
-    assert hasattr(result3, 'z2') and hasattr(result3, 'z3'), \
-        "Result should have correct structure (z2, z3 attributes)"
 
+class TestUint256AddSemantics:
+    """测试 add_semantics() 方法。"""
+
+    def test_add_simple(self):
+        """简单加法（无进位）：1 + 1 = 2"""
+        val1 = Uint256.from_int(1)
+        val2 = Uint256.from_int(1)
+        result = val1.add_semantics(val2)
+        expected = Uint256.from_int(2)
+        assert simplify(result.z0 == expected.z0)
+        assert simplify(result.z1 == expected.z1)
+
+    def test_add_cross_limb_carry(self):
+        """跨 limb 加法（有进位）：2^64 - 1 + 1 = 2^64"""
+        val1 = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
+        val2 = Uint256.from_int(1)
+        result = val1.add_semantics(val2)
+
+        # 结果应该是 [0, 1, 0, 0]
+        assert simplify(result.z0 == 0)
+        assert simplify(result.z1 == 1)
+        assert simplify(result.z2 == 0)
+        assert simplify(result.z3 == 0)
+
+    def test_add_zeros(self):
+        """全 0 加法：0 + 0 = 0"""
+        val1 = Uint256.from_int(0)
+        val2 = Uint256.from_int(0)
+        result = val1.add_semantics(val2)
+        expected = Uint256.from_int(0)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_add_overflow(self):
+        """最大值加法（溢出）：2^256 - 1 + 1 = 0"""
+        # 2^256 - 1 = 所有 limb 都是 0xFFFFFFFFFFFFFFFF
+        val1 = Uint256(
+            BitVecVal(0xFFFFFFFFFFFFFFFF, 64),
+            BitVecVal(0xFFFFFFFFFFFFFFFF, 64),
+            BitVecVal(0xFFFFFFFFFFFFFFFF, 64),
+            BitVecVal(0xFFFFFFFFFFFFFFFF, 64)
+        )
+        val2 = Uint256.from_int(1)
+        result = val1.add_semantics(val2)
+
+        # 溢出后应该全为 0
+        assert simplify(result.z0 == 0)
+        assert simplify(result.z1 == 0)
+        assert simplify(result.z2 == 0)
+        assert simplify(result.z3 == 0)
+
+    def test_add_multi_limb_carry(self):
+        """多 limb 进位：2^128 - 1 + 1 = 2^128"""
+        val1 = Uint256(
+            BitVecVal(0xFFFFFFFFFFFFFFFF, 64),
+            BitVecVal(0xFFFFFFFFFFFFFFFF, 64),
+            BitVecVal(0, 64),
+            BitVecVal(0, 64)
+        )
+        val2 = Uint256.from_int(1)
+        result = val1.add_semantics(val2)
+
+        # 结果应该是 [0, 0, 1, 0]
+        assert simplify(result.z0 == 0)
+        assert simplify(result.z1 == 0)
+        assert simplify(result.z2 == 1)
+        assert simplify(result.z3 == 0)
+
+
+class TestUint256SubSemantics:
+    """测试 sub_semantics() 方法。"""
+
+    def test_sub_simple(self):
+        """简单减法（无借位）：5 - 3 = 2"""
+        val1 = Uint256.from_int(5)
+        val2 = Uint256.from_int(3)
+        result = val1.sub_semantics(val2)
+        expected = Uint256.from_int(2)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_sub_cross_limb_borrow(self):
+        """跨 limb 减法（有借位）：2^64 - 1"""
+        # 2^64 表示为 [0, 1, 0, 0]
+        val1 = Uint256(
+            BitVecVal(0, 64),
+            BitVecVal(1, 64),
+            BitVecVal(0, 64),
+            BitVecVal(0, 64)
+        )
+        val2 = Uint256.from_int(1)
+        result = val1.sub_semantics(val2)
+
+        # 结果应该是 2^64 - 1 = [0xFFFFFFFFFFFFFFFF, 0, 0, 0]
+        expected = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z0 == expected.z0)
+        assert simplify(result.z1 == expected.z1)
+
+    def test_sub_zeros(self):
+        """全 0 减法：0 - 0 = 0"""
+        val1 = Uint256.from_int(0)
+        val2 = Uint256.from_int(0)
+        result = val1.sub_semantics(val2)
+        expected = Uint256.from_int(0)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_sub_underflow(self):
+        """下溢（借位传播）：0 - 1 = 2^256 - 1"""
+        val1 = Uint256.from_int(0)
+        val2 = Uint256.from_int(1)
+        result = val1.sub_semantics(val2)
+
+        # 结果应该是 2^256 - 1（全 1）
+        assert simplify(result.z0 == 0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z1 == 0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z2 == 0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z3 == 0xFFFFFFFFFFFFFFFF)
+
+    def test_sub_multi_limb_borrow(self):
+        """多 limb 借位：1 - 2^64"""
+        # 1 = [1, 0, 0, 0], 2^64 = [0, 1, 0, 0]
+        val1 = Uint256.from_int(1)
+        val2 = Uint256(
+            BitVecVal(0, 64),
+            BitVecVal(1, 64),
+            BitVecVal(0, 64),
+            BitVecVal(0, 64)
+        )
+        result = val1.sub_semantics(val2)
+
+        # 结果应该是 1 - 2^64 = 2^256 - 2^64 + 1
+        # 即 [1, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF]
+        assert simplify(result.z0 == 1)
+        assert simplify(result.z1 == 0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z2 == 0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z3 == 0xFFFFFFFFFFFFFFFF)
+
+    def test_sub_boundary(self):
+        """边界情况：2^128 - 2^64 = 2^64 * (2^64 - 1)"""
+        val1 = Uint256(
+            BitVecVal(0, 64),
+            BitVecVal(0, 64),
+            BitVecVal(1, 64),
+            BitVecVal(0, 64)
+        )
+        val2 = Uint256(
+            BitVecVal(0, 64),
+            BitVecVal(1, 64),
+            BitVecVal(0, 64),
+            BitVecVal(0, 64)
+        )
+        result = val1.sub_semantics(val2)
+
+        # 结果应该是 [0, 0xFFFFFFFFFFFFFFFF, 0, 0]
+        assert simplify(result.z0 == 0)
+        assert simplify(result.z1 == 0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z2 == 0)
+        assert simplify(result.z3 == 0)
+
+
+class TestUint256MulSemantics:
+    """测试 mul_semantics() 方法。"""
+
+    def test_mul_simple(self):
+        """简单乘法：2 * 3 = 6"""
+        val1 = Uint256.from_int(2)
+        val2 = Uint256.from_int(3)
+        result = val1.mul_semantics(val2)
+        expected = Uint256.from_int(6)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_mul_large_numbers(self):
+        """大数乘法：2^32 * 2^32 = 2^64"""
+        val1 = Uint256.from_int(2**32)
+        val2 = Uint256.from_int(2**32)
+        result = val1.mul_semantics(val2)
+
+        # 结果应该是 2^64 = [0, 1, 0, 0]
+        assert simplify(result.z0 == 0)
+        assert simplify(result.z1 == 1)
+        assert simplify(result.z2 == 0)
+        assert simplify(result.z3 == 0)
+
+    def test_mul_by_zero(self):
+        """零乘法：12345 * 0 = 0"""
+        val1 = Uint256.from_int(12345)
+        val2 = Uint256.from_int(0)
+        result = val1.mul_semantics(val2)
+        expected = Uint256.from_int(0)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_mul_overflow(self):
+        """溢出乘法：2^128 * 2^128 结果截断为 0"""
+        val1 = Uint256(
+            BitVecVal(0, 64),
+            BitVecVal(0, 64),
+            BitVecVal(1, 64),
+            BitVecVal(0, 64)
+        )
+        val2 = Uint256(
+            BitVecVal(0, 64),
+            BitVecVal(0, 64),
+            BitVecVal(1, 64),
+            BitVecVal(0, 64)
+        )
+        result = val1.mul_semantics(val2)
+
+        # 2^128 * 2^128 = 2^256，模 2^256 后为 0
+        assert simplify(result.z0 == 0)
+        assert simplify(result.z1 == 0)
+        assert simplify(result.z2 == 0)
+        assert simplify(result.z3 == 0)
+
+
+class TestUint256BitwiseSemantics:
+    """测试位运算操作。"""
+
+    def test_and_simple(self):
+        """AND 操作：0xFF & 0x0F = 0x0F"""
+        val1 = Uint256.from_int(0xFF)
+        val2 = Uint256.from_int(0x0F)
+        result = val1.and_semantics(val2)
+        expected = Uint256.from_int(0x0F)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_and_zeros(self):
+        """AND 全 0：0xFFFFFFFFFFFFFFFF & 0 = 0"""
+        val1 = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
+        val2 = Uint256.from_int(0)
+        result = val1.and_semantics(val2)
+        expected = Uint256.from_int(0)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_and_ones(self):
+        """AND 全 1：x & 0xFFFFFFFFFFFFFFFF = x（对于单个 limb）"""
+        val1 = Uint256.from_int(0x123456789ABCDEF0)
+        val2 = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
+        result = val1.and_semantics(val2)
+        assert simplify(result.z0 == val1.z0)
+
+    def test_or_simple(self):
+        """OR 操作：0xF0 | 0x0F = 0xFF"""
+        val1 = Uint256.from_int(0xF0)
+        val2 = Uint256.from_int(0x0F)
+        result = val1.or_semantics(val2)
+        expected = Uint256.from_int(0xFF)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_or_zeros(self):
+        """OR 全 0：x | 0 = x"""
+        val1 = Uint256.from_int(12345)
+        val2 = Uint256.from_int(0)
+        result = val1.or_semantics(val2)
+        assert simplify(result.z0 == val1.z0)
+
+    def test_or_ones(self):
+        """OR 全 1：x | 0xFFFFFFFFFFFFFFFF = 0xFFFFFFFFFFFFFFFF"""
+        val1 = Uint256.from_int(0x123456789ABCDEF0)
+        val2 = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
+        result = val1.or_semantics(val2)
+        expected = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_xor_same(self):
+        """XOR 相同值：x ^ x = 0"""
+        val1 = Uint256.from_int(0x123456789ABCDEF0)
+        result = val1.xor_semantics(val1)
+        expected = Uint256.from_int(0)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_xor_different(self):
+        """XOR 不同值：0xFF ^ 0xFF = 0, 0xF0 ^ 0x0F = 0xFF"""
+        val1 = Uint256.from_int(0xF0)
+        val2 = Uint256.from_int(0x0F)
+        result = val1.xor_semantics(val2)
+        expected = Uint256.from_int(0xFF)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_not_zero(self):
+        """NOT 零：~0 = 0xFFFFFFFFFFFFFFFF"""
+        val1 = Uint256.from_int(0)
+        result = val1.not_semantics()
+        expected = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_not_ones(self):
+        """NOT 全 1：~0xFFFFFFFFFFFFFFFF = 0"""
+        val1 = Uint256.from_int(0xFFFFFFFFFFFFFFFF)
+        result = val1.not_semantics()
+        expected = Uint256.from_int(0)
+        assert simplify(result.z0 == expected.z0)
+
+    def test_not_mixed(self):
+        """NOT 混合值：~0x00FF00FF = 0xFFFFFFFFFF00FF00（64位）"""
+        val1 = Uint256.from_int(0x00FF00FF)
+        result = val1.not_semantics()
+        expected = Uint256.from_int(0xFFFFFFFFFF00FF00)
+        assert simplify(result.z0 == expected.z0)
+
+
+class TestUint256ComparisonSemantics:
+    """测试比较操作。"""
+
+    def test_lt_less_than(self):
+        """LT 小于：1 < 5 为 True"""
+        val1 = Uint256.from_int(1)
+        val2 = Uint256.from_int(5)
+        result = val1.lt_semantics(val2)
+        # result 是一个 Z3 Bool 表达式，需要用 simplify 验证
+        assert simplify(result)
+
+    def test_lt_equal(self):
+        """LT 相等：5 < 5 为 False"""
+        val1 = Uint256.from_int(5)
+        val2 = Uint256.from_int(5)
+        result = val1.lt_semantics(val2)
+        assert not simplify(result)
+
+    def test_lt_greater(self):
+        """LT 大于：5 < 1 为 False"""
+        val1 = Uint256.from_int(5)
+        val2 = Uint256.from_int(1)
+        result = val1.lt_semantics(val2)
+        assert not simplify(result)
+
+    def test_gt_less_than(self):
+        """GT 小于：1 > 5 为 False"""
+        val1 = Uint256.from_int(1)
+        val2 = Uint256.from_int(5)
+        result = val1.gt_semantics(val2)
+        assert not simplify(result)
+
+    def test_gt_equal(self):
+        """GT 相等：5 > 5 为 False"""
+        val1 = Uint256.from_int(5)
+        val2 = Uint256.from_int(5)
+        result = val1.gt_semantics(val2)
+        assert not simplify(result)
+
+    def test_gt_greater(self):
+        """GT 大于：5 > 1 为 True"""
+        val1 = Uint256.from_int(5)
+        val2 = Uint256.from_int(1)
+        result = val1.gt_semantics(val2)
+        assert simplify(result)
+
+    def test_eq_equal(self):
+        """EQ 相等：5 == 5 为 True"""
+        val1 = Uint256.from_int(5)
+        val2 = Uint256.from_int(5)
+        result = val1.eq_semantics(val2)
+        assert simplify(result)
+
+    def test_eq_not_equal(self):
+        """EQ 不等：5 == 3 为 False"""
+        val1 = Uint256.from_int(5)
+        val2 = Uint256.from_int(3)
+        result = val1.eq_semantics(val2)
+        assert not simplify(result)
+
+    def test_eq_different_limbs(self):
+        """EQ 不同 limb：比较跨 limb 的值"""
+        val1 = Uint256(
+            BitVecVal(1, 64),
+            BitVecVal(0, 64),
+            BitVecVal(0, 64),
+            BitVecVal(0, 64)
+        )
+        val2 = Uint256.from_int(1)
+        result = val1.eq_semantics(val2)
+        assert simplify(result)
+
+    def test_iszero_zero(self):
+        """ISZERO 零：iszero(0) 为 True"""
+        val1 = Uint256.from_int(0)
+        result = val1.iszero_semantics()
+        assert simplify(result)
+
+    def test_iszero_nonzero(self):
+        """ISZERO 非零：iszero(1) 为 False"""
+        val1 = Uint256.from_int(1)
+        result = val1.iszero_semantics()
+        assert not simplify(result)
+
+    def test_iszero_large_nonzero(self):
+        """ISZERO 大数非零：iszero(2^128) 为 False"""
+        val1 = Uint256(
+            BitVecVal(0, 64),
+            BitVecVal(0, 64),
+            BitVecVal(1, 64),
+            BitVecVal(0, 64)
+        )
+        result = val1.iszero_semantics()
+        assert not simplify(result)
+
+
+class TestUint256Conversions:
+    """测试转换方法。"""
+
+    def test_from_int_simple(self):
+        """from_int 简单值：from_int(42)"""
+        val = Uint256.from_int(42)
+        assert simplify(val.z0 == 42)
+        assert simplify(val.z1 == 0)
+        assert simplify(val.z2 == 0)
+        assert simplify(val.z3 == 0)
+
+    def test_from_int_large(self):
+        """from_int 大值：from_int(2^64)"""
+        val = Uint256.from_int(2**64)
+        assert simplify(val.z0 == 0)
+        assert simplify(val.z1 == 1)
+        assert simplify(val.z2 == 0)
+        assert simplify(val.z3 == 0)
+
+    def test_to_bv256_and_from_bv256(self):
+        """to_bv256 和 from_bv256 往返转换"""
+        original = Uint256.from_int(0x123456789ABCDEF0)
+        bv = original.to_bv256()
+        restored = Uint256.from_bv256(bv)
+        assert simplify(original.z0 == restored.z0)
+        assert simplify(original.z1 == restored.z1)
+
+    def test_symbolic(self):
+        """symbolic 创建符号变量"""
+        val = Uint256.symbolic("x")
+        # 符号变量应该有正确的结构
+        assert hasattr(val, 'z0')
+        assert hasattr(val, 'z1')
+        assert hasattr(val, 'z2')
+        assert hasattr(val, 'z3')

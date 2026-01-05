@@ -129,67 +129,14 @@ class X86Program:
         result_registers = [Register.RBX, Register.RDX, Register.RCX, Register.RAX]
         reg_values = [state.get_register(reg) for reg in result_registers]
         semantic_formula = Concat(*reg_values)
-        
+
         return {
             'output_memory': state.memory,
             'semantic_formula': semantic_formula,
-            'executed_instructions': self.instructions if self.instructions else 
+            'executed_instructions': self.instructions if self.instructions else
                                     [insn for block in self.blocks for insn in block.instructions],
             'output_count': 1
         }
-    
-    def build_program_semantics_from_limbs(self,
-                                          val1_limbs: List[BitVec],
-                                          val2_limbs: List[BitVec],
-                                          result_registers: Optional[List[Register]] = None) -> Dict[str, Any]:
-        """使用limb列表作为输入构建程序语义。
-        
-        便利方法，从limb创建内存变量映射并执行整个程序。
-        
-        Args:
-            val1_limbs: 第一个操作数的[z0, z1, z2, z3]（每个64位）
-            val2_limbs: 第二个操作数的[z0, z1, z2, z3]（每个64位）
-            result_registers: 要从中提取结果的寄存器列表（从高到低顺序）。
-                            如果为None，对于256位结果默认为[RBX, RDX, RCX, RAX]。
-            
-        Returns:
-            包含语义公式和元数据的字典
-        """
-        if len(val1_limbs) != 4 or len(val2_limbs) != 4:
-            raise ValueError("Expected 4 limbs for 256-bit value")
-        
-        initial_memory = {
-            -0x40: val1_limbs[0],  # val1.z0
-            -0x38: val1_limbs[1],  # val1.z1
-            -0x30: val1_limbs[2],  # val1.z2
-            -0x28: val1_limbs[3],  # val1.z3
-            -0x20: val2_limbs[0],  # val2.z0
-            -0x18: val2_limbs[1],  # val2.z1
-            -0x10: val2_limbs[2],  # val2.z2
-            -0x08: val2_limbs[3],  # val2.z3
-        }
-        
-        if result_registers is None:
-            result_registers = [Register.RBX, Register.RDX, Register.RCX, Register.RAX]
-        
-        # 为整个程序构建语义
-        result = self.build_program_semantics(initial_memory)
-        
-        # 如果不同，使用指定寄存器重新提取
-        if result_registers != [Register.RBX, Register.RDX, Register.RCX, Register.RAX]:
-            from .execution_state import ExecutionState
-            state = ExecutionState(initial_memory=initial_memory.copy())
-            
-            if self.instructions:
-                self.semantics.executor.execute_sequence(state, self.instructions)
-            else:
-                for block in self.blocks:
-                    self.semantics.executor.execute_sequence(state, block.instructions)
-            
-            reg_values = [state.get_register(reg) for reg in result_registers]
-            result['semantic_formula'] = Concat(*reg_values)
-        
-        return result
     
     def to_z3(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
         """使用路径感知执行为整个程序构建Z3公式。

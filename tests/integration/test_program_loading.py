@@ -40,9 +40,9 @@ def test_x86_program_from_hex():
         f"Program should have at least one instruction, got {len(x86_program.instructions)}"
 
 
-def test_program_add_operation_verification():
+def test_evm_program_contains_add_operation():
     """测试EVM程序结构和操作检测。
-    
+
     此测试验证我们可以正确解析和检查EVM程序结构，
     包括在块内查找特定操作。
     """

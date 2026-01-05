@@ -519,16 +519,16 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         # SUB：从目标减去源
         if not operands['dest_reg']:
             raise ValueError(f"SUB instruction must have register destination: {operands}")
-        
+
         dest_reg = operands['dest_reg']
         reg_val = state.x86_registers.get_register(dest_reg)
-        
+
         if operands['immediate'] is not None:
             # SUB reg, immediate
             imm_val = BitVecVal(operands['immediate'], 64)
             result = reg_val - imm_val
             state.x86_registers.set_register(dest_reg, result)
-        
+
         return state
     
     elif mnemonic == 'cmp':
@@ -653,12 +653,188 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         state.return_length = If(status_code_is_returned, length_bv, zero_64)
         
         return state
-    
+
+    elif mnemonic == 'mul':
+        # MUL：无符号乘法（RAX * src -> RDX:RAX）
+        if not operands['dest_reg']:
+            raise ValueError(f"MUL instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        reg_val = state.x86_registers.get_register(dest_reg)
+
+        if operands['is_memory']:
+            # MUL reg, [base+offset]
+            base_reg = operands['base_reg']
+            offset = operands['offset']
+
+            if base_reg not in [Register.R14, Register.R13]:
+                raise ValueError(f"Unsupported base register for MUL: {base_reg}")
+
+            memory_offset = offset
+            if 'index_reg' in operands and operands['index_reg']:
+                index_reg = operands['index_reg']
+                index_val = state.x86_registers.get_register(index_reg)
+                if isinstance(offset, int):
+                    offset_bv = BitVecVal(offset, 64)
+                else:
+                    offset_bv = offset
+                memory_offset = offset_bv + index_val
+
+            mem_val = state.x86_memory.load_64bit(memory_offset)
+
+            # 执行64位乘法：result = reg_val * mem_val
+            # 结果是128位：RDX:RAX（高64位在RDX，低64位在RAX）
+            # 对于EVM验证，我们通常只关心低64位（截断）
+            result = reg_val * mem_val
+
+            # 存储低64位到目标寄存器
+            result_low = Extract(63, 0, result)
+            state.x86_registers.set_register(dest_reg, result_low)
+
+            # 高64位存储到RDX（如果需要）
+            result_high = Extract(127, 64, result)
+            state.x86_registers.set_register(Register.RDX, result_high)
+
+        elif operands['src_reg']:
+            # MUL reg, reg
+            src_reg = operands['src_reg']
+            src_val = state.x86_registers.get_register(src_reg)
+
+            # 执行乘法
+            result = reg_val * src_val
+
+            # 存储低64位
+            result_low = Extract(63, 0, result)
+            state.x86_registers.set_register(dest_reg, result_low)
+
+            # 高64位存储到RDX
+            result_high = Extract(127, 64, result)
+            state.x86_registers.set_register(Register.RDX, result_high)
+
+        return state
+
+    elif mnemonic == 'and':
+        # AND：按位与
+        if not operands['dest_reg']:
+            raise ValueError(f"AND instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        reg_val = state.x86_registers.get_register(dest_reg)
+
+        if operands['is_memory']:
+            # AND reg, [base+offset]
+            base_reg = operands['base_reg']
+            offset = operands['offset']
+
+            if base_reg not in [Register.R14, Register.R13]:
+                raise ValueError(f"Unsupported base register for AND: {base_reg}")
+
+            memory_offset = offset
+            if 'index_reg' in operands and operands['index_reg']:
+                index_reg = operands['index_reg']
+                index_val = state.x86_registers.get_register(index_reg)
+                if isinstance(offset, int):
+                    offset_bv = BitVecVal(offset, 64)
+                else:
+                    offset_bv = offset
+                memory_offset = offset_bv + index_val
+
+            mem_val = state.x86_memory.load_64bit(memory_offset)
+            result = reg_val & mem_val
+            state.x86_registers.set_register(dest_reg, result)
+
+        elif operands['src_reg']:
+            # AND reg, reg
+            src_reg = operands['src_reg']
+            src_val = state.x86_registers.get_register(src_reg)
+            result = reg_val & src_val
+            state.x86_registers.set_register(dest_reg, result)
+
+        return state
+
+    elif mnemonic == 'or':
+        # OR：按位或
+        if not operands['dest_reg']:
+            raise ValueError(f"OR instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        reg_val = state.x86_registers.get_register(dest_reg)
+
+        if operands['is_memory']:
+            # OR reg, [base+offset]
+            base_reg = operands['base_reg']
+            offset = operands['offset']
+
+            if base_reg not in [Register.R14, Register.R13]:
+                raise ValueError(f"Unsupported base register for OR: {base_reg}")
+
+            memory_offset = offset
+            if 'index_reg' in operands and operands['index_reg']:
+                index_reg = operands['index_reg']
+                index_val = state.x86_registers.get_register(index_reg)
+                if isinstance(offset, int):
+                    offset_bv = BitVecVal(offset, 64)
+                else:
+                    offset_bv = offset
+                memory_offset = offset_bv + index_val
+
+            mem_val = state.x86_memory.load_64bit(memory_offset)
+            result = reg_val | mem_val
+            state.x86_registers.set_register(dest_reg, result)
+
+        elif operands['src_reg']:
+            # OR reg, reg
+            src_reg = operands['src_reg']
+            src_val = state.x86_registers.get_register(src_reg)
+            result = reg_val | src_val
+            state.x86_registers.set_register(dest_reg, result)
+
+        return state
+
+    elif mnemonic == 'xor':
+        # XOR：按位异或
+        if not operands['dest_reg']:
+            raise ValueError(f"XOR instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        reg_val = state.x86_registers.get_register(dest_reg)
+
+        if operands['is_memory']:
+            # XOR reg, [base+offset]
+            base_reg = operands['base_reg']
+            offset = operands['offset']
+
+            if base_reg not in [Register.R14, Register.R13]:
+                raise ValueError(f"Unsupported base register for XOR: {base_reg}")
+
+            memory_offset = offset
+            if 'index_reg' in operands and operands['index_reg']:
+                index_reg = operands['index_reg']
+                index_val = state.x86_registers.get_register(index_reg)
+                if isinstance(offset, int):
+                    offset_bv = BitVecVal(offset, 64)
+                else:
+                    offset_bv = offset
+                memory_offset = offset_bv + index_val
+
+            mem_val = state.x86_memory.load_64bit(memory_offset)
+            result = reg_val ^ mem_val
+            state.x86_registers.set_register(dest_reg, result)
+
+        elif operands['src_reg']:
+            # XOR reg, reg
+            src_reg = operands['src_reg']
+            src_val = state.x86_registers.get_register(src_reg)
+            result = reg_val ^ src_val
+            state.x86_registers.set_register(dest_reg, result)
+
+        return state
+
     elif mnemonic in ['jb', 'jae', 'jmp']:
         # 控制流指令 - 原样返回状态
         # 这些将在控制流级别处理
         return state
-    
+
     else:
         # 未知指令 - 返回未更改的状态
         # TODO: 实现更多指令
