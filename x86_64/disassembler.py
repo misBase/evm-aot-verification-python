@@ -11,6 +11,7 @@ from .models import X86Instruction, Register
 
 
 # 将Capstone寄存器ID映射到我们的Register枚举
+# 注意：Go编译器只生成64位指令，因此只需要64位寄存器映射
 REGISTER_MAP = {
     capstone.x86.X86_REG_RAX: Register.RAX,
     capstone.x86.X86_REG_RCX: Register.RCX,
@@ -57,260 +58,113 @@ def disassemble_hex(hex_str: str, base_addr: int = 0) -> List[X86Instruction]:
     # 初始化x86-64的Capstone反汇编器
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     md.detail = True  # 启用详细指令信息
-    
+
     instructions = []
-    current_addr = base_addr
-    
+
     for insn in md.disasm(code_bytes, base_addr):
         # 获取助记符
         mnemonic = insn.mnemonic.lower()
-        
-        # 获取操作数字符串，如果需要则修复寄存器名称
+
+        # 获取操作数字符串
+        # Capstone 5.0.6能正确识别所有寄存器，不需要任何修复
         op_str = insn.op_str
-        
-        # 修复RSI -> R14映射（Capstone有时将R14误识别为RSI）
-        # 通过检查机器码来检查指令是否使用R14
-        # R14编码：ModR/M字节，R/M=110且REX.B=1
-        # 我们将通过检查操作数中的实际寄存器来修复此问题
-        fixed_op_str = op_str
-        # 检查内存操作数的基址寄存器
-        if hasattr(insn, 'operands') and len(insn.operands) > 0:
-            for op in insn.operands:
-                if op.type == capstone.x86.X86_OP_MEM:
-                    base_reg_id = op.mem.base
-                    if base_reg_id != 0:
-                        # 检查它是否实际上是R14（Capstone中的寄存器ID 62）
-                        # Capstone x86寄存器ID：R14 = 62，RSI = 6
-                        # 有时R14被解码为RSI，所以我们检查编码
-                        reg_name = insn.reg_name(base_reg_id)
-                        # 如果位移表明它是基于栈的（负偏移量）
-                        # 并且寄存器是RSI，则可能是R14
-                        if reg_name == 'rsi' and op.mem.disp < 0:
-                            # 检查ModR/M是否建议R14（这是启发式方法）
-                            # ModR/M中的R14：位2:0 = 110，REX.B=1
-                            fixed_op_str = fixed_op_str.replace('rsi', 'r14')
-        
-        op_str = fixed_op_str
         
         # 获取指令字节
         insn_bytes = bytes(insn.bytes)
-        
-        # 创建X86Instruction对象
+
+        # 创建X86Instruction对象，保存原始Capstone指令
         instruction = X86Instruction(
             addr=insn.address,
             mnemonic=mnemonic,
             op_str=op_str,
             bytes=insn_bytes,
-            size=insn.size
+            size=insn.size,
+            _cs_insn=insn  # 保存原始Capstone指令对象
         )
-        
+
         instructions.append(instruction)
-        current_addr += insn.size
-    
+
     return instructions
 
 
-def parse_operands(op_str: str) -> dict:
-    """将操作数字符串解析为结构化格式。
-    
+def parse_operands(instruction: X86Instruction) -> dict:
+    """使用Capstone操作数结构解析指令操作数。
+
     Args:
-        op_str: 来自Capstone的操作数字符串（例如，"rax, qword ptr [r14 - 0x40]"）
-        
+        instruction: X86Instruction对象（包含Capstone指令对象）
+
     Returns:
         包含解析操作数的字典：
         - 'dest_reg': Register枚举（如果目标是寄存器）
         - 'src_reg': Register枚举（如果源是寄存器）
         - 'base_reg': Register枚举（如果是带基址的内存操作数）
+        - 'index_reg': Register枚举（如果有索引寄存器）
+        - 'scale': int（索引寄存器的缩放因子）
         - 'offset': int（如果是带偏移量的内存操作数）
         - 'is_memory': bool（如果操作数是内存访问）
         - 'immediate': int（如果操作数是立即值）
         - 'jump_target': int（如果操作数是跳转目标地址）
-        
+
     Example:
-        >>> parse_operands("rax, qword ptr [r14 - 0x40]")
+        >>> insn = disassemble_hex("498b46c0")[0]
+        >>> parse_operands(insn)
         {'dest_reg': Register.RAX, 'base_reg': Register.R14, 'offset': -64, 'is_memory': True}
     """
     result = {
         'dest_reg': None,
         'src_reg': None,
         'base_reg': None,
+        'index_reg': None,
+        'scale': 1,
         'offset': 0,
         'is_memory': False,
         'immediate': None,
         'jump_target': None
     }
-    
-    # 按逗号分割以获取操作数
-    parts = [p.strip() for p in op_str.split(',')]
-    
-    if len(parts) == 0:
+
+    # 获取Capstone指令对象
+    cs_insn = instruction._cs_insn
+    if cs_insn is None or not hasattr(cs_insn, 'operands'):
         return result
-    
-    # 解析第一个操作数
-    first_str = parts[0]
-    
-    # 移除大小前缀，如"byte ptr"、"word ptr"、"qword ptr"
-    first_str = first_str.replace('byte ptr', '').replace('word ptr', '').replace('qword ptr', '').replace('dword ptr', '').strip()
-    
-    # 检查第一个操作数是否是内存操作数：[base +/- offset]
-    if '[' in first_str and ']' in first_str:
-        result['is_memory'] = True
-        # 提取方括号之间的内容
-        mem_content = first_str[first_str.index('[') + 1:first_str.index(']')].strip()
-        
-        # 解析基址寄存器和偏移量
-        # 格式："r14 - 0x40"或"r14 + 0x40"或只是"r14"
-        if ' - ' in mem_content:
-            base_str, offset_str = mem_content.split(' - ', 1)
-            sign = -1
-        elif ' + ' in mem_content:
-            base_str, offset_str = mem_content.split(' + ', 1)
-            sign = 1
-        elif '-' in mem_content and ' ' not in mem_content:
-            # 处理"r14-0x40"（无空格）
-            if '-' in mem_content:
-                base_str, offset_str = mem_content.split('-', 1)
-                sign = -1
-            else:
-                base_str = mem_content
-                offset_str = None
-                sign = 1
-        else:
-            # 无偏移量，只有基址寄存器
-            base_str = mem_content
-            offset_str = None
-            sign = 1
-        
-        # 解析基址寄存器
-        base_str = base_str.strip()
-        for reg_name, reg_enum in [(r.value, r) for r in Register]:
-            if base_str == reg_name:
-                result['base_reg'] = reg_enum
-                break
-        
-        # 解析偏移量
-        if offset_str:
-            offset_str = offset_str.strip()
-            # 如果存在则移除0x前缀
-            if offset_str.startswith('0x') or offset_str.startswith('0X'):
-                offset_val = int(offset_str, 16)
-            else:
-                offset_val = int(offset_str)
-            result['offset'] = sign * offset_val
-        
-        # 如果有第二个操作数，它可能是寄存器或立即值
-        if len(parts) > 1:
-            src_str = parts[1].strip()
-            # 首先尝试解析为寄存器
-            found_reg = False
-            for reg_name, reg_enum in [(r.value, r) for r in Register]:
-                if src_str == reg_name:
-                    result['src_reg'] = reg_enum
-                    found_reg = True
-                    break
-            # 如果不是寄存器，尝试解析为立即值
-            if not found_reg:
-                try:
-                    if src_str.startswith('0x') or src_str.startswith('0X'):
-                        result['immediate'] = int(src_str, 16)
-                    else:
-                        result['immediate'] = int(src_str)
-                except ValueError:
-                    pass
-    else:
-        # 第一个操作数是寄存器（目标）
-        for reg_name, reg_enum in [(r.value, r) for r in Register]:
-            if first_str == reg_name:
+
+    # 遍历操作数
+    for i, op in enumerate(cs_insn.operands):
+        if op.type == capstone.x86.X86_OP_REG:
+            # 寄存器操作数
+            reg_id = op.reg
+            reg_enum = REGISTER_MAP.get(reg_id)
+
+            # 第一个操作数通常是目标
+            if i == 0:
                 result['dest_reg'] = reg_enum
-                break
-        
-        # 如果存在则解析第二个操作数（源）
-        if len(parts) > 1:
-            src_str = parts[1].strip()
-            
-            # 检查它是否是内存操作数：[base +/- offset]
-            if '[' in src_str and ']' in src_str:
-                result['is_memory'] = True
-                # 提取方括号之间的内容
-                mem_content = src_str[src_str.index('[') + 1:src_str.index(']')].strip()
-                
-                # 解析基址寄存器和偏移量
-                # 格式："r14 - 0x40"或"r14 + 0x40"或只是"r14"
-                if ' - ' in mem_content:
-                    base_str, offset_str = mem_content.split(' - ', 1)
-                    sign = -1
-                elif ' + ' in mem_content:
-                    base_str, offset_str = mem_content.split(' + ', 1)
-                    sign = 1
-                elif '-' in mem_content and ' ' not in mem_content:
-                    # 处理"r14-0x40"（无空格）
-                    base_str, offset_str = mem_content.split('-', 1)
-                    sign = -1
-                else:
-                    # 无偏移量，只有基址寄存器
-                    base_str = mem_content
-                    offset_str = None
-                    sign = 1
-                
-                # 解析基址寄存器
-                base_str = base_str.strip()
-                for reg_name, reg_enum in [(r.value, r) for r in Register]:
-                    if base_str == reg_name:
-                        result['base_reg'] = reg_enum
-                        break
-                
-                # 解析偏移量
-                if offset_str:
-                    offset_str = offset_str.strip()
-                    # 如果存在则移除0x前缀
-                    if offset_str.startswith('0x') or offset_str.startswith('0X'):
-                        offset_val = int(offset_str, 16)
-                    else:
-                        offset_val = int(offset_str)
-                    result['offset'] = sign * offset_val
             else:
-                # 检查它是否是寄存器
-                for reg_name, reg_enum in [(r.value, r) for r in Register]:
-                    if src_str == reg_name:
-                        result['src_reg'] = reg_enum
-                        break
-                # 如果不是寄存器，检查它是否是立即值
-                if result['src_reg'] is None:
-                    try:
-                        # 尝试解析为立即值
-                        if src_str.startswith('0x') or src_str.startswith('0X'):
-                            result['immediate'] = int(src_str, 16)
-                        else:
-                            result['immediate'] = int(src_str)
-                    except ValueError:
-                        pass
-    
-    # 检查第一个操作数是否是立即值（对于像CMP rax, 0x3这样的指令）
-    if result['dest_reg'] is None and not result['is_memory'] and len(parts) > 0:
-        first_str = parts[0].strip()
-        # 检查它是否不是寄存器
-        is_reg = False
-        for reg_name, reg_enum in [(r.value, r) for r in Register]:
-            if first_str == reg_name:
-                is_reg = True
-                break
-        if not is_reg:
-            try:
-                if first_str.startswith('0x') or first_str.startswith('0X'):
-                    result['immediate'] = int(first_str, 16)
-                else:
-                    result['immediate'] = int(first_str)
-            except ValueError:
-                pass
-    
-    # 检查跳转目标（十六进制地址，如0x39）
-    if len(parts) == 1:
-        target_str = parts[0].strip()
-        if target_str.startswith('0x') or target_str.startswith('0X'):
-            try:
-                result['jump_target'] = int(target_str, 16)
-            except ValueError:
-                pass
-    
+                result['src_reg'] = reg_enum
+
+        elif op.type == capstone.x86.X86_OP_MEM:
+            # 内存操作数
+            result['is_memory'] = True
+
+            # 基址寄存器
+            if op.mem.base != 0:
+                result['base_reg'] = REGISTER_MAP.get(op.mem.base)
+
+            # 索引寄存器
+            if op.mem.index != 0:
+                result['index_reg'] = REGISTER_MAP.get(op.mem.index)
+
+            # 缩放因子
+            result['scale'] = op.mem.scale
+
+            # 偏移量
+            result['offset'] = op.mem.disp
+
+        elif op.type == capstone.x86.X86_OP_IMM:
+            # 立即数
+            result['immediate'] = op.imm
+
+            # 对于跳转指令，Capstone的op.imm已经包含了绝对跳转目标地址
+            if instruction.mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']:
+                result['jump_target'] = op.imm
+
     return result
 

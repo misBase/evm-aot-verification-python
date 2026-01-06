@@ -79,14 +79,14 @@ class X86CFG:
     
     def _extract_jump_target(self, insn: X86Instruction) -> Optional[int]:
         """从指令中提取跳转目标地址。
-        
+
         Args:
             insn: 跳转指令
-            
+
         Returns:
             目标地址，如果未找到则返回None
         """
-        operands = parse_operands(insn.op_str)
+        operands = parse_operands(insn)
         if operands.get('jump_target') is not None:
             return operands['jump_target']
         return None
@@ -243,7 +243,7 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
         
         if mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
             # 跳转指令：提取目标
-            operands = parse_operands(insn.op_str)
+            operands = parse_operands(insn)
             target = operands.get('jump_target')
             if target is not None:
                 block_starts.add(target)

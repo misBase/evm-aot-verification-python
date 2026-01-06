@@ -26,11 +26,10 @@ class InstructionExecutor:
             instruction: 要执行的指令
         """
         mnemonic = instruction.mnemonic.lower()
-        op_str = instruction.op_str
-        
+
         # 解析操作数
-        operands = parse_operands(op_str)
-        
+        operands = parse_operands(instruction)
+
         if mnemonic == 'mov':
             self._execute_mov(state, operands)
         elif mnemonic == 'add':

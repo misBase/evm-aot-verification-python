@@ -322,7 +322,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         更新后的SMT状态
     """
     mnemonic = insn.mnemonic.lower()
-    operands = parse_operands(insn.op_str)
+    operands = parse_operands(insn)
     
     if mnemonic == 'mov':
         # MOV：将值从源移动到目标

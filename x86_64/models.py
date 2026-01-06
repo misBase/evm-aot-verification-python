@@ -4,9 +4,10 @@ x86-64数据模型。
 本模块定义用于表示x86-64块和指令的数据结构。
 """
 
-from typing import List, Optional, Dict, Any, TYPE_CHECKING
+from typing import List, Optional, Dict, Any, TYPE_CHECKING, TYPE_CHECKING as TYPE_CHECKING_RUNTIME
 from dataclasses import dataclass, field
 from enum import Enum
+import capstone as cs_module
 
 if TYPE_CHECKING:
     from state.smt_state import SMTState
@@ -33,13 +34,15 @@ class Register(Enum):
 @dataclass
 class X86Instruction:
     """表示x86-64指令。"""
-    
+
     addr: int  # 指令地址
     mnemonic: str  # 指令助记符（例如，"mov"、"add"、"adc"）
     op_str: str  # 操作数字符串
     bytes: bytes  # 指令字节
     size: int  # 指令大小（字节）
-    
+    # 原始Capstone指令对象（用于访问操作数结构）
+    _cs_insn: Optional[Any] = field(default=None, repr=False)
+
     def __post_init__(self):
         """如果未提供则设置大小。"""
         if self.size == 0:
