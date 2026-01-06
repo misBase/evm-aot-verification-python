@@ -14,6 +14,7 @@ from state.smt_state import SMTState
 # 用于类型注解的前向引用
 if TYPE_CHECKING:
     from .cfg_structures import CFGNode
+    from .cfg_annotations import StateAnnotation
 
 
 class WorldState:
@@ -30,7 +31,7 @@ class WorldState:
         from z3 import BoolVal
         self.constraints: Constraints = Constraints()
         self.transaction_sequence: List = []
-        self.annotations: List['StateAnnotation'] = []
+        self.annotations: List[StateAnnotation] = []
 
     def __copy__(self):
         """浅拷贝（快速）。
@@ -218,7 +219,7 @@ class GlobalState:
         """
         self.world_state.constraints.add(constraint)
 
-    def annotate(self, annotation: 'StateAnnotation') -> None:
+    def annotate(self, annotation: StateAnnotation) -> None:
         """添加注解。
 
         Args:
@@ -226,7 +227,7 @@ class GlobalState:
         """
         self.world_state.annotations.append(annotation)
 
-    def get_annotation(self, annotation_type: type) -> Optional['StateAnnotation']:
+    def get_annotation(self, annotation_type: type) -> Optional[StateAnnotation]:
         """获取指定类型的注解。
 
         Args:
