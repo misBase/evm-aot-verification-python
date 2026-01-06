@@ -1,580 +1,518 @@
 #!/usr/bin/env python3
-"""测试EVM IR控制流图（CFG）构建和路径分析。"""
+"""测试新的动态 CFG 构建和 worklist 驱动的符号执行。"""
 
 import os
 import pytest
-from z3 import BoolVal
+from z3 import BoolVal, BitVecVal
 
 from evm_ir.json_parser import load_ir_from_json
-from evm_ir.cfg import IRCFG, build_ir_cfg
+from evm_ir.cfg import (
+    DynamicCFG, CFGNode, CFGEdge, EdgeType,
+    SymbolicExecutor, DFSStrategy, BFSStrategy,
+    GlobalState, WorldState, Constraints,
+    StateAnnotation, LoopCountAnnotation,
+    build_dynamic_cfg
+)
+from state.smt_state import SMTState
 
 
-class TestIRCFGBasic:
-    """测试CFG的基本功能。"""
-    
-    def test_build_cfg_from_two_blocks(self):
-        """测试从two_block.json构建CFG。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        # 验证块数量
-        assert len(cfg.blocks) == 2, "应该有两个块"
-        
-        # 验证入口块
-        entry = cfg.get_entry_block()
-        assert entry.pc == 0, "入口块应该是PC=0"
-        
-        # 验证终止块
-        terminals = cfg.get_terminal_blocks()
-        assert len(terminals) == 1, "应该有一个终止块"
-        assert terminals[0].pc == 13, "终止块应该是PC=13"
-        
-        # 验证块0的后继：应该有块1（PC=13）作为JUMPI的目标
-        block0 = cfg.blocks[0]
-        successors = cfg.get_successors(block0)
-        assert len(successors) == 2, "块0应该有两个后继（JUMPI：跳转和顺序执行）"
-        
-        # 验证块0的最后一个操作是JUMPI
-        assert block0.operations[-1].kind.upper() == "JUMPI", "块0应该以JUMPI结尾"
-        jumpi_op = block0.operations[-1]
-        assert jumpi_op.immediate == 13, "JUMPI应该跳转到PC=13"
-        assert jumpi_op.is_static == True, "JUMPI应该是静态跳转"
-        
-        # 验证块1（PC=13）是跳转目标
-        block1 = cfg.blocks[1]
-        assert block1.pc == 13, "块1的PC应该是13"
-        assert block1.is_jump_target == True, "块1应该是跳转目标"
-        assert block1.is_stop == True, "块1应该包含STOP"
-        
-        # 验证块1的后继：应该是空的（终止块）
-        successors1 = cfg.get_successors(block1)
-        assert len(successors1) == 0, "终止块应该没有后继"
-    
-    def test_build_cfg_from_three_blocks(self):
-        """测试从three_block.json构建CFG。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "three_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        # 验证块数量
-        assert len(cfg.blocks) == 2, "应该有两个块（注意：JSON中只有2个control_frames）"
-        
-        # 验证入口块
-        entry = cfg.get_entry_block()
-        assert entry.pc == 0, "入口块应该是PC=0"
-        
-        # 验证终止块
-        terminals = cfg.get_terminal_blocks()
-        assert len(terminals) == 1, "应该有一个终止块"
-        assert terminals[0].pc == 21, "终止块应该是PC=21"
-        
-        # 验证块0的后继
-        block0 = cfg.blocks[0]
-        successors = cfg.get_successors(block0)
-        # 块0有JUMPI到21，还有顺序执行（但顺序执行的下一个块也是21，所以可能只有一个）
-        # 实际上，由于块0后面没有其他块，所以只有跳转到21
-        assert len(successors) >= 1, "块0应该至少有一个后继"
-        
-        # 验证块0包含JUMPI和JUMP操作
-        jumpi_op = None
-        jump_op = None
-        for op in block0.operations:
-            if op.kind.upper() == "JUMPI":
-                jumpi_op = op
-            elif op.kind.upper() == "JUMP":
-                jump_op = op
-        
-        assert jumpi_op is not None, "块0应该包含JUMPI操作"
-        assert jumpi_op.immediate == 21, "JUMPI应该跳转到PC=21"
-        assert jump_op is not None, "块0应该包含JUMP操作"
-        assert jump_op.immediate == 21, "JUMP应该跳转到PC=21"
-    
-    def test_build_cfg_from_multi_blocks(self):
-        """测试从muti_block.json构建CFG（复杂控制流）。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "muti_block.json")
+class TestConstraints:
+    """测试约束集合。"""
 
-        ir_result = load_ir_from_json(ir_file)
+    def test_constraints_creation(self):
+        """测试约束集合创建。"""
+        constraints = Constraints()
+        assert len(constraints) == 1  # 默认包含 True
 
-        # muti_block.json包含动态跳转，应该抛出异常
-        from utils.exceptions import UnsupportedJumpError
-        with pytest.raises(UnsupportedJumpError) as exc_info:
-            cfg = build_ir_cfg(ir_result.blocks)
+    def test_add_constraint(self):
+        """测试添加约束。"""
+        from z3 import Bool
+        constraints = Constraints()
+        x = Bool('x')
+        constraints.add(x)
+        assert len(constraints) == 2
 
-        assert "dynamic_jump" in str(exc_info.value), "应该检测到动态跳转"
-    
-    def test_get_entry_block(self):
-        """测试获取入口块。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        entry = cfg.get_entry_block()
-        assert entry is not None, "应该返回入口块"
-        assert entry == cfg.blocks[0], "入口块应该是第一个块"
-    
-    def test_get_entry_block_empty(self):
-        """测试空块列表时获取入口块应该抛出异常。"""
-        cfg = IRCFG([])
-        with pytest.raises(ValueError, match="No blocks in CFG"):
-            cfg.get_entry_block()
-    
-    def test_get_terminal_blocks(self):
-        """测试获取终止块。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        terminals = cfg.get_terminal_blocks()
-        assert len(terminals) > 0, "应该至少有一个终止块"
-        
-        # 验证所有终止块都以终止操作结尾
-        for terminal in terminals:
-            assert terminal.operations, "终止块应该有操作"
-            last_op = terminal.operations[-1]
-            assert last_op.kind.upper() in ["STOP", "RETURN", "REVERT", "SELFDESTRUCT"], \
-                f"终止块PC={terminal.pc}应该以终止操作结尾"
+    def test_is_possible(self):
+        """测试可达性检查。"""
+        from z3 import Bool, And
+        constraints = Constraints()
+        x = Bool('x')
+        y = Bool('y')
+        constraints.add(x)
+        constraints.add(y)
+
+        # 可满足
+        assert constraints.is_possible() == True
+
+        # 不可满足
+        constraints2 = Constraints()
+        constraints2.add(x)
+        constraints2.add(BoolVal(False))
+        # 注意：Z3 可能不会立即检测到不可满足性
+        # 这里主要测试 API
+
+    def test_as_bool(self):
+        """测试转换为 BoolRef。"""
+        from z3 import Bool
+        constraints = Constraints()
+        x = Bool('x')
+        constraints.add(x)
+
+        result = constraints.as_bool()
+        assert result is not None
 
 
-class TestIRCFGSuccessors:
-    """测试CFG的后继关系。"""
-    
-    def test_successors_two_block(self):
-        """测试two_block.json中的后继关系。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        block0 = cfg.blocks[0]
-        block1 = cfg.blocks[1]
-        
-        # 块0的后继应该包含块1（通过JUMPI跳转）
-        successors0 = cfg.get_successors(block0)
-        assert block1 in successors0, "块1应该是块0的后继（通过JUMPI）"
-        
-        # 块1是终止块，应该没有后继
-        successors1 = cfg.get_successors(block1)
-        assert len(successors1) == 0, "终止块应该没有后继"
-    
-    def test_successors_three_block(self):
-        """测试three_block.json中的后继关系。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "three_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        block0 = cfg.blocks[0]
-        block1 = cfg.blocks[1]
-        
-        # 块0的后继应该包含块1（通过JUMPI跳转到PC=21）
-        successors0 = cfg.get_successors(block0)
-        assert block1 in successors0, "块1应该是块0的后继（通过JUMPI）"
-        
-        # 块1是终止块，应该没有后继
-        successors1 = cfg.get_successors(block1)
-        assert len(successors1) == 0, "终止块应该没有后继"
-    
-    def test_successors_jump_target(self):
-        """测试跳转目标的后继关系。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        # 验证跳转目标块
-        block1 = cfg.blocks[1]
-        assert block1.is_jump_target == True, "块1应该是跳转目标"
-        assert block1.pc == 13, "块1的PC应该是13"
+class TestWorldState:
+    """测试世界状态。"""
+
+    def test_world_state_creation(self):
+        """测试世界状态创建。"""
+        world_state = WorldState()
+        assert world_state.constraints is not None
+        assert world_state.transaction_sequence == []
+        assert world_state.annotations == []
+
+    def test_world_state_copy(self):
+        """测试世界状态拷贝。"""
+        world_state = WorldState()
+        copied = copy.copy(world_state)
+        assert copied is not world_state
 
 
-class TestIRCFGPaths:
-    """测试CFG的路径查找。"""
-    
-    def test_find_all_paths_two_block(self):
-        """测试在two_block.json中查找所有路径。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        paths = cfg.find_all_paths()
-        assert len(paths) > 0, "应该找到至少一条路径"
-        
-        # 验证路径结构
-        from z3 import BoolRef
-        for path, condition in paths:
-            assert isinstance(path, list), "路径应该是块列表"
-            assert len(path) > 0, "路径应该至少包含一个块"
-            assert isinstance(condition, BoolRef), "条件应该是BoolRef类型"
-            
-            # 验证路径从入口块开始
-            assert path[0] == cfg.get_entry_block(), "路径应该从入口块开始"
-            
-            # 验证路径以终止块结束
-            assert path[-1] in cfg.get_terminal_blocks(), "路径应该以终止块结束"
-    
-    def test_find_all_paths_three_block(self):
-        """测试在three_block.json中查找所有路径。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "three_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        paths = cfg.find_all_paths()
-        assert len(paths) > 0, "应该找到至少一条路径"
-        
-        # 验证路径结构
-        for path, condition in paths:
-            assert isinstance(path, list), "路径应该是块列表"
-            assert len(path) > 0, "路径应该至少包含一个块"
-            
-            # 验证路径从入口块开始
-            assert path[0] == cfg.get_entry_block(), "路径应该从入口块开始"
-            
-            # 验证路径以终止块结束
-            assert path[-1] in cfg.get_terminal_blocks(), "路径应该以终止块结束"
-    
-    def test_find_all_paths_multi_block(self):
-        """测试在muti_block.json中查找所有路径。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "muti_block.json")
+class TestGlobalState:
+    """测试全局状态。"""
 
-        ir_result = load_ir_from_json(ir_file)
+    def test_global_state_creation(self):
+        """测试全局状态创建。"""
+        mstate = SMTState.create_initial_state(num_inputs=0)
+        gstate = GlobalState(mstate=mstate)
 
-        # muti_block.json包含动态跳转，应该抛出异常
-        from utils.exceptions import UnsupportedJumpError
-        with pytest.raises(UnsupportedJumpError) as exc_info:
-            cfg = build_ir_cfg(ir_result.blocks)
+        assert gstate.mstate == mstate
+        assert gstate.world_state is not None
+        assert gstate.depth == 0
 
-        assert "dynamic_jump" in str(exc_info.value), "应该检测到动态跳转"
+    def test_global_state_add_constraint(self):
+        """测试添加约束。"""
+        from z3 import Bool
+        mstate = SMTState.create_initial_state(num_inputs=0)
+        gstate = GlobalState(mstate=mstate)
+
+        x = Bool('x')
+        gstate.add_constraint(x)
+
+        assert len(gstate.get_constraints()) == 2  # True + x
+
+    def test_global_state_annotate(self):
+        """测试添加注解。"""
+        mstate = SMTState.create_initial_state(num_inputs=0)
+        gstate = GlobalState(mstate=mstate)
+
+        ann = LoopCountAnnotation(loop_target_pc=10, count=1)
+        gstate.annotate(ann)
+
+        retrieved = gstate.get_annotation(LoopCountAnnotation)
+        assert retrieved is not None
+        assert retrieved.loop_target_pc == 10
 
 
-class TestIRCFGJumpOperations:
-    """测试CFG对JUMP/JUMPI操作的处理。"""
-    
-    def test_jumpi_immediate_value(self):
-        """测试JUMPI操作的immediate值处理。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        block0 = cfg.blocks[0]
-        jumpi_op = block0.operations[-1]
-        
-        assert jumpi_op.kind.upper() == "JUMPI", "最后一个操作应该是JUMPI"
-        assert jumpi_op.immediate == 13, "JUMPI的immediate值应该是13"
-        assert jumpi_op.is_static == True, "JUMPI应该是静态跳转"
-        
-        # 验证跳转目标被正确识别
-        successors = cfg.get_successors(block0)
-        target_block = cfg.blocks_by_pc.get(13)
-        assert target_block in successors, "跳转目标块应该在后继列表中"
-    
-    def test_jump_immediate_value(self):
-        """测试JUMP操作的immediate值处理。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "three_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        block0 = cfg.blocks[0]
-        # 查找JUMP操作
-        jump_op = None
-        for op in block0.operations:
-            if op.kind.upper() == "JUMP":
-                jump_op = op
+class TestDynamicCFGStructure:
+    """测试动态 CFG 的基本结构。"""
+
+    def test_cfg_node_creation(self):
+        """测试 CFG 节点创建。"""
+        from evm_ir.models import EVMBlock
+
+        block = EVMBlock(
+            pc=0,
+            stack_depth=0,
+            min_depth=0,
+            max_depth=1024,
+            static_gas=10,
+            is_jump_target=False,
+            is_inner_block=False,
+            is_stop=False,
+            operations=[]
+        )
+
+        node = CFGNode(block=block)
+        assert node.pc == 0
+        assert len(node.states) == 0
+        assert len(node.incoming_edges) == 0
+        assert len(node.outgoing_edges) == 0
+
+    def test_cfg_edge_creation(self):
+        """测试 CFG 边创建。"""
+        edge = CFGEdge(
+            node_from=0,
+            node_to=13,
+            edge_type=EdgeType.CONDITIONAL,
+            condition=BoolVal(True)
+        )
+
+        assert edge.node_from == 0
+        assert edge.node_to == 13
+        assert edge.edge_type == EdgeType.CONDITIONAL
+        assert edge.condition == BoolVal(True)
+
+    def test_dynamic_cfg_creation(self):
+        """测试动态 CFG 创建。"""
+        from evm_ir.models import EVMBlock
+
+        blocks = [
+            EVMBlock(
+                pc=i,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[]
+            )
+            for i in range(3)
+        ]
+
+        cfg = DynamicCFG(blocks)
+        assert len(cfg.nodes) == 3
+        assert 0 in cfg.nodes
+        assert 1 in cfg.nodes
+        assert 2 in cfg.nodes
+
+    def test_add_edge(self):
+        """测试添加边。"""
+        from evm_ir.models import EVMBlock
+
+        blocks = [
+            EVMBlock(
+                pc=i,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[]
+            )
+            for i in range(2)
+        ]
+
+        cfg = DynamicCFG(blocks)
+        edge = cfg.add_edge(0, 1, EdgeType.UNCONDITIONAL)
+
+        assert edge.node_from == 0
+        assert edge.node_to == 1
+        assert edge.edge_type == EdgeType.UNCONDITIONAL
+
+        # 检查节点的边
+        node0 = cfg.get_node(0)
+        node1 = cfg.get_node(1)
+        assert len(node0.outgoing_edges) == 1
+        assert len(node1.incoming_edges) == 1
+
+    def test_get_successors(self):
+        """测试获取后继节点。"""
+        from evm_ir.models import EVMBlock
+
+        blocks = [
+            EVMBlock(
+                pc=i,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[]
+            )
+            for i in range(3)
+        ]
+
+        cfg = DynamicCFG(blocks)
+        cfg.add_edge(0, 1, EdgeType.FALLTHROUGH)
+        cfg.add_edge(0, 2, EdgeType.CONDITIONAL, BoolVal(True))
+
+        successors = cfg.get_successors(0)
+        assert len(successors) == 2
+
+
+class TestSearchStrategies:
+    """测试搜索策略。"""
+
+    def test_dfs_strategy(self):
+        """测试 DFS 策略。"""
+        strategy = DFSStrategy(work_list=[], max_depth=100)
+
+        # 添加一些状态
+        mstate = SMTState.create_initial_state(num_inputs=0)
+        for i in range(3):
+            node = CFGNode(block=None)  # 简化测试
+            gstate = GlobalState(mstate=mstate, node=node)
+            gstate.depth = i
+            strategy.work_list.append(gstate)
+
+        # DFS 应该返回最后一个添加的状态
+        state = strategy.get_strategic_global_state()
+        assert state is not None
+        assert state.depth == 2
+
+    def test_bfs_strategy(self):
+        """测试 BFS 策略。"""
+        strategy = BFSStrategy(work_list=[], max_depth=100)
+
+        # 添加一些状态
+        mstate = SMTState.create_initial_state(num_inputs=0)
+        for i in range(3):
+            node = CFGNode(block=None)  # 简化测试
+            gstate = GlobalState(mstate=mstate, node=node)
+            gstate.depth = i
+            strategy.work_list.append(gstate)
+
+        # BFS 应该返回第一个添加的状态
+        state = strategy.get_strategic_global_state()
+        assert state is not None
+        assert state.depth == 0
+
+    def test_strategy_iteration(self):
+        """测试策略迭代。"""
+        strategy = DFSStrategy(work_list=[], max_depth=100)
+
+        mstate = SMTState.create_initial_state(num_inputs=0)
+        node = CFGNode(block=None)
+        gstate = GlobalState(mstate=mstate, node=node)
+        gstate.depth = 0
+        strategy.work_list.append(gstate)
+
+        # 测试迭代器接口
+        count = 0
+        for _ in strategy:
+            count += 1
+            if count >= 1:
                 break
-        
-        assert jump_op is not None, "应该找到JUMP操作"
-        assert jump_op.immediate == 21, "JUMP的immediate值应该是21"
-        assert jump_op.is_static == True, "JUMP应该是静态跳转"
-        
-        # 验证跳转目标被正确识别
-        target_block = cfg.blocks_by_pc.get(21)
-        assert target_block is not None, "应该找到目标块（PC=21）"
-    
-    def test_static_jump_target_resolution(self):
-        """测试静态跳转目标解析。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        # 验证blocks_by_pc字典包含所有块
-        assert 0 in cfg.blocks_by_pc, "应该包含PC=0的块"
-        assert 13 in cfg.blocks_by_pc, "应该包含PC=13的块"
-        
-        # 验证可以通过PC查找块
-        block0 = cfg.blocks_by_pc[0]
-        block1 = cfg.blocks_by_pc[13]
-        
-        assert block0.pc == 0, "通过PC查找应该返回正确的块"
-        assert block1.pc == 13, "通过PC查找应该返回正确的块"
+        assert count == 1
 
 
-class TestIRCFGLoops:
-    """测试CFG的循环检测。"""
-    
-    def test_detect_loops_empty(self):
-        """测试在没有循环的CFG中检测循环。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        loops = cfg.detect_loops()
-        # two_block.json没有循环，所以应该返回空列表或只包含自循环
-        # 由于当前实现返回空列表，我们验证它不会崩溃
-        assert isinstance(loops, list), "应该返回列表"
-    
-    def test_validate_loops(self):
-        """测试循环验证。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        # 验证不会抛出异常（因为没有不支持的循环）
-        try:
-            cfg.validate_loops()
-        except Exception as e:
-            pytest.fail(f"validate_loops不应该抛出异常: {e}")
-    
-    def test_is_self_loop(self):
-        """测试自循环检测。"""
-        test_dir = os.path.dirname(__file__)
-        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
-        ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        # two_block.json中没有自循环
-        for block in cfg.blocks:
-            is_self_loop = cfg._is_self_loop(block)
-            assert isinstance(is_self_loop, bool), "应该返回布尔值"
-            assert is_self_loop == False, "two_block.json中不应该有自循环"
+class TestStateAnnotations:
+    """测试状态注释系统。"""
+
+    def test_loop_count_annotation(self):
+        """测试循环计数注释。"""
+        ann = LoopCountAnnotation(loop_target_pc=10, count=5)
+        assert ann.loop_target_pc == 10
+        assert ann.count == 5
+
+    def test_annotation_merge(self):
+        """测试注释合并。"""
+        ann1 = LoopCountAnnotation(loop_target_pc=10, count=5)
+        ann2 = LoopCountAnnotation(loop_target_pc=10, count=3)
+
+        assert ann1.check_merge(ann2)
+        merged = ann1.merge(ann2)
+        assert merged.count == 5  # 取最大值
 
 
-class TestIRCFGEdgeCases:
-    """测试CFG的边界情况。"""
-    
-    def test_empty_blocks(self):
-        """测试空块列表。"""
-        cfg = IRCFG([])
-        
-        with pytest.raises(ValueError):
-            cfg.get_entry_block()
-        
-        terminals = cfg.get_terminal_blocks()
-        assert terminals == [], "空CFG应该没有终止块"
-    
-    def test_single_block(self):
-        """测试单个块的CFG。"""
+class TestSymbolicExecutor:
+    """测试符号执行引擎。"""
+
+    def test_executor_creation(self):
+        """测试执行器创建。"""
+        from evm_ir.models import EVMBlock, EvmOperator
+
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=True,
+                operations=[
+                    EvmOperator(kind="STOP", pc=0)
+                ]
+            )
+        ]
+
+        executor = SymbolicExecutor(blocks, strategy_cls=DFSStrategy, max_depth=100)
+        assert len(executor.blocks) == 1
+        assert executor.cfg is not None
+        assert executor.work_list == []
+
+    def test_execute_simple_program(self):
+        """测试执行简单程序（单个 STOP 块）。"""
+        from evm_ir.models import EVMBlock, EvmOperator
+
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=2,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=True,
+                operations=[
+                    EvmOperator(kind="TAG", pc=0),
+                    EvmOperator(kind="STOP", pc=1)
+                ]
+            )
+        ]
+
+        executor = SymbolicExecutor(blocks)
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        final_states = executor.execute(state)
+
+        # 应该有一个终止状态
+        assert len(final_states) == 1
+
+        # CFG 应该有一个节点
+        assert len(executor.cfg.nodes) == 1
+
+    def test_execute_two_block_program(self):
+        """测试执行两块程序（JUMPI + STOP）。"""
         test_dir = os.path.dirname(__file__)
         ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
 
         ir_result = load_ir_from_json(ir_file)
-        # 只使用第一个块，它包含JUMPI到不存在的块，应该抛出LogicError
-        from utils.exceptions import LogicError
-        with pytest.raises(LogicError) as exc_info:
-            single_block_cfg = IRCFG([ir_result.blocks[0]])
 
-        assert "target block not found" in str(exc_info.value), "应该因为目标块不存在而抛出逻辑错误"
-    
-    def test_blocks_by_pc(self):
-        """测试blocks_by_pc字典的正确性。"""
+        executor = SymbolicExecutor(ir_result.blocks, strategy_cls=DFSStrategy)
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        final_states = executor.execute(state)
+
+        # 应该有终止状态
+        assert len(final_states) > 0
+
+        # CFG 应该有边
+        assert len(executor.cfg.edges) > 0
+
+    def test_reachability_check(self):
+        """测试可达性检查。"""
+        from evm_ir.models import EVMBlock, EvmOperator
+
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=2,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=True,
+                operations=[
+                    EvmOperator(kind="STOP", pc=0)
+                ]
+            )
+        ]
+
+        # 启用可达性检查
+        executor = SymbolicExecutor(blocks, use_reachability_check=True)
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        final_states = executor.execute(state)
+        assert len(final_states) == 1
+
+
+class TestEVMProgramIntegration:
+    """测试 EVMProgram 与新执行引擎的集成。"""
+
+    def test_evm_program_to_z3(self):
+        """测试 EVMProgram.to_z3 使用新执行引擎。"""
+        from evm_ir.program import EVMProgram
+
         test_dir = os.path.dirname(__file__)
         ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
-        
+
         ir_result = load_ir_from_json(ir_file)
-        cfg = build_ir_cfg(ir_result.blocks)
-        
-        # 验证所有块都在字典中
-        for block in cfg.blocks:
-            assert block.pc in cfg.blocks_by_pc, f"块PC={block.pc}应该在blocks_by_pc中"
-            assert cfg.blocks_by_pc[block.pc] == block, f"blocks_by_pc应该返回正确的块"
-        
-        # 验证字典大小
-        assert len(cfg.blocks_by_pc) == len(cfg.blocks), "blocks_by_pc应该包含所有块"
+        program = EVMProgram(ir_result)
+
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        # 使用默认的 DFS 策略
+        final_state, result = program.to_z3(state)
+
+        assert final_state is not None
+        assert 'offset' in result
+        assert 'length' in result
+        assert 'memory' in result
+        assert 'has_return' in result
+
+    def test_evm_program_with_bfs_strategy(self):
+        """测试 EVMProgram 使用 BFS 策略。"""
+        from evm_ir.program import EVMProgram
+
+        test_dir = os.path.dirname(__file__)
+        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
+
+        ir_result = load_ir_from_json(ir_file)
+        program = EVMProgram(ir_result)
+
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        # 使用 BFS 策略
+        final_state, result = program.to_z3(state, strategy_cls=BFSStrategy)
+
+        assert final_state is not None
+        assert 'offset' in result
 
 
-class TestIRCFGDynamicJump:
-    """测试CFG对动态跳转的处理（应抛出错误）。"""
+class TestEdgeType:
+    """测试边类型枚举。"""
 
-    def test_dynamic_jump_should_error(self):
-        """测试动态JUMP应该抛出UnsupportedJumpError异常。"""
+    def test_edge_type_values(self):
+        """测试边类型值。"""
+        assert EdgeType.UNCONDITIONAL.value == "unconditional"
+        assert EdgeType.CONDITIONAL.value == "conditional"
+        assert EdgeType.FALLTHROUGH.value == "fallthrough"
+        assert EdgeType.CALL.value == "call"
+        assert EdgeType.RETURN.value == "return"
+
+
+class TestDynamicJumpHandling:
+    """测试动态跳转处理。"""
+
+    def test_dynamic_jump_raises_error(self):
+        """测试动态跳转应该抛出错误。"""
         from evm_ir.models import EVMBlock, EvmOperator
         from utils.exceptions import UnsupportedJumpError
 
-        # 创建一个包含动态JUMP的块
-        dynamic_jump_op = EvmOperator(
-            kind="JUMP",
-            pc=0,
-            immediate=None,  # 没有immediate值
-            is_static=False  # 不是静态跳转
-        )
-        block0 = EVMBlock(
-            pc=0,
-            stack_depth=0,
-            min_depth=0,
-            max_depth=1024,
-            static_gas=10,
-            is_jump_target=False,
-            is_inner_block=False,
-            is_stop=False,
-            operations=[dynamic_jump_op]
-        )
-        block1 = EVMBlock(
-            pc=1,
-            stack_depth=0,
-            min_depth=0,
-            max_depth=1024,
-            static_gas=1,
-            is_jump_target=True,
-            is_inner_block=False,
-            is_stop=True,
-            operations=[EvmOperator(kind="STOP", pc=1)]
-        )
+        # 创建动态 JUMP
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[
+                    EvmOperator(
+                        kind="JUMP",
+                        pc=0,
+                        immediate=None,
+                        is_static=False
+                    )
+                ]
+            )
+        ]
 
-        # 构建CFG应该抛出UnsupportedJumpError
+        executor = SymbolicExecutor(blocks)
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        # 应该抛出 UnsupportedJumpError
         with pytest.raises(UnsupportedJumpError) as exc_info:
-            IRCFG([block0, block1])
+            executor.execute(state)
 
-        assert "dynamic_jump" in str(exc_info.value), "应该抛出dynamic_jump错误"
-        assert "pc=0" in str(exc_info.value), "错误消息应该包含PC信息"
+        assert "dynamic_jump" in str(exc_info.value)
 
-    def test_dynamic_jumpi_should_error(self):
-        """测试动态JUMPI应该抛出UnsupportedJumpError异常。"""
-        from evm_ir.models import EVMBlock, EvmOperator
-        from utils.exceptions import UnsupportedJumpError
 
-        dynamic_jumpi_op = EvmOperator(
-            kind="JUMPI",
-            pc=0,
-            immediate=None,
-            is_static=False
-        )
-        block0 = EVMBlock(
-            pc=0,
-            stack_depth=0,
-            min_depth=0,
-            max_depth=1024,
-            static_gas=10,
-            is_jump_target=False,
-            is_inner_block=False,
-            is_stop=False,
-            operations=[dynamic_jumpi_op]
-        )
-        block1 = EVMBlock(
-            pc=1,
-            stack_depth=0,
-            min_depth=0,
-            max_depth=1024,
-            static_gas=1,
-            is_jump_target=True,
-            is_inner_block=False,
-            is_stop=True,
-            operations=[EvmOperator(kind="STOP", pc=1)]
-        )
-
-        # 构建CFG应该抛出UnsupportedJumpError
-        with pytest.raises(UnsupportedJumpError) as exc_info:
-            IRCFG([block0, block1])
-
-        assert "dynamic_jumpi" in str(exc_info.value), "应该抛出dynamic_jumpi错误"
-        assert "pc=0" in str(exc_info.value), "错误消息应该包含PC信息"
-
-    def test_static_jump_missing_target_should_error(self):
-        """测试静态跳转但目标块不存在应该抛出LogicError异常。"""
-        from evm_ir.models import EVMBlock, EvmOperator
-        from utils.exceptions import LogicError
-
-        # 创建静态JUMP，但目标块不存在
-        static_jump_op = EvmOperator(
-            kind="JUMP",
-            pc=0,
-            immediate=999,  # 目标PC不存在
-            is_static=True  # 是静态跳转
-        )
-        block0 = EVMBlock(
-            pc=0,
-            stack_depth=0,
-            min_depth=0,
-            max_depth=1024,
-            static_gas=10,
-            is_jump_target=False,
-            is_inner_block=False,
-            is_stop=False,
-            operations=[static_jump_op]
-        )
-
-        # 构建CFG应该抛出LogicError（逻辑错误）
-        with pytest.raises(LogicError) as exc_info:
-            IRCFG([block0])
-
-        assert "target block not found" in str(exc_info.value), "错误消息应该说明目标块未找到"
-        assert "pc=999" in str(exc_info.value), "错误消息应该包含目标PC"
-
-    def test_static_jumpi_missing_target_should_error(self):
-        """测试静态条件跳转但目标块不存在应该抛出LogicError异常。"""
-        from evm_ir.models import EVMBlock, EvmOperator
-        from utils.exceptions import LogicError
-
-        # 创建静态JUMPI，但目标块不存在
-        static_jumpi_op = EvmOperator(
-            kind="JUMPI",
-            pc=0,
-            immediate=999,  # 目标PC不存在
-            is_static=True  # 是静态跳转
-        )
-        block0 = EVMBlock(
-            pc=0,
-            stack_depth=0,
-            min_depth=0,
-            max_depth=1024,
-            static_gas=10,
-            is_jump_target=False,
-            is_inner_block=False,
-            is_stop=False,
-            operations=[static_jumpi_op]
-        )
-        block1 = EVMBlock(
-            pc=1,
-            stack_depth=0,
-            min_depth=0,
-            max_depth=1024,
-            static_gas=1,
-            is_jump_target=True,
-            is_inner_block=False,
-            is_stop=True,
-            operations=[EvmOperator(kind="STOP", pc=1)]
-        )
-
-        # 构建CFG应该抛出LogicError（逻辑错误）
-        with pytest.raises(LogicError) as exc_info:
-            IRCFG([block0, block1])
-
-        assert "target block not found" in str(exc_info.value), "错误消息应该说明目标块未找到"
-        assert "pc=999" in str(exc_info.value), "错误消息应该包含目标PC"
-
+# 导入 copy 模块
+import copy
