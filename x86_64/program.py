@@ -3,6 +3,8 @@ x86-64程序级模型。
 
 本模块为x86-64机器码提供程序级语义，
 操作整个程序（块序列）而不是单个块。
+
+使用基于 evm_ir 设计的动态 CFG 构建和 worklist 驱动的符号执行。
 """
 
 from typing import List, Dict, Any, Optional, Tuple
@@ -10,7 +12,10 @@ from z3 import BitVec, BitVecVal, Concat, If, BoolVal, And, Not
 from .models import X86Block, X86Instruction, Register
 from .semantics import X86SemanticsModel
 from .disassembler import disassemble_hex
-from .cfg import build_x86_cfg, identify_basic_blocks
+from .cfg import identify_basic_blocks
+from .cfg_executor import X86SymbolicExecutor
+from .cfg_strategies import X86DFSStrategy
+from .cfg_state import X86GlobalState
 from state.smt_state import SMTState
 
 
@@ -138,89 +143,172 @@ class X86Program:
             'output_count': 1
         }
     
-    def to_z3(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
-        """使用路径感知执行为整个程序构建Z3公式。
-        
-        此方法识别所有执行路径，符号地执行每条路径，
-        并使用Z3 If表达式合并结果。
-        
+    def to_z3(self, state: SMTState,
+             strategy_cls: type = X86DFSStrategy,
+             max_depth: int = 100,
+             use_reachability_check: bool = True) -> Tuple[SMTState, Dict[str, Any]]:
+        """使用 worklist 驱动的符号执行为整个程序构建Z3公式。
+
+        参考 evm_ir 的设计：
+        - 动态构建 CFG
+        - 使用 work_list 管理待执行状态
+        - 支持可插拔的搜索策略（DFS/BFS/BoundedLoops）
+        - 支持状态注解系统
+        - 可达性检查剪枝不可达状态
+
         Args:
             state: 已准备好输入的初始SMT状态
-        
+            strategy_cls: 搜索策略类（默认 DFS）
+            max_depth: 最大执行深度
+            use_reachability_check: 是否使用可达性检查
+
         Returns:
             (final_state, result_dict)元组，其中：
-            - final_state: 程序执行后的最终SMT状态
+            - final_state: 程序执行后的最终SMT状态（从所有路径合并）
             - result_dict: 包含合并返回值的字典（offset, length, memory, base_addr, has_return）
         """
         # 获取要执行的指令
-        instructions_to_execute = self.instructions if self.instructions else []
-        if not instructions_to_execute:
-            # 从块中提取
-            for block in self.blocks:
-                instructions_to_execute.extend(block.instructions)
-        
+        instructions_to_execute = self._get_instructions()
+
         if not instructions_to_execute:
             # 无指令：返回默认结果
-            from z3 import BitVecVal
-            r15_value = state.x86_registers.get_register(Register.R15)
-            result = {
-                'offset': BitVecVal(0, 64),
-                'length': BitVecVal(0, 64),
-                'memory': state.x86_memory.Memory,
-                'base_addr': r15_value,
-                'has_return': BoolVal(False)
-            }
-            return state, result
-        
-        # 从指令构建CFG
-        cfg = build_x86_cfg(instructions_to_execute)
-        
-        # 查找从入口到返回块的所有路径
-        entry = cfg.get_entry_block()
-        terminals = cfg.get_return_blocks()
-        paths = cfg.find_all_paths(entry, terminals)
-        
-        if not paths:
-            # 回退：如果未找到路径，使用简单的顺序执行
+            return self._empty_result(state)
+
+        # 识别基本块
+        blocks = identify_basic_blocks(instructions_to_execute)
+
+        if not blocks:
+            # 没有块，回退到顺序执行
             return self._to_z3_sequential(state, instructions_to_execute)
-        
-        # 执行每条路径并收集结果
-        path_results = []
-        for path_blocks, path_condition in paths:
-            # 执行路径
-            path_state = state.copy()
-            
-            # 按顺序执行路径中的所有指令
-            for block in path_blocks:
-                for insn in block.instructions:
-                    path_state = insn.to_z3(path_state)
-            
-            # 提取此路径的结果
-            from z3 import BitVecVal
-            r15_value = path_state.x86_registers.get_register(Register.R15)
-            has_return = path_state.return_length != BitVecVal(0, 64)
-            
-            path_result = {
-                'offset': path_state.return_offset,
-                'length': path_state.return_length,
-                'memory': path_state.x86_memory.Memory,
-                'base_addr': r15_value,
-                'has_return': has_return
-            }
-            
-            path_results.append((path_condition, path_result))
-        
-        # 使用If表达式合并所有路径结果
-        merged_result = self._merge_path_results(path_results)
-        
-        # 创建最终状态（使用最后一条路径的状态作为基础，但结果是合并的）
-        final_state = state.copy()
-        final_state.return_offset = merged_result['offset']
-        final_state.return_length = merged_result['length']
-        final_state.x86_memory.Memory = merged_result['memory']
-        # 如果需要则更新R15（尽管它通常是常量）
-        
-        return final_state, merged_result
+
+        # 创建符号执行引擎
+        executor = X86SymbolicExecutor(
+            blocks=blocks,
+            strategy_cls=strategy_cls,
+            max_depth=max_depth,
+            use_reachability_check=use_reachability_check
+        )
+
+        # 执行符号执行
+        final_global_states = executor.execute(state)
+
+        if not final_global_states:
+            # 没有终止状态，返回默认结果
+            return self._empty_result(state)
+
+        # 合并所有终止状态
+        # 使用 If 表达式按路径条件合并
+        merged_state = self._merge_global_states(final_global_states)
+
+        # 提取结果
+        r15_value = merged_state.x86_registers.get_register(Register.R15)
+        has_return = merged_state.return_length != BitVecVal(0, 64)
+
+        result = {
+            'offset': merged_state.return_offset,
+            'length': merged_state.return_length,
+            'memory': merged_state.x86_memory.Memory,
+            'base_addr': r15_value,
+            'has_return': has_return
+        }
+
+        return merged_state, result
+
+    def _get_instructions(self) -> List[X86Instruction]:
+        """获取要执行的指令列表。
+
+        Returns:
+            指令列表
+        """
+        if self.instructions:
+            return self.instructions
+        result = []
+        for block in self.blocks:
+            result.extend(block.instructions)
+        return result
+
+    def _empty_result(self, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
+        """返回空结果（无指令时）。
+
+        Args:
+            state: 初始SMT状态
+
+        Returns:
+            (final_state, result_dict)元组
+        """
+        r15_value = state.x86_registers.get_register(Register.R15)
+        result = {
+            'offset': BitVecVal(0, 64),
+            'length': BitVecVal(0, 64),
+            'memory': state.x86_memory.Memory,
+            'base_addr': r15_value,
+            'has_return': BoolVal(False)
+        }
+        return state, result
+
+    def _merge_global_states(self, global_states: List[X86GlobalState]) -> SMTState:
+        """合并所有全局状态的机器状态。
+
+        使用嵌套 If 表达式合并所有路径的结果。
+
+        Args:
+            global_states: X86GlobalState 列表
+
+        Returns:
+            合并后的 SMTState
+        """
+        if not global_states:
+            # 空列表，返回空状态
+            return SMTState()
+
+        if len(global_states) == 1:
+            # 单一路径，直接返回机器状态
+            return global_states[0].mstate
+
+        # 多条路径，使用 If 表达式合并
+        # 从后往前构建嵌套 If
+        merged = SMTState()
+
+        # 合并 return_offset
+        expr = BitVecVal(0, 64)
+        for gstate in reversed(global_states):
+            condition = gstate.get_constraints().as_bool()
+            expr = If(condition, gstate.mstate.return_offset, expr)
+        merged.return_offset = expr
+
+        # 合并 return_length
+        expr = BitVecVal(0, 64)
+        for gstate in reversed(global_states):
+            condition = gstate.get_constraints().as_bool()
+            expr = If(condition, gstate.mstate.return_length, expr)
+        merged.return_length = expr
+
+        # 合并 x86 内存
+        first_memory = global_states[0].mstate.x86_memory.Memory
+        expr = first_memory
+        for gstate in reversed(global_states):
+            condition = gstate.get_constraints().as_bool()
+            expr = If(condition, gstate.mstate.x86_memory.Memory, expr)
+        merged.x86_memory.Memory = expr
+
+        # 合并寄存器 (RBX, RDX, RCX, RAX)
+        for reg in [Register.RBX, Register.RDX, Register.RCX, Register.RAX]:
+            first_val = global_states[0].mstate.x86_registers.get_register(reg)
+            expr = first_val
+            for gstate in reversed(global_states):
+                condition = gstate.get_constraints().as_bool()
+                expr = If(condition, gstate.mstate.x86_registers.get_register(reg), expr)
+            merged.x86_registers.set_register(reg, expr)
+
+        # 合并 R15（基址寄存器）
+        first_r15 = global_states[0].mstate.x86_registers.get_register(Register.R15)
+        expr = first_r15
+        for gstate in reversed(global_states):
+            condition = gstate.get_constraints().as_bool()
+            expr = If(condition, gstate.mstate.x86_registers.get_register(Register.R15), expr)
+        merged.x86_registers.set_register(Register.R15, expr)
+
+        return merged
     
     def _to_z3_sequential(self, state: SMTState, instructions: List[X86Instruction]) -> Tuple[SMTState, Dict[str, Any]]:
         """回退：无路径分析的顺序执行。
