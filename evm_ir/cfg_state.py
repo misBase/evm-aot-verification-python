@@ -83,11 +83,16 @@ class Constraints:
     def __copy__(self):
         """浅拷贝约束。
 
+        创建新的 Constraints 对象和新的约束列表（但列表中的 Z3 表达式是共享的）。
+        这与 mythril 的实现一致，确保后续添加约束不会影响原状态。
+
         Returns:
-            新的 Constraints 实例，共享约束列表
+            新的 Constraints 实例，包含新的约束列表
         """
         new_constraints = Constraints()
-        new_constraints._constraints = self._constraints
+        # 复制列表内容，而不是共享引用
+        # Z3 表达式是不可变的，所以共享列表元素是安全的
+        new_constraints._constraints = self._constraints.copy()
         return new_constraints
 
     def __deepcopy__(self, memo):
