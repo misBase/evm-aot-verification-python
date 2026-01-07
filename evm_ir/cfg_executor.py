@@ -138,6 +138,9 @@ class SymbolicExecutor:
 
         # 主执行循环
         for global_state in self.strategy:
+            # 【预留】循环检测调用点（TODO: 实现检测逻辑）
+            self._detect_and_handle_loops(global_state)
+
             # 执行单个状态
             new_states = self.execute_state(global_state)
 
@@ -407,6 +410,42 @@ class SymbolicExecutor:
         last_op = node.block.operations[-1]
         last_kind = last_op.kind.upper()
         return last_kind in ["STOP", "RETURN", "REVERT", "SELFDESTRUCT"]
+
+    def _detect_and_handle_loops(self, global_state: GlobalState) -> None:
+        """检测当前状态是否形成循环，并根据类型分类处理。
+
+        TODO: 实现循环检测逻辑
+        - PC 重复检测
+        - 循环分类（静态/动态/无界）
+        - 静态有界循环展开
+        - 其他循环类型抛出 UnsupportedLoopError
+
+        Args:
+            global_state: 当前全局状态
+
+        Raises:
+            UnsupportedLoopError: 检测到不支持的循环类型时抛出
+        """
+        # TODO: 实现循环检测
+        pass
+
+    def _classify_loop(self, loop_pc: int, path_context: Dict) -> str:
+        """判断循环类型。
+
+        TODO: 实现循环分类逻辑
+        - 静态有界：检查循环条件是否为常量比较
+        - 动态有界：条件与符号变量比较
+        - 无界：无法确定循环边界
+
+        Args:
+            loop_pc: 循环头的 PC
+            path_context: 执行路径上下文信息
+
+        Returns:
+            "static_bounded" | "dynamic_bounded" | "unbounded"
+        """
+        # TODO: 实现循环分类
+        return "dynamic_bounded"  # 默认返回
 
 
 def build_dynamic_cfg(blocks: List[EVMBlock],
