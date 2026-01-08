@@ -6,7 +6,7 @@
 """
 
 from typing import Dict, Optional, List, TYPE_CHECKING
-from z3 import BitVec, BitVecVal, Array, ArraySort, BitVecSort, IntSort, Int, Select, Store
+from z3 import BitVec, BitVecVal, Array, ArraySort, BitVecSort, IntSort, Int, Select, Store, BoolRef
 
 if TYPE_CHECKING:
     from x86_64.models import Register
@@ -873,7 +873,7 @@ class EVMGasState:
         new_state = EVMGasState(initial_gas=new_gas)
         return new_state
 
-    def is_out_of_gas(self) -> 'BoolRef':
+    def is_out_of_gas(self) -> BoolRef:
         """检查是否耗尽Gas。
 
         Returns:
