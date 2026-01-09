@@ -5,7 +5,7 @@ x86-64 符号执行引擎（参考 evm_ir）。
 """
 
 from typing import List, Dict, Optional, Tuple
-from z3 import BitVecVal, Not, Bool
+from z3 import BitVecVal, Not, And, Or
 
 from .models import X86Block, X86Instruction
 from .cfg_structures import X86DynamicCFG, X86EdgeType
@@ -59,30 +59,51 @@ class X86SymbolicExecutor:
         # 终止状态列表
         self.final_states: List[X86GlobalState] = []
 
-    def manage_cfg(self, insn: X86Instruction, new_states: List[X86GlobalState]) -> None:
+    def manage_cfg(self, insn: X86Instruction, new_states: List[X86GlobalState],
+                   from_addr: int) -> None:
         """管理 CFG 构建。
 
         在执行过程中动态添加边。
 
         Args:
             insn: 当前执行的指令
-            new_states: 新生成的状态
+            new_states: 新生成的状态列表
+            from_addr: 前驱节点地址（当前块地址）
         """
         if not new_states:
             return
 
-        # 获取当前节点的地址
-        # 注意：我们需要在执行指令前获取当前地址，因为 new_states 已经指向后继节点
-        # 这里需要从 global_state 中获取，但该方法签名没有提供
-        # 我们需要从 new_states 反推，或者修改方法签名
-        # 暂时假设所有 new_states 来自同一个前驱节点
-        if not new_states[0].node:
-            return
+        mnemonic = insn.mnemonic.lower()
 
-        # 实际上，我们需要从调用者传递当前节点地址
-        # 这是一个设计问题，暂时注释掉 CFG 更新逻辑
-        # TODO: 修复 manage_cfg 的设计，需要传递当前节点地址
-        return
+        if mnemonic == 'jmp':
+            # 无条件跳转：添加单条边
+            if len(new_states) == 1 and new_states[0].node:
+                to_addr = new_states[0].node.address
+                self.cfg.add_edge(from_addr, to_addr, X86EdgeType.UNCONDITIONAL)
+
+        elif mnemonic in ['jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+            # 条件跳转：添加两条边（跳转和 fallthrough）
+            for i, state in enumerate(new_states):
+                if not state.node:
+                    continue
+                to_addr = state.node.address
+
+                # 第一个状态是跳转分支，第二个是 fallthrough
+                if i == 0:
+                    edge_type = X86EdgeType.CONDITIONAL_TRUE
+                    # 从状态约束中提取条件
+                    condition = self._extract_jcc_condition(state)
+                else:
+                    edge_type = X86EdgeType.CONDITIONAL_FALSE
+                    condition = None  # fallthrough 条件是跳转条件的否定，在边类型中体现
+
+                self.cfg.add_edge(from_addr, to_addr, edge_type, condition)
+
+        else:
+            # Fallthrough：添加顺序执行边
+            if len(new_states) == 1 and new_states[0].node:
+                to_addr = new_states[0].node.address
+                self.cfg.add_edge(from_addr, to_addr, X86EdgeType.FALLTHROUGH)
 
     def execute(self, initial_state: SMTState, entry_addr: Optional[int] = None) -> List[X86GlobalState]:
         """执行符号执行。
@@ -117,6 +138,9 @@ class X86SymbolicExecutor:
 
         # 主执行循环
         for global_state in self.strategy:
+            # 循环检测调用点（TODO: 实现检测逻辑）
+            self._detect_and_handle_loops(global_state)
+
             # 执行单个状态
             new_states = self.execute_state(global_state)
 
@@ -131,10 +155,11 @@ class X86SymbolicExecutor:
                     pruned = old_count - len(new_states)
                     self.pruned_states += pruned
 
-                # 更新 CFG (暂时禁用，因为设计需要修复)
-                # if global_state.node and global_state.node.block.instructions:
-                #     last_insn = global_state.node.block.instructions[-1]
-                #     self.manage_cfg(last_insn, new_states, global_state.node.address)
+                # 更新 CFG
+                if global_state.node and global_state.node.block.instructions:
+                    last_insn = global_state.node.block.instructions[-1]
+                    from_addr = global_state.node.address
+                    self.manage_cfg(last_insn, new_states, from_addr)
 
                 # 添加新状态到 work_list
                 self.work_list.extend(new_states)
@@ -203,7 +228,7 @@ class X86SymbolicExecutor:
             根据编译器实现，机器码中没有间接跳转，
             所有跳转目标都是静态确定的。
         """
-        import copy
+        import copy as copy_module
 
         # 解析跳转目标
         operands = parse_operands(insn)
@@ -220,7 +245,7 @@ class X86SymbolicExecutor:
             target_node = self.cfg.get_or_create_node(target_addr)
             new_state = X86GlobalState(
                 mstate=mstate,
-                world_state=copy(global_state.world_state),
+                world_state=copy_module.copy(global_state.world_state),
                 node=target_node
             )
             new_state.depth = global_state.depth + 1
@@ -254,7 +279,7 @@ class X86SymbolicExecutor:
             - 所有跳转目标都是静态确定的
             - 没有间接跳转
         """
-        import copy
+        import copy as copy_module
 
         # 解析跳转目标
         operands = parse_operands(insn)
@@ -276,7 +301,7 @@ class X86SymbolicExecutor:
             target_node = self.cfg.get_or_create_node(target_addr)
 
             # 深拷贝状态
-            jump_world_state = copy.deepcopy(global_state.world_state)
+            jump_world_state = copy_module.deepcopy(global_state.world_state)
             jump_world_state.constraints.add(jump_condition)
 
             jump_state = X86GlobalState(
@@ -294,7 +319,7 @@ class X86SymbolicExecutor:
             fallthrough_node = self.cfg.get_or_create_node(fallthrough_addr)
 
             # 深拷贝状态
-            fallthrough_world_state = copy.deepcopy(global_state.world_state)
+            fallthrough_world_state = copy_module.deepcopy(global_state.world_state)
             fallthrough_world_state.constraints.add(fallthrough_condition)
 
             fallthrough_state = X86GlobalState(
@@ -318,34 +343,55 @@ class X86SymbolicExecutor:
             符号条件（BoolRef）
 
         Note:
-            当前实现存在局限性：
-            - 创建的是自由变量（没有与实际 CPU 标志关联）
-            - 完整实现需要从 CPU 标志寄存器（CF, ZF, SF, OF）中提取条件
-            - 需要在 SMTState 或 x86_registers 中实现标志访问接口
+            从 CPU 标志寄存器（CF, ZF, SF, OF）中提取实际条件。
+            标志位是 1 位 BitVec，使用 == 运算符比较得到 BoolRef。
         """
-        from .models import Register
+        # 获取 CPU 标志位（1 位 BitVec）
+        cf = mstate.x86_registers.get_flag('CF')
+        zf = mstate.x86_registers.get_flag('ZF')
+        sf = mstate.x86_registers.get_flag('SF')
+        of = mstate.x86_registers.get_flag('OF')
 
-        # 映射助记符到标志
-        # jl/jle/jg/jge 实际上涉及 SF 和 OF 的关系
-        flag_map = {
-            'jb': ('CF', True),      # CF == 1
-            'jae': ('CF', False),    # CF == 0
-            'je': ('ZF', True),      # ZF == 1
-            'jne': ('ZF', False),    # ZF == 0
-            'jl': ('SF', 'OF'),      # SF != OF
-            'jle': ('ZF', 'SF'),     # ZF == 1 or SF != OF
-            'jg': ('ZF', 'SF'),      # ZF == 0 and SF == OF
-            'jge': ('SF', 'OF'),     # SF == OF
+        # 将 1 位 BitVec 转换为 BoolRef
+        # (flag == BitVecVal(1, 1)) 返回 BoolRef
+        cf_true = (cf == BitVecVal(1, 1))
+        cf_false = (cf == BitVecVal(0, 1))
+        zf_true = (zf == BitVecVal(1, 1))
+        zf_false = (zf == BitVecVal(0, 1))
+        sf_eq_of = (sf == of)
+        sf_ne_of = Not(sf == of)
+
+        # 根据助记符构建条件
+        # jl/jle/jg/jge 涉及 SF 和 OF 的关系
+        conditions = {
+            'jb': cf_true,           # CF == 1 (无符号小于)
+            'jae': cf_false,         # CF == 0 (无符号大于等于)
+            'je': zf_true,           # ZF == 1 (等于)
+            'jne': zf_false,         # ZF == 0 (不等于)
+            'jl': sf_ne_of,          # SF != OF (有符号小于)
+            'jle': Or(zf_true, sf_ne_of),  # ZF == 1 or SF != OF (有符号小于等于)
+            'jg': And(zf_false, sf_eq_of),  # ZF == 0 and SF == OF (有符号大于)
+            'jge': sf_eq_of,         # SF == OF (有符号大于等于)
         }
 
-        flag_info = flag_map.get(mnemonic, ('ZF', True))
+        return conditions.get(mnemonic, zf_true)
 
-        # TODO: 完整实现需要从 CPU 标志寄存器中提取实际条件
-        # 当前简化实现：创建符号变量作为占位符
-        # 这意味着约束求解时会产生自由变量，可能影响验证结果
-        condition_var = Bool(f"jump_cond_{mnemonic}")
+    def _extract_jcc_condition(self, state: X86GlobalState):
+        """从状态中提取 Jcc 条件（用于 CFG 边）。
 
-        return condition_var
+        Args:
+            state: 全局状态
+
+        Returns:
+            条件 BoolRef 或 None
+        """
+        # 从世界状态的约束中获取最后的条件
+        # 在 _handle_jcc 中，我们将 jump_condition 添加到约束中
+        constraints = state.get_constraints()
+        if len(constraints) > 0:
+            # 返回最后一个添加的约束（即跳转条件）
+            return list(constraints)[-1]
+        return None
 
     def _handle_fallthrough(self, global_state: X86GlobalState, mstate: SMTState,
                            block: X86Block) -> List[X86GlobalState]:
@@ -359,7 +405,7 @@ class X86SymbolicExecutor:
         Returns:
             新全局状态列表
         """
-        import copy
+        import copy as copy_module
 
         # 找到下一个块
         current_idx = self.blocks.index(block)
@@ -372,7 +418,7 @@ class X86SymbolicExecutor:
 
         new_state = X86GlobalState(
             mstate=mstate,
-            world_state=copy(global_state.world_state),
+            world_state=copy_module.copy(global_state.world_state),
             node=next_node
         )
         new_state.depth = global_state.depth + 1
@@ -394,6 +440,42 @@ class X86SymbolicExecutor:
 
         last_insn = node.block.instructions[-1]
         return last_insn.mnemonic.lower() == 'ret'
+
+    def _detect_and_handle_loops(self, global_state: X86GlobalState) -> None:
+        """检测当前状态是否形成循环，并根据类型分类处理。
+
+        TODO: 实现循环检测逻辑
+        - 地址重复检测
+        - 循环分类（静态/动态/无界）
+        - 静态有界循环展开
+        - 其他循环类型抛出 UnsupportedLoopError
+
+        Args:
+            global_state: 当前全局状态
+
+        Raises:
+            UnsupportedLoopError: 检测到不支持的循环类型时抛出
+        """
+        # TODO: 实现循环检测
+        pass
+
+    def _classify_loop(self, loop_addr: int, path_context: Dict) -> str:
+        """判断循环类型。
+
+        TODO: 实现循环分类逻辑
+        - 静态有界：检查循环条件是否为常量比较
+        - 动态有界：条件与符号变量比较
+        - 无界：无法确定循环边界
+
+        Args:
+            loop_addr: 循环头的地址
+            path_context: 执行路径上下文信息
+
+        Returns:
+            "static_bounded" | "dynamic_bounded" | "unbounded"
+        """
+        # TODO: 实现循环分类
+        return "dynamic_bounded"  # 默认返回
 
 
 def build_x86_dynamic_cfg(blocks: List[X86Block],
