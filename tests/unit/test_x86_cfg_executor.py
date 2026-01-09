@@ -879,6 +879,75 @@ class TestComplexScenarios:
         state.x86_registers.set_register(Register.R15, BitVecVal(0x2000, 64))
         return state
 
+    def test_real_compiler_output_complex_function(self):
+        """测试来自真实编译器的复杂函数的完整符号执行。
+
+        这是一个实际的 Go 编译器生成的 x86-64 代码，包含：
+        - 多个条件分支 (jb, jae)
+        - 多个 ret 指令
+        - 复杂的控制流
+        - 256位算术运算 (adc 指令)
+
+        测试验证：
+        1. 基本块识别正确
+        2. 符号执行能完成
+        3. CFG 边构建正确
+        4. 终止状态正确收集
+        """
+        hex_code = (
+            "4d8b75384d0375304d8b7d10498b45704883f80372234883e80349894570"
+            "498b45304883f8407222483d21800000732b4d8b75384901c6eb3341c685"
+            "e00000000c49c7452800000000c341c685e00000000e49c7452800000000"
+            "c341c685e00000000f49c7452800000000c3498b46c0490346e0498b4ec8"
+            "49134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498"
+            "956d049895ed841c685e00000000249c74528fcffffffc3"
+        )
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        # 验证基本块识别
+        assert len(blocks) == 8, f"Expected 8 blocks, got {len(blocks)}"
+
+        block_starts = [b.start_addr for b in blocks]
+        expected_starts = [0x1000, 0x1016, 0x1028, 0x1030, 0x1039, 0x104a, 0x105b, 0x106c]
+        for expected in expected_starts:
+            assert expected in block_starts, f"Expected block at 0x{expected:x}"
+
+        # 创建执行器并执行
+        executor = X86SymbolicExecutor(blocks, max_depth=50, use_reachability_check=True)
+        final_states = executor.execute(state)
+
+        # 验证执行结果
+        # 应该有终止状态（来自 ret 指令）
+        assert len(final_states) >= 1, "Should have at least one terminal state"
+
+        # 验证终止状态都是 ret 指令
+        for fs in final_states:
+            assert fs.node.block.instructions[-1].mnemonic.lower() == 'ret', \
+                f"Final state should end with ret, got {fs.node.block.instructions[-1].mnemonic}"
+
+        # 验证 CFG 边
+        assert len(executor.cfg.edges) >= 4, f"Should have at least 4 CFG edges, got {len(executor.cfg.edges)}"
+
+        # 验证边类型多样性
+        edge_types = {e.edge_type for e in executor.cfg.edges}
+        # 这个编译器输出所有块都以跳转或 ret 结尾，所以可能没有 FALLTHROUGH 边
+        assert len(edge_types) >= 1, f"Should have at least one edge type, got {edge_types}"
+
+        # 验证统计信息
+        assert executor.total_states >= 1, "Should have created at least one state"
+
+        # 验证包含 adc 的块（256位加法）
+        adc_blocks = [b for b in blocks if any(i.mnemonic == "adc" for i in b.instructions)]
+        assert len(adc_blocks) >= 1, "Should have at least one block with adc instructions"
+
+        # 最后一个块应该包含 adc 序列和 ret
+        last_block = next((b for b in blocks if b.start_addr == 0x106c), None)
+        assert last_block is not None, "Should have a block at 0x106c"
+        assert last_block.instructions[-1].mnemonic == "ret", "Last block should end with ret"
+        adc_instructions = [insn for insn in last_block.instructions if insn.mnemonic == "adc"]
+        assert len(adc_instructions) == 3, "Should have 3 adc instructions for 256-bit addition"
+
     def test_nested_conditional_jumps(self):
         """测试嵌套条件跳转。"""
         # je 0x1005; je 0x1008; ret; ret; ret

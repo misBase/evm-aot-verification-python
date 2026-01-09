@@ -222,3 +222,34 @@ class X86DynamicCFG:
 
     def __repr__(self):
         return f"X86DynamicCFG(nodes={len(self.nodes)}, edges={len(self.edges)})"
+
+    def visualize(self, output_path: str | None = None, **kwargs) -> str:
+        """可视化 CFG。
+
+        生成 Graphviz DOT 格式的控制流图可视化。
+
+        Args:
+            output_path: 可选的输出文件路径（.dot 文件）
+            **kwargs: 传递给可视化器的参数
+                - title: 图标题
+                - show_constraints: 是否显示约束条件（默认 True）
+                - show_instructions: 是否显示指令列表（默认 True）
+                - show_states: 是否显示状态数量（默认 True）
+                - compact: 紧凑模式（默认 False）
+
+        Returns:
+            DOT 格式字符串
+
+        Example:
+            >>> cfg.visualize("x86_cfg.dot")
+            >>> dot_content = cfg.visualize(show_constraints=False)
+        """
+        from visualization.cfg_visualizer import CFGVisualizer
+
+        visualizer = CFGVisualizer(self, cfg_type="x86")
+        dot_content = visualizer.generate_dot(**kwargs)
+
+        if output_path:
+            visualizer.save_to_file(output_path, **kwargs)
+
+        return dot_content
