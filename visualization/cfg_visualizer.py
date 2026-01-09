@@ -269,15 +269,63 @@ class DOTGenerator:
 
         return "\\n".join(lines) if lines else ""
 
+    def _parse_flag_condition(self, cond_str: str) -> str:
+        """解析标志位条件为可读格式。
+
+        将 Z3 BoolRef 字符串转换为标志位条件，如 "CF=1", "ZF=0"。
+
+        Args:
+            cond_str: Z3 BoolRef 的字符串表示
+
+        Returns:
+            可读的标志位条件字符串，如果无法解析则返回原始字符串
+        """
+        import re
+
+        # 模式匹配：
+        # "1 == CF" -> "CF=1"
+        # "0 == ZF" -> "ZF=0"
+        # "Not(1 == CF)" -> "CF=0"
+        # "Not(0 == ZF)" -> "ZF=1"
+
+        # 首先尝试解析 Not(模式)
+        not_pattern = r'Not\((\d+)\s*==\s*([A-Z]+)\)'
+        not_match = re.search(not_pattern, cond_str)
+        if not_match:
+            value = int(not_match.group(1))
+            flag = not_match.group(2)
+            # Not 反转值
+            return f"{flag}={1 - value}"
+
+        # 然后尝试解析直接相等模式
+        eq_pattern = r'(\d+)\s*==\s*([A-Z]+)'
+        eq_match = re.search(eq_pattern, cond_str)
+        if eq_match:
+            value = eq_match.group(1)
+            flag = eq_match.group(2)
+            return f"{flag}={value}"
+
+        # 如果都无法匹配，返回原始字符串（可能已经过格式化或包含其他表达式）
+        return cond_str
+
     def _format_constraint(self, condition: BoolRef | None, compact: bool) -> str:
         """格式化约束条件。
 
-        将 Z3 BoolRef 转换为可读字符串。
+        将 Z3 BoolRef 转换为可读的标志位条件。
         """
         if condition is None:
             return ""
 
         cond_str = str(condition)
+
+        # 尝试解析为标志位条件
+        flag_condition = self._parse_flag_condition(cond_str)
+
+        # 如果解析后的字符串与原始不同，说明成功解析
+        if flag_condition != cond_str:
+            return flag_condition
+
+        # 否则使用原始格式化逻辑
         if compact and len(cond_str) > self.style.MAX_CONSTRAINT_LENGTH:
             return cond_str[: self.style.MAX_CONSTRAINT_LENGTH] + self.style.CONSTRAINT_ELLIPSIS
         return cond_str
@@ -361,21 +409,7 @@ class DOTGenerator:
             style, color = self._get_edge_style_and_color(edge)
 
             # 构建标签
-            label_parts = []
-
-            # 边类型
-            edge_type_str = (
-                edge.edge_type.value if hasattr(edge.edge_type, "value") else str(edge.edge_type)
-            )
-            label_parts.append(edge_type_str)
-
-            # 条件约束
-            if show_constraints and edge.condition:
-                cond_str = self._format_constraint(edge.condition, compact)
-                if cond_str:
-                    label_parts.append(f"[{cond_str}]")
-
-            label = " ".join(label_parts)
+            label = self._build_edge_label(edge, show_constraints, compact)
             label = label.replace('"', '\\"')  # 转义引号
 
             # 生成边定义
@@ -386,6 +420,178 @@ class DOTGenerator:
             lines.append("    ];")
 
         return lines
+
+    def _build_edge_label(self, edge: EdgeProtocol, show_constraints: bool, compact: bool) -> str:
+        """构建边的标签。
+
+        优先显示指令助记符和条件信息，如 "jb (CF=1)"。
+
+        Args:
+            edge: CFG 边
+            show_constraints: 是否显示约束条件
+            compact: 是否使用紧凑模式
+
+        Returns:
+            边标签字符串
+        """
+        # 检查是否有源指令信息
+        source_insn = None
+        if hasattr(edge, 'source_instruction'):
+            source_insn = edge.source_instruction
+
+        # 如果有源指令，优先显示指令助记符
+        if source_insn is not None:
+            mnemonic = source_insn.mnemonic if hasattr(source_insn, 'mnemonic') else None
+            if mnemonic:
+                mnemonic_lower = mnemonic.lower()
+
+                # 对于条件跳转，显示助记符和条件
+                if mnemonic_lower in ['jb', 'jae', 'je', 'jne', 'jl', 'jge', 'jle', 'jg']:
+                    # 尝试获取条件描述
+                    condition_desc = self._get_condition_description(edge, show_constraints, compact)
+                    if condition_desc:
+                        return f"{mnemonic} ({condition_desc})"
+                    return mnemonic
+
+                # 对于无条件跳转，只显示助记符
+                elif mnemonic_lower == 'jmp':
+                    return mnemonic
+
+        # 尝试解析标志位条件（如果没有源指令）
+        if show_constraints and hasattr(edge, 'condition') and edge.condition is not None:
+            cond_str = self._format_constraint(edge.condition, compact)
+            if cond_str and self._is_simple_flag_condition(cond_str):
+                # 如果是简单的标志位条件（如 CF=1），直接显示
+                return cond_str
+
+        # 如果没有条件，显示边类型
+        edge_type_str = (
+            edge.edge_type.value if hasattr(edge.edge_type, "value") else str(edge.edge_type)
+        )
+        return edge_type_str
+
+    def _get_condition_description(self, edge: EdgeProtocol, show_constraints: bool, compact: bool) -> str:
+        """获取条件的描述。
+
+        根据指令类型推断标志位条件，如 "CF=1"。
+
+        Args:
+            edge: CFG 边
+            show_constraints: 是否显示约束条件
+            compact: 是否使用紧凑模式
+
+        Returns:
+            条件描述字符串，如果无法解析则返回空字符串
+        """
+        if not show_constraints:
+            return ""
+
+        # 检查是否有源指令
+        source_insn = None
+        if hasattr(edge, 'source_instruction'):
+            source_insn = edge.source_instruction
+
+        if source_insn is None:
+            return ""
+
+        mnemonic = source_insn.mnemonic if hasattr(source_insn, 'mnemonic') else None
+        if not mnemonic:
+            return ""
+
+        # 根据指令类型和边类型推断标志位条件
+        mnemonic_lower = mnemonic.lower()
+        edge_type = edge.edge_type if hasattr(edge, 'edge_type') else None
+
+        # 只处理条件跳转指令
+        if mnemonic_lower not in ['jb', 'jae', 'je', 'jne', 'jl', 'jge', 'jle', 'jg']:
+            return ""
+
+        # 获取边类型字符串
+        edge_type_str = edge_type.value if hasattr(edge_type, 'value') else str(edge_type)
+
+        # 根据指令和边类型确定标志位条件
+        # conditional_true 表示条件为真时跳转，conditional_false 表示条件为假时跳转
+        if edge_type_str == 'conditional_true':
+            # 跳转分支（条件为真）
+            return self._get_flag_for_jump_true(mnemonic_lower)
+        elif edge_type_str == 'conditional_false':
+            # Fallthrough 分支（条件为假）
+            return self._get_flag_for_jump_false(mnemonic_lower)
+
+        return ""
+
+    def _get_flag_for_jump_true(self, mnemonic: str) -> str:
+        """获取条件为真时的标志位值。
+
+        Args:
+            mnemonic: 指令助记符（小写）
+
+        Returns:
+            标志位条件，如 "CF=1"
+        """
+        # jb: CF=1 (无符号小于)
+        # jae: CF=0 (无符号大于等于)
+        # je: ZF=1 (等于)
+        # jne: ZF=0 (不等于)
+        # jl: SF!=OF (有符号小于)
+        # jge: SF=OF (有符号大于等于)
+        # jle: ZF=1 或 SF!=OF (有符号小于等于)
+        # jg: ZF=0 且 SF=OF (有符号大于)
+        flag_conditions = {
+            'jb': 'CF=1',
+            'jae': 'CF=0',
+            'je': 'ZF=1',
+            'jne': 'ZF=0',
+            'jl': 'SF≠OF',
+            'jge': 'SF=OF',
+            'jle': 'ZF=1 or SF≠OF',
+            'jg': 'ZF=0 & SF=OF',
+        }
+        return flag_conditions.get(mnemonic, '')
+
+    def _get_flag_for_jump_false(self, mnemonic: str) -> str:
+        """获取条件为假时的标志位值（fallthrough 分支）。
+
+        Args:
+            mnemonic: 指令助记符（小写）
+
+        Returns:
+            标志位条件，如 "CF=0"
+        """
+        # jb fallthrough: CF=0
+        # jae fallthrough: CF=1
+        # je fallthrough: ZF=0
+        # jne fallthrough: ZF=1
+        # jl fallthrough: SF=OF
+        # jge fallthrough: SF≠OF
+        # jle fallthrough: ZF=0 且 SF=OF
+        # jg fallthrough: ZF=1 或 SF≠OF
+        flag_conditions = {
+            'jb': 'CF=0',
+            'jae': 'CF=1',
+            'je': 'ZF=0',
+            'jne': 'ZF=1',
+            'jl': 'SF=OF',
+            'jge': 'SF≠OF',
+            'jle': 'ZF=0 & SF=OF',
+            'jg': 'ZF=1 or SF≠OF',
+        }
+        return flag_conditions.get(mnemonic, '')
+
+    def _is_simple_flag_condition(self, cond_str: str) -> bool:
+        """检查是否是简单的标志位条件。
+
+        简单条件如 "CF=1", "ZF=0" 等，不包含复杂的表达式。
+
+        Args:
+            cond_str: 条件字符串
+
+        Returns:
+            如果是简单的标志位条件则返回 True
+        """
+        # 如果包含空格或特殊字符（除了 =），说明不是简单条件
+        # 简单条件格式: FLAG=VALUE (如 CF=1, ZF=0)
+        return '=' in cond_str and ' ' not in cond_str and not cond_str.startswith('(')
 
 
 class CFGVisualizer:

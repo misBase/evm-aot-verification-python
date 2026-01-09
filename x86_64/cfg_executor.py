@@ -79,7 +79,8 @@ class X86SymbolicExecutor:
             # 无条件跳转：添加单条边
             if len(new_states) == 1 and new_states[0].node:
                 to_addr = new_states[0].node.address
-                self.cfg.add_edge(from_addr, to_addr, X86EdgeType.UNCONDITIONAL)
+                self.cfg.add_edge(from_addr, to_addr, X86EdgeType.UNCONDITIONAL,
+                                source_instruction=insn)
 
         elif mnemonic in ['jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
             # 条件跳转：添加两条边（跳转和 fallthrough）
@@ -97,13 +98,15 @@ class X86SymbolicExecutor:
                     edge_type = X86EdgeType.CONDITIONAL_FALSE
                     condition = None  # fallthrough 条件是跳转条件的否定，在边类型中体现
 
-                self.cfg.add_edge(from_addr, to_addr, edge_type, condition)
+                self.cfg.add_edge(from_addr, to_addr, edge_type, condition,
+                                source_instruction=insn)
 
         else:
             # Fallthrough：添加顺序执行边
             if len(new_states) == 1 and new_states[0].node:
                 to_addr = new_states[0].node.address
-                self.cfg.add_edge(from_addr, to_addr, X86EdgeType.FALLTHROUGH)
+                self.cfg.add_edge(from_addr, to_addr, X86EdgeType.FALLTHROUGH,
+                                source_instruction=insn)
 
     def execute(self, initial_state: SMTState, entry_addr: Optional[int] = None) -> List[X86GlobalState]:
         """执行符号执行。

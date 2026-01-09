@@ -11,7 +11,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from z3 import BoolRef
 
-from .models import X86Block
+from .models import X86Block, X86Instruction
 
 # 前向引用，避免循环导入
 if TYPE_CHECKING:
@@ -40,16 +40,18 @@ class X86EdgeType(Enum):
 class X86CFGEdge:
     """x86-64 CFG 中的边。
 
-    连接两个节点，包含边类型和条件。
+    连接两个节点，包含边类型、条件和源指令。
     """
     node_from: int  # 起始节点的地址
     node_to: int    # 目标节点的地址
     edge_type: X86EdgeType
     condition: Optional[BoolRef] = None  # 条件分支的约束条件
+    source_instruction: Optional[X86Instruction] = None  # 产生这条边的源指令
 
     def __repr__(self):
         cond_str = f" [{self.condition}]" if self.condition else ""
-        return f"X86Edge(0x{self.node_from:x} -> 0x{self.node_to:x}, {self.edge_type.value}{cond_str})"
+        src_str = f" ({self.source_instruction.mnemonic})" if self.source_instruction else ""
+        return f"X86Edge(0x{self.node_from:x} -> 0x{self.node_to:x}, {self.edge_type.value}{cond_str}{src_str})"
 
 
 @dataclass
@@ -121,7 +123,8 @@ class X86DynamicCFG:
         return self.nodes[addr]
 
     def add_edge(self, from_addr: int, to_addr: int, edge_type: X86EdgeType,
-                 condition: Optional[BoolRef] = None) -> X86CFGEdge:
+                 condition: Optional[BoolRef] = None,
+                 source_instruction: Optional[X86Instruction] = None) -> X86CFGEdge:
         """添加一条边。
 
         Args:
@@ -129,6 +132,7 @@ class X86DynamicCFG:
             to_addr: 目标节点地址
             edge_type: 边类型
             condition: 可选的条件约束
+            source_instruction: 产生这条边的源指令（可选）
 
         Returns:
             创建的 X86CFGEdge
@@ -140,7 +144,8 @@ class X86DynamicCFG:
             node_from=from_addr,
             node_to=to_addr,
             edge_type=edge_type,
-            condition=condition
+            condition=condition,
+            source_instruction=source_instruction
         )
 
         self.edges.append(edge)
