@@ -552,12 +552,17 @@ class TestIntegration:
         测试验证：
         1. 能够处理真实的编译器输出
         2. 包含多个基本块
-        3. 包含不同类型的边
+        3. 包含不同类型的边（条件跳转、fallthrough、无条件跳转）
         4. 正确生成 DOT 文件
+        5. 使用符号执行器动态构建 CFG
         """
         from x86_64.disassembler import disassemble_hex
+        from x86_64.cfg import identify_basic_blocks
+        from x86_64.cfg_executor import build_x86_dynamic_cfg
+        from x86_64.cfg_strategies import X86DFSStrategy
+        from state.smt_state import SMTState
 
-        # 真实的编译器输出，包含 8 个基本块
+        # 真实的编译器输出，包含条件跳转（jb, jae）和多个分支
         hex_code = (
             "4d8b75384d0375304d8b7d10498b45704883f80372234883e80349894570"
             "498b45304883f8407222483d21800000732b4d8b75384901c6eb3341c685"
@@ -570,25 +575,26 @@ class TestIntegration:
         # 反汇编代码
         instructions = disassemble_hex(hex_code, base_addr=0x1000)
 
-        # 创建基本块（基于已知的块边界）
-        block_starts = [0x1000, 0x1016, 0x1028, 0x1030, 0x1039, 0x104a, 0x105b, 0x106c]
-        blocks = []
-        for i, start in enumerate(block_starts):
-            end = block_starts[i + 1] if i + 1 < len(block_starts) else 0x1000 + len(hex_code) // 2
-            block_insts = [inst for inst in instructions if start <= inst.addr < end]
-            blocks.append(X86Block(start_addr=start, end_addr=end, instructions=block_insts))
+        # 使用 identify_basic_blocks 自动识别基本块
+        blocks = identify_basic_blocks(instructions)
 
-        # 创建 CFG
-        cfg = X86DynamicCFG(blocks)
+        # 验证基本块识别正确
+        # 应该识别出包含条件跳转的块：
+        # 0x1000: 包含 'jb 0x1039' 指令
+        # 0x1016: 包含 'jb 0x104a' 指令
+        # 0x1028: 包含 'jae 0x105b' 指令
+        assert len(blocks) > 0, "Should identify at least one basic block"
 
-        # 添加边（基于编译器输出的控制流）
-        cfg.add_edge(0x1000, 0x1016, X86EdgeType.UNCONDITIONAL)
-        cfg.add_edge(0x1016, 0x1028, X86EdgeType.UNCONDITIONAL)
-        cfg.add_edge(0x1028, 0x1030, X86EdgeType.UNCONDITIONAL)
-        cfg.add_edge(0x1030, 0x1039, X86EdgeType.UNCONDITIONAL)
-        cfg.add_edge(0x1039, 0x104a, X86EdgeType.UNCONDITIONAL)
-        cfg.add_edge(0x104a, 0x105b, X86EdgeType.UNCONDITIONAL)
-        cfg.add_edge(0x105b, 0x106c, X86EdgeType.UNCONDITIONAL)
+        # 创建初始 SMT 状态
+        initial_state = SMTState()
+
+        # 使用符号执行器动态构建 CFG
+        final_states, cfg = build_x86_dynamic_cfg(
+            blocks=blocks,
+            initial_state=initial_state,
+            strategy_cls=X86DFSStrategy,
+            max_depth=100
+        )
 
         # 生成可视化
         visualizer = CFGVisualizer(cfg, cfg_type="x86")
@@ -603,16 +609,28 @@ class TestIntegration:
         # 验证节点数量
         assert f"// {len(blocks)} nodes" in dot or dot.count("node_") >= len(blocks)
 
+        # 验证包含条件边（因为有条件跳转指令 jb, jae）
+        # 应该包含 conditional_true 或 conditional_false 类型的边
+        stats = visualizer.get_statistics()
+        edge_types = stats.get("edge_types", {})
+
+        # 应该有条件边（jb 和 jae 指令产生）
+        has_conditional = (
+            edge_types.get("conditional_true", 0) > 0 or
+            edge_types.get("conditional_false", 0) > 0
+        )
+        assert has_conditional, "CFG should have conditional edges from jb/jae instructions"
+
         # 保存到文件
         output_file = tmp_path / "real_x86_cfg.dot"
         visualizer.save_to_file(str(output_file))
         assert output_file.exists()
 
-        # 获取并验证统计信息
-        stats = visualizer.get_statistics()
+        # 验证统计信息
         assert stats["cfg_type"] == "x86"
         assert stats["num_nodes"] == len(blocks)
-        assert stats["num_edges"] == 7
+        # 应该有 7 条边：3 个条件跳转(jb, jb, jae) × 2 + 1 个无条件跳转(jmp)
+        assert stats["num_edges"] == 7, f"Should have 7 edges from 3 conditional jumps (2 each) + 1 unconditional jump, got {stats['num_edges']}"
 
     def test_visualize_complex_cfg(self):
         """测试可视化复杂 CFG（菱形控制流）。"""
