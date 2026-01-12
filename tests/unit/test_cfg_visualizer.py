@@ -543,6 +543,123 @@ class TestX86CFGIntegration:
         assert "0x1000" in dot_content
 
 
+class TestThreeBlockJSON:
+    """测试 three_block.json 的 CFG 可视化。
+
+    该测试使用真实的 JSON 数据文件，包含：
+    - PC=0: 包含 JUMPI 指令（条件跳转到 PC=21）
+    - PC=15: 包含 RETURN 指令
+    - PC=21: 是跳转目标，包含 STOP 指令
+    """
+
+    def test_visualize_three_block_json(self, tmp_path: Path):
+        """测试从 three_block.json 加载并可视化 CFG。
+
+        验证：
+        1. JSON 文件能正确加载
+        2. CFG 结构正确（3 个节点，2 条边）
+        3. DOT 文件正确生成
+        4. 边类型正确（JUMPI 产生条件边和 fallthrough 边）
+        """
+        from evm_ir.json_parser import load_ir_from_json
+        from evm_ir.cfg_executor import build_dynamic_cfg
+        from evm_ir.cfg_strategies import DFSStrategy
+        from state.smt_state import SMTState
+
+        # 加载 three_block.json
+        test_dir = Path(__file__).parent.parent
+        json_file = test_dir / "data" / "three_block.json"
+
+        ir_result = load_ir_from_json(str(json_file))
+
+        # 验证 JSON 加载正确
+        assert len(ir_result.blocks) == 3, "Should have 3 control frames"
+
+        # 验证基本块信息
+        blocks = ir_result.blocks
+        assert blocks[0].pc == 0
+        assert blocks[1].pc == 15
+        assert blocks[2].pc == 21
+
+        # 验证操作
+        # PC=0 应该包含 JUMPI
+        assert any(op.kind == "JUMPI" for op in blocks[0].operations)
+        # PC=15 应该包含 RETURN
+        assert any(op.kind == "RETURN" for op in blocks[1].operations)
+        # PC=21 应该包含 STOP
+        assert any(op.kind == "STOP" for op in blocks[2].operations)
+
+        # 使用符号执行器动态构建 CFG
+        initial_state = SMTState.create_initial_state(num_inputs=0)
+        final_states, cfg = build_dynamic_cfg(
+            blocks=blocks,
+            initial_state=initial_state,
+            strategy_cls=DFSStrategy,
+            max_depth=100
+        )
+
+        # 验证 CFG 结构
+        assert len(cfg.nodes) == 3, "CFG should have 3 nodes"
+        assert len(cfg.edges) == 2, "JUMPI should produce 2 edges (conditional + fallthrough)"
+
+        # 验证节点
+        assert 0 in cfg.nodes, "PC=0 should be in CFG"
+        assert 15 in cfg.nodes, "PC=15 should be in CFG"
+        assert 21 in cfg.nodes, "PC=21 should be in CFG"
+
+        # 验证边类型（JUMPI 产生 CONDITIONAL_TRUE 和 CONDITIONAL_FALSE 边）
+        edge_types = [edge.edge_type for edge in cfg.edges]
+        assert EdgeType.CONDITIONAL_TRUE in edge_types, "JUMPI should produce CONDITIONAL_TRUE edge"
+        assert EdgeType.CONDITIONAL_FALSE in edge_types, "JUMPI should produce CONDITIONAL_FALSE edge"
+        assert len([e for e in cfg.edges if e.node_from == 0]) == 2, "PC=0 should have 2 outgoing edges"
+
+        # 验证边的目标
+        edge_targets = sorted([e.node_to for e in cfg.edges if e.node_from == 0])
+        assert edge_targets == [15, 21], "PC=0 should have edges to PC=15 (fallthrough) and PC=21 (jump)"
+
+        # 验证边的源操作
+        for edge in cfg.edges:
+            if edge.node_from == 0:
+                assert edge.source_operation is not None, "Edge from PC=0 should have source_operation"
+                assert edge.source_operation.kind == "JUMPI", f"Source operation should be JUMPI, got {edge.source_operation.kind}"
+
+        # 生成可视化
+        visualizer = CFGVisualizer(cfg, cfg_type="evm")
+        dot = visualizer.generate_dot(title="Three Block CFG from JSON")
+
+        # 验证 DOT 内容包含 JUMPI 和具体条件标签
+        assert "digraph CFG" in dot
+        assert "Three Block CFG" in dot
+        assert "PC=0" in dot
+        assert "PC=15" in dot
+        assert "PC=21" in dot
+        assert "JUMPI" in dot
+        # 验证包含条件描述（true/false）
+        assert ("true" in dot or "false" in dot), \
+                "Should contain condition labels (true/false)"
+
+        # 保存到文件
+        output_file = tmp_path / "three_block_cfg.dot"
+        visualizer.save_to_file(str(output_file))
+        assert output_file.exists()
+
+        # 验证统计信息
+        stats = visualizer.get_statistics()
+        assert stats["cfg_type"] == "evm"
+        assert stats["num_nodes"] == 3
+        assert stats["num_edges"] == 2
+
+        # 保存到文件
+        output_file = tmp_path / "three_block_cfg.dot"
+        visualizer.save_to_file(str(output_file))
+        assert output_file.exists()
+
+        # 验证文件内容
+        content = output_file.read_text()
+        assert "PC=0" in content
+        assert "JUMPI" in content
+
+
 class TestIntegration:
     """集成测试。"""
 

@@ -223,8 +223,58 @@ class DOTGenerator:
 
         return self.style.COLOR_NORMAL
 
+    def _format_instructions_html(self, node: NodeProtocol, compact: bool) -> str:
+        """格式化指令列表为 HTML 表格行。
+
+        从节点的基本块中提取指令并格式化为 HTML 表格行。
+        使用 HTML 可以实现真正的左对齐。
+        """
+        if not hasattr(node, "block") or node.block is None:
+            return ""
+
+        block = node.block
+        # EVM 使用 operations，x86-64 使用 instructions
+        items = getattr(block, "instructions", None) or getattr(block, "operations", [])
+
+        if not items:
+            return ""
+
+        if compact:
+            # 紧凑模式：只显示数量
+            return f'<tr><td align="left">[{len(items)} instrs]</td></tr>'
+
+        # 完整模式：显示所有指令
+        lines = []
+        max_instructions = 10  # 最多显示 10 条
+
+        for item in items[:max_instructions]:
+            if hasattr(item, "mnemonic"):
+                # x86-64 指令
+                mnemonic = item.mnemonic
+                op_str = getattr(item, "op_str", "")
+                addr_str = f"0x{item.addr:x}" if hasattr(item, "addr") else ""
+                line = f"    {addr_str} {mnemonic} {op_str}".strip()
+                lines.append(f'<tr><td align="left">{line}</td></tr>')
+            elif hasattr(item, "kind"):
+                # EVM 操作 - 跳过 TAG 和 BLOCKEND，它们只是标记
+                kind = item.kind
+                if kind in ["TAG", "BLOCKEND"]:
+                    continue
+                pc_str = f"pc={item.pc:3d}" if hasattr(item, "pc") else "     "
+                imm_str = ""
+                if hasattr(item, "immediate") and item.immediate is not None:
+                    imm_str = f"imm={item.immediate}"
+                # 格式化为对齐的列: PC(7) + 空格 + KIND(8) + 空格 + IMM
+                line = f"{pc_str}  {kind:8} {imm_str}".strip()
+                lines.append(f'<tr><td align="left" fontname="Courier">{line}</td></tr>')
+
+        if len(items) > max_instructions:
+            lines.append(f'<tr><td align="left">    ... ({len(items) - max_instructions} more)</td></tr>')
+
+        return "\n".join(lines) if lines else ""
+
     def _format_instructions(self, node: NodeProtocol, compact: bool) -> str:
-        """格式化指令列表。
+        """格式化指令列表（非 HTML 版本，用于某些特殊情况）。
 
         从节点的基本块中提取指令并格式化为字符串。
         """
@@ -361,32 +411,39 @@ class DOTGenerator:
             color = self._get_node_color(node)
 
             # 构建标签
-            label_parts = []
+            is_x86 = hasattr(node, "block") and hasattr(node.block, "start_addr")
 
-            # 地址/PC - 统一使用十六进制显示
-            if hasattr(node, "block") and hasattr(node.block, "start_addr"):
-                # x86-64
-                label_parts.append(f"0x{addr:x}")
+            if is_x86:
+                # x86-64 - 使用 HTML 标签实现左对齐
+                if show_instructions:
+                    instr_str = self._format_instructions_html(node, compact)
+                else:
+                    instr_str = ""
+                label = f'<{instr_str}>'
             else:
-                # EVM
-                label_parts.append(f"PC={addr}")
+                # EVM - 使用 HTML 标签实现左对齐
+                if show_instructions:
+                    instr_str = self._format_instructions_html(node, compact)
+                else:
+                    instr_str = ""
 
-            # 指令
-            if show_instructions:
-                instr_str = self._format_instructions(node, compact)
+                separator = '-' * 20
+                states = f"States: {len(node.states)}" if show_states and hasattr(node, "states") else ""
+
+                # 组合成 HTML 表格
+                label = '<<table border="0" cellborder="0" cellspacing="0">'
+                label += f'<tr><td><b>PC={addr}</b></td></tr>'
+                if show_instructions:
+                    label += f'<tr><td>{separator}</td></tr>'
                 if instr_str:
-                    label_parts.append(instr_str)
-
-            # 状态数量
-            if show_states and hasattr(node, "states"):
-                label_parts.append(f"States: {len(node.states)}")
-
-            label = "\\n".join(label_parts)
-            label = label.replace('"', '\\"')  # 转义引号
+                    label += instr_str
+                if states:
+                    label += f'<tr><td>{states}</td></tr>'
+                label += '</table>>'
 
             # 生成节点定义
             lines.append(f"    node_{addr} [")
-            lines.append(f'        label="{label}"')
+            lines.append(f'        label={label}')
             lines.append(f'        fillcolor="{color}"')
             lines.append(f'        shape={self.style.NODE_SHAPE}')
             lines.append(f'        style="{self.style.NODE_STYLE}"')
@@ -424,7 +481,7 @@ class DOTGenerator:
     def _build_edge_label(self, edge: EdgeProtocol, show_constraints: bool, compact: bool) -> str:
         """构建边的标签。
 
-        优先显示指令助记符和条件信息，如 "jb (CF=1)"。
+        优先显示指令助记符和条件信息，如 "jb (CF=1)" 或 "JUMPI (条件为真)"。
 
         Args:
             edge: CFG 边
@@ -434,12 +491,17 @@ class DOTGenerator:
         Returns:
             边标签字符串
         """
-        # 检查是否有源指令信息
+        # 检查是否有源指令信息（x86-64 使用 source_instruction）
         source_insn = None
         if hasattr(edge, 'source_instruction'):
             source_insn = edge.source_instruction
 
-        # 如果有源指令，优先显示指令助记符
+        # 检查是否有源操作信息（EVM 使用 source_operation）
+        source_op = None
+        if hasattr(edge, 'source_operation'):
+            source_op = edge.source_operation
+
+        # 如果有源指令，优先显示指令助记符（x86-64）
         if source_insn is not None:
             mnemonic = source_insn.mnemonic if hasattr(source_insn, 'mnemonic') else None
             if mnemonic:
@@ -456,6 +518,23 @@ class DOTGenerator:
                 # 对于无条件跳转，只显示助记符
                 elif mnemonic_lower == 'jmp':
                     return mnemonic
+
+        # 如果有源操作，显示操作类型（EVM）
+        if source_op is not None:
+            op_kind = source_op.kind if hasattr(source_op, 'kind') else None
+            if op_kind:
+                op_kind_upper = op_kind.upper()
+
+                # 对于条件跳转（JUMPI），显示操作和条件
+                if op_kind_upper == 'JUMPI':
+                    condition_desc = self._get_evm_jumpi_condition(edge, show_constraints, compact)
+                    if condition_desc:
+                        return f"{op_kind} ({condition_desc})"
+                    return op_kind
+
+                # 对于无条件跳转（JUMP），只显示操作
+                elif op_kind_upper == 'JUMP':
+                    return op_kind
 
         # 尝试解析标志位条件（如果没有源指令）
         if show_constraints and hasattr(edge, 'condition') and edge.condition is not None:
@@ -577,6 +656,41 @@ class DOTGenerator:
             'jg': 'ZF=1 or SF≠OF',
         }
         return flag_conditions.get(mnemonic, '')
+
+    def _get_evm_jumpi_condition(self, edge: EdgeProtocol, show_constraints: bool, compact: bool) -> str:
+        """获取 EVM JUMPI 条件的描述。
+
+        根据边类型和条件约束返回具体的条件描述，如 "true" 或 "false"。
+
+        JUMPI 的条件是：栈顶元素不为 0 时跳转（true），为 0 时顺序执行（false）。
+        由于是符号执行，我们不知道具体的值，只能显示条件类型。
+
+        Args:
+            edge: CFG 边
+            show_constraints: 是否显示约束条件
+            compact: 是否使用紧凑模式
+
+        Returns:
+            条件描述字符串，如果无法解析则返回空字符串
+        """
+        if not show_constraints:
+            return ""
+
+        edge_type = edge.edge_type if hasattr(edge, 'edge_type') else None
+        if edge_type is None:
+            return ""
+
+        edge_type_str = edge_type.value if hasattr(edge_type, 'value') else str(edge_type)
+
+        # 根据边类型确定条件描述
+        if edge_type_str == 'conditional_true':
+            # 条件为真：栈顶元素不为零
+            return "true"
+        elif edge_type_str == 'conditional_false':
+            # 条件为假：栈顶元素为零
+            return "false"
+
+        return ""
 
     def _is_simple_flag_condition(self, cond_str: str) -> bool:
         """检查是否是简单的标志位条件。

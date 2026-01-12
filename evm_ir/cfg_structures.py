@@ -11,7 +11,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from z3 import BoolRef
 
-from .models import EVMBlock
+from .models import EVMBlock, EvmOperator
 
 # 前向引用，避免循环导入
 if TYPE_CHECKING:
@@ -20,27 +20,31 @@ if TYPE_CHECKING:
 
 class EdgeType(Enum):
     """边的类型。"""
-    UNCONDITIONAL = "unconditional"  # 无条件跳转（JUMP）
-    CONDITIONAL = "conditional"      # 条件跳转（JUMPI 的分支）
-    FALLTHROUGH = "fallthrough"      # 顺序执行
-    CALL = "call"                    # 函数调用（预留）
-    RETURN = "return"                # 函数返回（预留）
+    UNCONDITIONAL = "unconditional"       # 无条件跳转（JUMP）
+    CONDITIONAL_TRUE = "conditional_true"  # 条件跳转条件为真（JUMPI taken）
+    CONDITIONAL_FALSE = "conditional_false"  # 条件跳转条件为假（JUMPI not taken）
+    CONDITIONAL = "conditional"           # 条件跳转（通用，向后兼容）
+    FALLTHROUGH = "fallthrough"           # 顺序执行
+    CALL = "call"                         # 函数调用（预留）
+    RETURN = "return"                     # 函数返回（预留）
 
 
 @dataclass
 class CFGEdge:
     """CFG 中的边。
 
-    连接两个节点，包含边类型和条件。
+    连接两个节点，包含边类型、条件和源操作。
     """
     node_from: int  # 起始节点的 PC
     node_to: int    # 目标节点的 PC
     edge_type: EdgeType
     condition: Optional[BoolRef] = None  # 条件分支的约束条件
+    source_operation: Optional['EvmOperator'] = None  # 产生这条边的源操作
 
     def __repr__(self):
         cond_str = f" [{self.condition}]" if self.condition else ""
-        return f"Edge({self.node_from} -> {self.node_to}, {self.edge_type.value}{cond_str})"
+        src_str = f" ({self.source_operation.kind})" if self.source_operation else ""
+        return f"Edge({self.node_from} -> {self.node_to}, {self.edge_type.value}{cond_str}{src_str})"
 
 
 @dataclass
@@ -109,7 +113,8 @@ class DynamicCFG:
         return self.nodes[pc]
 
     def add_edge(self, from_pc: int, to_pc: int, edge_type: EdgeType,
-                 condition: Optional[BoolRef] = None) -> CFGEdge:
+                 condition: Optional[BoolRef] = None,
+                 source_operation: Optional[EvmOperator] = None) -> CFGEdge:
         """添加一条边。
 
         Args:
@@ -117,6 +122,7 @@ class DynamicCFG:
             to_pc: 目标节点 PC
             edge_type: 边类型
             condition: 可选的条件约束
+            source_operation: 产生这条边的源操作（可选）
 
         Returns:
             创建的 CFGEdge
@@ -128,7 +134,8 @@ class DynamicCFG:
             node_from=from_pc,
             node_to=to_pc,
             edge_type=edge_type,
-            condition=condition
+            condition=condition,
+            source_operation=source_operation
         )
 
         self.edges.append(edge)

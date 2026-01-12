@@ -4,8 +4,11 @@
 定义 SymbolicExecutor 类，实现 worklist 驱动的符号执行。
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, TYPE_CHECKING, Any
 from z3 import BitVecVal, Not
+
+if TYPE_CHECKING:
+    from .models import EvmOperator
 
 from .models import EVMBlock
 from .cfg_structures import DynamicCFG, EdgeType
@@ -58,7 +61,9 @@ class SymbolicExecutor:
         # 终止状态列表
         self.final_states: List[GlobalState] = []
 
-    def manage_cfg(self, opcode: str, new_states: List[GlobalState]) -> None:
+    def manage_cfg(self, opcode: str, new_states: List[GlobalState],
+                   from_pc: int,
+                   source_op: Optional[Any] = None) -> None:
         """管理 CFG 构建。
 
         在执行过程中动态添加边。
@@ -66,29 +71,40 @@ class SymbolicExecutor:
         Args:
             opcode: 操作码（JUMP/JUMPI 等）
             new_states: 新生成的状态
+            from_pc: 源节点 PC
+            source_op: 产生这条边的源操作（EvmOperator）
         """
         if not new_states:
             return
 
-        # 获取当前节点的 PC
-        current_pc = new_states[0].node.pc if new_states[0].node else None
-        if current_pc is None:
-            return
+        current_pc = from_pc
 
         if opcode == "JUMP":
             # 无条件跳转：添加单条边
-            if len(new_states) == 1:
+            if len(new_states) == 1 and new_states[0].node:
                 target_pc = new_states[0].node.pc
-                self.cfg.add_edge(current_pc, target_pc, EdgeType.UNCONDITIONAL)
+                self.cfg.add_edge(current_pc, target_pc, EdgeType.UNCONDITIONAL,
+                                source_operation=source_op)
 
         elif opcode == "JUMPI":
             # 条件跳转：添加两条边（跳转和顺序执行）
-            for state in new_states:
-                if state.node:
-                    target_pc = state.node.pc
-                    # 从状态中获取条件
+            # 第一个状态是跳转分支（条件为真），第二个是 fallthrough（条件为假）
+            for i, state in enumerate(new_states):
+                if not state.node:
+                    continue
+                target_pc = state.node.pc
+
+                if i == 0:
+                    # 跳转分支（条件为真）
+                    edge_type = EdgeType.CONDITIONAL_TRUE
                     condition = self._extract_jumpi_condition(state)
-                    self.cfg.add_edge(current_pc, target_pc, EdgeType.CONDITIONAL, condition)
+                else:
+                    # Fallthrough 分支（条件为假）
+                    edge_type = EdgeType.CONDITIONAL_FALSE
+                    condition = None  # 条件为假的边不需要额外条件
+
+                self.cfg.add_edge(current_pc, target_pc, edge_type, condition,
+                                source_operation=source_op)
 
     def _extract_jumpi_condition(self, state: GlobalState):
         """从状态中提取 JUMPI 条件。
@@ -157,9 +173,10 @@ class SymbolicExecutor:
 
                 # 更新 CFG
                 last_op = self._get_last_operation(global_state)
-                if last_op:
+                if last_op and global_state.node:
                     opcode = last_op.kind.upper()
-                    self.manage_cfg(opcode, new_states)
+                    from_pc = global_state.node.pc
+                    self.manage_cfg(opcode, new_states, from_pc, source_op=last_op)
 
                 # 添加新状态到 work_list
                 self.work_list.extend(new_states)
