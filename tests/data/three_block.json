@@ -1,7 +1,6 @@
 {
     "control_frames": [
         {
-            "is_inner_block": false,
             "is_jump_target": false,
             "is_stop": false,
             "max_depth": 1022,
@@ -60,7 +59,18 @@
                     "kind": "JUMPI",
                     "param": 1,
                     "pc": 14
-                },
+                }
+            ],
+            "pc": 0,
+            "stack_depth": 0,
+            "static_gas": 34
+        },
+        {
+            "is_jump_target": false,
+            "is_stop": true,
+            "max_depth": 1022,
+            "min_depth": 1,
+            "operations": [
                 {
                     "kind": "TAG",
                     "pc": 14
@@ -96,12 +106,11 @@
                     "pc": 21
                 }
             ],
-            "pc": 0,
-            "stack_depth": 0,
-            "static_gas": 34
+            "pc": 15,
+            "stack_depth": -1,
+            "static_gas": 9
         },
         {
-            "is_inner_block": false,
             "is_jump_target": true,
             "is_stop": true,
             "max_depth": 1022,
@@ -109,7 +118,7 @@
             "operations": [
                 {
                     "kind": "TAG",
-                    "param": 2,
+                    "param": 3,
                     "pc": 21
                 },
                 {

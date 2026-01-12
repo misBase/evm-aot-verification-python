@@ -633,7 +633,14 @@ class TestIntegration:
         assert stats["num_edges"] == 7, f"Should have 7 edges from 3 conditional jumps (2 each) + 1 unconditional jump, got {stats['num_edges']}"
 
     def test_visualize_complex_cfg(self):
-        """测试可视化复杂 CFG（菱形控制流）。"""
+        """测试可视化复杂 CFG（菱形控制流）。
+
+        模拟以下 EVM 代码的控制流：
+        PC=0:  JUMPI 26    ; 如果条件为真，跳转到 PC=26
+        PC=13: ADD         ; JUMPI 条件为假时顺序执行到这里
+        PC=26: SUB         ; JUMPI 条件为真时跳转到这里
+        PC=39: STOP        ; 汇聚点
+        """
         # 创建菱形控制流
         blocks = [
             EVMBlock(
@@ -683,9 +690,12 @@ class TestIntegration:
         ]
 
         cfg = DynamicCFG(blocks)
-        cfg.add_edge(0, 13, EdgeType.CONDITIONAL)  # 条件为真
-        cfg.add_edge(0, 26, EdgeType.FALLTHROUGH)  # 条件为假
-        cfg.add_edge(13, 39, EdgeType.UNCONDITIONAL)
+        # JUMPI 在 PC=0，目标地址是 PC=26
+        # 条件为真：跳转到 PC=26 (执行 SUB)
+        cfg.add_edge(0, 26, EdgeType.CONDITIONAL)
+        # 条件为假：顺序执行 PC=13 (执行 ADD)
+        cfg.add_edge(0, 13, EdgeType.FALLTHROUGH)
+        cfg.add_edge(13, 26, EdgeType.UNCONDITIONAL)
         cfg.add_edge(26, 39, EdgeType.UNCONDITIONAL)
 
         visualizer = CFGVisualizer(cfg)
