@@ -39,8 +39,9 @@ class WorldState:
         Returns:
             新的 WorldState 实例
         """
+        import copy
         new_state = WorldState()
-        new_state.constraints = self.constraints
+        new_state.constraints = copy.copy(self.constraints)
         # transaction_sequence 引用共享
         new_state.transaction_sequence = self.transaction_sequence
         # 注解引用共享

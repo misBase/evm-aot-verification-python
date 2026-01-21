@@ -4,7 +4,7 @@ EVM IR语义建模。
 本模块使用Z3为EVM IR操作提供语义建模。
 """
 
-from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or
+from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, URem, LShR, SignExt, ZeroExt, BitVecSort, Function, Select
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
@@ -17,50 +17,106 @@ MAX_RETURN_DATA_SIZE = 256  # 最大返回数据大小（字节）（256字节 =
 class EVMOperationSemantics:
     """单个EVM操作的语义建模。"""
     
-    def add_semantics(self, a: BitVec, b: BitVec) -> BitVec:
-        """构建EVM ADD操作的逻辑公式。
-        
-        EVM ADD语义：
-          - 输入：两个256位值a和b（表示为4x64位limb）
-          - 输出：(a + b) mod 2^256
-          - 实现：委托给Uint256.add_semantics()方法
-          
-        这遵循与Go实现相同的模式，其中
-        opAdd在uint256类型上调用y.Add(&x, y)。
-          
-        Args:
-            a: 第一个256位操作数（大小为256的Z3 BitVec，或Uint256）
-            b: 第二个256位操作数（大小为256的Z3 BitVec，或Uint256）
-            
-        Returns:
-            表示(a + b) mod 2^256的逻辑公式，作为256位BitVec
-        """
-        # 如果输入是BitVec，则转换为Uint256
-        # 检查它是否是BitVecRef（Z3的BitVec类型）
+    def _to_uint256(self, a: Any) -> Uint256:
+        """将输入转换为Uint256。"""
         if isinstance(a, BitVecRef) and a.size() == 256:
-            a_uint = Uint256.from_bv256(a)
+            return Uint256.from_bv256(a)
         elif isinstance(a, Uint256):
-            a_uint = a
+            return a
         elif hasattr(a, 'to_bv256'):
-            a_uint = Uint256.from_bv256(a.to_bv256())
+            return Uint256.from_bv256(a.to_bv256())
+        elif isinstance(a, int):
+            return Uint256.from_int(a)
         else:
-            raise ValueError(f"Unsupported type for operand a: {type(a)}")
-        
-        if isinstance(b, BitVecRef) and b.size() == 256:
-            b_uint = Uint256.from_bv256(b)
-        elif isinstance(b, Uint256):
-            b_uint = b
-        elif hasattr(b, 'to_bv256'):
-            b_uint = Uint256.from_bv256(b.to_bv256())
-        else:
-            raise ValueError(f"Unsupported type for operand b: {type(b)}")
-        
-        # 调用Uint256.add_semantics()方法（类似于Go的y.Add(&x, y)）
+            raise ValueError(f"Unsupported type for operand: {type(a)}")
+
+    def add_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM ADD操作的逻辑公式。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
         result_uint = a_uint.add_semantics(b_uint)
-        
-        # 将结果转换回256位BitVec
         return result_uint.to_bv256()
-    
+
+    def sub_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM SUB操作的逻辑公式。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        result_uint = a_uint.sub_semantics(b_uint)
+        return result_uint.to_bv256()
+
+    def mul_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM MUL操作的逻辑公式。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        result_uint = a_uint.mul_semantics(b_uint)
+        return result_uint.to_bv256()
+
+    def div_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM DIV操作的逻辑公式 (a / b)。"""
+        # EVM DIV: if b == 0, result is 0
+        a_bv = a if isinstance(a, BitVecRef) else self._to_uint256(a).to_bv256()
+        b_bv = b if isinstance(b, BitVecRef) else self._to_uint256(b).to_bv256()
+        return If(b_bv == 0, BitVecVal(0, 256), UDiv(a_bv, b_bv))
+
+    def mod_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM MOD操作的逻辑公式 (a % b)。"""
+        # EVM MOD: if b == 0, result is 0
+        a_bv = a if isinstance(a, BitVecRef) else self._to_uint256(a).to_bv256()
+        b_bv = b if isinstance(b, BitVecRef) else self._to_uint256(b).to_bv256()
+        return If(b_bv == 0, BitVecVal(0, 256), URem(a_bv, b_bv))
+
+    def lt_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM LT操作的逻辑公式 (a < b)。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        # Uint256.lt_semantics returns BoolRef, need to convert to BitVec(0/1)
+        return If(a_uint.lt_semantics(b_uint), BitVecVal(1, 256), BitVecVal(0, 256))
+
+    def gt_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM GT操作的逻辑公式 (a > b)。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        return If(a_uint.gt_semantics(b_uint), BitVecVal(1, 256), BitVecVal(0, 256))
+
+    def eq_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM EQ操作的逻辑公式 (a == b)。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        return If(a_uint.eq_semantics(b_uint), BitVecVal(1, 256), BitVecVal(0, 256))
+
+    def iszero_semantics(self, a: BitVec) -> BitVec:
+        """构建EVM ISZERO操作的逻辑公式 (a == 0)。"""
+        a_uint = self._to_uint256(a)
+        return If(a_uint.iszero_semantics(), BitVecVal(1, 256), BitVecVal(0, 256))
+
+    def and_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM AND操作的逻辑公式 (a & b)。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        return a_uint.and_semantics(b_uint).to_bv256()
+
+    def or_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM OR操作的逻辑公式 (a | b)。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        return a_uint.or_semantics(b_uint).to_bv256()
+
+    def xor_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM XOR操作的逻辑公式 (a ^ b)。"""
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        return a_uint.xor_semantics(b_uint).to_bv256()
+
+    def not_semantics(self, a: BitVec) -> BitVec:
+        """构建EVM NOT操作的逻辑公式 (~a)。"""
+        a_uint = self._to_uint256(a)
+        return a_uint.not_semantics().to_bv256()
+
+    def exp_semantics(self, base: BitVec, exponent: BitVec) -> BitVec:
+        """构建EVM EXP操作的逻辑公式 (base^exponent)。"""
+        exp_func = Function('evm_exp', BitVecSort(256), BitVecSort(256), BitVecSort(256))
+        return exp_func(base, exponent)
+
     def push_semantics(self, immediate: int, param: int = 1) -> BitVec:
         """构建EVM PUSH操作的逻辑公式。
         
@@ -133,26 +189,120 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
     
     elif kind == "ADD":
-        # ADD：弹出两个值，相加，推送结果
-        # 使用Z3 Array：value_b = Select(Stack, SP-1), value_a = Select(Stack, SP-2)
-        # result = value_a + value_b
-        # Stack' = Store(Stack, SP-2, result), SP' = SP - 1
-        
-        # 从栈中弹出两个值
         b, stack_after_pop1 = state.evm_stack.pop()
         a, stack_after_pop2 = stack_after_pop1.pop()
-        
-        # 计算加法
         result = op_semantics.add_semantics(a, b)
-        
-        # 推送结果
-        new_stack_state = stack_after_pop2.push(result)
-        state.evm_stack = new_stack_state
+        state.evm_stack = stack_after_pop2.push(result)
         return state
-    
+
+    elif kind == "SUB":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.sub_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "MUL":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.mul_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "DIV":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.div_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "MOD":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.mod_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "EXP":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.exp_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "LT":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.lt_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "GT":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.gt_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "EQ":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.eq_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "ISZERO":
+        a, stack_after_pop = state.evm_stack.pop()
+        result = op_semantics.iszero_semantics(a)
+        state.evm_stack = stack_after_pop.push(result)
+        return state
+
+    elif kind == "AND":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.and_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "OR":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.or_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "XOR":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.xor_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "NOT":
+        a, stack_after_pop = state.evm_stack.pop()
+        result = op_semantics.not_semantics(a)
+        state.evm_stack = stack_after_pop.push(result)
+        return state
+
+    elif kind == "POP":
+        _, stack_after_pop = state.evm_stack.pop()
+        state.evm_stack = stack_after_pop
+        return state
+
+    elif kind == "DUP":
+        if op.param is None:
+            raise ValueError(f"DUP operation missing param at pc={op.pc}")
+        state.evm_stack = state.evm_stack.dup(op.param)
+        return state
+
+    elif kind == "SWAP":
+        if op.param is None:
+            raise ValueError(f"SWAP operation missing param at pc={op.pc}")
+        state.evm_stack = state.evm_stack.swap(op.param)
+        return state
+
     elif kind.startswith("PUSH"):
         # PUSH：将立即值推送到栈上
-        # 使用Z3 Array：SP' = SP + 1, Stack' = Store(Stack, SP, value)
         if op.immediate is None:
             raise ValueError(f"PUSH operation missing immediate at pc={op.pc}")
         
@@ -163,38 +313,84 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     
     elif kind == "MLOAD":
         # MLOAD：从内存加载32字节，推送到栈上
-        # 使用Z3 Array：offset = Select(Stack, SP-1)
-        # value = load_256bit(Memory, offset), Stack' = Store(Stack, SP-1, value)
-        
-        # 从栈中弹出偏移量
         offset_bv, stack_after_pop = state.evm_stack.pop()
-        
-        # 使用Z3 Array从内存加载32字节（256位）
         mem_value, new_memory_state = state.evm_memory.load_256bit(offset_bv)
-        
-        # 将加载的值推送到栈上
-        new_stack_state = stack_after_pop.push(mem_value)
-        
-        # 更新状态
-        state.evm_stack = new_stack_state
+        state.evm_stack = stack_after_pop.push(mem_value)
         state.evm_memory = new_memory_state
         return state
     
     elif kind == "MSTORE":
         # MSTORE：弹出偏移量和值，将32字节存储到内存
-        # 使用Z3 Array：value = Select(Stack, SP-1), offset = Select(Stack, SP-2)
-        # Memory' = store_256bit(Memory, offset, value), SP' = SP - 2
-        
-        # 弹出值和偏移量
         value, stack_after_pop1 = state.evm_stack.pop()
         offset_bv, stack_after_pop2 = stack_after_pop1.pop()
-        
-        # 使用Z3 Array将32字节（256位）存储到内存
         new_memory_state = state.evm_memory.store_256bit(offset_bv, value)
-        
-        # 更新状态
         state.evm_stack = stack_after_pop2
         state.evm_memory = new_memory_state
+        return state
+
+    elif kind == "SLOAD":
+        # SLOAD: Pop key, push value from storage
+        key, stack_after_pop = state.evm_stack.pop()
+        val = state.evm_storage.sload(key)
+        state.evm_stack = stack_after_pop.push(val)
+        return state
+
+    elif kind == "SSTORE":
+        # SSTORE: Pop key and value, store in storage
+        val, stack_after_pop1 = state.evm_stack.pop()
+        key, stack_after_pop2 = stack_after_pop1.pop()
+        state.evm_storage = state.evm_storage.sstore(key, val)
+        state.evm_stack = stack_after_pop2
+        return state
+
+    elif kind == "CALLDATASIZE":
+        # CALLDATASIZE: Push calldatasize onto stack
+        state.evm_stack = state.evm_stack.push(state.calldatasize)
+        return state
+
+    elif kind == "CALLDATALOAD":
+        # CALLDATALOAD: Pop offset, push 32 bytes from calldata
+        offset_bv, stack_after_pop = state.evm_stack.pop()
+        
+        # Truncate offset to 64-bit for array access
+        if offset_bv.size() == 256:
+            offset_64 = Extract(63, 0, offset_bv)
+        else:
+            offset_64 = offset_bv
+            
+        # Load 32 bytes and concat
+        bytes_list = []
+        for i in range(32):
+            byte_val = Select(state.calldata, offset_64 + BitVecVal(i, 64))
+            bytes_list.append(byte_val)
+        
+        data_256 = Concat(*bytes_list)
+        state.evm_stack = stack_after_pop.push(data_256)
+        return state
+
+    elif kind == "CALLVALUE":
+        # CALLVALUE: Push callvalue onto stack
+        state.evm_stack = state.evm_stack.push(state.callvalue)
+        return state
+
+    elif kind == "SHA3":
+        # SHA3: Pop offset and length, push symbolic hash
+        # We model hash as an uninterpreted function of the memory content
+        length_bv, stack_after_pop1 = state.evm_stack.pop()
+        offset_bv, stack_after_pop2 = stack_after_pop1.pop()
+        
+        # Use an uninterpreted function for SHA3
+        # Since memory is an array, we can use a function that takes (Memory, offset, length)
+        # For simplicity, we can use a fresh symbolic value or a function
+        sha3_func = Function('sha3', state.evm_memory.Memory.sort(), 
+                             offset_bv.sort(), length_bv.sort(), BitVecSort(256))
+        hash_val = sha3_func(state.evm_memory.Memory, offset_bv, length_bv)
+        
+        state.evm_stack = stack_after_pop2.push(hash_val)
+        return state
+
+    elif kind == "BASEFEE":
+        state.evm_stack = state.evm_stack.push(state.basefee)
         return state
     
     elif kind == "RETURN":
@@ -230,15 +426,59 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         
         return state
     
-    elif kind in ["JUMP", "JUMPI", "STOP", "REVERT"]:
-        # 控制流操作 - 原样返回状态
-        # 这些将在控制流级别处理
+    elif kind == "JUMPI":
+        # JUMPI: dest, cond = pop, pop
+        # 在当前 IR 中，如果 is_static 且有 immediate，则 dest 已被折叠，只需弹出 cond
+        if op.is_static and op.immediate is not None:
+            _, state.evm_stack = state.evm_stack.pop()
+        else:
+            # 动态跳转：弹出 dest 和 cond
+            _, state.evm_stack = state.evm_stack.pop()
+            _, state.evm_stack = state.evm_stack.pop()
         return state
-    
+
+    elif kind == "JUMP":
+        # JUMP: dest = pop
+        # 如果 is_static 且有 immediate，则 dest 已被折叠，无需弹出
+        if not (op.is_static and op.immediate is not None):
+            _, state.evm_stack = state.evm_stack.pop()
+        return state
+
+    elif kind == "REVERT":
+        # REVERT: offset, length = pop, pop
+        _, state.evm_stack = state.evm_stack.pop()
+        _, state.evm_stack = state.evm_stack.pop()
+        return state
+
+    elif kind == "STOP":
+        # STOP: 对状态无堆栈影响
+        return state
+
+    elif kind == "LOG":
+        # LOG指令：从栈中弹出参数并记录事件
+        # immediate 字段表示主题数量 (0-4)
+        # LOG[n] 弹出 (2+n) 个值: offset, size, topic1...topicn
+        # 占位实现：只弹出值，不实际记录事件日志
+
+        # 获取主题数量
+        num_topics = op.immediate if op.immediate is not None else 0
+
+        # 弹出所有主题
+        for _ in range(num_topics):
+            _, state.evm_stack = state.evm_stack.pop()
+
+        # 弹出 size 和 offset
+        _, state.evm_stack = state.evm_stack.pop()
+        _, state.evm_stack = state.evm_stack.pop()
+
+        return state
+
     else:
         # 未知操作 - 返回未更改的状态
         # TODO: 实现更多操作
-        return state
+
+        # 抛出错误，因为未知操作不应该出现
+        raise ValueError(f"Unknown operation: {kind}")
 
 
 def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:

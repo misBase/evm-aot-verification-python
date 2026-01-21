@@ -678,6 +678,12 @@ class SMTState:
         # PC（程序计数器）
         self.pc: int = 0
 
+        # 环境信息
+        self.calldata = Array('CallData', BitVecSort(64), BitVecSort(8))
+        self.calldatasize = BitVec('CallDataSize', 256)
+        self.callvalue = BitVec('CallValue', 256)
+        self.basefee = BitVec('BaseFee', 256)
+
     def copy(self) -> 'SMTState':
         """创建状态的副本。
 
@@ -694,6 +700,13 @@ class SMTState:
         new_state.return_offset = self.return_offset
         new_state.return_length = self.return_length
         new_state.pc = self.pc
+        
+        # 复制环境信息
+        new_state.calldata = self.calldata
+        new_state.calldatasize = self.calldatasize
+        new_state.callvalue = self.callvalue
+        new_state.basefee = self.basefee
+        
         return new_state
 
     @staticmethod

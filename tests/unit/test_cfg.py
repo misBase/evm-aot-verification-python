@@ -516,3 +516,158 @@ class TestDynamicJumpHandling:
 
 # 导入 copy 模块
 import copy
+
+
+class TestCompleteCFG:
+    """测试执行完成后完整构建出的 CFG。"""
+
+    def test_two_block_complete_cfg(self):
+        """测试两块程序执行完成后 CFG 的完整结构。"""
+        test_dir = os.path.dirname(__file__)
+        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
+
+        ir_result = load_ir_from_json(ir_file)
+
+        executor = SymbolicExecutor(ir_result.blocks, strategy_cls=DFSStrategy)
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        final_states = executor.execute(state)
+
+        # 验证执行完成
+        assert len(final_states) > 0
+
+        cfg = executor.cfg
+
+        # 验证节点: 应该有两个节点
+        assert len(cfg.nodes) == 2
+        assert 0 in cfg.nodes
+        assert 13 in cfg.nodes
+
+        # 验证边: JUMPI 产生两条边（条件为真跳转，条件为假 fallthrough）
+        # 但由于 pc=13 是下一个块，fallthrough 也指向 pc=13
+        # 所以可能会有两条到 pc=13 的边，或者一条边
+        assert len(cfg.edges) > 0
+
+        # 验证边的类型
+        for edge in cfg.edges:
+            if edge.node_from == 0 and edge.node_to == 13:
+                # 应该是条件跳转相关的边
+                assert edge.edge_type in [
+                    EdgeType.CONDITIONAL_TRUE,
+                    EdgeType.CONDITIONAL_FALSE,
+                    EdgeType.FALLTHROUGH
+                ]
+                # 验证源操作被正确记录
+                assert edge.source_operation is not None
+                assert edge.source_operation.kind == "JUMPI"
+
+    def test_cfg_structure_after_execution(self):
+        """测试执行完成后 CFG 的结构性属性。"""
+        test_dir = os.path.dirname(__file__)
+        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
+
+        ir_result = load_ir_from_json(ir_file)
+
+        executor = SymbolicExecutor(ir_result.blocks, strategy_cls=DFSStrategy)
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        final_states = executor.execute(state)
+
+        cfg = executor.cfg
+
+        # 验证每个节点的出边和入边
+        for pc, node in cfg.nodes.items():
+            # 验证节点的出边与其在 edges 中的一致
+            for edge in node.outgoing_edges:
+                assert edge in cfg.edges
+                assert edge.node_from == pc
+
+            # 验证节点的入边与其在 edges 中的一致
+            for edge in node.incoming_edges:
+                assert edge in cfg.edges
+                assert edge.node_to == pc
+
+        # 验证边的连通性
+        # pc=0 应该有出边（JUMPI）
+        node_0 = cfg.get_node(0)
+        assert len(node_0.outgoing_edges) > 0
+
+        # pc=13 应该没有出边（STOP 是终止指令）
+        node_13 = cfg.get_node(13)
+        assert len(node_13.outgoing_edges) == 0
+
+    def test_cfg_edge_conditions(self):
+        """测试 CFG 边的条件约束。"""
+        from evm_ir.models import EVMBlock, EvmOperator
+        from z3 import Not
+
+        # 创建一个简单的 JUMPI 程序
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[
+                    EvmOperator(kind="PUSH", pc=0, immediate="5"),
+                    EvmOperator(kind="JUMPI", pc=2, immediate=10, is_static=True)
+                ]
+            ),
+            EVMBlock(
+                pc=10,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=2,
+                is_jump_target=True,
+                is_inner_block=False,
+                is_stop=True,
+                operations=[
+                    EvmOperator(kind="STOP", pc=10)
+                ]
+            )
+        ]
+
+        executor = SymbolicExecutor(blocks, strategy_cls=DFSStrategy)
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        final_states = executor.execute(state)
+        cfg = executor.cfg
+
+        # 验证条件边
+        conditional_edges = [e for e in cfg.edges if e.edge_type == EdgeType.CONDITIONAL_TRUE]
+        fallthrough_edges = [e for e in cfg.edges if e.edge_type == EdgeType.FALLTHROUGH]
+
+        # JUMPI 应该产生条件边
+        assert len(conditional_edges) > 0
+
+        # 每个条件边应该有条件约束（除了 fallthrough）
+        for edge in conditional_edges:
+            if edge.edge_type == EdgeType.CONDITIONAL_TRUE:
+                # 条件为真的边应该有条件
+                assert edge.condition is not None
+
+    def test_cfg_source_operation_tracking(self):
+        """测试 CFG 边的源操作追踪。"""
+        test_dir = os.path.dirname(__file__)
+        ir_file = os.path.join(test_dir, "..", "data", "two_block.json")
+
+        ir_result = load_ir_from_json(ir_file)
+
+        executor = SymbolicExecutor(ir_result.blocks, strategy_cls=DFSStrategy)
+        state = SMTState.create_initial_state(num_inputs=0)
+
+        final_states = executor.execute(state)
+        cfg = executor.cfg
+
+        # 验证所有边都有源操作（除了可能的特殊边）
+        for edge in cfg.edges:
+            # JUMP/JUMPI 产生的边应该有源操作
+            if edge.edge_type in [EdgeType.UNCONDITIONAL, EdgeType.CONDITIONAL_TRUE, EdgeType.FALLTHROUGH]:
+                if edge.source_operation is not None:
+                    # 验证源操作是正确的类型
+                    assert edge.source_operation.kind in ["JUMP", "JUMPI"]

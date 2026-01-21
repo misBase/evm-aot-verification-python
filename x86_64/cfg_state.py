@@ -136,8 +136,9 @@ class X86WorldState:
         Returns:
             新的 X86WorldState 实例
         """
+        import copy
         new_state = X86WorldState()
-        new_state.constraints = self.constraints
+        new_state.constraints = copy.copy(self.constraints)
         # 注解引用共享
         new_state.annotations = self.annotations
         return new_state

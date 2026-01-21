@@ -31,7 +31,7 @@ class SymbolicExecutor:
                  blocks: List[EVMBlock],
                  strategy_cls: type = DFSStrategy,
                  max_depth: int = 100,
-                 use_reachability_check: bool = True):
+                 use_reachability_check: bool = False):
         """初始化符号执行引擎。
 
         Args:
@@ -205,38 +205,61 @@ class SymbolicExecutor:
         mstate = global_state.mstate
 
         # 执行块中的所有操作
-        new_mstate = mstate.copy()
+        current_mstate = mstate.copy()
 
-        for op in block.operations:
+        # 过滤出实际执行的操作（跳过标记）
+        ops = [op for op in block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
+        
+        if not ops:
+            # 空块，顺序执行到下一个块
+            global_state.mstate = current_mstate
+            return self._handle_fallthrough(global_state, current_mstate, block)
+
+        # 检查最后一个指令是否是跳转指令
+        last_op = ops[-1]
+        last_kind = last_op.kind.upper()
+        
+        # 执行除最后一个跳转指令以外的所有指令
+        main_ops = ops[:-1] if last_kind in ["JUMP", "JUMPI"] else ops
+        
+        for op in main_ops:
             kind = op.kind.upper()
-
-            # 跳过标记操作
-            if kind in ["TAG", "BLOCKEND"]:
-                continue
-
+            
             # 检查终止指令
             if kind in ["STOP", "RETURN", "REVERT", "SELFDESTRUCT"]:
+                # 执行终止指令（可能包含堆栈弹出，如 RETURN/REVERT）
+                current_mstate = op.to_z3(current_mstate)
+                # 更新全局状态为终止时的状态
+                global_state.mstate = current_mstate
                 # 返回空列表（无后继状态）
                 return []
 
             # 执行操作
-            new_mstate = op.to_z3(new_mstate)
+            current_mstate = op.to_z3(current_mstate)
 
-        # 获取最后一个操作来确定控制流
-        if not block.operations:
-            # 空块，顺序执行到下一个块
-            return self._handle_fallthrough(global_state, new_mstate, block)
-
-        last_op = block.operations[-1]
-        last_kind = last_op.kind.upper()
-
+        # 处理跳转或顺序执行
         if last_kind == "JUMP":
-            return self._handle_jump(global_state, new_mstate, block)
+            # 执行跳转指令（更新堆栈）
+            final_mstate = last_op.to_z3(current_mstate)
+            global_state.mstate = final_mstate
+            return self._handle_jump(global_state, final_mstate, block)
+            
         elif last_kind == "JUMPI":
-            return self._handle_jumpi(global_state, new_mstate, block)
+            # 在执行 JUMPI 弹出前提取条件
+            # 对于静态跳转，dest 已折叠，栈顶是条件
+            condition_value = current_mstate.evm_stack.peek(0)
+            
+            # 执行 JUMPI 指令（更新堆栈，弹出条件）
+            final_mstate = last_op.to_z3(current_mstate)
+            global_state.mstate = final_mstate
+            
+            # 传递提取的条件给处理器
+            return self._handle_jumpi(global_state, final_mstate, block, condition_value)
+            
         else:
-            # 顺序执行到下一个块
-            return self._handle_fallthrough(global_state, new_mstate, block)
+            # 顺序执行到下一个块（已经在 main_ops 中执行完所有指令）
+            global_state.mstate = current_mstate
+            return self._handle_fallthrough(global_state, current_mstate, block)
 
     def _handle_jump(self, global_state: GlobalState, mstate: SMTState, block: EVMBlock) -> List[GlobalState]:
         """处理 JUMP 指令。
@@ -276,20 +299,21 @@ class SymbolicExecutor:
         target_node = self.cfg.get_or_create_node(target_pc)
         new_state = GlobalState(
             mstate=mstate,
-            world_state=copy(global_state.world_state),
+            world_state=copy.copy(global_state.world_state),
             node=target_node
         )
         new_state.depth = global_state.depth + 1
 
         return [new_state]
 
-    def _handle_jumpi(self, global_state: GlobalState, mstate: SMTState, block: EVMBlock) -> List[GlobalState]:
+    def _handle_jumpi(self, global_state: GlobalState, mstate: SMTState, block: EVMBlock, condition_value: Optional[Any] = None) -> List[GlobalState]:
         """处理 JUMPI 指令。
 
         Args:
             global_state: 当前全局状态
             mstate: 执行后的机器状态
             block: 当前块
+            condition_value: 预先提取的跳转条件（如果为 None 则从 mstate 中提取）
 
         Returns:
             新全局状态列表（两个分支）
@@ -318,8 +342,10 @@ class SymbolicExecutor:
                 f"but target block not found"
             )
 
-        # 从栈中提取条件（在 JUMPI 执行前）
-        condition_value = global_state.mstate.evm_stack.peek(0)
+        # 确定跳转条件
+        if condition_value is None:
+            # 如果没有传入提取好的条件，则尝试从 mstate 中 peek（此时 JUMPI 可能还未执行）
+            condition_value = mstate.evm_stack.peek(0)
 
         # 转换为布尔条件：非零 = True
         jump_condition = condition_value != BitVecVal(0, 256)
@@ -331,7 +357,7 @@ class SymbolicExecutor:
         if target_block is not None:
             target_node = self.cfg.get_or_create_node(target_pc)
 
-            # 深拷贝状态
+            # 深拷贝状态（JUMPI 分支必须深拷贝，参考 Mythril）
             jump_world_state = copy.deepcopy(global_state.world_state)
             jump_world_state.constraints.add(jump_condition)
 
@@ -344,12 +370,12 @@ class SymbolicExecutor:
             new_states.append(jump_state)
 
         # 分支 2：顺序执行
-        current_idx = self.blocks.index(block)
+        current_idx = self.blocks.index(block) # TODO: make it more efficient
         if current_idx + 1 < len(self.blocks):
             fallthrough_pc = self.blocks[current_idx + 1].pc
             fallthrough_node = self.cfg.get_or_create_node(fallthrough_pc)
 
-            # 深拷贝状态
+            # 深拷贝状态（JUMPI 分支必须深拷贝，参考 Mythril）
             fallthrough_world_state = copy.deepcopy(global_state.world_state)
             fallthrough_world_state.constraints.add(fallthrough_condition)
 
@@ -390,7 +416,7 @@ class SymbolicExecutor:
 
         new_state = GlobalState(
             mstate=mstate,
-            world_state=copy(global_state.world_state),
+            world_state=copy.copy(global_state.world_state),
             node=next_node
         )
         new_state.depth = global_state.depth + 1

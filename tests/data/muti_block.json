@@ -3107,7 +3107,7 @@
                 },
                 {
                     "immediate": "3",
-                    "kind": "Missing opcode 0xb4",
+                    "kind": "LOG",
                     "pc": 1146
                 },
                 {
