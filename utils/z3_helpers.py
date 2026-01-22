@@ -62,14 +62,17 @@ def analyze_jump_target(target_expr: BitVec) -> JumpTargetAnalysis:
     Returns:
         JumpTargetAnalysis 分析结果
     """
+    # 先简化表达式，消除冗余结构、常量折叠等
+    simplified_expr = simplify(target_expr)
+
     # 情况1：直接常量
-    const_value = get_bv_const_value(target_expr)
+    const_value = get_bv_const_value(simplified_expr)
     if const_value is not None:
         return JumpTargetAnalysis(is_static=True, targets=[(const_value, None)])
 
     # 情况2：If 表达式（包括嵌套）
-    if is_if_expression(target_expr):
-        targets = _extract_targets_from_if(target_expr)
+    if is_if_expression(simplified_expr):
+        targets = _extract_targets_from_if(simplified_expr)
         if targets:
             return JumpTargetAnalysis(is_static=True, targets=targets)
 
