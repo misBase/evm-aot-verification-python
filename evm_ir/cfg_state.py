@@ -13,7 +13,7 @@ from state.smt_state import SMTState
 
 # 用于类型注解的前向引用
 if TYPE_CHECKING:
-    from .cfg_structures import CFGNode
+    from .cfg_structures import CFGNode, EdgeType
     from .cfg_annotations import StateAnnotation
 
 
@@ -157,6 +157,7 @@ class GlobalState:
     - mstate: 机器状态（EVM 状态）
     - environment: 环境信息
     - node: 当前 CFG 节点
+    - edge_type_hint: 边类型提示（用于 manage_cfg 确定边类型）
     """
 
     def __init__(self,
@@ -172,6 +173,7 @@ class GlobalState:
         """
         self.mstate = mstate
         self.world_state = world_state if world_state is not None else WorldState()
+        self.edge_type_hint: Optional['EdgeType'] = None  # 边类型提示
         self.node = node
 
         # 执行深度（用于循环检测）

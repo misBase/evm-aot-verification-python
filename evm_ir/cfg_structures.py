@@ -20,13 +20,15 @@ if TYPE_CHECKING:
 
 class EdgeType(Enum):
     """边的类型。"""
-    UNCONDITIONAL = "unconditional"       # 无条件跳转（JUMP）
-    CONDITIONAL_TRUE = "conditional_true"  # 条件跳转条件为真（JUMPI taken）
-    CONDITIONAL_FALSE = "conditional_false"  # 条件跳转条件为假（JUMPI not taken）
-    CONDITIONAL = "conditional"           # 条件跳转（通用，向后兼容）
-    FALLTHROUGH = "fallthrough"           # 顺序执行
-    CALL = "call"                         # 函数调用（预留）
-    RETURN = "return"                     # 函数返回（预留）
+    UNCONDITIONAL = "unconditional"           # 无条件跳转（JUMP 到常量）
+    CONDITIONAL_TRUE = "conditional_true"     # JUMPI 条件为真（跳转到常量）
+    CONDITIONAL_FALSE = "conditional_false"   # JUMPI 条件为假（fallthrough）
+    IF_THEN = "if_then"                       # If 表达式的 then 分支
+    IF_ELSE = "if_else"                       # If 表达式的 else 分支
+    CONDITIONAL = "conditional"               # 条件跳转（通用，向后兼容）
+    FALLTHROUGH = "fallthrough"               # 顺序执行
+    CALL = "call"                             # 函数调用（预留）
+    RETURN = "return"                         # 函数返回（预留）
 
 
 @dataclass
