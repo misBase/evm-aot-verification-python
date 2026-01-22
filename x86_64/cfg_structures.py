@@ -135,10 +135,18 @@ class X86DynamicCFG:
             source_instruction: 产生这条边的源指令（可选）
 
         Returns:
-            创建的 X86CFGEdge
+            创建的 X86CFGEdge（如果边已存在则返回已有的边）
         """
         from_node = self.get_or_create_node(from_addr)
         to_node = self.get_or_create_node(to_addr)
+
+        # 检查是否已存在相同的边（相同的起点、终点和边类型）
+        for existing_edge in self.edges:
+            if (existing_edge.node_from == from_addr and
+                existing_edge.node_to == to_addr and
+                existing_edge.edge_type == edge_type):
+                # 边已存在，返回已有的边而不是重复添加
+                return existing_edge
 
         edge = X86CFGEdge(
             node_from=from_addr,

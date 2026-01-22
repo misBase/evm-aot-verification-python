@@ -47,3 +47,6 @@ htmlcov/
 *.smt2
 
 CLAUDE.md
+
+# Visualization dot files
+*.dot

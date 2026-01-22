@@ -127,10 +127,18 @@ class DynamicCFG:
             source_operation: 产生这条边的源操作（可选）
 
         Returns:
-            创建的 CFGEdge
+            创建的 CFGEdge（如果边已存在则返回已有的边）
         """
         from_node = self.get_or_create_node(from_pc)
         to_node = self.get_or_create_node(to_pc)
+
+        # 检查是否已存在相同的边（相同的起点、终点和边类型）
+        for existing_edge in self.edges:
+            if (existing_edge.node_from == from_pc and
+                existing_edge.node_to == to_pc and
+                existing_edge.edge_type == edge_type):
+                # 边已存在，返回已有的边而不是重复添加
+                return existing_edge
 
         edge = CFGEdge(
             node_from=from_pc,
