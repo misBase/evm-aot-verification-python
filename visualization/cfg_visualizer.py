@@ -117,12 +117,16 @@ class DOTStyle:
     EDGE_STYLE_UNCONDITIONAL: str = "solid"
     EDGE_STYLE_CONDITIONAL: str = "dashed"
     EDGE_STYLE_FALLTHROUGH: str = "bold,solid"
+    EDGE_STYLE_IF_THEN: str = "solid"         # IF_THEN 边样式
+    EDGE_STYLE_IF_ELSE: str = "dotted"        # IF_ELSE 边样式
 
     # 边颜色
     EDGE_COLOR_UNCONDITIONAL: str = "#000000"  # 黑色
     EDGE_COLOR_CONDITIONAL_TRUE: str = "#228B22"  # 森林绿
     EDGE_COLOR_CONDITIONAL_FALSE: str = "#DC143C"  # 深红
     EDGE_COLOR_FALLTHROUGH: str = "#4169E1"  # 皇家蓝
+    EDGE_COLOR_IF_THEN: str = "#FF8C00"      # 深橙色
+    EDGE_COLOR_IF_ELSE: str = "#9932CC"      # 深兰花紫
 
     # 约束显示
     MAX_CONSTRAINT_LENGTH: int = 50
@@ -243,11 +247,31 @@ class DOTGenerator:
             # 紧凑模式：只显示数量
             return f'<tr><td align="left">[{len(items)} instrs]</td></tr>'
 
-        # 完整模式：显示所有指令
+        # 完整模式：智能显示指令
         lines = []
-        max_instructions = 10  # 最多显示 10 条
+        max_head_instructions = 8  # 开头最多显示 8 条
+        tail_instructions = 2  # 结尾始终显示 2 条
 
-        for item in items[:max_instructions]:
+        # 过滤掉 TAG 和 BLOCKEND（仅针对 EVM）
+        filtered_items = []
+        for item in items:
+            if hasattr(item, "kind") and item.kind in ["TAG", "BLOCKEND"]:
+                continue
+            filtered_items.append(item)
+
+        total = len(filtered_items)
+
+        # 如果总数不多，全部显示
+        if total <= max_head_instructions + tail_instructions:
+            items_to_show = filtered_items
+            omitted_count = 0
+        else:
+            # 显示前面几条 + 省略 + 最后几条
+            items_to_show = filtered_items[:max_head_instructions]
+            omitted_count = total - max_head_instructions - tail_instructions
+
+        # 格式化显示的指令
+        for item in items_to_show:
             if hasattr(item, "mnemonic"):
                 # x86-64 指令
                 mnemonic = item.mnemonic
@@ -256,10 +280,8 @@ class DOTGenerator:
                 line = f"    {addr_str} {mnemonic} {op_str}".strip()
                 lines.append(f'<tr><td align="left">{line}</td></tr>')
             elif hasattr(item, "kind"):
-                # EVM 操作 - 跳过 TAG 和 BLOCKEND，它们只是标记
+                # EVM 操作
                 kind = item.kind
-                if kind in ["TAG", "BLOCKEND"]:
-                    continue
                 pc_str = f"pc={item.pc:3d}" if hasattr(item, "pc") else "     "
                 imm_str = ""
                 if hasattr(item, "immediate") and item.immediate is not None:
@@ -268,8 +290,28 @@ class DOTGenerator:
                 line = f"{pc_str}  {kind:8} {imm_str}".strip()
                 lines.append(f'<tr><td align="left" fontname="Courier">{line}</td></tr>')
 
-        if len(items) > max_instructions:
-            lines.append(f'<tr><td align="left">    ... ({len(items) - max_instructions} more)</td></tr>')
+        # 如果有省略的指令，添加省略提示
+        if omitted_count > 0:
+            lines.append(f'<tr><td align="left">    ... ({omitted_count} more)</td></tr>')
+
+            # 添加最后几条指令
+            for item in filtered_items[-tail_instructions:]:
+                if hasattr(item, "mnemonic"):
+                    # x86-64 指令
+                    mnemonic = item.mnemonic
+                    op_str = getattr(item, "op_str", "")
+                    addr_str = f"0x{item.addr:x}" if hasattr(item, "addr") else ""
+                    line = f"    {addr_str} {mnemonic} {op_str}".strip()
+                    lines.append(f'<tr><td align="left">{line}</td></tr>')
+                elif hasattr(item, "kind"):
+                    # EVM 操作
+                    kind = item.kind
+                    pc_str = f"pc={item.pc:3d}" if hasattr(item, "pc") else "     "
+                    imm_str = ""
+                    if hasattr(item, "immediate") and item.immediate is not None:
+                        imm_str = f"imm={item.immediate}"
+                    line = f"{pc_str}  {kind:8} {imm_str}".strip()
+                    lines.append(f'<tr><td align="left" fontname="Courier">{line}</td></tr>')
 
         return "\n".join(lines) if lines else ""
 
@@ -292,11 +334,31 @@ class DOTGenerator:
             # 紧凑模式：只显示数量
             return f"[{len(items)} instrs]"
 
-        # 完整模式：显示所有指令
+        # 完整模式：智能显示指令
         lines = []
-        max_instructions = 10  # 最多显示 10 条
+        max_head_instructions = 8  # 开头最多显示 8 条
+        tail_instructions = 2  # 结尾始终显示 2 条
 
-        for item in items[:max_instructions]:
+        # 过滤掉 TAG 和 BLOCKEND（仅针对 EVM）
+        filtered_items = []
+        for item in items:
+            if hasattr(item, "kind") and item.kind in ["TAG", "BLOCKEND"]:
+                continue
+            filtered_items.append(item)
+
+        total = len(filtered_items)
+
+        # 如果总数不多，全部显示
+        if total <= max_head_instructions + tail_instructions:
+            items_to_show = filtered_items
+            omitted_count = 0
+        else:
+            # 显示前面几条 + 省略 + 最后几条
+            items_to_show = filtered_items[:max_head_instructions]
+            omitted_count = total - max_head_instructions - tail_instructions
+
+        # 格式化显示的指令
+        for item in items_to_show:
             if hasattr(item, "mnemonic"):
                 # x86-64 指令
                 mnemonic = item.mnemonic
@@ -314,8 +376,28 @@ class DOTGenerator:
                 line = f"    {pc_str} {kind} {imm_str}".strip()
                 lines.append(line)
 
-        if len(items) > max_instructions:
-            lines.append(f"    ... ({len(items) - max_instructions} more)")
+        # 如果有省略的指令，添加省略提示
+        if omitted_count > 0:
+            lines.append(f"    ... ({omitted_count} more)")
+
+            # 添加最后几条指令
+            for item in filtered_items[-tail_instructions:]:
+                if hasattr(item, "mnemonic"):
+                    # x86-64 指令
+                    mnemonic = item.mnemonic
+                    op_str = getattr(item, "op_str", "")
+                    addr_str = f"0x{item.addr:x}" if hasattr(item, "addr") else ""
+                    line = f"    {addr_str} {mnemonic} {op_str}".strip()
+                    lines.append(line)
+                elif hasattr(item, "kind"):
+                    # EVM 操作
+                    kind = item.kind
+                    pc_str = f"pc={item.pc}" if hasattr(item, "pc") else ""
+                    imm_str = ""
+                    if hasattr(item, "immediate") and item.immediate is not None:
+                        imm_str = f"imm={item.immediate}"
+                    line = f"    {pc_str} {kind} {imm_str}".strip()
+                    lines.append(line)
 
         return "\\n".join(lines) if lines else ""
 
@@ -391,12 +473,19 @@ class DOTGenerator:
 
         if "unconditional" in edge_type:
             return self.style.EDGE_STYLE_UNCONDITIONAL, self.style.EDGE_COLOR_UNCONDITIONAL
-        elif "conditional_true" in edge_type or "conditional" in edge_type:
+        elif "conditional_true" in edge_type:
             return self.style.EDGE_STYLE_CONDITIONAL, self.style.EDGE_COLOR_CONDITIONAL_TRUE
         elif "conditional_false" in edge_type:
             return self.style.EDGE_STYLE_CONDITIONAL, self.style.EDGE_COLOR_CONDITIONAL_FALSE
+        elif "if_then" in edge_type:
+            return self.style.EDGE_STYLE_IF_THEN, self.style.EDGE_COLOR_IF_THEN
+        elif "if_else" in edge_type:
+            return self.style.EDGE_STYLE_IF_ELSE, self.style.EDGE_COLOR_IF_ELSE
         elif "fallthrough" in edge_type:
             return self.style.EDGE_STYLE_FALLTHROUGH, self.style.EDGE_COLOR_FALLTHROUGH
+        # 通用 conditional 检查放在最后作为兜底
+        elif "conditional" in edge_type:
+            return self.style.EDGE_STYLE_CONDITIONAL, self.style.EDGE_COLOR_CONDITIONAL_TRUE
         else:
             return "solid", "#000000"
 
@@ -534,6 +623,12 @@ class DOTGenerator:
 
                 # 对于无条件跳转（JUMP），只显示操作
                 elif op_kind_upper == 'JUMP':
+                    # 检查是否是 if 表达式跳转
+                    edge_type_str = edge.edge_type.value if hasattr(edge.edge_type, 'value') else str(edge.edge_type)
+                    if edge_type_str == 'if_then':
+                        return "JUMP (then)"
+                    elif edge_type_str == 'if_else':
+                        return "JUMP (else)"
                     return op_kind
 
         # 尝试解析标志位条件（如果没有源指令）
@@ -665,6 +760,8 @@ class DOTGenerator:
         JUMPI 的条件是：栈顶元素不为 0 时跳转（true），为 0 时顺序执行（false）。
         由于是符号执行，我们不知道具体的值，只能显示条件类型。
 
+        对于 If 表达式的情况，返回嵌套的条件描述，如 "true)(then" 会组合成 "JUMPI(true)(then)"。
+
         Args:
             edge: CFG 边
             show_constraints: 是否显示约束条件
@@ -689,6 +786,14 @@ class DOTGenerator:
         elif edge_type_str == 'conditional_false':
             # 条件为假：栈顶元素为零
             return "false"
+        elif edge_type_str == 'if_then':
+            # JUMPI 跳转到 If 表达式的 then 分支
+            # 返回 "true)(then" 会组合成 "JUMPI(true)(then)"
+            return "true)(then"
+        elif edge_type_str == 'if_else':
+            # JUMPI 跳转到 If 表达式的 else 分支
+            # 返回 "true)(else" 会组合成 "JUMPI(true)(else)"
+            return "true)(else"
 
         return ""
 

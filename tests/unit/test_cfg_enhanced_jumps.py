@@ -418,8 +418,10 @@ def test_jumpi_multi_target_edge_types():
     assert len(if_else_edges) == 1, "Should have one IF_ELSE edge"
     
     # 验证跳转目标
-    assert if_then_edges[0].node_to == 10, "IF_THEN should target PC=10"
-    assert if_else_edges[0].node_to == 20, "IF_ELSE should target PC=20"
+    # 注意：Z3 的 simplify 会将 If(x < 100, 10, 20) 重写为 If(100 <= x, 20, 10)
+    # 因此 IF_THEN 对应简化后的 then 分支（PC=20），IF_ELSE 对应 else 分支（PC=10）
+    assert if_then_edges[0].node_to == 20, "IF_THEN should target PC=20 (after Z3 simplification)"
+    assert if_else_edges[0].node_to == 10, "IF_ELSE should target PC=10 (after Z3 simplification)"
 
     # Fallthrough 分支应为 CONDITIONAL_FALSE
     ft_edges = [e for e in jumpi_edges if e.edge_type == EdgeType.CONDITIONAL_FALSE]

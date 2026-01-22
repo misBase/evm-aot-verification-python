@@ -209,6 +209,42 @@ class TestDOTGenerator:
         dot_compact = generator.generate(compact=True)
         assert "[2 instrs]" in dot_compact or "2 instrs" in dot_compact
 
+    def test_instruction_truncation_with_tail(self):
+        """测试指令截断时显示头部和尾部指令。"""
+        # 创建一个有很多指令的块
+        operations = []
+        for i in range(20):
+            operations.append(EvmOperator(kind=f"OP{i}", pc=i))
+
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=operations,
+            ),
+        ]
+
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(compact=False)
+
+        # 验证包含前面几条指令
+        assert "OP0" in dot
+        assert "OP1" in dot
+
+        # 验证包含省略标记
+        assert "more)" in dot
+
+        # 验证包含最后两条指令（根据新逻辑）
+        assert "OP18" in dot
+        assert "OP19" in dot
+
     def test_edge_labels(self):
         """测试边标签生成。"""
         blocks = [
