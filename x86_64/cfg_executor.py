@@ -187,6 +187,9 @@ class X86SymbolicExecutor:
         if node is None:
             return []
 
+        # 将当前状态添加到节点的状态列表（用于追踪和调试）
+        node.states.append(global_state)
+
         block = node.block
         mstate = global_state.mstate
 
@@ -236,27 +239,36 @@ class X86SymbolicExecutor:
         # 解析跳转目标
         operands = parse_operands(insn)
 
-        if operands.get('jump_target') is not None:
-            # 直接跳转（静态目标）
-            target_addr = operands['jump_target']
-            target_block = self.blocks_by_addr.get(target_addr)
-
-            if target_block is None:
-                # 目标未找到，可能是外部跳转
-                return []
-
-            target_node = self.cfg.get_or_create_node(target_addr)
-            new_state = X86GlobalState(
-                mstate=mstate,
-                world_state=copy_module.copy(global_state.world_state),
-                node=target_node
-            )
-            new_state.depth = global_state.depth + 1
-            return [new_state]
-        else:
-            # 根据编译器实现，不应该出现间接跳转
-            # 如果出现，返回空列表表示不支持
+        target_addr = operands.get('jump_target')
+        
+        if target_addr is None:
+            # 无法解析目标，可能是间接跳转或解析错误
+            # 检查是否是明确的间接跳转（寄存器/内存跳转）
+            if operands.get('is_indirect'):
+                from utils.exceptions import UnsupportedJumpError
+                raise UnsupportedJumpError(
+                    "indirect_jump",
+                    f"Indirect JMP at address 0x{insn.addr:x}",
+                    "x86 indirect jumps are not supported by the compiler"
+                )
+            # 否则返回空列表（可能是解析失败或外部目标）
             return []
+
+        # 直接跳转（静态目标）
+        target_block = self.blocks_by_addr.get(target_addr)
+
+        if target_block is None:
+            # 目标块不存在，可能是外部跳转或超出范围
+            return []
+
+        target_node = self.cfg.get_or_create_node(target_addr)
+        new_state = X86GlobalState(
+            mstate=mstate,
+            world_state=copy_module.copy(global_state.world_state),  # 单路径使用 copy（参考 mythril）
+            node=target_node
+        )
+        new_state.depth = global_state.depth + 1
+        return [new_state]
 
     def _handle_jcc(self, global_state: X86GlobalState, mstate: SMTState,
                     block: X86Block, insn: X86Instruction) -> List[X86GlobalState]:
@@ -287,6 +299,19 @@ class X86SymbolicExecutor:
         # 解析跳转目标
         operands = parse_operands(insn)
         target_addr = operands.get('jump_target')
+        
+        # 检测间接跳转（真正的间接寻址）
+        if target_addr is None:
+            # 检查是否是明确的间接跳转
+            if operands.get('is_indirect'):
+                from utils.exceptions import UnsupportedJumpError
+                raise UnsupportedJumpError(
+                    "indirect_conditional_jump",
+                    f"Indirect conditional jump at address 0x{insn.addr:x}",
+                    "x86 indirect conditional jumps are not supported by the compiler"
+                )
+            # 如果只是解析失败，目标块设为 None（后续处理会跳过该分支）
+        
         target_block = self.blocks_by_addr.get(target_addr) if target_addr else None
 
         mnemonic = insn.mnemonic.lower()
@@ -388,12 +413,31 @@ class X86SymbolicExecutor:
         Returns:
             条件 BoolRef 或 None
         """
-        # 从世界状态的约束中获取最后的条件
-        # 在 _handle_jcc 中，我们将 jump_condition 添加到约束中
+        from z3 import BoolVal, eq, And
+        
         constraints = state.get_constraints()
-        if len(constraints) > 0:
+        
+        # 过滤掉初始的 True 约束，只获取实际添加的约束
+        real_constraints = [
+            c for c in constraints 
+            if not (isinstance(c, type(BoolVal(True))) and eq(c, BoolVal(True)))
+        ]
+        
+        if real_constraints:
             # 返回最后一个添加的约束（即跳转条件）
+            return real_constraints[-1]
+        
+        # 如果没有实际约束，检查 flag_constraints
+        if hasattr(constraints, 'flag_constraints'):
+            flag_constraints = constraints.flag_constraints
+            if flag_constraints:
+                # 返回合并的标志约束
+                return And(*flag_constraints.values())
+        
+        # 如果没有任何约束，返回最后一个约束（可能是初始的 True）
+        if len(constraints) > 0:
             return list(constraints)[-1]
+        
         return None
 
     def _handle_fallthrough(self, global_state: X86GlobalState, mstate: SMTState,

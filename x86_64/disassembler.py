@@ -104,6 +104,7 @@ def parse_operands(instruction: X86Instruction) -> dict:
         - 'is_memory': bool（如果操作数是内存访问）
         - 'immediate': int（如果操作数是立即值）
         - 'jump_target': int（如果操作数是跳转目标地址）
+        - 'is_indirect': bool（如果是间接跳转，即跳转目标是寄存器或内存）
 
     Example:
         >>> insn = disassemble_hex("498b46c0")[0]
@@ -119,7 +120,8 @@ def parse_operands(instruction: X86Instruction) -> dict:
         'offset': 0,
         'is_memory': False,
         'immediate': None,
-        'jump_target': None
+        'jump_target': None,
+        'is_indirect': False
     }
 
     # 获取Capstone指令对象
@@ -140,6 +142,10 @@ def parse_operands(instruction: X86Instruction) -> dict:
             else:
                 result['src_reg'] = reg_enum
 
+            # 检查是否是间接跳转（跳转指令的第一个操作数是寄存器）
+            if (i == 0 and instruction.mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']):
+                result['is_indirect'] = True
+
         elif op.type == capstone.x86.X86_OP_MEM:
             # 内存操作数
             result['is_memory'] = True
@@ -157,6 +163,10 @@ def parse_operands(instruction: X86Instruction) -> dict:
 
             # 偏移量
             result['offset'] = op.mem.disp
+
+            # 检查是否是间接跳转（跳转指令的第一个操作数是内存）
+            if (i == 0 and instruction.mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']):
+                result['is_indirect'] = True
 
         elif op.type == capstone.x86.X86_OP_IMM:
             # 立即数

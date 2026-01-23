@@ -39,7 +39,7 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
             if target is not None:
                 block_starts.add(target)
 
-            # 跳转后的指令也是块起始（顺序执行）
+            # 跳转后的指令也是块起始（fallthrough）
             if i + 1 < len(instructions):
                 block_starts.add(instructions[i + 1].addr)
 
@@ -69,11 +69,13 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
                 block_instructions.append(insn)
 
         if block_instructions:
+            # is_jump_target 语义：除入口块外的所有块
+            # 虽然语义上不够精确，但这样标记有助于区分"入口点"和"其他控制流目标"
             block = X86Block(
                 start_addr=start_addr,
                 end_addr=end_addr,
                 instructions=block_instructions,
-                is_jump_target=(start_addr != instructions[0].addr)  # 除第一个外都是跳转目标
+                is_jump_target=(start_addr != instructions[0].addr)
             )
             blocks.append(block)
 

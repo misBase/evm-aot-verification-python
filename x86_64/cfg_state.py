@@ -133,18 +133,24 @@ class X86WorldState:
     def __copy__(self):
         """浅拷贝（快速）。
 
+        参考 mythril 的设计，拷贝注解列表以确保状态独立。
+        虽然当前代码中不使用注解，但为未来扩展预留正确的行为。
+
         Returns:
             新的 X86WorldState 实例
         """
         import copy
         new_state = X86WorldState()
         new_state.constraints = copy.copy(self.constraints)
-        # 注解引用共享
-        new_state.annotations = self.annotations
+        # 拷贝注解列表（参考 mythril）
+        new_state.annotations = [copy(a) for a in self.annotations]
         return new_state
 
     def __deepcopy__(self, memo):
         """深拷贝（慢但正确）。
+
+        参考 mythril 的设计，注解仍使用 copy（Z3 表达式不可变）。
+        主要区别是 constraints 使用 deepcopy。
 
         Returns:
             新的 X86WorldState 实例
@@ -152,7 +158,8 @@ class X86WorldState:
         import copy
         new_state = X86WorldState()
         new_state.constraints = copy.deepcopy(self.constraints, memo)
-        new_state.annotations = copy.deepcopy(self.annotations, memo)
+        # 注解使用 copy 而非 deepcopy（参考 mythril）
+        new_state.annotations = [copy(a) for a in self.annotations]
         return new_state
 
 
