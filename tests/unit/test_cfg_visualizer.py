@@ -175,14 +175,20 @@ class TestDOTGenerator:
         assert '</table>>' in dot
 
     @pytest.mark.parametrize("cfg_type,create_blocks,expected_labels", [
-        ("evm",
-         lambda: [create_evm_block(pc=0), create_evm_block(pc=13, is_jump_target=True, is_stop=True)],
-         ["<tr><td><b>PC=0</b></td></tr>", "<tr><td><b>PC=13</b></td></tr>"]),
-        ("x86",
-         lambda: [create_x86_block(0x1000), create_x86_block(0x2000, instructions=[
-             X86Instruction(addr=0x2000, mnemonic="xor", op_str="rbx, rbx", bytes=b"\x48\x31\xdb", size=3)
-         ])],
-         ["<tr><td><b>0x1000</b></td></tr>", "<tr><td><b>0x2000</b></td></tr>"]),
+        pytest.param(
+            "evm",
+            lambda: [create_evm_block(pc=0), create_evm_block(pc=13, is_jump_target=True, is_stop=True)],
+            ["<tr><td><b>PC=0</b></td></tr>", "<tr><td><b>PC=13</b></td></tr>"],
+            id="evm",
+        ),
+        pytest.param(
+            "x86",
+            lambda: [create_x86_block(0x1000), create_x86_block(0x2000, instructions=[
+                X86Instruction(addr=0x2000, mnemonic="xor", op_str="rbx, rbx", bytes=b"\x48\x31\xdb", size=3)
+            ])],
+            ["<tr><td><b>0x1000</b></td></tr>", "<tr><td><b>0x2000</b></td></tr>"],
+            id="x86",
+        ),
     ])
     def test_address_row_format(self, cfg_type, create_blocks, expected_labels):
         """验证地址/PC 行格式：加粗显示。"""
@@ -216,20 +222,26 @@ class TestDOTGenerator:
         assert '<tr><td>' + '-' * 20 + '</td></tr>' in dot
 
     @pytest.mark.parametrize("cfg_type,create_block,expected_rows", [
-        ("evm",
-         lambda: create_evm_block(pc=0, operations=[
-             EvmOperator(kind="ADD", pc=0),
-             EvmOperator(kind="PUSH1", pc=1, immediate=0x10),
-         ]),
-         ['<tr><td align="left" fontname="Courier">pc=  0  ADD</td></tr>',
-          '<tr><td align="left" fontname="Courier">pc=  1  PUSH1    imm=16</td></tr>']),
-        ("x86",
-         lambda: create_x86_block(0x1000, 0x1004, instructions=[
-             X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
-             X86Instruction(addr=0x1003, mnemonic="ret", op_str="", bytes=b"\xc3", size=1),
-         ]),
-         ['<tr><td align="left">0x1000 xor rax, rax</td></tr>',
-          '<tr><td align="left">0x1003 ret</td></tr>']),
+        pytest.param(
+            "evm",
+            lambda: create_evm_block(pc=0, operations=[
+                EvmOperator(kind="ADD", pc=0),
+                EvmOperator(kind="PUSH1", pc=1, immediate=0x10),
+            ]),
+            ['<tr><td align="left" fontname="Courier">pc=  0  ADD</td></tr>',
+             '<tr><td align="left" fontname="Courier">pc=  1  PUSH1    imm=16</td></tr>'],
+            id="evm",
+        ),
+        pytest.param(
+            "x86",
+            lambda: create_x86_block(0x1000, 0x1004, instructions=[
+                X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
+                X86Instruction(addr=0x1003, mnemonic="ret", op_str="", bytes=b"\xc3", size=1),
+            ]),
+            ['<tr><td align="left">0x1000 xor rax, rax</td></tr>',
+             '<tr><td align="left">0x1003 ret</td></tr>'],
+            id="x86",
+        ),
     ])
     def test_instruction_operation_row_format(self, cfg_type, create_block, expected_rows):
         """验证指令/操作行格式。"""
@@ -336,11 +348,22 @@ class TestDOTGenerator:
     # ---------------------------------------------------------------------
 
     @pytest.mark.parametrize("cfg_type,create_block,addr_label,instr_name", [
-        ("evm", lambda: create_evm_block(pc=0, operations=[EvmOperator(kind="ADD", pc=0)]),
-         "<tr><td><b>PC=0</b></td></tr>", "ADD"),
-        ("x86", lambda: create_x86_block(0x1000, instructions=[
-            X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3)
-        ]), "<tr><td><b>0x1000</b></td></tr>", "xor"),
+        pytest.param(
+            "evm",
+            lambda: create_evm_block(pc=0, operations=[EvmOperator(kind="ADD", pc=0)]),
+            "<tr><td><b>PC=0</b></td></tr>",
+            "ADD",
+            id="evm",
+        ),
+        pytest.param(
+            "x86",
+            lambda: create_x86_block(0x1000, instructions=[
+                X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3)
+            ]),
+            "<tr><td><b>0x1000</b></td></tr>",
+            "xor",
+            id="x86",
+        ),
     ])
     def test_hide_instructions(self, cfg_type, create_block, addr_label, instr_name):
         """测试隐藏指令时不显示分隔线和指令内容。"""
