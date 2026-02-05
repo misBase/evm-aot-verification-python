@@ -503,12 +503,25 @@ class DOTGenerator:
             is_x86 = hasattr(node, "block") and hasattr(node.block, "start_addr")
 
             if is_x86:
-                # x86-64 - 使用 HTML 标签实现左对齐
+                # x86-64 - 使用 HTML 表格格式（与 EVM 保持一致）
                 if show_instructions:
                     instr_str = self._format_instructions_html(node, compact)
                 else:
                     instr_str = ""
-                label = f'<{instr_str}>'
+
+                separator = '-' * 20
+                states = f"States: {len(node.states)}" if show_states and hasattr(node, "states") else ""
+
+                # 组合成 HTML 表格（类似 EVM 的格式）
+                label = '<<table border="0" cellborder="0" cellspacing="0">'
+                label += f'<tr><td><b>0x{addr:x}</b></td></tr>'  # 始终显示地址
+                if show_instructions:
+                    label += f'<tr><td>{separator}</td></tr>'
+                if instr_str:
+                    label += instr_str
+                if states:
+                    label += f'<tr><td>{states}</td></tr>'
+                label += '</table>>'
             else:
                 # EVM - 使用 HTML 标签实现左对齐
                 if show_instructions:

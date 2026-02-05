@@ -545,6 +545,604 @@ class TestEVMCFGIntegration:
         assert "PC=0" in dot_content
 
 
+class TestEVMHTMLTableFormat:
+    """测试 EVM CFG 的 HTML 表格格式。"""
+
+    def test_evm_html_table_structure(self):
+        """验证 HTML 表格基本结构：包含 <table> 标签和正确属性。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[EvmOperator(kind="ADD", pc=0)],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate()
+
+        # 验证 table 标签
+        assert '<table border="0" cellborder="0" cellspacing="0">' in dot
+        assert '</table>>' in dot
+
+    def test_evm_pc_row_format(self):
+        """验证 PC 行格式：<tr><td><b>PC={pc}</b></td></tr>"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[EvmOperator(kind="ADD", pc=0)],
+            ),
+            EVMBlock(
+                pc=13,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=True,
+                is_inner_block=False,
+                is_stop=True,
+                operations=[EvmOperator(kind="STOP", pc=13)],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate()
+
+        # 验证 PC 行格式（加粗）
+        assert '<tr><td><b>PC=0</b></td></tr>' in dot
+        assert '<tr><td><b>PC=13</b></td></tr>' in dot
+
+    def test_evm_separator_line(self):
+        """验证分隔线：20 个破折号。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[EvmOperator(kind="ADD", pc=0)],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=True)
+
+        # 验证分隔线（20 个破折号）
+        assert '<tr><td>' + '-' * 20 + '</td></tr>' in dot
+
+    def test_evm_operation_row_format(self):
+        """验证操作行格式：<tr><td align="left" fontname="Courier">{pc}  {kind} {imm}</td></tr>"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[
+                    EvmOperator(kind="ADD", pc=0),
+                    EvmOperator(kind="PUSH1", pc=1, immediate=0x10),
+                ],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=True)
+
+        # 验证操作行格式（左对齐，Courier 字体）
+        # 格式: pc={pc:3d}  {kind:8} {imm}
+        assert '<tr><td align="left" fontname="Courier">pc=  0  ADD</td></tr>' in dot
+        assert '<tr><td align="left" fontname="Courier">pc=  1  PUSH1    imm=16</td></tr>' in dot
+
+    def test_evm_states_row(self):
+        """验证状态计数行格式。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[EvmOperator(kind="ADD", pc=0)],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        cfg.get_node(0).states = [None, None, None]  # 添加 3 个状态
+
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_states=True)
+
+        # 验证状态计数
+        assert '<tr><td>States: 3</td></tr>' in dot
+
+    def test_evm_compact_mode(self):
+        """验证紧凑模式：[N instrs]。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[
+                    EvmOperator(kind="ADD", pc=0),
+                    EvmOperator(kind="MUL", pc=1),
+                ],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+
+        # 完整模式
+        dot_full = generator.generate(compact=False)
+        assert "ADD" in dot_full
+
+        # 紧凑模式
+        dot_compact = generator.generate(compact=True)
+        assert '[2 instrs]' in dot_compact
+
+    def test_evm_operation_truncation(self):
+        """验证操作截断：显示前 8 条 + 省略 + 最后 2 条。"""
+        # 创建包含 15 条操作的块
+        operations = []
+        for i in range(15):
+            operations.append(EvmOperator(kind=f"OP{i}", pc=i))
+
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=operations,
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=True)
+
+        # 验证包含前面的操作
+        assert 'OP0' in dot
+        assert 'OP1' in dot
+
+        # 验证包含省略标记
+        assert 'more)' in dot
+
+        # 验证包含最后两条操作
+        assert 'OP13' in dot
+        assert 'OP14' in dot
+
+
+class TestEVMShowOptions:
+    """测试 EVM CFG 显示选项。"""
+
+    def test_evm_hide_instructions(self):
+        """测试隐藏指令时不显示分隔线和指令内容。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[EvmOperator(kind="ADD", pc=0)],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=False)
+
+        # 验证 PC 行仍然存在
+        assert '<tr><td><b>PC=0</b></td></tr>' in dot
+
+        # 验证分隔线不存在（20 个破折号）
+        assert '<tr><td>' + '-' * 20 + '</td></tr>' not in dot
+
+        # 验证操作不存在
+        assert 'ADD' not in dot
+
+    def test_evm_show_states(self):
+        """测试显示状态计数。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[EvmOperator(kind="ADD", pc=0)],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        cfg.get_node(0).states = [None, None]
+
+        # 显示状态
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_states=True)
+        assert 'States: 2' in dot
+
+        # 隐藏状态
+        dot = generator.generate(show_states=False)
+        assert 'States:' not in dot
+
+
+class TestEVMEmptyBlock:
+    """测试 EVM 空块的可视化。"""
+
+    def test_evm_empty_block_has_address_only(self):
+        """测试空块只显示 PC 行（隐藏指令时）。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        # 隐藏指令和状态，空块只显示 PC 行
+        dot = generator.generate(show_instructions=False, show_states=False)
+
+        # 验证 PC 行存在
+        assert '<tr><td><b>PC=0</b></td></tr>' in dot
+
+        # 验证 table 标签完整
+        assert '<table border="0" cellborder="0" cellspacing="0">' in dot
+        assert '</table>>' in dot
+
+        # 验证分隔线不存在（没有操作且隐藏了指令显示）
+        assert '<tr><td>' + '-' * 20 + '</td></tr>' not in dot
+
+    def test_evm_empty_block_with_states_shows_separator(self):
+        """测试空块在显示指令时会有分隔线。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        # 默认情况下 show_instructions=True 且 show_states=True
+        dot = generator.generate()
+
+        # 验证 PC 行存在
+        assert '<tr><td><b>PC=0</b></td></tr>' in dot
+
+        # 当 show_instructions=True 时，即使没有操作也会显示分隔线
+        assert '<tr><td>' + '-' * 20 + '</td></tr>' in dot
+
+    def test_evm_filters_tag_and_blockend(self):
+        """测试 TAG 和 BLOCKEND 操作被过滤掉。"""
+        blocks = [
+            EVMBlock(
+                pc=0,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=10,
+                is_jump_target=False,
+                is_inner_block=False,
+                is_stop=False,
+                operations=[
+                    EvmOperator(kind="TAG", pc=0),
+                    EvmOperator(kind="ADD", pc=1),
+                    EvmOperator(kind="BLOCKEND", pc=2),
+                    EvmOperator(kind="POP", pc=3),
+                ],
+            ),
+        ]
+        cfg = DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=True)
+
+        # 验证 TAG 和 BLOCKEND 不在输出中
+        assert 'TAG' not in dot
+        assert 'BLOCKEND' not in dot
+
+        # 验证其他操作存在
+        assert 'ADD' in dot
+        assert 'POP' in dot
+
+
+class TestX86HTMLTableFormat:
+    """测试 x86-64 CFG 的 HTML 表格格式。"""
+
+    def test_x86_html_table_structure(self):
+        """验证 HTML 表格基本结构：包含 <table> 标签和正确属性。"""
+        blocks = [
+            X86Block(
+                start_addr=0x1000,
+                end_addr=0x1003,
+                instructions=[
+                    X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
+                ],
+            ),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate()
+
+        # 验证 table 标签
+        assert '<table border="0" cellborder="0" cellspacing="0">' in dot
+        assert '</table>>' in dot
+
+    def test_x86_address_row_format(self):
+        """验证地址行格式：<tr><td><b>0x{addr:x}</b></td></tr>"""
+        blocks = [
+            X86Block(
+                start_addr=0x1000,
+                end_addr=0x1003,
+                instructions=[
+                    X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
+                ],
+            ),
+            X86Block(
+                start_addr=0x2000,
+                end_addr=0x2003,
+                instructions=[
+                    X86Instruction(addr=0x2000, mnemonic="xor", op_str="rbx, rbx", bytes=b"\x48\x31\xdb", size=3),
+                ],
+            ),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate()
+
+        # 验证地址行格式（加粗，十六进制）
+        assert '<tr><td><b>0x1000</b></td></tr>' in dot
+        assert '<tr><td><b>0x2000</b></td></tr>' in dot
+
+    def test_x86_separator_line(self):
+        """验证分隔线：20 个破折号。"""
+        blocks = [
+            X86Block(
+                start_addr=0x1000,
+                end_addr=0x1003,
+                instructions=[
+                    X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
+                ],
+            ),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=True)
+
+        # 验证分隔线（20 个破折号）
+        assert '<tr><td>' + '-' * 20 + '</td></tr>' in dot
+
+    def test_x86_instruction_row_format(self):
+        """验证指令行格式：<tr><td align="left">{addr} {mnemonic} {op_str}</td></tr>"""
+        blocks = [
+            X86Block(
+                start_addr=0x1000,
+                end_addr=0x1004,
+                instructions=[
+                    X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
+                    X86Instruction(addr=0x1003, mnemonic="ret", op_str="", bytes=b"\xc3", size=1),
+                ],
+            ),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=True)
+
+        # 验证指令行格式（左对齐）
+        assert '<tr><td align="left">0x1000 xor rax, rax</td></tr>' in dot
+        assert '<tr><td align="left">0x1003 ret</td></tr>' in dot
+
+    def test_x86_states_row(self):
+        """验证状态计数行格式。"""
+        blocks = [
+            X86Block(
+                start_addr=0x1000,
+                end_addr=0x1003,
+                instructions=[
+                    X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
+                ],
+            ),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        cfg.get_node(0x1000).states = [None, None, None]  # 添加 3 个状态
+
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_states=True)
+
+        # 验证状态计数
+        assert '<tr><td>States: 3</td></tr>' in dot
+
+    def test_x86_compact_mode(self):
+        """验证紧凑模式：[N instrs]。"""
+        blocks = [
+            X86Block(
+                start_addr=0x1000,
+                end_addr=0x1002,
+                instructions=[
+                    X86Instruction(addr=0x1000, mnemonic="mov", op_str="rax, rbx", bytes=b"", size=0),
+                    X86Instruction(addr=0x1001, mnemonic="add", op_str="rax, 1", bytes=b"", size=0),
+                ],
+            ),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+
+        # 完整模式
+        dot_full = generator.generate(compact=False)
+        assert "mov" in dot_full
+
+        # 紧凑模式
+        dot_compact = generator.generate(compact=True)
+        assert '[2 instrs]' in dot_compact
+
+    def test_x86_instruction_truncation(self):
+        """验证指令截断：显示前 8 条 + 省略 + 最后 2 条。"""
+        # 创建包含 15 条指令的块
+        instructions = []
+        for i in range(15):
+            addr = 0x1000 + i
+            instructions.append(
+                X86Instruction(addr=addr, mnemonic=f"op{i}", op_str=f"r{i}, r{i}", bytes=b"", size=1)
+            )
+
+        blocks = [
+            X86Block(start_addr=0x1000, end_addr=0x100f, instructions=instructions),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=True)
+
+        # 验证包含前面的指令
+        assert 'op0' in dot
+        assert 'op1' in dot
+
+        # 验证包含省略标记
+        assert 'more)' in dot
+
+        # 验证包含最后两条指令
+        assert 'op13' in dot
+        assert 'op14' in dot
+
+
+class TestX86ShowOptions:
+    """测试 x86-64 CFG 显示选项。"""
+
+    def test_x86_hide_instructions(self):
+        """测试隐藏指令时不显示分隔线和指令内容。"""
+        blocks = [
+            X86Block(
+                start_addr=0x1000,
+                end_addr=0x1003,
+                instructions=[
+                    X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
+                ],
+            ),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_instructions=False)
+
+        # 验证地址行仍然存在
+        assert '<tr><td><b>0x1000</b></td></tr>' in dot
+
+        # 验证分隔线不存在（20 个破折号）
+        assert '<tr><td>' + '-' * 20 + '</td></tr>' not in dot
+
+        # 验证指令不存在
+        assert 'xor' not in dot
+
+    def test_x86_show_states(self):
+        """测试显示状态计数。"""
+        blocks = [
+            X86Block(
+                start_addr=0x1000,
+                end_addr=0x1003,
+                instructions=[
+                    X86Instruction(addr=0x1000, mnemonic="xor", op_str="rax, rax", bytes=b"\x48\x31\xc0", size=3),
+                ],
+            ),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        cfg.get_node(0x1000).states = [None, None]
+
+        # 显示状态
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(show_states=True)
+        assert 'States: 2' in dot
+
+        # 隐藏状态
+        dot = generator.generate(show_states=False)
+        assert 'States:' not in dot
+
+
+class TestX86EmptyBlock:
+    """测试 x86-64 空块的可视化。"""
+
+    def test_x86_empty_block_has_address_only(self):
+        """测试空块只显示地址行（隐藏指令时）。"""
+        blocks = [
+            X86Block(start_addr=0x1000, end_addr=0x1000, instructions=[]),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        # 隐藏指令和状态，空块只显示地址行
+        dot = generator.generate(show_instructions=False, show_states=False)
+
+        # 验证地址行存在
+        assert '<tr><td><b>0x1000</b></td></tr>' in dot
+
+        # 验证 table 标签完整
+        assert '<table border="0" cellborder="0" cellspacing="0">' in dot
+        assert '</table>>' in dot
+
+        # 验证分隔线不存在（没有指令且隐藏了指令显示）
+        assert '<tr><td>' + '-' * 20 + '</td></tr>' not in dot
+
+    def test_x86_empty_block_with_states_shows_separator(self):
+        """测试空块在显示状态时会有分隔线。"""
+        blocks = [
+            X86Block(start_addr=0x1000, end_addr=0x1000, instructions=[]),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        generator = DOTGenerator(cfg)
+        # 默认情况下 show_instructions=True 且 show_states=True
+        dot = generator.generate()
+
+        # 验证地址行存在
+        assert '<tr><td><b>0x1000</b></td></tr>' in dot
+
+        # 当 show_instructions=True 时，即使没有指令也会显示分隔线
+        assert '<tr><td>' + '-' * 20 + '</td></tr>' in dot
+
+
 class TestX86CFGIntegration:
     """测试 x86-64 CFG 集成。"""
 
