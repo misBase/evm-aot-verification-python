@@ -200,4 +200,11 @@ class EVMProgram:
         return merged
 
     def __repr__(self):
-        return f"EVMProgram(blocks={len(self.blocks)})"
+        blocks_info = f"blocks={len(self.blocks)}"
+        if self.blocks:
+            entry_pc = self.blocks[0].pc
+            blocks_info += f", entry_pc=0x{entry_pc:x}"
+            # 统计操作数
+            total_ops = sum(len(block.operations) for block in self.blocks)
+            blocks_info += f", operators={total_ops}"
+        return f"EVMProgram({blocks_info})"

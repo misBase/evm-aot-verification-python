@@ -4,6 +4,7 @@
 验证x86精化EVM：对所有输入，x86_output = EVM_output。
 """
 
+import time
 from z3 import BitVec, SolverFor, Distinct, unsat, sat, set_option, Array, Select, And, ForAll
 from typing import Tuple, Optional
 
@@ -70,31 +71,44 @@ class RefinementChecker:
         """用于单个BitVec结果的旧版精化检查（向后兼容）。"""
         if evm_result.size() != 256 or x86_result.size() != 256:
             raise ValueError("Both results must be 256-bit BitVecs")
-        
+
         # 为了证明精化关系：证明不存在使它们不同的输入
         # 我们检查：∃ inputs. evm_result ≠ x86_result
         # 如果UNSAT，则精化关系成立（它们总是相等）
-        
+
         self.solver.reset()
         self.solver.add(Distinct(evm_result, x86_result))
-        
+
+        start_time = time.time()
         result = self.solver.check()
-        
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            stats = self.solver.statistics()
+            print(f"    ├─ Solve time: {solve_time:.3f}s")
+            print(f"    ├─ Z3 result: {result}")
+
         if result == unsat:
             msg = "✓ VERIFIED: x86 refines EVM (semantically equivalent for all inputs)"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return True, msg
         elif result == sat:
             model = self.solver.model()
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return False, msg
         else:
             msg = "? UNKNOWN: Solver could not determine refinement"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return False, msg
     
-    def _check_refinement_with_length(self, evm_result, 
+    def _check_refinement_with_length(self, evm_result,
                                      x86_result) -> Tuple[bool, Optional[str]]:
         """通过长度和数据比较检查精化关系。
-        
+
         Args:
             evm_result: (data, length)元组，其中：
                 - data: Array[BitVec[64], BitVec[8]]或BitVec（用于向后兼容）
@@ -102,80 +116,100 @@ class RefinementChecker:
             x86_result: (data, length)元组，其中：
                 - data: Array[BitVec[64], BitVec[8]]或BitVec（用于向后兼容）
                 - length: x86输出长度的逻辑公式（64位BitVec）
-        
+
         Returns:
             (verified, message)，如果精化关系成立则verified为True
         """
         evm_data, evm_length = evm_result
         x86_data, x86_length = x86_result
-        
+
         if evm_length.size() != 64 or x86_length.size() != 64:
             raise ValueError("Length must be 64-bit BitVec")
-        
+
         # 第一次检查：长度必须相等
         # 如果长度不同，程序不等价
         self.solver.reset()
         self.solver.add(evm_length != x86_length)
+
+        start_time = time.time()
         result = self.solver.check()
-        
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ Length equality check: {solve_time:.3f}s, result={result}")
+
         if result == sat:
             # 长度可能不同 - 不等价
-            return False, "✗ COUNTEREXAMPLE: Return lengths differ"
-        
+            msg = "✗ COUNTEREXAMPLE: Return lengths differ"
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+
         # 第二次检查：如果长度相等，数据必须相等
         # 处理Array和BitVec两种格式
         self.solver.reset()
         self.solver.add(evm_length == x86_length)  # 长度相等
-        
+
         # 检查数据是Array还是BitVec
         if isinstance(evm_data, Array) and isinstance(x86_data, Array):
             # Array格式：仅比较到length字节
             # 我们想检查：Exists i. (i < length) && (evm_data[i] != x86_data[i])
             # 如果UNSAT，则ForAll i. (i < length) => (evm_data[i] == x86_data[i])
             from z3 import BitVecVal, ULT
-            
+
             # 创建符号索引变量
             i = BitVec('return_data_index', 64)
-            
+
             # 约束：i < length
             index_in_range = ULT(i, evm_length)
-            
+
             # 比较位置i处的字节
             evm_byte = Select(evm_data, i)
             x86_byte = Select(x86_data, i)
-            
+
             # 添加约束：i < length AND evm_data[i] != x86_data[i]
             # 如果这是可满足的，我们找到了反例
             self.solver.add(index_in_range)
             self.solver.add(evm_byte != x86_byte)
-            
+
         else:
             # BitVec格式（向后兼容）：比较整个固定大小数据
             if evm_data.size() != x86_data.size():
                 raise ValueError(f"Data sizes must match: EVM={evm_data.size()}, x86={x86_data.size()}")
             self.solver.add(Distinct(evm_data, x86_data))  # But data differs
-        
+
+        start_time = time.time()
         result = self.solver.check()
-        
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ Data equality check: {solve_time:.3f}s, result={result}")
+
         if result == unsat:
             msg = "✓ VERIFIED: x86 refines EVM (lengths and data are equivalent for all inputs)"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return True, msg
         elif result == sat:
             model = self.solver.model()
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (data differs)"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return False, msg
         else:
             msg = "? UNKNOWN: Solver could not determine refinement"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return False, msg
     
     def _check_refinement_direct_memory(self, evm_result: dict, x86_result: dict) -> Tuple[bool, Optional[str]]:
         """通过直接比较内存内容检查精化关系。
-        
+
         这是优化的方法：不是将所有字节提取到Array中，
         而是使用量词直接比较内存内容：
-          ForAll i. (0 <= i < length) => 
+          ForAll i. (0 <= i < length) =>
             EVM_memory[evm_offset + i] == x86_memory[x86_base_addr + x86_offset + i]
-        
+
         Args:
             evm_result: 包含以下键的字典：
                 - 'offset': EVM内存中的64位BitVec偏移量（0 = 无返回）
@@ -189,84 +223,113 @@ class RefinementChecker:
                 - 'memory': Array[BitVec[64], BitVec[8]] - x86内存
                 - 'base_addr': 64位BitVec（R15寄存器值，EVM内存基址指针）
                 - 'has_return': BitVec条件（length != 0）
-        
+
         Returns:
             (verified, message)，如果精化关系成立则verified为True
         """
         from z3 import ForAll, Implies, And, ULT, UGE, BitVec, Select, BitVecVal, sat, unsat
-        
+
         evm_offset = evm_result['offset']
         evm_length = evm_result['length']
         evm_memory = evm_result['memory']
         evm_has_return = evm_result.get('has_return', evm_length != BitVecVal(0, 64))
-        
+
         x86_offset = x86_result['offset']
         x86_length = x86_result['length']
         x86_memory = x86_result['memory']
         x86_base_addr = x86_result['base_addr']
         x86_has_return = x86_result.get('has_return', x86_length != BitVecVal(0, 64))
-        
+
         # 第一次检查：返回条件必须等价
         # EVM返回当且仅当x86返回
         self.solver.reset()
         self.solver.add(evm_has_return != x86_has_return)
+
+        start_time = time.time()
         result = self.solver.check()
-        
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ Return condition check: {solve_time:.3f}s, result={result}")
+
         if result == sat:
-            return False, "✗ COUNTEREXAMPLE: Return conditions differ (one returns, the other doesn't)"
-        
+            msg = "✗ COUNTEREXAMPLE: Return conditions differ (one returns, the other doesn't)"
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+
         # 第二次检查：如果两者都返回（或都不返回），长度必须相等
         self.solver.reset()
         self.solver.add(evm_has_return)  # 假设两者都返回
         self.solver.add(x86_has_return)
         self.solver.add(evm_length != x86_length)
+
+        start_time = time.time()
         result = self.solver.check()
-        
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ Length equality check: {solve_time:.3f}s, result={result}")
+
         if result == sat:
-            return False, "✗ COUNTEREXAMPLE: Return lengths differ"
-        
+            msg = "✗ COUNTEREXAMPLE: Return lengths differ"
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+
         # 第三次检查：如果长度相等且两者都返回，内存内容必须相等
-        # 我们想检查：ForAll i. (0 <= i < length) => 
+        # 我们想检查：ForAll i. (0 <= i < length) =>
         #   EVM_memory[evm_offset + i] == x86_memory[x86_base_addr + x86_offset + i]
-        # 
-        # 我们检查否定：Exists i. (0 <= i < length) AND 
+        #
+        # 我们检查否定：Exists i. (0 <= i < length) AND
         #   EVM_memory[evm_offset + i] != x86_memory[x86_base_addr + x86_offset + i]
         # 如果这是UNSAT，则ForAll成立。
-        
+
         self.solver.reset()
         self.solver.add(evm_has_return)  # 两者都返回
         self.solver.add(x86_has_return)
         self.solver.add(evm_length == x86_length)  # 长度相等
-        
+
         # 创建符号索引变量
         i = BitVec('return_data_index', 64)
-        
+
         # 约束：0 <= i < length
         index_in_range = And(UGE(i, BitVecVal(0, 64)), ULT(i, evm_length))
-        
+
         # 计算内存地址
         evm_addr = evm_offset + i
         x86_addr = x86_base_addr + x86_offset + i
-        
+
         # 从内存读取字节
         evm_byte = Select(evm_memory, evm_addr)
         x86_byte = Select(x86_memory, x86_addr)
-        
+
         # 添加约束：i在范围内 AND evm_byte != x86_byte
         # 如果这是可满足的，我们找到了反例
         self.solver.add(index_in_range)
         self.solver.add(evm_byte != x86_byte)
-        
+
+        start_time = time.time()
         result = self.solver.check()
-        
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ Memory content check: {solve_time:.3f}s, result={result}")
+
         if result == unsat:
             msg = "✓ VERIFIED: x86 refines EVM (return conditions, lengths, and memory contents are equivalent for all inputs)"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return True, msg
         elif result == sat:
             model = self.solver.model()
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (memory contents differ)"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return False, msg
         else:
             msg = "? UNKNOWN: Solver could not determine refinement"
+            if self.verbose:
+                print(f"    └─ {msg}")
             return False, msg
 

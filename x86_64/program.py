@@ -407,5 +407,11 @@ class X86Program:
         }
     
     def __repr__(self):
-        return f"X86Program(blocks={len(self.blocks)}, instructions={len(self.instructions)}, base_addr=0x{self.base_addr:x})"
+        info = f"instructions={len(self.instructions)}, base_addr=0x{self.base_addr:x}"
+        if self.blocks:
+            entry_addr = self.blocks[0].start_addr
+            info = f"blocks={len(self.blocks)}, entry_addr=0x{entry_addr:x}, " + info
+        else:
+            info = f"blocks=0 (sequential), " + info
+        return f"X86Program({info})"
 
