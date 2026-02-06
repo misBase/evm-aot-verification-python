@@ -198,7 +198,6 @@ def test_verify_add_program_pair():
     )
 
 
-@pytest.mark.skip
 def test_verify_add_program_pair_full():
     """使用add_program.json和完整x86十六进制序列测试程序级验证。
     
