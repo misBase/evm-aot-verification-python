@@ -5,8 +5,8 @@ x86-64指令执行器。
 """
 
 from typing import List
-from z3 import BitVec, BitVecVal, Concat, Extract
-from .models import X86Instruction
+from z3 import BitVec, BitVecVal, Concat, Extract, LShR, UDiv, URem, If, Not, And, Or
+from .models import X86Instruction, Register
 from .execution_state import ExecutionState
 from .disassembler import parse_operands
 
@@ -36,12 +36,38 @@ class InstructionExecutor:
             self._execute_add(state, operands)
         elif mnemonic == 'adc':
             self._execute_adc(state, operands)
+        elif mnemonic == 'sbb':
+            self._execute_sbb(state, operands)
         elif mnemonic == 'sub':
             self._execute_sub(state, operands)
         elif mnemonic == 'inc':
             self._execute_inc(state, operands)
+        elif mnemonic == 'movzx':
+            self._execute_movzx(state, operands)
+        elif mnemonic == 'shl':
+            self._execute_shl(state, operands)
+        elif mnemonic == 'shr':
+            self._execute_shr(state, operands)
+        elif mnemonic == 'not':
+            self._execute_not(state, operands)
+        elif mnemonic == 'bswap':
+            self._execute_bswap(state, operands)
+        elif mnemonic == 'div':
+            self._execute_div(state, operands)
         elif mnemonic == 'cmp':
             self._execute_cmp(state, operands)
+        elif mnemonic == 'mul':
+            self._execute_mul(state, operands)
+        elif mnemonic == 'and':
+            self._execute_and(state, operands)
+        elif mnemonic == 'or':
+            self._execute_or(state, operands)
+        elif mnemonic == 'xor':
+            self._execute_xor(state, operands)
+        elif mnemonic == 'nop':
+            pass
+        elif mnemonic.startswith('set'):
+            self._execute_setcc(state, mnemonic, operands)
         elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'jmp']:
             # 条件/无条件跳转 - 目前，我们继续执行
             # 在完整实现中，我们将跟踪控制流
@@ -165,6 +191,15 @@ class InstructionExecutor:
             
             # 更新进位标志
             state.set_flag('CF', carry_out)
+        elif operands['immediate'] is not None:
+            imm_val = BitVecVal(operands['immediate'], 64)
+            reg_ext = Concat(BitVecVal(0, 1), reg_val)
+            imm_ext = Concat(BitVecVal(0, 1), imm_val)
+            sum_ext = reg_ext + imm_ext
+            result = Extract(63, 0, sum_ext)
+            carry_out = Extract(64, 64, sum_ext)
+            state.set_register(dest_reg, result)
+            state.set_flag('CF', carry_out)
         else:
             raise ValueError(f"Unsupported ADD operand combination: {operands}")
     
@@ -174,26 +209,31 @@ class InstructionExecutor:
         支持：
         - ADC reg, [base+offset]  （将内存和进位加到寄存器）
         """
-        if not operands['dest_reg'] or not operands['is_memory']:
-            raise ValueError(f"ADC instruction must have register destination and memory source: {operands}")
+        if not operands['dest_reg']:
+            raise ValueError(f"ADC instruction must have register destination: {operands}")
         
         dest_reg = operands['dest_reg']
-        offset = operands['offset']
         
         # 获取当前寄存器值
         reg_val = state.get_register(dest_reg)
         
-        # 加载内存值
-        mem_val = state.load_memory(offset)
+        if operands['is_memory']:
+            rhs_val = state.load_memory(operands['offset'])
+        elif operands['src_reg']:
+            rhs_val = state.get_register(operands['src_reg'])
+        elif operands['immediate'] is not None:
+            rhs_val = BitVecVal(operands['immediate'], 64)
+        else:
+            raise ValueError(f"Unsupported ADC operand combination: {operands}")
         
         # 获取进位标志
         carry_in = state.get_flag('CF')
         
         # 执行带进位加法（64位，带进位生成）
         reg_ext = Concat(BitVecVal(0, 1), reg_val)
-        mem_ext = Concat(BitVecVal(0, 1), mem_val)
+        rhs_ext = Concat(BitVecVal(0, 1), rhs_val)
         carry_ext = Concat(BitVecVal(0, 64), carry_in)
-        sum_ext = reg_ext + mem_ext + carry_ext
+        sum_ext = reg_ext + rhs_ext + carry_ext
         
         # 提取结果和进位
         result = Extract(63, 0, sum_ext)
@@ -217,13 +257,37 @@ class InstructionExecutor:
         dest_reg = operands['dest_reg']
         reg_val = state.get_register(dest_reg)
         
-        if operands['immediate'] is not None:
-            # SUB reg, immediate
-            imm_val = BitVecVal(operands['immediate'], 64)
-            result = reg_val - imm_val
-            state.set_register(dest_reg, result)
+        if operands['is_memory']:
+            rhs_val = state.load_memory(operands['offset'])
+        elif operands['src_reg']:
+            rhs_val = state.get_register(operands['src_reg'])
+        elif operands['immediate'] is not None:
+            rhs_val = BitVecVal(operands['immediate'], 64)
         else:
             raise ValueError(f"Unsupported SUB operand combination: {operands}")
+        result = reg_val - rhs_val
+        state.set_register(dest_reg, result)
+
+    def _execute_sbb(self, state: ExecutionState, operands: dict) -> None:
+        """执行SBB指令。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"SBB instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        lhs = state.get_register(dest_reg)
+        carry_in = state.get_flag('CF')
+
+        if operands['is_memory']:
+            rhs = state.load_memory(operands['offset'])
+        elif operands['src_reg']:
+            rhs = state.get_register(operands['src_reg'])
+        elif operands['immediate'] is not None:
+            rhs = BitVecVal(operands['immediate'], 64)
+        else:
+            raise ValueError(f"Unsupported SBB operand combination: {operands}")
+
+        result = lhs - rhs - Concat(BitVecVal(0, 63), carry_in)
+        state.set_register(dest_reg, result)
 
     def _execute_inc(self, state: ExecutionState, operands: dict) -> None:
         """执行INC指令。
@@ -237,6 +301,101 @@ class InstructionExecutor:
         dest_reg = operands['dest_reg']
         reg_val = state.get_register(dest_reg)
         state.set_register(dest_reg, reg_val + BitVecVal(1, 64))
+
+    def _execute_movzx(self, state: ExecutionState, operands: dict) -> None:
+        """执行MOVZX指令（简化版，仅保留零扩展效果）。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"MOVZX instruction must have register destination: {operands}")
+
+        if operands['is_memory']:
+            src_val = state.load_memory(operands['offset']) & BitVecVal(0xFF, 64)
+        elif operands['src_reg']:
+            src_val = state.get_register(operands['src_reg']) & BitVecVal(0xFF, 64)
+        else:
+            raise ValueError(f"Unsupported MOVZX operand combination: {operands}")
+
+        state.set_register(operands['dest_reg'], src_val)
+
+    def _execute_shl(self, state: ExecutionState, operands: dict) -> None:
+        """执行SHL指令（寄存器目标）。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"SHL instruction must have register destination: {operands}")
+        dest_reg = operands['dest_reg']
+        value = state.get_register(dest_reg)
+
+        if operands['immediate'] is not None:
+            count = BitVecVal(operands['immediate'] & 0x3F, 64)
+        elif operands['src_reg']:
+            count = state.get_register(operands['src_reg']) & BitVecVal(0x3F, 64)
+        else:
+            count = BitVecVal(0, 64)
+
+        state.set_register(dest_reg, value << count)
+
+    def _execute_shr(self, state: ExecutionState, operands: dict) -> None:
+        """执行SHR指令（寄存器目标）。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"SHR instruction must have register destination: {operands}")
+        dest_reg = operands['dest_reg']
+        value = state.get_register(dest_reg)
+
+        if operands['immediate'] is not None:
+            count = BitVecVal(operands['immediate'] & 0x3F, 64)
+        elif operands['src_reg']:
+            count = state.get_register(operands['src_reg']) & BitVecVal(0x3F, 64)
+        else:
+            count = BitVecVal(0, 64)
+
+        state.set_register(dest_reg, LShR(value, count))
+
+    def _execute_not(self, state: ExecutionState, operands: dict) -> None:
+        """执行NOT指令。"""
+        if operands['is_memory'] and not operands['dest_reg']:
+            offset = operands['offset']
+            state.store_memory(offset, ~state.load_memory(offset))
+            return
+
+        if not operands['dest_reg']:
+            raise ValueError(f"NOT instruction must have destination: {operands}")
+        dest_reg = operands['dest_reg']
+        state.set_register(dest_reg, ~state.get_register(dest_reg))
+
+    def _execute_bswap(self, state: ExecutionState, operands: dict) -> None:
+        """执行BSWAP指令。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"BSWAP instruction must have register operand: {operands}")
+        dest_reg = operands['dest_reg']
+        value = state.get_register(dest_reg)
+        swapped = Concat(
+            Extract(7, 0, value),
+            Extract(15, 8, value),
+            Extract(23, 16, value),
+            Extract(31, 24, value),
+            Extract(39, 32, value),
+            Extract(47, 40, value),
+            Extract(55, 48, value),
+            Extract(63, 56, value),
+        )
+        state.set_register(dest_reg, swapped)
+
+    def _execute_div(self, state: ExecutionState, operands: dict) -> None:
+        """执行DIV指令（RDX:RAX / op）。"""
+        if operands['is_memory']:
+            divisor = state.load_memory(operands['offset'])
+        elif operands['dest_reg']:
+            divisor = state.get_register(operands['dest_reg'])
+        else:
+            raise ValueError(f"DIV instruction must have memory/register operand: {operands}")
+
+        rax = state.get_register(Register.RAX)
+        rdx = state.get_register(Register.RDX)
+        dividend = Concat(rdx, rax)
+        divisor128 = Concat(BitVecVal(0, 64), divisor)
+
+        q = UDiv(dividend, divisor128)
+        r = URem(dividend, divisor128)
+        state.set_register(Register.RAX, Extract(63, 0, q))
+        state.set_register(Register.RDX, Extract(63, 0, r))
     
     def _execute_cmp(self, state: ExecutionState, operands: dict) -> None:
         """执行CMP指令。
@@ -253,28 +412,116 @@ class InstructionExecutor:
         
         if operands['immediate'] is not None:
             # CMP reg, immediate
-            imm_val = BitVecVal(operands['immediate'], 64)
-            # 计算用于设置标志的结果
-            result = reg_val - imm_val
-            
-            # 根据比较设置标志
-            # CF（进位标志）：如果无符号减法会借位则设置
-            # 目前，我们将符号地计算它
-            reg_ext = Concat(BitVecVal(0, 1), reg_val)
-            imm_ext = Concat(BitVecVal(0, 1), imm_val)
-            diff_ext = reg_ext - imm_ext
-            cf = Extract(64, 64, diff_ext)
-            state.set_flag('CF', cf)
-            
-            # ZF（零标志）：如果结果为零则设置
-            # reg_val == imm_val返回BoolRef，转换为1位BitVec
-            zf_bool = (reg_val == imm_val)
-            # 将BoolRef转换为1位BitVec：IfThenElse(condition, 1, 0)
-            from z3 import If
-            zf = If(zf_bool, BitVecVal(1, 1), BitVecVal(0, 1))
-            state.set_flag('ZF', zf)
+            rhs_val = BitVecVal(operands['immediate'], 64)
+        elif operands['src_reg']:
+            rhs_val = state.get_register(operands['src_reg'])
+        elif operands['is_memory']:
+            rhs_val = state.load_memory(operands['offset'])
         else:
             raise ValueError(f"Unsupported CMP operand combination: {operands}")
+
+        reg_ext = Concat(BitVecVal(0, 1), reg_val)
+        rhs_ext = Concat(BitVecVal(0, 1), rhs_val)
+        diff_ext = reg_ext - rhs_ext
+        cf = Extract(64, 64, diff_ext)
+        zf = If(reg_val == rhs_val, BitVecVal(1, 1), BitVecVal(0, 1))
+        state.set_flag('CF', cf)
+        state.set_flag('ZF', zf)
+
+    def _execute_mul(self, state: ExecutionState, operands: dict) -> None:
+        """执行MUL指令（RDX:RAX = RAX * op）。"""
+        if operands['is_memory']:
+            op_val = state.load_memory(operands['offset'])
+        elif operands['dest_reg']:
+            op_val = state.get_register(operands['dest_reg'])
+        else:
+            raise ValueError(f"MUL instruction must have memory/register operand: {operands}")
+
+        rax = state.get_register(Register.RAX)
+        product = Concat(BitVecVal(0, 64), rax) * Concat(BitVecVal(0, 64), op_val)
+        state.set_register(Register.RAX, Extract(63, 0, product))
+        state.set_register(Register.RDX, Extract(127, 64, product))
+
+    def _execute_and(self, state: ExecutionState, operands: dict) -> None:
+        """执行AND指令。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"AND instruction must have register destination: {operands}")
+        dest_reg = operands['dest_reg']
+        lhs = state.get_register(dest_reg)
+        if operands['is_memory']:
+            rhs = state.load_memory(operands['offset'])
+        elif operands['src_reg']:
+            rhs = state.get_register(operands['src_reg'])
+        elif operands['immediate'] is not None:
+            rhs = BitVecVal(operands['immediate'], 64)
+        else:
+            raise ValueError(f"Unsupported AND operand combination: {operands}")
+        state.set_register(dest_reg, lhs & rhs)
+
+    def _execute_or(self, state: ExecutionState, operands: dict) -> None:
+        """执行OR指令。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"OR instruction must have register destination: {operands}")
+        dest_reg = operands['dest_reg']
+        lhs = state.get_register(dest_reg)
+        if operands['is_memory']:
+            rhs = state.load_memory(operands['offset'])
+        elif operands['src_reg']:
+            rhs = state.get_register(operands['src_reg'])
+        elif operands['immediate'] is not None:
+            rhs = BitVecVal(operands['immediate'], 64)
+        else:
+            raise ValueError(f"Unsupported OR operand combination: {operands}")
+        state.set_register(dest_reg, lhs | rhs)
+
+    def _execute_xor(self, state: ExecutionState, operands: dict) -> None:
+        """执行XOR指令。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"XOR instruction must have register destination: {operands}")
+        dest_reg = operands['dest_reg']
+        lhs = state.get_register(dest_reg)
+        if operands['is_memory']:
+            rhs = state.load_memory(operands['offset'])
+        elif operands['src_reg']:
+            rhs = state.get_register(operands['src_reg'])
+        elif operands['immediate'] is not None:
+            rhs = BitVecVal(operands['immediate'], 64)
+        else:
+            raise ValueError(f"Unsupported XOR operand combination: {operands}")
+        state.set_register(dest_reg, lhs ^ rhs)
+
+    def _execute_setcc(self, state: ExecutionState, mnemonic: str, operands: dict) -> None:
+        """执行SETcc指令（仅寄存器目标）。"""
+        if not operands['dest_reg']:
+            raise ValueError(f"SETcc instruction must have register destination: {operands}")
+
+        cf = state.get_flag('CF') == BitVecVal(1, 1)
+        zf = state.get_flag('ZF') == BitVecVal(1, 1)
+        sf = state.get_flag('SF') == BitVecVal(1, 1)
+        of = state.get_flag('OF') == BitVecVal(1, 1)
+        sf_eq_of = sf == of
+        sf_ne_of = Not(sf == of)
+
+        conds = {
+            'setb': cf,
+            'setae': Not(cf),
+            'seta': And(Not(cf), Not(zf)),
+            'setbe': Or(cf, zf),
+            'sete': zf,
+            'setne': Not(zf),
+            'setl': sf_ne_of,
+            'setle': Or(zf, sf_ne_of),
+            'setg': And(Not(zf), sf_eq_of),
+            'setge': sf_eq_of,
+            'sets': sf,
+            'setns': Not(sf),
+        }
+        if mnemonic not in conds:
+            raise ValueError(f"Unsupported SETcc instruction: {mnemonic}")
+
+        old_val = state.get_register(operands['dest_reg'])
+        low8 = If(conds[mnemonic], BitVecVal(1, 8), BitVecVal(0, 8))
+        state.set_register(operands['dest_reg'], Concat(Extract(63, 8, old_val), low8))
     
     def execute_sequence(self, state: ExecutionState, instructions: List[X86Instruction]) -> None:
         """执行指令序列。

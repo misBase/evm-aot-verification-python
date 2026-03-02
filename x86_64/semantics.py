@@ -4,7 +4,7 @@ x86-64指令语义建模。
 本模块使用Z3为x86-64指令提供语义建模。
 """
 
-from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt
+from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem, Not, And, Or
 from typing import List, Dict, Optional, Any, Tuple
 from .models import X86Block, X86Instruction, Register
 from .execution_state import ExecutionState
@@ -379,9 +379,29 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         state.x86_registers.set_flag('ZF', _bool_to_bv1(result64 == BitVecVal(0, 64)))
         state.x86_registers.set_flag('SF', Extract(63, 63, result64))
 
+    def _update_sbb_flags(lhs64, rhs64, carry_in, result64):
+        # SBB: lhs - rhs - CF，CF 表示借位
+        lhs_ext = Concat(BitVecVal(0, 1), lhs64)
+        rhs_ext = Concat(BitVecVal(0, 1), rhs64)
+        carry_ext = Concat(BitVecVal(0, 64), carry_in)
+        diff_ext = lhs_ext - rhs_ext - carry_ext
+        borrow = Extract(64, 64, diff_ext)
+
+        rhs_with_carry = rhs64 + ZeroExt(63, carry_in)
+        overflow = Extract(63, 63, (lhs64 ^ rhs_with_carry) & (lhs64 ^ result64))
+
+        state.x86_registers.set_flag('CF', borrow)
+        state.x86_registers.set_flag('OF', overflow)
+        state.x86_registers.set_flag('ZF', _bool_to_bv1(result64 == BitVecVal(0, 64)))
+        state.x86_registers.set_flag('SF', Extract(63, 63, result64))
+
     def _load_memory_by_size(addr64, size_bytes: Optional[int]):
         if size_bytes == 1:
             return ZeroExt(56, state.x86_memory.load_byte(addr64))
+        if size_bytes == 2:
+            b0 = state.x86_memory.load_byte(addr64)
+            b1 = state.x86_memory.load_byte(addr64 + BitVecVal(1, 64))
+            return ZeroExt(48, Concat(b1, b0))
         if size_bytes == 4:
             b0 = state.x86_memory.load_byte(addr64)
             b1 = state.x86_memory.load_byte(addr64 + BitVecVal(1, 64))
@@ -393,6 +413,11 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     def _store_memory_by_size(addr64, size_bytes: Optional[int], value64):
         if size_bytes == 1:
             return state.x86_memory.store_byte(addr64, Extract(7, 0, value64))
+        if size_bytes == 2:
+            mem = state.x86_memory
+            mem = mem.store_byte(addr64, Extract(7, 0, value64))
+            mem = mem.store_byte(addr64 + BitVecVal(1, 64), Extract(15, 8, value64))
+            return mem
         if size_bytes == 4:
             mem = state.x86_memory
             mem = mem.store_byte(addr64, Extract(7, 0, value64))
@@ -406,6 +431,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         value64 = state.x86_registers.get_register(reg)
         if size_bytes == 1:
             return ZeroExt(56, Extract(7, 0, value64))
+        if size_bytes == 2:
+            return ZeroExt(48, Extract(15, 0, value64))
         if size_bytes == 4:
             return ZeroExt(32, Extract(31, 0, value64))
         return value64
@@ -414,6 +441,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         old_val = state.x86_registers.get_register(reg)
         if size_bytes == 1:
             new_val = Concat(Extract(63, 8, old_val), Extract(7, 0, value64))
+        elif size_bytes == 2:
+            new_val = Concat(Extract(63, 16, old_val), Extract(15, 0, value64))
         elif size_bytes == 4:
             new_val = ZeroExt(32, Extract(31, 0, value64))
         else:
@@ -441,6 +470,97 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             signed_imm = _sign_extend_int(immediate, imm_size * 8)
             return BitVecVal(signed_imm, 64)
         return BitVecVal(immediate, 64)
+
+    def _shift_count_64() -> BitVec:
+        if operands['immediate'] is not None:
+            return BitVecVal(operands['immediate'] & 0x3F, 64)
+        if operands['src_reg']:
+            src_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+            return ZeroExt(58, Extract(5, 0, src_val))
+        return BitVecVal(0, 64)
+
+    def _set_shift_flags(lhs64, result64, count64, is_left: bool):
+        old_cf = state.x86_registers.get_flag('CF')
+        old_of = state.x86_registers.get_flag('OF')
+        count_is_zero = count64 == BitVecVal(0, 64)
+        count_is_one = count64 == BitVecVal(1, 64)
+
+        if is_left:
+            cf_candidate = Extract(0, 0, LShR(lhs64, BitVecVal(64, 64) - count64))
+            of_candidate = Extract(63, 63, result64) ^ cf_candidate
+        else:
+            cf_candidate = Extract(0, 0, LShR(lhs64, count64 - BitVecVal(1, 64)))
+            of_candidate = Extract(63, 63, lhs64)
+
+        new_cf = If(count_is_zero, old_cf, cf_candidate)
+        new_of = If(count_is_zero, old_of, If(count_is_one, of_candidate, old_of))
+        new_zf = If(count_is_zero, state.x86_registers.get_flag('ZF'),
+                    _bool_to_bv1(result64 == BitVecVal(0, 64)))
+        new_sf = If(count_is_zero, state.x86_registers.get_flag('SF'),
+                    Extract(63, 63, result64))
+
+        state.x86_registers.set_flag('CF', new_cf)
+        state.x86_registers.set_flag('OF', new_of)
+        state.x86_registers.set_flag('ZF', new_zf)
+        state.x86_registers.set_flag('SF', new_sf)
+
+    def _bswap64(value64):
+        return Concat(
+            Extract(7, 0, value64),
+            Extract(15, 8, value64),
+            Extract(23, 16, value64),
+            Extract(31, 24, value64),
+            Extract(39, 32, value64),
+            Extract(47, 40, value64),
+            Extract(55, 48, value64),
+            Extract(63, 56, value64),
+        )
+
+    def _setcc_condition(setcc_mnemonic: str):
+        cf = state.x86_registers.get_flag('CF') == BitVecVal(1, 1)
+        zf = state.x86_registers.get_flag('ZF') == BitVecVal(1, 1)
+        sf = state.x86_registers.get_flag('SF') == BitVecVal(1, 1)
+        of = state.x86_registers.get_flag('OF') == BitVecVal(1, 1)
+        pf = state.x86_registers.get_flag('PF') == BitVecVal(1, 1)
+        sf_eq_of = sf == of
+        sf_ne_of = sf != of
+
+        conditions = {
+            'seta': And(Not(cf), Not(zf)),
+            'setnbe': And(Not(cf), Not(zf)),
+            'setae': Not(cf),
+            'setnb': Not(cf),
+            'setnc': Not(cf),
+            'setb': cf,
+            'setc': cf,
+            'setbe': Or(cf, zf),
+            'setna': Or(cf, zf),
+            'sete': zf,
+            'setz': zf,
+            'setne': Not(zf),
+            'setnz': Not(zf),
+            'setg': And(Not(zf), sf_eq_of),
+            'setnle': And(Not(zf), sf_eq_of),
+            'setge': sf_eq_of,
+            'setnl': sf_eq_of,
+            'setl': sf_ne_of,
+            'setnge': sf_ne_of,
+            'setle': Or(zf, sf_ne_of),
+            'setng': Or(zf, sf_ne_of),
+            'sets': sf,
+            'setns': Not(sf),
+            'seto': of,
+            'setno': Not(of),
+            'setp': pf,
+            'setpe': pf,
+            'setnp': Not(pf),
+            'setpo': Not(pf),
+        }
+
+        cond = conditions.get(setcc_mnemonic)
+        if cond is None:
+            raise ValueError(f"Unsupported SETcc instruction: {setcc_mnemonic}")
+        return cond
     
     if mnemonic == 'mov':
         # MOV：将值从源移动到目标
@@ -487,6 +607,24 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             imm_val = _imm_to_bv64(memory_size)
             state.x86_memory = _store_memory_by_size(memory_offset, memory_size, imm_val)
         
+        return state
+
+    elif mnemonic == 'movzx':
+        # MOVZX：零扩展移动
+        if not operands['dest_reg']:
+            raise ValueError(f"MOVZX instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        dest_size = operands.get('dest_size')
+
+        if operands['is_memory']:
+            src_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+        elif operands['src_reg']:
+            src_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+        else:
+            raise ValueError(f"Unsupported MOVZX operand combination: {operands}")
+
+        _write_register_by_size(dest_reg, src_val, dest_size)
         return state
     
     elif mnemonic == 'add':
@@ -549,23 +687,30 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     
     elif mnemonic == 'adc':
         # ADC：带进位加法
-        if not operands['dest_reg'] or not operands['is_memory']:
-            raise ValueError(f"ADC instruction must have register destination and memory source: {operands}")
+        if not operands['dest_reg']:
+            raise ValueError(f"ADC instruction must have register destination: {operands}")
         
         dest_reg = operands['dest_reg']
         dest_size = operands.get('dest_size')
         reg_val = _read_register_by_size(dest_reg, dest_size)
-        memory_offset = _effective_address()
-
-        mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
         carry_in = state.x86_registers.get_flag('CF')
-        addend = mem_val + ZeroExt(63, carry_in)
+
+        if operands['is_memory']:
+            rhs_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+        elif operands['src_reg']:
+            rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+        elif operands['immediate'] is not None:
+            rhs_val = _imm_to_bv64(dest_size)
+        else:
+            raise ValueError(f"Unsupported ADC operand combination: {operands}")
+
+        addend = rhs_val + ZeroExt(63, carry_in)
         
         # 执行带进位加法
         reg_ext = Concat(BitVecVal(0, 1), reg_val)
-        mem_ext = Concat(BitVecVal(0, 1), mem_val)
+        rhs_ext = Concat(BitVecVal(0, 1), rhs_val)
         carry_ext = Concat(BitVecVal(0, 64), carry_in)
-        sum_ext = reg_ext + mem_ext + carry_ext
+        sum_ext = reg_ext + rhs_ext + carry_ext
         
         result = Extract(63, 0, sum_ext)
         carry_out = Extract(64, 64, sum_ext)
@@ -573,6 +718,30 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         _write_register_by_size(dest_reg, result, dest_size)
         _update_add_like_flags(reg_val, addend, result, carry_out)
         
+        return state
+
+    elif mnemonic == 'sbb':
+        # SBB：带借位减法
+        if not operands['dest_reg']:
+            raise ValueError(f"SBB instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        dest_size = operands.get('dest_size')
+        lhs = _read_register_by_size(dest_reg, dest_size)
+        carry_in = state.x86_registers.get_flag('CF')
+
+        if operands['is_memory']:
+            rhs = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+        elif operands['src_reg']:
+            rhs = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+        elif operands['immediate'] is not None:
+            rhs = _imm_to_bv64(dest_size)
+        else:
+            raise ValueError(f"Unsupported SBB operand combination: {operands}")
+
+        result = lhs - rhs - ZeroExt(63, carry_in)
+        _write_register_by_size(dest_reg, result, dest_size)
+        _update_sbb_flags(lhs, rhs, carry_in, result)
         return state
     
     elif mnemonic == 'sub':
@@ -584,12 +753,18 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         dest_size = operands.get('dest_size')
         reg_val = _read_register_by_size(dest_reg, dest_size)
 
-        if operands['immediate'] is not None:
-            # SUB reg, immediate
-            imm_val = _imm_to_bv64(dest_size)
-            result = reg_val - imm_val
-            _write_register_by_size(dest_reg, result, dest_size)
-            _update_sub_like_flags(reg_val, imm_val, result)
+        if operands['is_memory']:
+            rhs_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+        elif operands['src_reg']:
+            rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+        elif operands['immediate'] is not None:
+            rhs_val = _imm_to_bv64(dest_size)
+        else:
+            raise ValueError(f"Unsupported SUB operand combination: {operands}")
+
+        result = reg_val - rhs_val
+        _write_register_by_size(dest_reg, result, dest_size)
+        _update_sub_like_flags(reg_val, rhs_val, result)
 
         return state
 
@@ -616,11 +791,17 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         dest_size = operands.get('dest_size')
         reg_val = _read_register_by_size(dest_reg, dest_size)
         
-        if operands['immediate'] is not None:
-            # CMP reg, immediate
-            imm_val = _imm_to_bv64(dest_size)
-            result = reg_val - imm_val
-            _update_sub_like_flags(reg_val, imm_val, result)
+        if operands['is_memory']:
+            rhs_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+        elif operands['src_reg']:
+            rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+        elif operands['immediate'] is not None:
+            rhs_val = _imm_to_bv64(dest_size)
+        else:
+            raise ValueError(f"Unsupported CMP operand combination: {operands}")
+
+        result = reg_val - rhs_val
+        _update_sub_like_flags(reg_val, rhs_val, result)
         
         return state
 
@@ -736,46 +917,53 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         return state
 
     elif mnemonic == 'mul':
-        # MUL：无符号乘法（RAX * src -> RDX:RAX）
-        if not operands['dest_reg']:
-            raise ValueError(f"MUL instruction must have register destination: {operands}")
-
-        dest_reg = operands['dest_reg']
-        reg_val = state.x86_registers.get_register(dest_reg)
-
+        # MUL：无符号乘法（RDX:RAX = RAX * op）
         if operands['is_memory']:
-            # MUL reg, [base+offset]
-            memory_offset = _effective_address()
-            mem_val = state.x86_memory.load_64bit(memory_offset)
+            op_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+        elif operands['dest_reg']:
+            op_val = _read_register_by_size(operands['dest_reg'], operands.get('dest_size'))
+        else:
+            raise ValueError(f"MUL instruction must have memory/register operand: {operands}")
 
-            # 执行64位乘法：result = reg_val * mem_val
-            # 结果是128位：RDX:RAX（高64位在RDX，低64位在RAX）
-            result = ZeroExt(64, reg_val) * ZeroExt(64, mem_val)
+        rax_val = state.x86_registers.get_register(Register.RAX)
+        product = ZeroExt(64, rax_val) * ZeroExt(64, op_val)
+        result_low = Extract(63, 0, product)
+        result_high = Extract(127, 64, product)
 
-            # 存储低64位到目标寄存器
-            result_low = Extract(63, 0, result)
-            state.x86_registers.set_register(dest_reg, result_low)
+        state.x86_registers.set_register(Register.RAX, result_low)
+        state.x86_registers.set_register(Register.RDX, result_high)
 
-            # 高64位存储到RDX（如果需要）
-            result_high = Extract(127, 64, result)
-            state.x86_registers.set_register(Register.RDX, result_high)
+        # 对 MUL，CF/OF 在高64位非零时置1，否则置0
+        high_is_non_zero = result_high != BitVecVal(0, 64)
+        cf_of = _bool_to_bv1(high_is_non_zero)
+        state.x86_registers.set_flag('CF', cf_of)
+        state.x86_registers.set_flag('OF', cf_of)
+        return state
 
-        elif operands['src_reg']:
-            # MUL reg, reg
-            src_reg = operands['src_reg']
-            src_val = state.x86_registers.get_register(src_reg)
+    elif mnemonic == 'div':
+        # DIV：无符号除法（RDX:RAX / op -> quotient in RAX, remainder in RDX）
+        if operands['is_memory']:
+            divisor = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+        elif operands['dest_reg']:
+            divisor = _read_register_by_size(operands['dest_reg'], operands.get('dest_size'))
+        else:
+            raise ValueError(f"DIV instruction must have memory/register operand: {operands}")
 
-            # 执行乘法
-            result = ZeroExt(64, reg_val) * ZeroExt(64, src_val)
+        old_rax = state.x86_registers.get_register(Register.RAX)
+        old_rdx = state.x86_registers.get_register(Register.RDX)
+        dividend = Concat(old_rdx, old_rax)
+        divisor128 = ZeroExt(64, divisor)
+        q128 = UDiv(dividend, divisor128)
+        r128 = URem(dividend, divisor128)
 
-            # 存储低64位
-            result_low = Extract(63, 0, result)
-            state.x86_registers.set_register(dest_reg, result_low)
+        quotient_fits = Extract(127, 64, q128) == BitVecVal(0, 64)
+        divisor_non_zero = divisor != BitVecVal(0, 64)
+        can_divide = divisor_non_zero & quotient_fits
 
-            # 高64位存储到RDX
-            result_high = Extract(127, 64, result)
-            state.x86_registers.set_register(Register.RDX, result_high)
-
+        new_rax = If(can_divide, Extract(63, 0, q128), old_rax)
+        new_rdx = If(can_divide, Extract(63, 0, r128), old_rdx)
+        state.x86_registers.set_register(Register.RAX, new_rax)
+        state.x86_registers.set_register(Register.RDX, new_rdx)
         return state
 
     elif mnemonic == 'and':
@@ -799,6 +987,10 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             src_reg = operands['src_reg']
             src_val = _read_register_by_size(src_reg, operands.get('src_size'))
             result = reg_val & src_val
+            _write_register_by_size(dest_reg, result, dest_size)
+
+        elif operands['immediate'] is not None:
+            result = reg_val & _imm_to_bv64(dest_size)
             _write_register_by_size(dest_reg, result, dest_size)
 
         _update_logic_flags(_read_register_by_size(dest_reg, dest_size))
@@ -827,6 +1019,10 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             result = reg_val | src_val
             _write_register_by_size(dest_reg, result, dest_size)
 
+        elif operands['immediate'] is not None:
+            result = reg_val | _imm_to_bv64(dest_size)
+            _write_register_by_size(dest_reg, result, dest_size)
+
         _update_logic_flags(_read_register_by_size(dest_reg, dest_size))
         return state
 
@@ -853,8 +1049,104 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             result = reg_val ^ src_val
             _write_register_by_size(dest_reg, result, dest_size)
 
+        elif operands['immediate'] is not None:
+            result = reg_val ^ _imm_to_bv64(dest_size)
+            _write_register_by_size(dest_reg, result, dest_size)
+
         _update_logic_flags(_read_register_by_size(dest_reg, dest_size))
         return state
+
+    elif mnemonic == 'shl':
+        # SHL：逻辑左移
+        count64 = _shift_count_64()
+        if operands['is_memory'] and not operands['dest_reg']:
+            addr = _effective_address()
+            mem_size = operands.get('memory_size')
+            lhs = _load_memory_by_size(addr, mem_size)
+            result = lhs << count64
+            state.x86_memory = _store_memory_by_size(addr, mem_size, result)
+            _set_shift_flags(lhs, result, count64, is_left=True)
+            return state
+
+        if not operands['dest_reg']:
+            raise ValueError(f"SHL instruction must have destination operand: {operands}")
+
+        dest_reg = operands['dest_reg']
+        dest_size = operands.get('dest_size')
+        lhs = _read_register_by_size(dest_reg, dest_size)
+        result = lhs << count64
+        _write_register_by_size(dest_reg, result, dest_size)
+        _set_shift_flags(lhs, result, count64, is_left=True)
+        return state
+
+    elif mnemonic == 'shr':
+        # SHR：逻辑右移
+        count64 = _shift_count_64()
+        if operands['is_memory'] and not operands['dest_reg']:
+            addr = _effective_address()
+            mem_size = operands.get('memory_size')
+            lhs = _load_memory_by_size(addr, mem_size)
+            result = LShR(lhs, count64)
+            state.x86_memory = _store_memory_by_size(addr, mem_size, result)
+            _set_shift_flags(lhs, result, count64, is_left=False)
+            return state
+
+        if not operands['dest_reg']:
+            raise ValueError(f"SHR instruction must have destination operand: {operands}")
+
+        dest_reg = operands['dest_reg']
+        dest_size = operands.get('dest_size')
+        lhs = _read_register_by_size(dest_reg, dest_size)
+        result = LShR(lhs, count64)
+        _write_register_by_size(dest_reg, result, dest_size)
+        _set_shift_flags(lhs, result, count64, is_left=False)
+        return state
+
+    elif mnemonic == 'not':
+        # NOT：按位取反，不影响标志位
+        if operands['is_memory'] and not operands['dest_reg']:
+            addr = _effective_address()
+            mem_size = operands.get('memory_size')
+            value = _load_memory_by_size(addr, mem_size)
+            state.x86_memory = _store_memory_by_size(addr, mem_size, ~value)
+            return state
+
+        if not operands['dest_reg']:
+            raise ValueError(f"NOT instruction must have destination operand: {operands}")
+
+        dest_reg = operands['dest_reg']
+        dest_size = operands.get('dest_size')
+        value = _read_register_by_size(dest_reg, dest_size)
+        _write_register_by_size(dest_reg, ~value, dest_size)
+        return state
+
+    elif mnemonic == 'bswap':
+        # BSWAP：按字节反转寄存器
+        if not operands['dest_reg']:
+            raise ValueError(f"BSWAP instruction must have register operand: {operands}")
+
+        dest_reg = operands['dest_reg']
+        value = state.x86_registers.get_register(dest_reg)
+        state.x86_registers.set_register(dest_reg, _bswap64(value))
+        return state
+
+    elif mnemonic.startswith('set'):
+        # SETcc：根据标志位写入 0/1 到 8-bit 目的操作数，不修改标志位
+        cond = _setcc_condition(mnemonic)
+        value64 = ZeroExt(63, _bool_to_bv1(cond))
+
+        if operands['is_memory'] and not operands['dest_reg']:
+            addr = _effective_address()
+            mem_size = operands.get('memory_size') or 1
+            state.x86_memory = _store_memory_by_size(addr, mem_size, value64)
+            return state
+
+        if operands['dest_reg']:
+            dest_size = operands.get('dest_size') or 1
+            _write_register_by_size(operands['dest_reg'], value64, dest_size)
+            return state
+
+        raise ValueError(f"SETcc instruction must have register/memory destination: {operands}")
 
     elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'jmp']:
         # 控制流指令 - 原样返回状态
