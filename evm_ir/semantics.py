@@ -30,6 +30,12 @@ class EVMOperationSemantics:
         else:
             raise ValueError(f"Unsupported type for operand: {type(a)}")
 
+    def _to_bv256(self, a: Any) -> BitVecRef:
+        """将输入转换为256位BitVec。"""
+        if isinstance(a, BitVecRef) and a.size() == 256:
+            return a
+        return self._to_uint256(a).to_bv256()
+
     def add_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM ADD操作的逻辑公式。"""
         a_uint = self._to_uint256(a)
@@ -65,6 +71,25 @@ class EVMOperationSemantics:
         b_bv = b if isinstance(b, BitVecRef) else self._to_uint256(b).to_bv256()
         return If(b_bv == 0, BitVecVal(0, 256), URem(a_bv, b_bv))
 
+    def sdiv_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM SDIV操作的逻辑公式 (a sdiv b)。"""
+        a_bv = self._to_bv256(a)
+        b_bv = self._to_bv256(b)
+        # BitVec 的 / 运算符是有符号除法（bvsdiv）
+        return If(b_bv == BitVecVal(0, 256), BitVecVal(0, 256), a_bv / b_bv)
+
+    def smod_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM SMOD操作的逻辑公式。"""
+        a_bv = self._to_bv256(a)
+        b_bv = self._to_bv256(b)
+        zero = BitVecVal(0, 256)
+        # SMOD: sign(a) * (abs(a) mod abs(b))
+        a_abs = If(a_bv < zero, -a_bv, a_bv)
+        b_abs = If(b_bv < zero, -b_bv, b_bv)
+        rem_abs = URem(a_abs, b_abs)
+        signed_rem = If(a_bv < zero, -rem_abs, rem_abs)
+        return If(b_bv == zero, zero, signed_rem)
+
     def lt_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM LT操作的逻辑公式 (a < b)。"""
         a_uint = self._to_uint256(a)
@@ -77,6 +102,18 @@ class EVMOperationSemantics:
         a_uint = self._to_uint256(a)
         b_uint = self._to_uint256(b)
         return If(a_uint.gt_semantics(b_uint), BitVecVal(1, 256), BitVecVal(0, 256))
+
+    def slt_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM SLT操作的逻辑公式 (a < b, signed)。"""
+        a_bv = self._to_bv256(a)
+        b_bv = self._to_bv256(b)
+        return If(a_bv < b_bv, BitVecVal(1, 256), BitVecVal(0, 256))
+
+    def sgt_semantics(self, a: BitVec, b: BitVec) -> BitVec:
+        """构建EVM SGT操作的逻辑公式 (a > b, signed)。"""
+        a_bv = self._to_bv256(a)
+        b_bv = self._to_bv256(b)
+        return If(a_bv > b_bv, BitVecVal(1, 256), BitVecVal(0, 256))
 
     def eq_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM EQ操作的逻辑公式 (a == b)。"""
@@ -117,6 +154,105 @@ class EVMOperationSemantics:
         exp_func = Function('evm_exp', BitVecSort(256), BitVecSort(256), BitVecSort(256))
         return exp_func(base, exponent)
 
+    def signextend_semantics(self, index: BitVec, value: BitVec) -> BitVec:
+        """构建EVM SIGNEXTEND操作的逻辑公式。"""
+        index_bv = self._to_bv256(index)
+        value_bv = self._to_bv256(value)
+        # index >= 32 时，返回原值
+        out_of_range = UGE(index_bv, BitVecVal(32, 256))
+        result = value_bv
+
+        # 有限展开 0..31 字节，避免动态 Extract
+        for i in range(31, -1, -1):
+            bit_index = i * 8 + 7
+            low_mask = BitVecVal((1 << (bit_index + 1)) - 1, 256)
+            sign_bit = Extract(bit_index, bit_index, value_bv)
+            extended = If(
+                sign_bit == BitVecVal(1, 1),
+                value_bv | (~low_mask),
+                value_bv & low_mask
+            )
+            result = If(index_bv == BitVecVal(i, 256), extended, result)
+
+        return If(out_of_range, value_bv, result)
+
+    def byte_semantics(self, index: BitVec, value: BitVec) -> BitVec:
+        """构建EVM BYTE操作的逻辑公式。"""
+        index_bv = self._to_bv256(index)
+        value_bv = self._to_bv256(value)
+        zero_256 = BitVecVal(0, 256)
+        result = zero_256
+
+        # index=0 取最高字节（bits[255:248]），index=31 取最低字节
+        for i in range(31, -1, -1):
+            byte_i = ZeroExt(248, Extract(255 - 8 * i, 248 - 8 * i, value_bv))
+            result = If(index_bv == BitVecVal(i, 256), byte_i, result)
+
+        return If(UGE(index_bv, BitVecVal(32, 256)), zero_256, result)
+
+    def addmod_semantics(self, a: BitVec, b: BitVec, mod: BitVec) -> BitVec:
+        """构建EVM ADDMOD操作的逻辑公式。"""
+        a_bv = self._to_bv256(a)
+        b_bv = self._to_bv256(b)
+        mod_bv = self._to_bv256(mod)
+        zero_256 = BitVecVal(0, 256)
+
+        # 在扩展位宽下计算，避免 256 位加法先溢出
+        a_ext = ZeroExt(1, a_bv)      # 257-bit
+        b_ext = ZeroExt(1, b_bv)      # 257-bit
+        mod_ext = ZeroExt(1, mod_bv)  # 257-bit
+        res_ext = URem(a_ext + b_ext, mod_ext)
+
+        return If(mod_bv == zero_256, zero_256, Extract(255, 0, res_ext))
+
+    def mulmod_semantics(self, a: BitVec, b: BitVec, mod: BitVec) -> BitVec:
+        """构建EVM MULMOD操作的逻辑公式。"""
+        a_bv = self._to_bv256(a)
+        b_bv = self._to_bv256(b)
+        mod_bv = self._to_bv256(mod)
+        zero_256 = BitVecVal(0, 256)
+
+        # 在扩展位宽下计算，避免 256 位乘法先溢出
+        a_ext = ZeroExt(256, a_bv)      # 512-bit
+        b_ext = ZeroExt(256, b_bv)      # 512-bit
+        mod_ext = ZeroExt(256, mod_bv)  # 512-bit
+        res_ext = URem(a_ext * b_ext, mod_ext)
+
+        return If(mod_bv == zero_256, zero_256, Extract(255, 0, res_ext))
+
+    def shl_semantics(self, value: BitVec, shift: BitVec) -> BitVec:
+        """构建EVM SHL操作的逻辑公式。"""
+        value_bv = self._to_bv256(value)
+        shift_bv = self._to_bv256(shift)
+        return If(
+            UGE(shift_bv, BitVecVal(256, 256)),
+            BitVecVal(0, 256),
+            value_bv << shift_bv
+        )
+
+    def shr_semantics(self, value: BitVec, shift: BitVec) -> BitVec:
+        """构建EVM SHR操作的逻辑公式。"""
+        value_bv = self._to_bv256(value)
+        shift_bv = self._to_bv256(shift)
+        return If(
+            UGE(shift_bv, BitVecVal(256, 256)),
+            BitVecVal(0, 256),
+            LShR(value_bv, shift_bv)
+        )
+
+    def sar_semantics(self, value: BitVec, shift: BitVec) -> BitVec:
+        """构建EVM SAR操作的逻辑公式。"""
+        value_bv = self._to_bv256(value)
+        shift_bv = self._to_bv256(shift)
+        zero_256 = BitVecVal(0, 256)
+        all_ones = BitVecVal((1 << 256) - 1, 256)
+        sign_is_negative = Extract(255, 255, value_bv) == BitVecVal(1, 1)
+        return If(
+            UGE(shift_bv, BitVecVal(256, 256)),
+            If(sign_is_negative, all_ones, zero_256),
+            value_bv >> shift_bv
+        )
+
     def push_semantics(self, immediate: int, param: int = 1) -> BitVec:
         """构建EVM PUSH操作的逻辑公式。
         
@@ -147,6 +283,61 @@ class EVMOperationSemantics:
             if len(inputs) < 2:
                 raise ValueError("ADD requires 2 inputs")
             return self.add_semantics(inputs[0], inputs[1])
+
+        elif kind == "SDIV":
+            if len(inputs) < 2:
+                raise ValueError("SDIV requires 2 inputs")
+            return self.sdiv_semantics(inputs[0], inputs[1])
+
+        elif kind == "SMOD":
+            if len(inputs) < 2:
+                raise ValueError("SMOD requires 2 inputs")
+            return self.smod_semantics(inputs[0], inputs[1])
+
+        elif kind == "SLT":
+            if len(inputs) < 2:
+                raise ValueError("SLT requires 2 inputs")
+            return self.slt_semantics(inputs[0], inputs[1])
+
+        elif kind == "SGT":
+            if len(inputs) < 2:
+                raise ValueError("SGT requires 2 inputs")
+            return self.sgt_semantics(inputs[0], inputs[1])
+
+        elif kind == "SIGNEXTEND":
+            if len(inputs) < 2:
+                raise ValueError("SIGNEXTEND requires 2 inputs")
+            return self.signextend_semantics(inputs[0], inputs[1])
+
+        elif kind == "BYTE":
+            if len(inputs) < 2:
+                raise ValueError("BYTE requires 2 inputs")
+            return self.byte_semantics(inputs[0], inputs[1])
+
+        elif kind == "ADDMOD":
+            if len(inputs) < 3:
+                raise ValueError("ADDMOD requires 3 inputs")
+            return self.addmod_semantics(inputs[0], inputs[1], inputs[2])
+
+        elif kind == "MULMOD":
+            if len(inputs) < 3:
+                raise ValueError("MULMOD requires 3 inputs")
+            return self.mulmod_semantics(inputs[0], inputs[1], inputs[2])
+
+        elif kind == "SHL":
+            if len(inputs) < 2:
+                raise ValueError("SHL requires 2 inputs")
+            return self.shl_semantics(inputs[0], inputs[1])
+
+        elif kind == "SHR":
+            if len(inputs) < 2:
+                raise ValueError("SHR requires 2 inputs")
+            return self.shr_semantics(inputs[0], inputs[1])
+
+        elif kind == "SAR":
+            if len(inputs) < 2:
+                raise ValueError("SAR requires 2 inputs")
+            return self.sar_semantics(inputs[0], inputs[1])
         
         elif kind.startswith("PUSH"):
             if op.immediate is None:
@@ -216,10 +407,24 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
+    elif kind == "SDIV":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.sdiv_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
     elif kind == "MOD":
         b, stack_after_pop1 = state.evm_stack.pop()
         a, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.mod_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "SMOD":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.smod_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
@@ -241,6 +446,20 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         b, stack_after_pop1 = state.evm_stack.pop()
         a, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.gt_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "SLT":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.slt_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "SGT":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.sgt_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
@@ -284,6 +503,57 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         state.evm_stack = stack_after_pop.push(result)
         return state
 
+    elif kind == "SIGNEXTEND":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.signextend_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "BYTE":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.byte_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "ADDMOD":
+        c, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop3 = stack_after_pop2.pop()
+        result = op_semantics.addmod_semantics(a, b, c)
+        state.evm_stack = stack_after_pop3.push(result)
+        return state
+
+    elif kind == "MULMOD":
+        c, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop3 = stack_after_pop2.pop()
+        result = op_semantics.mulmod_semantics(a, b, c)
+        state.evm_stack = stack_after_pop3.push(result)
+        return state
+
+    elif kind == "SHL":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.shl_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "SHR":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.shr_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
+    elif kind == "SAR":
+        b, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.sar_semantics(a, b)
+        state.evm_stack = stack_after_pop2.push(result)
+        return state
+
     elif kind == "POP":
         _, stack_after_pop = state.evm_stack.pop()
         state.evm_stack = stack_after_pop
@@ -324,6 +594,16 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         value, stack_after_pop1 = state.evm_stack.pop()
         offset_bv, stack_after_pop2 = stack_after_pop1.pop()
         new_memory_state = state.evm_memory.store_256bit(offset_bv, value)
+        state.evm_stack = stack_after_pop2
+        state.evm_memory = new_memory_state
+        return state
+
+    elif kind == "MSTORE8":
+        # MSTORE8：先弹出偏移量，再弹出值；仅写入低8位
+        offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        value_bv, stack_after_pop2 = stack_after_pop1.pop()
+        byte_val = Extract(7, 0, value_bv)
+        new_memory_state = state.evm_memory.set_byte(offset_bv, byte_val)
         state.evm_stack = stack_after_pop2
         state.evm_memory = new_memory_state
         return state
@@ -599,4 +879,3 @@ def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, 
     }
     
     return merged_state, result
-
