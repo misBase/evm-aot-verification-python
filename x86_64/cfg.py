@@ -14,7 +14,7 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
 
     基本块边界：
     - 开始：程序入口、跳转目标、ret后的指令
-    - 结束：jmp、条件跳转（jb/jae）、ret
+    - 结束：jmp、条件跳转（如jb/jae/ja/jbe）、ret
 
     Args:
         instructions: x86-64指令列表
@@ -32,7 +32,7 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
     for i, insn in enumerate(instructions):
         mnemonic = insn.mnemonic.lower()
 
-        if mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+        if mnemonic in ['jmp', 'jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
             # 跳转指令：提取目标
             operands = parse_operands(insn)
             target = operands.get('jump_target')

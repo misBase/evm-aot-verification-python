@@ -729,7 +729,8 @@ class SMTState:
         # Lazy imports to avoid circular dependencies
         from common.uint256 import Uint256
         from verification.memory_mapping import StackMemoryMapper
-        from z3 import IntVal
+        from z3 import IntVal, BitVecVal
+        from x86_64.models import Register
 
         # 验证输入数量
         if num_inputs < 0:
@@ -739,6 +740,22 @@ class SMTState:
 
         # 创建基础状态
         initial_state = SMTState()
+
+        # 与AOT约定对齐：
+        # R13: callEngine基址，R14: stack基址，R15: memory基址
+        # 在验证环境中统一设为0，便于与相对偏移建模拼接。
+        zero_64 = BitVecVal(0, 64)
+        initial_state.x86_registers.set_register(Register.R13, zero_64)
+        initial_state.x86_registers.set_register(Register.R14, zero_64)
+        initial_state.x86_registers.set_register(Register.R15, zero_64)
+
+        # 初始化callEngine中会被预热代码读取的关键字段：
+        # [R13+16]  = memoryElement0Address
+        # [R13+48]  = stackBasePointerInBytes
+        # [R13+56]  = stackElement0Address
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(16, zero_64)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(48, zero_64)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(56, zero_64)
 
         # 使用SP = 0初始化EVM栈
         initial_state.evm_stack = EVMStackState(initial_depth=0, sp=IntVal(0))
@@ -903,4 +920,3 @@ class EVMGasState:
         """
         new_state = EVMGasState(initial_gas=self.Gas)
         return new_state
-

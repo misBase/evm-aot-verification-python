@@ -29,6 +29,30 @@ REGISTER_MAP = {
     capstone.x86.X86_REG_R15: Register.R15,
 }
 
+# 常见别名寄存器映射到对应64位寄存器（便于统一建模）
+_REGISTER_ALIASES = {
+    # 64-bit GPR aliases
+    "X86_REG_EAX": Register.RAX, "X86_REG_AX": Register.RAX, "X86_REG_AL": Register.RAX,
+    "X86_REG_ECX": Register.RCX, "X86_REG_CX": Register.RCX, "X86_REG_CL": Register.RCX,
+    "X86_REG_EDX": Register.RDX, "X86_REG_DX": Register.RDX, "X86_REG_DL": Register.RDX,
+    "X86_REG_EBX": Register.RBX, "X86_REG_BX": Register.RBX, "X86_REG_BL": Register.RBX,
+    "X86_REG_ESI": Register.RSI, "X86_REG_SI": Register.RSI, "X86_REG_SIL": Register.RSI,
+    "X86_REG_EDI": Register.RDI, "X86_REG_DI": Register.RDI, "X86_REG_DIL": Register.RDI,
+    "X86_REG_R8D": Register.R8, "X86_REG_R8W": Register.R8, "X86_REG_R8B": Register.R8,
+    "X86_REG_R9D": Register.R9, "X86_REG_R9W": Register.R9, "X86_REG_R9B": Register.R9,
+    "X86_REG_R10D": Register.R10, "X86_REG_R10W": Register.R10, "X86_REG_R10B": Register.R10,
+    "X86_REG_R11D": Register.R11, "X86_REG_R11W": Register.R11, "X86_REG_R11B": Register.R11,
+    "X86_REG_R12D": Register.R12, "X86_REG_R12W": Register.R12, "X86_REG_R12B": Register.R12,
+    "X86_REG_R13D": Register.R13, "X86_REG_R13W": Register.R13, "X86_REG_R13B": Register.R13,
+    "X86_REG_R14D": Register.R14, "X86_REG_R14W": Register.R14, "X86_REG_R14B": Register.R14,
+    "X86_REG_R15D": Register.R15, "X86_REG_R15W": Register.R15, "X86_REG_R15B": Register.R15,
+}
+
+for alias_name, reg_enum in _REGISTER_ALIASES.items():
+    alias_id = getattr(capstone.x86, alias_name, None)
+    if alias_id is not None:
+        REGISTER_MAP[alias_id] = reg_enum
+
 
 def disassemble_hex(hex_str: str, base_addr: int = 0) -> List[X86Instruction]:
     """将十六进制编码的机器码反汇编为X86Instruction对象。
@@ -103,6 +127,7 @@ def parse_operands(instruction: X86Instruction) -> dict:
         - 'offset': int（如果是带偏移量的内存操作数）
         - 'is_memory': bool（如果操作数是内存访问）
         - 'immediate': int（如果操作数是立即值）
+        - 'immediate_size': int（立即数操作数宽度，字节）
         - 'jump_target': int（如果操作数是跳转目标地址）
         - 'is_indirect': bool（如果是间接跳转，即跳转目标是寄存器或内存）
 
@@ -114,12 +139,16 @@ def parse_operands(instruction: X86Instruction) -> dict:
     result = {
         'dest_reg': None,
         'src_reg': None,
+        'dest_size': None,
+        'src_size': None,
         'base_reg': None,
         'index_reg': None,
         'scale': 1,
         'offset': 0,
+        'memory_size': None,
         'is_memory': False,
         'immediate': None,
+        'immediate_size': None,
         'jump_target': None,
         'is_indirect': False
     }
@@ -139,11 +168,13 @@ def parse_operands(instruction: X86Instruction) -> dict:
             # 第一个操作数通常是目标
             if i == 0:
                 result['dest_reg'] = reg_enum
+                result['dest_size'] = op.size
             else:
                 result['src_reg'] = reg_enum
+                result['src_size'] = op.size
 
             # 检查是否是间接跳转（跳转指令的第一个操作数是寄存器）
-            if (i == 0 and instruction.mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']):
+            if (i == 0 and instruction.mnemonic in ['jmp', 'jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']):
                 result['is_indirect'] = True
 
         elif op.type == capstone.x86.X86_OP_MEM:
@@ -164,17 +195,25 @@ def parse_operands(instruction: X86Instruction) -> dict:
             # 偏移量
             result['offset'] = op.mem.disp
 
+            # 内存操作数宽度（字节）
+            result['memory_size'] = op.size
+
+            if i == 0:
+                result['dest_size'] = op.size
+            else:
+                result['src_size'] = op.size
+
             # 检查是否是间接跳转（跳转指令的第一个操作数是内存）
-            if (i == 0 and instruction.mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']):
+            if (i == 0 and instruction.mnemonic in ['jmp', 'jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']):
                 result['is_indirect'] = True
 
         elif op.type == capstone.x86.X86_OP_IMM:
             # 立即数
             result['immediate'] = op.imm
+            result['immediate_size'] = op.size
 
             # 对于跳转指令，Capstone的op.imm已经包含了绝对跳转目标地址
-            if instruction.mnemonic in ['jmp', 'jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']:
+            if instruction.mnemonic in ['jmp', 'jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'call']:
                 result['jump_target'] = op.imm
 
     return result
-

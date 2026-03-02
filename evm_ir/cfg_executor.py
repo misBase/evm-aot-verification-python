@@ -574,7 +574,7 @@ class SymbolicExecutor:
 
         return [new_state]
 
-    def _get_last_operation(self, global_state: GlobalState) -> Optional:
+    def _get_last_operation(self, global_state: GlobalState) -> Optional['EvmOperator']:
         """获取块中的最后一个操作。
 
         Args:

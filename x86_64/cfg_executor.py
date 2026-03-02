@@ -82,7 +82,7 @@ class X86SymbolicExecutor:
                 self.cfg.add_edge(from_addr, to_addr, X86EdgeType.UNCONDITIONAL,
                                 source_instruction=insn)
 
-        elif mnemonic in ['jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+        elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
             # 条件跳转：添加两条边（跳转和 fallthrough）
             for i, state in enumerate(new_states):
                 if not state.node:
@@ -209,7 +209,7 @@ class X86SymbolicExecutor:
 
         if mnemonic == 'jmp':
             return self._handle_jmp(global_state, new_mstate, block, last_insn)
-        elif mnemonic in ['jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+        elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
             return self._handle_jcc(global_state, new_mstate, block, last_insn)
         elif mnemonic == 'ret':
             return []  # 终止状态
@@ -277,6 +277,7 @@ class X86SymbolicExecutor:
         支持的条件跳转指令：
         - JE/JNE: 等于/不等于
         - JB/JAE: 无符号小于/大于等于
+        - JA/JBE: 无符号大于/小于等于
         - JL/JGE: 有符号小于/大于等于
         - JLE/JG: 有符号小于等于/大于
 
@@ -394,6 +395,8 @@ class X86SymbolicExecutor:
         conditions = {
             'jb': cf_true,           # CF == 1 (无符号小于)
             'jae': cf_false,         # CF == 0 (无符号大于等于)
+            'ja': And(cf_false, zf_false),   # CF == 0 and ZF == 0 (无符号大于)
+            'jbe': Or(cf_true, zf_true),     # CF == 1 or ZF == 1 (无符号小于等于)
             'je': zf_true,           # ZF == 1 (等于)
             'jne': zf_false,         # ZF == 0 (不等于)
             'jl': sf_ne_of,          # SF != OF (有符号小于)
@@ -486,7 +489,18 @@ class X86SymbolicExecutor:
             return False
 
         last_insn = node.block.instructions[-1]
-        return last_insn.mnemonic.lower() == 'ret'
+        mnemonic = last_insn.mnemonic.lower()
+        if mnemonic == 'ret':
+            return True
+
+        # 非显式跳转/返回指令：若当前块已是最后一个块，则自然终止
+        if mnemonic not in ['jmp', 'jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+            try:
+                return self.blocks.index(node.block) == len(self.blocks) - 1
+            except ValueError:
+                return False
+
+        return False
 
     def _detect_and_handle_loops(self, global_state: X86GlobalState) -> None:
         """检测当前状态是否形成循环，并根据类型分类处理。

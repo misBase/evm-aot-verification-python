@@ -6,7 +6,7 @@ x86-64指令执行器。
 
 from typing import List
 from z3 import BitVec, BitVecVal, Concat, Extract
-from .models import X86Instruction, Register
+from .models import X86Instruction
 from .execution_state import ExecutionState
 from .disassembler import parse_operands
 
@@ -38,9 +38,11 @@ class InstructionExecutor:
             self._execute_adc(state, operands)
         elif mnemonic == 'sub':
             self._execute_sub(state, operands)
+        elif mnemonic == 'inc':
+            self._execute_inc(state, operands)
         elif mnemonic == 'cmp':
             self._execute_cmp(state, operands)
-        elif mnemonic in ['jb', 'jae', 'jmp']:
+        elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'jmp']:
             # 条件/无条件跳转 - 目前，我们继续执行
             # 在完整实现中，我们将跟踪控制流
             # 为了验证目的，我们假设采用成功路径
@@ -64,12 +66,8 @@ class InstructionExecutor:
         """
         if operands['is_memory'] and operands['dest_reg']:
             # MOV reg, [base+offset]
-            base_reg = operands['base_reg']
             offset = operands['offset']
             dest_reg = operands['dest_reg']
-            
-            if base_reg not in [Register.R14, Register.R13]:
-                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
             
             # 从内存加载
             mem_val = state.load_memory(offset)
@@ -77,12 +75,8 @@ class InstructionExecutor:
             
         elif operands['is_memory'] and operands['src_reg']:
             # MOV [base+offset], reg
-            base_reg = operands['base_reg']
             offset = operands['offset']
             src_reg = operands['src_reg']
-            
-            if base_reg not in [Register.R14, Register.R13]:
-                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
             
             # 存储到内存
             reg_val = state.get_register(src_reg)
@@ -90,12 +84,8 @@ class InstructionExecutor:
             
         elif operands['is_memory'] and operands['immediate'] is not None:
             # MOV [base+offset], immediate（例如，MOV BYTE PTR [r13+0xe0], 0xc）
-            base_reg = operands['base_reg']
             offset = operands['offset']
             immediate = operands['immediate']
-            
-            if base_reg not in [Register.R14, Register.R13]:
-                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
             
             # 将立即值存储到内存（根据大小进行符号扩展或零扩展）
             # 对于字节操作，我们将存储为64位，并进行适当的扩展
@@ -136,11 +126,7 @@ class InstructionExecutor:
         
         if operands['is_memory']:
             # ADD reg, [base+offset]
-            base_reg = operands['base_reg']
             offset = operands['offset']
-            
-            if base_reg not in [Register.R14, Register.R13]:
-                raise ValueError(f"Unsupported base register for ADD: {base_reg}")
             
             # 加载内存值
             mem_val = state.load_memory(offset)
@@ -192,11 +178,7 @@ class InstructionExecutor:
             raise ValueError(f"ADC instruction must have register destination and memory source: {operands}")
         
         dest_reg = operands['dest_reg']
-        base_reg = operands['base_reg']
         offset = operands['offset']
-        
-        if base_reg != Register.R14:
-            raise ValueError(f"Unsupported base register for ADC: {base_reg}")
         
         # 获取当前寄存器值
         reg_val = state.get_register(dest_reg)
@@ -242,6 +224,19 @@ class InstructionExecutor:
             state.set_register(dest_reg, result)
         else:
             raise ValueError(f"Unsupported SUB operand combination: {operands}")
+
+    def _execute_inc(self, state: ExecutionState, operands: dict) -> None:
+        """执行INC指令。
+
+        支持：
+        - INC reg
+        """
+        if not operands['dest_reg']:
+            raise ValueError(f"INC instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        reg_val = state.get_register(dest_reg)
+        state.set_register(dest_reg, reg_val + BitVecVal(1, 64))
     
     def _execute_cmp(self, state: ExecutionState, operands: dict) -> None:
         """执行CMP指令。
@@ -290,4 +285,3 @@ class InstructionExecutor:
         """
         for instruction in instructions:
             self.execute_instruction(state, instruction)
-

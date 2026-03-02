@@ -4,7 +4,7 @@ x86-64指令语义建模。
 本模块使用Z3为x86-64指令提供语义建模。
 """
 
-from z3 import BitVec, BitVecVal, Concat, Extract, If
+from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt
 from typing import List, Dict, Optional, Any, Tuple
 from .models import X86Block, X86Instruction, Register
 from .execution_state import ExecutionState
@@ -17,14 +17,18 @@ from state.smt_state import SMTState
 EVM_NATIVE_CALL_STATUS_CODE_RETURNED = 0  # evmNativeCallStatusCodeReturned = iota
 EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = 200  # 168 + 8 + 8 + 8 + 32
 AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE = Register.R13  # 指向callEngine实例的指针
-AMD64_RESERVED_REGISTER_FOR_MEMORY = Register.R15  # 指向EVM内存的指针（memoryElement0Address）
 
 
 class X86InstructionSemantics:
     """单个x86-64指令的语义建模。"""
+
+    @staticmethod
+    def _memory_key(base_reg: Register, offset: int) -> str:
+        base_name = base_reg.value if hasattr(base_reg, 'value') else str(base_reg)
+        return f"{base_name}:{offset:+d}"
     
     def mov_reg_mem_semantics(self, dest_reg: Register, base_reg: Register, 
-                              offset: int, mem_vars: Dict[int, BitVec]) -> BitVec:
+                              offset: int, mem_vars: Dict[Any, BitVec]) -> BitVec:
         """建模MOV reg, [base+offset]指令。
         
         Args:
@@ -36,17 +40,13 @@ class X86InstructionSemantics:
         Returns:
             加载到目标寄存器的值
         """
-        if base_reg == Register.R14:
-            # 从EVM栈内存加载
-            if offset not in mem_vars:
-                # 如果不存在则创建符号变量
-                mem_vars[offset] = BitVec(f"mem_{offset:+d}", 64)
-            return mem_vars[offset]
-        else:
-            raise ValueError(f"Unsupported base register: {base_reg}")
+        key = self._memory_key(base_reg, offset)
+        if key not in mem_vars:
+            mem_vars[key] = BitVec(f"mem_{key.replace(':', '_')}", 64)
+        return mem_vars[key]
     
     def add_reg_mem_semantics(self, dest_reg: Register, base_reg: Register,
-                              offset: int, mem_vars: Dict[int, BitVec],
+                              offset: int, mem_vars: Dict[Any, BitVec],
                               carry_in: Optional[BitVec] = None) -> Tuple[BitVec, BitVec]:
         """建模ADD/ADC reg, [base+offset]指令。
         
@@ -92,7 +92,7 @@ class X86InstructionSemantics:
         return result, carry_out
     
     def mov_mem_reg_semantics(self, base_reg: Register, offset: int,
-                              src_reg: Register, mem_vars: Dict[int, BitVec]) -> None:
+                              src_reg: Register, mem_vars: Dict[Any, BitVec]) -> None:
         """建模MOV [base+offset], reg指令。
         
         Args:
@@ -101,14 +101,11 @@ class X86InstructionSemantics:
             src_reg: 源寄存器
             mem_vars: 将偏移量映射到符号内存变量的字典
         """
-        if base_reg == Register.R14:
-            # 存储到EVM栈内存
-            reg_val_key = f"reg_{src_reg.value}"
-            if reg_val_key not in mem_vars:
-                mem_vars[reg_val_key] = BitVec(f"{src_reg.value}_init", 64)
-            mem_vars[offset] = mem_vars[reg_val_key]
-        else:
-            raise ValueError(f"Unsupported base register: {base_reg}")
+        # 存储到x86内存（按 base+offset 编址）
+        reg_val_key = f"reg_{src_reg.value}"
+        if reg_val_key not in mem_vars:
+            mem_vars[reg_val_key] = BitVec(f"{src_reg.value}_init", 64)
+        mem_vars[self._memory_key(base_reg, offset)] = mem_vars[reg_val_key]
 
 
 class X86SemanticsModel:
@@ -323,91 +320,172 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     """
     mnemonic = insn.mnemonic.lower()
     operands = parse_operands(insn)
+
+    def _to_bv64(value):
+        if isinstance(value, int):
+            return BitVecVal(value, 64)
+        if value.size() == 64:
+            return value
+        raise ValueError(f"Expected 64-bit value, got {value.size()} bits")
+
+    def _bool_to_bv1(cond):
+        return If(cond, BitVecVal(1, 1), BitVecVal(0, 1))
+
+    def _effective_address() -> BitVec:
+        base_reg = operands.get('base_reg')
+        offset = _to_bv64(operands.get('offset', 0))
+        addr = offset if base_reg is None else state.x86_registers.get_register(base_reg) + offset
+
+        index_reg = operands.get('index_reg')
+        if index_reg is not None:
+            scale = operands.get('scale', 1) or 1
+            index_val = state.x86_registers.get_register(index_reg)
+            if scale != 1:
+                index_val = index_val * BitVecVal(scale, 64)
+            addr = addr + index_val
+        return addr
+
+    def _update_logic_flags(result64):
+        state.x86_registers.set_flag('CF', BitVecVal(0, 1))
+        state.x86_registers.set_flag('OF', BitVecVal(0, 1))
+        state.x86_registers.set_flag('ZF', _bool_to_bv1(result64 == BitVecVal(0, 64)))
+        state.x86_registers.set_flag('SF', Extract(63, 63, result64))
+
+    def _update_add_like_flags(lhs64, rhs64, result64, carry_out):
+        # OF = MSB((lhs XOR result) AND (rhs XOR result))
+        overflow = Extract(63, 63, (lhs64 ^ result64) & (rhs64 ^ result64))
+        state.x86_registers.set_flag('CF', carry_out)
+        state.x86_registers.set_flag('OF', overflow)
+        state.x86_registers.set_flag('ZF', _bool_to_bv1(result64 == BitVecVal(0, 64)))
+        state.x86_registers.set_flag('SF', Extract(63, 63, result64))
+
+    def _update_sub_like_flags(lhs64, rhs64, result64):
+        # CF 表示无符号借位，使用65位扩展提取
+        lhs_ext = Concat(BitVecVal(0, 1), lhs64)
+        rhs_ext = Concat(BitVecVal(0, 1), rhs64)
+        borrow = Extract(64, 64, lhs_ext - rhs_ext)
+        # OF = MSB((lhs XOR rhs) AND (lhs XOR result))
+        overflow = Extract(63, 63, (lhs64 ^ rhs64) & (lhs64 ^ result64))
+        state.x86_registers.set_flag('CF', borrow)
+        state.x86_registers.set_flag('OF', overflow)
+        state.x86_registers.set_flag('ZF', _bool_to_bv1(result64 == BitVecVal(0, 64)))
+        state.x86_registers.set_flag('SF', Extract(63, 63, result64))
+
+    def _update_inc_like_flags(lhs64, result64):
+        # INC 不修改 CF，只更新 OF/ZF/SF（AF/PF 当前未建模）
+        one64 = BitVecVal(1, 64)
+        overflow = Extract(63, 63, (lhs64 ^ result64) & (one64 ^ result64))
+        state.x86_registers.set_flag('OF', overflow)
+        state.x86_registers.set_flag('ZF', _bool_to_bv1(result64 == BitVecVal(0, 64)))
+        state.x86_registers.set_flag('SF', Extract(63, 63, result64))
+
+    def _load_memory_by_size(addr64, size_bytes: Optional[int]):
+        if size_bytes == 1:
+            return ZeroExt(56, state.x86_memory.load_byte(addr64))
+        if size_bytes == 4:
+            b0 = state.x86_memory.load_byte(addr64)
+            b1 = state.x86_memory.load_byte(addr64 + BitVecVal(1, 64))
+            b2 = state.x86_memory.load_byte(addr64 + BitVecVal(2, 64))
+            b3 = state.x86_memory.load_byte(addr64 + BitVecVal(3, 64))
+            return ZeroExt(32, Concat(b3, b2, b1, b0))
+        return state.x86_memory.load_limb(addr64)
+
+    def _store_memory_by_size(addr64, size_bytes: Optional[int], value64):
+        if size_bytes == 1:
+            return state.x86_memory.store_byte(addr64, Extract(7, 0, value64))
+        if size_bytes == 4:
+            mem = state.x86_memory
+            mem = mem.store_byte(addr64, Extract(7, 0, value64))
+            mem = mem.store_byte(addr64 + BitVecVal(1, 64), Extract(15, 8, value64))
+            mem = mem.store_byte(addr64 + BitVecVal(2, 64), Extract(23, 16, value64))
+            mem = mem.store_byte(addr64 + BitVecVal(3, 64), Extract(31, 24, value64))
+            return mem
+        return state.x86_memory.store_limb(addr64, value64)
+
+    def _read_register_by_size(reg, size_bytes: Optional[int]):
+        value64 = state.x86_registers.get_register(reg)
+        if size_bytes == 1:
+            return ZeroExt(56, Extract(7, 0, value64))
+        if size_bytes == 4:
+            return ZeroExt(32, Extract(31, 0, value64))
+        return value64
+
+    def _write_register_by_size(reg, value64, size_bytes: Optional[int]):
+        old_val = state.x86_registers.get_register(reg)
+        if size_bytes == 1:
+            new_val = Concat(Extract(63, 8, old_val), Extract(7, 0, value64))
+        elif size_bytes == 4:
+            new_val = ZeroExt(32, Extract(31, 0, value64))
+        else:
+            new_val = value64
+        state.x86_registers.set_register(reg, new_val)
+
+    def _sign_extend_int(value: int, bits: int) -> int:
+        mask = (1 << bits) - 1
+        value &= mask
+        sign_bit = 1 << (bits - 1)
+        if value & sign_bit:
+            return value - (1 << bits)
+        return value
+
+    def _imm_to_bv64(target_size_bytes: Optional[int]) -> BitVec:
+        immediate = operands['immediate']
+        imm_size = operands.get('immediate_size')
+
+        if target_size_bytes == 1:
+            return BitVecVal(immediate & 0xFF, 64)
+        if target_size_bytes == 4:
+            return ZeroExt(32, BitVecVal(immediate & 0xFFFFFFFF, 32))
+
+        if imm_size in (1, 4):
+            signed_imm = _sign_extend_int(immediate, imm_size * 8)
+            return BitVecVal(signed_imm, 64)
+        return BitVecVal(immediate, 64)
     
     if mnemonic == 'mov':
         # MOV：将值从源移动到目标
         if operands['is_memory'] and operands['dest_reg']:
             # MOV reg, [base+offset]
-            base_reg = operands['base_reg']
-            offset = operands['offset']
             dest_reg = operands['dest_reg']
-            
-            if base_reg in [Register.R14, Register.R13]:
-                # 从x86内存加载（R14 = 栈基址，R13 = callEngine指针）
-                # offset可以是int（具体）或BitVec（符号）
-                # 如果有索引寄存器，计算：base_offset + index_reg
-                memory_offset = offset
-                if 'index_reg' in operands and operands['index_reg']:
-                    # 支持[base+index]寻址模式
-                    index_reg = operands['index_reg']
-                    index_val = state.x86_registers.get_register(index_reg)
-                    # 如果需要，将具体offset转换为BitVec
-                    if isinstance(offset, int):
-                        offset_bv = BitVecVal(offset, 64)
-                    else:
-                        offset_bv = offset
-                    memory_offset = offset_bv + index_val
-                
-                mem_val = state.x86_memory.load_limb(memory_offset)
-                state.x86_registers.set_register(dest_reg, mem_val)
-            else:
-                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
+            dest_size = operands.get('dest_size')
+            memory_size = operands.get('memory_size')
+            memory_offset = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, memory_size)
+            _write_register_by_size(dest_reg, mem_val, dest_size)
         
         elif operands['is_memory'] and operands['src_reg']:
             # MOV [base+offset], reg
-            base_reg = operands['base_reg']
-            offset = operands['offset']
             src_reg = operands['src_reg']
-            
-            if base_reg in [Register.R14, Register.R13]:
-                # 存储到x86内存（R14 = 栈基址，R13 = callEngine指针）
-                # offset可以是int（具体）或BitVec（符号）
-                # 如果有索引寄存器，计算：base_offset + index_reg
-                memory_offset = offset
-                if 'index_reg' in operands and operands['index_reg']:
-                    # 支持[base+index]寻址模式
-                    index_reg = operands['index_reg']
-                    index_val = state.x86_registers.get_register(index_reg)
-                    # 如果需要，将具体offset转换为BitVec
-                    if isinstance(offset, int):
-                        offset_bv = BitVecVal(offset, 64)
-                    else:
-                        offset_bv = offset
-                    memory_offset = offset_bv + index_val
-                
-                reg_val = state.x86_registers.get_register(src_reg)
-                new_memory_state = state.x86_memory.store_limb(memory_offset, reg_val)
-                state.x86_memory = new_memory_state
-            else:
-                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
+            src_size = operands.get('src_size')
+            memory_size = operands.get('memory_size')
+            memory_offset = _effective_address()
+
+            reg_val = _read_register_by_size(src_reg, src_size)
+            new_memory_state = _store_memory_by_size(memory_offset, memory_size, reg_val)
+            state.x86_memory = new_memory_state
         
         elif operands['dest_reg'] and operands['src_reg']:
             # MOV reg1, reg2
             dest_reg = operands['dest_reg']
+            dest_size = operands.get('dest_size')
             src_reg = operands['src_reg']
-            src_val = state.x86_registers.get_register(src_reg)
-            state.x86_registers.set_register(dest_reg, src_val)
+            src_size = operands.get('src_size')
+            src_val = _read_register_by_size(src_reg, src_size)
+            _write_register_by_size(dest_reg, src_val, dest_size)
         
         elif operands['dest_reg'] and operands['immediate'] is not None:
             # MOV reg, immediate
             dest_reg = operands['dest_reg']
-            immediate = operands['immediate']
-            imm_val = BitVecVal(immediate, 64)
-            state.x86_registers.set_register(dest_reg, imm_val)
+            dest_size = operands.get('dest_size')
+            imm_val = _imm_to_bv64(dest_size)
+            _write_register_by_size(dest_reg, imm_val, dest_size)
         
         elif operands['is_memory'] and operands['immediate'] is not None:
-            # MOV [base+offset], immediate（字节操作）
-            base_reg = operands['base_reg']
-            offset = operands['offset']
-            immediate = operands['immediate']
-            
-            if base_reg in [Register.R14, Register.R13]:
-                # 将立即值存储到内存（R14 = 栈基址，R13 = callEngine指针）
-                imm_val = BitVecVal(immediate & 0xFF, 64)  # 字节操作
-                new_memory_state = state.x86_memory.store_limb(offset, imm_val)
-                state.x86_memory = new_memory_state
-            else:
-                raise ValueError(f"Unsupported base register for MOV: {base_reg}")
+            # MOV [base+offset], immediate
+            memory_size = operands.get('memory_size')
+            memory_offset = _effective_address()
+            imm_val = _imm_to_bv64(memory_size)
+            state.x86_memory = _store_memory_by_size(memory_offset, memory_size, imm_val)
         
         return state
     
@@ -417,48 +495,31 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             raise ValueError(f"ADD instruction must have register destination: {operands}")
         
         dest_reg = operands['dest_reg']
-        reg_val = state.x86_registers.get_register(dest_reg)
+        dest_size = operands.get('dest_size')
+        reg_val = _read_register_by_size(dest_reg, dest_size)
         
         if operands['is_memory']:
             # ADD reg, [base+offset]
-            base_reg = operands['base_reg']
-            offset = operands['offset']
-            
-            if base_reg in [Register.R14, Register.R13]:
-                # 与内存相加（R14 = 栈基址，R13 = callEngine指针）
-                # offset可以是int（具体）或BitVec（符号）
-                # 如果有索引寄存器，计算：base_offset + index_reg
-                memory_offset = offset
-                if 'index_reg' in operands and operands['index_reg']:
-                    index_reg = operands['index_reg']
-                    index_val = state.x86_registers.get_register(index_reg)
-                    if isinstance(offset, int):
-                        offset_bv = BitVecVal(offset, 64)
-                    else:
-                        offset_bv = offset
-                    memory_offset = offset_bv + index_val
-                
-                mem_val = state.x86_memory.load_limb(memory_offset)
-                
-                # 执行加法（64位，带进位生成）
-                reg_ext = Concat(BitVecVal(0, 1), reg_val)
-                mem_ext = Concat(BitVecVal(0, 1), mem_val)
-                sum_ext = reg_ext + mem_ext
-                
-                # 提取结果和进位
-                result = Extract(63, 0, sum_ext)
-                carry_out = Extract(64, 64, sum_ext)
-                
-                # 更新寄存器和进位标志
-                state.x86_registers.set_register(dest_reg, result)
-                state.x86_registers.set_flag('CF', carry_out)
-            else:
-                raise ValueError(f"Unsupported base register for ADD: {base_reg}")
+            memory_offset = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
+
+            # 执行加法（64位，带进位生成）
+            reg_ext = Concat(BitVecVal(0, 1), reg_val)
+            mem_ext = Concat(BitVecVal(0, 1), mem_val)
+            sum_ext = reg_ext + mem_ext
+
+            # 提取结果和进位
+            result = Extract(63, 0, sum_ext)
+            carry_out = Extract(64, 64, sum_ext)
+
+            # 更新寄存器和标志
+            _write_register_by_size(dest_reg, result, dest_size)
+            _update_add_like_flags(reg_val, mem_val, result, carry_out)
         
         elif operands['src_reg']:
             # ADD reg, reg
             src_reg = operands['src_reg']
-            src_val = state.x86_registers.get_register(src_reg)
+            src_val = _read_register_by_size(src_reg, operands.get('src_size'))
             
             # 执行加法
             reg_ext = Concat(BitVecVal(0, 1), reg_val)
@@ -468,8 +529,21 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             result = Extract(63, 0, sum_ext)
             carry_out = Extract(64, 64, sum_ext)
             
-            state.x86_registers.set_register(dest_reg, result)
-            state.x86_registers.set_flag('CF', carry_out)
+            _write_register_by_size(dest_reg, result, dest_size)
+            _update_add_like_flags(reg_val, src_val, result, carry_out)
+
+        elif operands['immediate'] is not None:
+            # ADD reg, immediate
+            imm_val = _imm_to_bv64(dest_size)
+            reg_ext = Concat(BitVecVal(0, 1), reg_val)
+            imm_ext = Concat(BitVecVal(0, 1), imm_val)
+            sum_ext = reg_ext + imm_ext
+
+            result = Extract(63, 0, sum_ext)
+            carry_out = Extract(64, 64, sum_ext)
+
+            _write_register_by_size(dest_reg, result, dest_size)
+            _update_add_like_flags(reg_val, imm_val, result, carry_out)
         
         return state
     
@@ -479,27 +553,13 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             raise ValueError(f"ADC instruction must have register destination and memory source: {operands}")
         
         dest_reg = operands['dest_reg']
-        base_reg = operands['base_reg']
-        offset = operands['offset']
-        
-        if base_reg not in [Register.R14, Register.R13]:
-            raise ValueError(f"Unsupported base register for ADC: {base_reg}")
-        
-        reg_val = state.x86_registers.get_register(dest_reg)
-        # offset可以是int（具体）或BitVec（符号）
-        # 如果有索引寄存器，计算：base_offset + index_reg
-        memory_offset = offset
-        if 'index_reg' in operands and operands['index_reg']:
-            index_reg = operands['index_reg']
-            index_val = state.x86_registers.get_register(index_reg)
-            if isinstance(offset, int):
-                offset_bv = BitVecVal(offset, 64)
-            else:
-                offset_bv = offset
-            memory_offset = offset_bv + index_val
-        
-        mem_val = state.x86_memory.load_limb(memory_offset)
+        dest_size = operands.get('dest_size')
+        reg_val = _read_register_by_size(dest_reg, dest_size)
+        memory_offset = _effective_address()
+
+        mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
         carry_in = state.x86_registers.get_flag('CF')
+        addend = mem_val + ZeroExt(63, carry_in)
         
         # 执行带进位加法
         reg_ext = Concat(BitVecVal(0, 1), reg_val)
@@ -510,8 +570,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         result = Extract(63, 0, sum_ext)
         carry_out = Extract(64, 64, sum_ext)
         
-        state.x86_registers.set_register(dest_reg, result)
-        state.x86_registers.set_flag('CF', carry_out)
+        _write_register_by_size(dest_reg, result, dest_size)
+        _update_add_like_flags(reg_val, addend, result, carry_out)
         
         return state
     
@@ -521,14 +581,30 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             raise ValueError(f"SUB instruction must have register destination: {operands}")
 
         dest_reg = operands['dest_reg']
-        reg_val = state.x86_registers.get_register(dest_reg)
+        dest_size = operands.get('dest_size')
+        reg_val = _read_register_by_size(dest_reg, dest_size)
 
         if operands['immediate'] is not None:
             # SUB reg, immediate
-            imm_val = BitVecVal(operands['immediate'], 64)
+            imm_val = _imm_to_bv64(dest_size)
             result = reg_val - imm_val
-            state.x86_registers.set_register(dest_reg, result)
+            _write_register_by_size(dest_reg, result, dest_size)
+            _update_sub_like_flags(reg_val, imm_val, result)
 
+        return state
+
+    elif mnemonic == 'inc':
+        # INC：目标 + 1，不修改 CF
+        if not operands['dest_reg']:
+            raise ValueError(f"INC instruction must have register destination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        dest_size = operands.get('dest_size')
+        reg_val = _read_register_by_size(dest_reg, dest_size)
+
+        result = reg_val + BitVecVal(1, 64)
+        _write_register_by_size(dest_reg, result, dest_size)
+        _update_inc_like_flags(reg_val, result)
         return state
     
     elif mnemonic == 'cmp':
@@ -537,25 +613,33 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             raise ValueError(f"CMP instruction must have register operand: {operands}")
         
         dest_reg = operands['dest_reg']
-        reg_val = state.x86_registers.get_register(dest_reg)
+        dest_size = operands.get('dest_size')
+        reg_val = _read_register_by_size(dest_reg, dest_size)
         
         if operands['immediate'] is not None:
             # CMP reg, immediate
-            imm_val = BitVecVal(operands['immediate'], 64)
+            imm_val = _imm_to_bv64(dest_size)
             result = reg_val - imm_val
-            
-            # 设置标志
-            reg_ext = Concat(BitVecVal(0, 1), reg_val)
-            imm_ext = Concat(BitVecVal(0, 1), imm_val)
-            diff_ext = reg_ext - imm_ext
-            cf = Extract(64, 64, diff_ext)
-            state.x86_registers.set_flag('CF', cf)
-            
-            # ZF（零标志）
-            zf_bool = (reg_val == imm_val)
-            zf = If(zf_bool, BitVecVal(1, 1), BitVecVal(0, 1))
-            state.x86_registers.set_flag('ZF', zf)
+            _update_sub_like_flags(reg_val, imm_val, result)
         
+        return state
+
+    elif mnemonic == 'test':
+        # TEST：按位与并设置标志（不修改操作数）
+        if not operands['dest_reg']:
+            raise ValueError(f"TEST instruction must have register operand: {operands}")
+
+        lhs = _read_register_by_size(operands['dest_reg'], operands.get('dest_size'))
+        if operands['src_reg']:
+            rhs = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+        elif operands['immediate'] is not None:
+            rhs = _imm_to_bv64(operands.get('dest_size'))
+        elif operands['is_memory']:
+            rhs = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+        else:
+            raise ValueError(f"Unsupported TEST operand combination: {operands}")
+
+        _update_logic_flags(lhs & rhs)
         return state
     
     elif mnemonic == 'ret':
@@ -585,31 +669,31 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         # x86-64使用x86内存（通过R14用于栈，R15用于EVM内存）
         # 从x86内存获取offset和length（EVM栈通过R14存储在x86内存中）
         # Go代码：offset, size := c.PopUint64(), c.PopUint64()
-        # 这意味着：首先弹出size（stack[0]），然后弹出offset（stack[1]）
+        # 这意味着：首先弹出offset（stack[0]），然后弹出size（stack[1]）
         # x86内存中的栈布局：stack[0]在R14-0x40，stack[1]在R14-0x20
         
         # 获取R14寄存器值（栈基址指针）
         r14_value = state.x86_registers.get_register(Register.R14)
         
         # 使用绝对地址从x86内存中提取栈值
-        # stack[0]（顶部）= size（length）在R14-0x40，stack[1] = offset在R14-0x20
+        # stack[0]（顶部）= offset在R14-0x40，stack[1] = size（length）在R14-0x20
         # 我们需要从x86内存加载256位值（4×64位limb）
         
-        # Stack[0]（size/length）：从R14-0x40加载（4×64位limb）
+        # Stack[0]（offset）：从R14-0x40加载（4×64位limb）
         stack0_base = r14_value + BitVecVal(-0x40, 64)
-        size_z0 = state.x86_memory.load_64bit(stack0_base)
-        size_z1 = state.x86_memory.load_64bit(stack0_base + BitVecVal(8, 64))
-        size_z2 = state.x86_memory.load_64bit(stack0_base + BitVecVal(16, 64))
-        size_z3 = state.x86_memory.load_64bit(stack0_base + BitVecVal(24, 64))
-        size_stack_value = Concat(size_z3, size_z2, size_z1, size_z0)  # 256位值
-        
-        # Stack[1]（offset）：从R14-0x20加载（4×64位limb）
-        stack1_base = r14_value + BitVecVal(-0x20, 64)
-        offset_z0 = state.x86_memory.load_64bit(stack1_base)
-        offset_z1 = state.x86_memory.load_64bit(stack1_base + BitVecVal(8, 64))
-        offset_z2 = state.x86_memory.load_64bit(stack1_base + BitVecVal(16, 64))
-        offset_z3 = state.x86_memory.load_64bit(stack1_base + BitVecVal(24, 64))
+        offset_z0 = state.x86_memory.load_64bit(stack0_base)
+        offset_z1 = state.x86_memory.load_64bit(stack0_base + BitVecVal(8, 64))
+        offset_z2 = state.x86_memory.load_64bit(stack0_base + BitVecVal(16, 64))
+        offset_z3 = state.x86_memory.load_64bit(stack0_base + BitVecVal(24, 64))
         offset_stack_value = Concat(offset_z3, offset_z2, offset_z1, offset_z0)  # 256位值
+        
+        # Stack[1]（size/length）：从R14-0x20加载（4×64位limb）
+        stack1_base = r14_value + BitVecVal(-0x20, 64)
+        size_z0 = state.x86_memory.load_64bit(stack1_base)
+        size_z1 = state.x86_memory.load_64bit(stack1_base + BitVecVal(8, 64))
+        size_z2 = state.x86_memory.load_64bit(stack1_base + BitVecVal(16, 64))
+        size_z3 = state.x86_memory.load_64bit(stack1_base + BitVecVal(24, 64))
+        size_stack_value = Concat(size_z3, size_z2, size_z1, size_z0)  # 256位值
         
         # 将256位栈值截断为64位用于offset和length
         # Go代码使用PopUint64()，所以我们需要64位值
@@ -640,9 +724,6 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         # - 如果status_code == RETURNED：使用提取的offset和length
         # - 否则：使用0（无返回值）
         
-        # R15寄存器指向EVM内存基址（memoryElement0Address）
-        r15_value = state.x86_registers.get_register(AMD64_RESERVED_REGISTER_FOR_MEMORY)
-        
         # 使用If表达式有条件地设置返回值
         # 这允许符号地处理多条路径
         zero_64 = BitVecVal(0, 64)
@@ -664,28 +745,12 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
         if operands['is_memory']:
             # MUL reg, [base+offset]
-            base_reg = operands['base_reg']
-            offset = operands['offset']
-
-            if base_reg not in [Register.R14, Register.R13]:
-                raise ValueError(f"Unsupported base register for MUL: {base_reg}")
-
-            memory_offset = offset
-            if 'index_reg' in operands and operands['index_reg']:
-                index_reg = operands['index_reg']
-                index_val = state.x86_registers.get_register(index_reg)
-                if isinstance(offset, int):
-                    offset_bv = BitVecVal(offset, 64)
-                else:
-                    offset_bv = offset
-                memory_offset = offset_bv + index_val
-
+            memory_offset = _effective_address()
             mem_val = state.x86_memory.load_64bit(memory_offset)
 
             # 执行64位乘法：result = reg_val * mem_val
             # 结果是128位：RDX:RAX（高64位在RDX，低64位在RAX）
-            # 对于EVM验证，我们通常只关心低64位（截断）
-            result = reg_val * mem_val
+            result = ZeroExt(64, reg_val) * ZeroExt(64, mem_val)
 
             # 存储低64位到目标寄存器
             result_low = Extract(63, 0, result)
@@ -701,7 +766,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             src_val = state.x86_registers.get_register(src_reg)
 
             # 执行乘法
-            result = reg_val * src_val
+            result = ZeroExt(64, reg_val) * ZeroExt(64, src_val)
 
             # 存储低64位
             result_low = Extract(63, 0, result)
@@ -719,37 +784,24 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             raise ValueError(f"AND instruction must have register destination: {operands}")
 
         dest_reg = operands['dest_reg']
-        reg_val = state.x86_registers.get_register(dest_reg)
+        dest_size = operands.get('dest_size')
+        reg_val = _read_register_by_size(dest_reg, dest_size)
 
         if operands['is_memory']:
             # AND reg, [base+offset]
-            base_reg = operands['base_reg']
-            offset = operands['offset']
-
-            if base_reg not in [Register.R14, Register.R13]:
-                raise ValueError(f"Unsupported base register for AND: {base_reg}")
-
-            memory_offset = offset
-            if 'index_reg' in operands and operands['index_reg']:
-                index_reg = operands['index_reg']
-                index_val = state.x86_registers.get_register(index_reg)
-                if isinstance(offset, int):
-                    offset_bv = BitVecVal(offset, 64)
-                else:
-                    offset_bv = offset
-                memory_offset = offset_bv + index_val
-
-            mem_val = state.x86_memory.load_64bit(memory_offset)
+            memory_offset = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
             result = reg_val & mem_val
-            state.x86_registers.set_register(dest_reg, result)
+            _write_register_by_size(dest_reg, result, dest_size)
 
         elif operands['src_reg']:
             # AND reg, reg
             src_reg = operands['src_reg']
-            src_val = state.x86_registers.get_register(src_reg)
+            src_val = _read_register_by_size(src_reg, operands.get('src_size'))
             result = reg_val & src_val
-            state.x86_registers.set_register(dest_reg, result)
+            _write_register_by_size(dest_reg, result, dest_size)
 
+        _update_logic_flags(_read_register_by_size(dest_reg, dest_size))
         return state
 
     elif mnemonic == 'or':
@@ -758,37 +810,24 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             raise ValueError(f"OR instruction must have register destination: {operands}")
 
         dest_reg = operands['dest_reg']
-        reg_val = state.x86_registers.get_register(dest_reg)
+        dest_size = operands.get('dest_size')
+        reg_val = _read_register_by_size(dest_reg, dest_size)
 
         if operands['is_memory']:
             # OR reg, [base+offset]
-            base_reg = operands['base_reg']
-            offset = operands['offset']
-
-            if base_reg not in [Register.R14, Register.R13]:
-                raise ValueError(f"Unsupported base register for OR: {base_reg}")
-
-            memory_offset = offset
-            if 'index_reg' in operands and operands['index_reg']:
-                index_reg = operands['index_reg']
-                index_val = state.x86_registers.get_register(index_reg)
-                if isinstance(offset, int):
-                    offset_bv = BitVecVal(offset, 64)
-                else:
-                    offset_bv = offset
-                memory_offset = offset_bv + index_val
-
-            mem_val = state.x86_memory.load_64bit(memory_offset)
+            memory_offset = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
             result = reg_val | mem_val
-            state.x86_registers.set_register(dest_reg, result)
+            _write_register_by_size(dest_reg, result, dest_size)
 
         elif operands['src_reg']:
             # OR reg, reg
             src_reg = operands['src_reg']
-            src_val = state.x86_registers.get_register(src_reg)
+            src_val = _read_register_by_size(src_reg, operands.get('src_size'))
             result = reg_val | src_val
-            state.x86_registers.set_register(dest_reg, result)
+            _write_register_by_size(dest_reg, result, dest_size)
 
+        _update_logic_flags(_read_register_by_size(dest_reg, dest_size))
         return state
 
     elif mnemonic == 'xor':
@@ -797,46 +836,32 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             raise ValueError(f"XOR instruction must have register destination: {operands}")
 
         dest_reg = operands['dest_reg']
-        reg_val = state.x86_registers.get_register(dest_reg)
+        dest_size = operands.get('dest_size')
+        reg_val = _read_register_by_size(dest_reg, dest_size)
 
         if operands['is_memory']:
             # XOR reg, [base+offset]
-            base_reg = operands['base_reg']
-            offset = operands['offset']
-
-            if base_reg not in [Register.R14, Register.R13]:
-                raise ValueError(f"Unsupported base register for XOR: {base_reg}")
-
-            memory_offset = offset
-            if 'index_reg' in operands and operands['index_reg']:
-                index_reg = operands['index_reg']
-                index_val = state.x86_registers.get_register(index_reg)
-                if isinstance(offset, int):
-                    offset_bv = BitVecVal(offset, 64)
-                else:
-                    offset_bv = offset
-                memory_offset = offset_bv + index_val
-
-            mem_val = state.x86_memory.load_64bit(memory_offset)
+            memory_offset = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
             result = reg_val ^ mem_val
-            state.x86_registers.set_register(dest_reg, result)
+            _write_register_by_size(dest_reg, result, dest_size)
 
         elif operands['src_reg']:
             # XOR reg, reg
             src_reg = operands['src_reg']
-            src_val = state.x86_registers.get_register(src_reg)
+            src_val = _read_register_by_size(src_reg, operands.get('src_size'))
             result = reg_val ^ src_val
-            state.x86_registers.set_register(dest_reg, result)
+            _write_register_by_size(dest_reg, result, dest_size)
 
+        _update_logic_flags(_read_register_by_size(dest_reg, dest_size))
         return state
 
-    elif mnemonic in ['jb', 'jae', 'jmp']:
+    elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge', 'jmp']:
         # 控制流指令 - 原样返回状态
         # 这些将在控制流级别处理
         return state
-
-    else:
-        # 未知指令 - 返回未更改的状态
-        # TODO: 实现更多指令
+    elif mnemonic == 'nop':
         return state
 
+    else:
+        raise ValueError(f"Unsupported instruction in x86_instruction_to_z3: {mnemonic}")
