@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from typing import List, Optional, TYPE_CHECKING
-from z3 import BoolRef, BoolVal, Solver, sat
+from z3 import BoolRef, BoolVal, Solver, unsat
 
 from state.smt_state import SMTState
 
@@ -15,6 +15,8 @@ from state.smt_state import SMTState
 if TYPE_CHECKING:
     from .cfg_structures import CFGNode, EdgeType
     from .cfg_annotations import StateAnnotation
+
+DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS = 1000
 
 
 class WorldState:
@@ -128,11 +130,17 @@ class Constraints:
         for constraint in self._constraints:
             solver.add(constraint)
 
-        if solver_timeout is not None:
-            solver.set(timeout=solver_timeout)
+        timeout_ms = (
+            solver_timeout
+            if solver_timeout is not None
+            else DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS
+        )
+        if timeout_ms is not None and timeout_ms > 0:
+            solver.set(timeout=timeout_ms)
 
         result = solver.check()
-        return result == sat
+        # 仅当明确 UNSAT 时才剪枝；UNKNOWN 视为可能可达，避免不声音剪枝。
+        return result != unsat
 
     def as_bool(self) -> BoolRef:
         """将约束集合转换为单个 BoolRef（合取）。

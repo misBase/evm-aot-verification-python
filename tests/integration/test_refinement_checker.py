@@ -50,6 +50,10 @@ X86_ADD_BASE_ADDR = 0x6c
 X86_ADD_FULL_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b45704883f80372234883e80349894570498b45304883f8407222483d21800000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c3498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed841c685e00000000249c74528fcffffffc3"
 X86_ADD_FULL_BASE_ADDR = 0x0
 
+# muti_block 程序级样本（文件中存放十六进制机器码）
+X86_MUTI_BLOCK_BASE_ADDR = 0x0
+X86_MUTI_BLOCK_08_BASE_ADDR = 0x0
+
 
 # ===========================
 # Pytest 测试夹具
@@ -228,4 +232,50 @@ def test_verify_add_program_pair_full():
     assert verified, (
         f"Full program pair verification failed. "
         f"EVM program from {ir_path} and full x86 program should be equivalent. Error: {msg}"
+    )
+
+
+def test_verify_muti_block_program_pair_full():
+    """使用 muti_block.json 与 muti_block.hex 进行全量程序等价验证。"""
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "muti_block.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "muti_block.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=X86_MUTI_BLOCK_BASE_ADDR)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=180000, verbose=False)
+    initial_state = SMTState.create_initial_state(0)
+    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
+
+    assert verified, (
+        f"muti_block program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} should be equivalent. Error: {msg}"
+    )
+
+
+def test_verify_muti_block_08_program_pair_full():
+    """使用 muti_block_08.json 与 muti_block_08.hex 进行全量程序等价验证。"""
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "muti_block_08.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "muti_block_08.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=X86_MUTI_BLOCK_08_BASE_ADDR)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=180000, verbose=False)
+    initial_state = SMTState.create_initial_state(0)
+    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
+
+    assert verified, (
+        f"muti_block_08 program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} should be equivalent. Error: {msg}"
     )

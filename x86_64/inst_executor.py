@@ -30,8 +30,10 @@ class InstructionExecutor:
         # 解析操作数
         operands = parse_operands(instruction)
 
-        if mnemonic == 'mov':
+        if mnemonic == 'mov' or mnemonic == 'movabs':
             self._execute_mov(state, operands)
+        elif mnemonic == 'lea':
+            self._execute_lea(state, operands, instruction)
         elif mnemonic == 'add':
             self._execute_add(state, operands)
         elif mnemonic == 'adc':
@@ -79,6 +81,16 @@ class InstructionExecutor:
             pass
         else:
             raise ValueError(f"Unsupported instruction: {mnemonic}")
+
+    def _update_add_flags(self, state: ExecutionState, lhs, rhs, result, carry_out) -> None:
+        """更新 ADD/ADC 类指令使用的核心标志。"""
+        overflow = Extract(63, 63, (lhs ^ result) & (rhs ^ result))
+        zf = If(result == BitVecVal(0, 64), BitVecVal(1, 1), BitVecVal(0, 1))
+        sf = Extract(63, 63, result)
+        state.set_flag('CF', carry_out)
+        state.set_flag('OF', overflow)
+        state.set_flag('ZF', zf)
+        state.set_flag('SF', sf)
     
     def _execute_mov(self, state: ExecutionState, operands: dict) -> None:
         """执行MOV指令。
@@ -136,6 +148,32 @@ class InstructionExecutor:
             state.set_register(dest_reg, imm_val)
         else:
             raise ValueError(f"Unsupported MOV operand combination: {operands}")
+
+    def _execute_lea(self, state: ExecutionState, operands: dict, instruction: X86Instruction) -> None:
+        """执行 LEA 指令（仅计算地址，不访问内存）。"""
+        if not operands['dest_reg'] or not operands['is_memory']:
+            raise ValueError(f"Unsupported LEA operand combination: {operands}")
+
+        offset = operands.get('offset', 0)
+        base_reg = operands.get('base_reg')
+        index_reg = operands.get('index_reg')
+        scale = operands.get('scale', 1) or 1
+
+        if base_reg:
+            addr = state.get_register(base_reg) + BitVecVal(offset, 64)
+        elif 'rip' in instruction.op_str.lower():
+            # RIP 相对寻址：next_ip + disp
+            addr = BitVecVal(instruction.addr + instruction.size + offset, 64)
+        else:
+            addr = BitVecVal(offset, 64)
+
+        if index_reg:
+            index_val = state.get_register(index_reg)
+            if scale != 1:
+                index_val = index_val * BitVecVal(scale, 64)
+            addr = addr + index_val
+
+        state.set_register(operands['dest_reg'], addr)
     
     def _execute_add(self, state: ExecutionState, operands: dict) -> None:
         """执行ADD指令。
@@ -144,12 +182,34 @@ class InstructionExecutor:
         - ADD reg, [base+offset]  （将内存加到寄存器）
         - ADD reg, reg            （将寄存器加到寄存器）
         """
+        if operands['is_memory'] and not operands['dest_reg']:
+            # ADD [base+offset], reg/imm
+            offset = operands['offset']
+            mem_val = state.load_memory(offset)
+
+            if operands['src_reg']:
+                rhs_val = state.get_register(operands['src_reg'])
+            elif operands['immediate'] is not None:
+                rhs_val = BitVecVal(operands['immediate'], 64)
+            else:
+                raise ValueError(f"Unsupported ADD operand combination: {operands}")
+
+            mem_ext = Concat(BitVecVal(0, 1), mem_val)
+            rhs_ext = Concat(BitVecVal(0, 1), rhs_val)
+            sum_ext = mem_ext + rhs_ext
+            result = Extract(63, 0, sum_ext)
+            carry_out = Extract(64, 64, sum_ext)
+
+            state.store_memory(offset, result)
+            self._update_add_flags(state, mem_val, rhs_val, result, carry_out)
+            return
+
         if not operands['dest_reg']:
             raise ValueError(f"ADD instruction must have register destination: {operands}")
-        
+
         dest_reg = operands['dest_reg']
         reg_val = state.get_register(dest_reg)
-        
+
         if operands['is_memory']:
             # ADD reg, [base+offset]
             offset = operands['offset']
@@ -168,9 +228,7 @@ class InstructionExecutor:
             
             # 更新寄存器
             state.set_register(dest_reg, result)
-            
-            # 更新进位标志
-            state.set_flag('CF', carry_out)
+            self._update_add_flags(state, reg_val, mem_val, result, carry_out)
             
         elif operands['src_reg']:
             # ADD reg, reg
@@ -188,9 +246,7 @@ class InstructionExecutor:
             
             # 更新寄存器
             state.set_register(dest_reg, result)
-            
-            # 更新进位标志
-            state.set_flag('CF', carry_out)
+            self._update_add_flags(state, reg_val, src_val, result, carry_out)
         elif operands['immediate'] is not None:
             imm_val = BitVecVal(operands['immediate'], 64)
             reg_ext = Concat(BitVecVal(0, 1), reg_val)
@@ -199,7 +255,7 @@ class InstructionExecutor:
             result = Extract(63, 0, sum_ext)
             carry_out = Extract(64, 64, sum_ext)
             state.set_register(dest_reg, result)
-            state.set_flag('CF', carry_out)
+            self._update_add_flags(state, reg_val, imm_val, result, carry_out)
         else:
             raise ValueError(f"Unsupported ADD operand combination: {operands}")
     

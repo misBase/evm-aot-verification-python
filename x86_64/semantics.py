@@ -4,6 +4,7 @@ x86-64指令语义建模。
 本模块使用Z3为x86-64指令提供语义建模。
 """
 
+import capstone
 from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem, Not, And, Or
 from typing import List, Dict, Optional, Any, Tuple
 from .models import X86Block, X86Instruction, Register
@@ -319,6 +320,9 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         更新后的SMT状态
     """
     mnemonic = insn.mnemonic.lower()
+    if mnemonic == 'movabs':
+        # MOVABS 与 MOV reg, imm64 语义一致
+        mnemonic = 'mov'
     operands = parse_operands(insn)
 
     def _to_bv64(value):
@@ -334,7 +338,18 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     def _effective_address() -> BitVec:
         base_reg = operands.get('base_reg')
         offset = _to_bv64(operands.get('offset', 0))
-        addr = offset if base_reg is None else state.x86_registers.get_register(base_reg) + offset
+        rip_relative = False
+        cs_insn = insn._cs_insn
+        if cs_insn is not None and hasattr(cs_insn, 'operands'):
+            for op in cs_insn.operands:
+                if op.type == capstone.x86.X86_OP_MEM and op.mem.base == capstone.x86.X86_REG_RIP:
+                    rip_relative = True
+                    break
+
+        if rip_relative:
+            addr = BitVecVal(insn.addr + insn.size, 64) + offset
+        else:
+            addr = offset if base_reg is None else state.x86_registers.get_register(base_reg) + offset
 
         index_reg = operands.get('index_reg')
         if index_reg is not None:
@@ -626,12 +641,47 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
         _write_register_by_size(dest_reg, src_val, dest_size)
         return state
+
+    elif mnemonic == 'lea':
+        # LEA：只计算有效地址，不访问内存且不修改标志位
+        if not operands['dest_reg'] or not operands['is_memory']:
+            raise ValueError(f"Unsupported LEA operand combination: {operands}")
+
+        dest_reg = operands['dest_reg']
+        dest_size = operands.get('dest_size')
+        effective_addr = _effective_address()
+        _write_register_by_size(dest_reg, effective_addr, dest_size)
+        return state
     
     elif mnemonic == 'add':
         # ADD：将源加到目标，设置进位标志
+        if operands['is_memory'] and not operands['dest_reg']:
+            # ADD [base+offset], reg/imm
+            memory_offset = _effective_address()
+            memory_size = operands.get('memory_size')
+            lhs_val = _load_memory_by_size(memory_offset, memory_size)
+
+            if operands['src_reg']:
+                rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+            elif operands['immediate'] is not None:
+                rhs_val = _imm_to_bv64(memory_size)
+            else:
+                raise ValueError(f"Unsupported ADD operand combination: {operands}")
+
+            lhs_ext = Concat(BitVecVal(0, 1), lhs_val)
+            rhs_ext = Concat(BitVecVal(0, 1), rhs_val)
+            sum_ext = lhs_ext + rhs_ext
+
+            result = Extract(63, 0, sum_ext)
+            carry_out = Extract(64, 64, sum_ext)
+
+            state.x86_memory = _store_memory_by_size(memory_offset, memory_size, result)
+            _update_add_like_flags(lhs_val, rhs_val, result, carry_out)
+            return state
+
         if not operands['dest_reg']:
             raise ValueError(f"ADD instruction must have register destination: {operands}")
-        
+
         dest_reg = operands['dest_reg']
         dest_size = operands.get('dest_size')
         reg_val = _read_register_by_size(dest_reg, dest_size)

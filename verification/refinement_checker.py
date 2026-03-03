@@ -24,15 +24,42 @@ class RefinementChecker:
         """
         self.timeout_ms = timeout_ms
         self.verbose = verbose
-        
-        if verbose:
-            set_option(verbose=10)
-            set_option(proof=True)
+
+        # NOTE: Z3 set_option 是全局设置。这里显式在每个实例中设置，避免
+        # 前一个 verbose=True 的测试污染后续 verbose=False 的测试。
+        set_option(verbose=10 if verbose else 0)
+        set_option(proof=bool(verbose))
         
         # 使用QF_AUFBV（数组、未解释函数、位向量）以支持Array比较
         # QF_BV不支持Arrays，所以我们需要QF_AUFBV
         self.solver = SolverFor("QF_AUFBV")
         self.solver.set("timeout", timeout_ms)
+
+    def _timeout_message(self) -> str:
+        return f"? TIMEOUT: Solver exceeded overall timeout ({self.timeout_ms} ms)"
+
+    def _unknown_message(self) -> str:
+        reason = self.solver.reason_unknown()
+        if reason == "timeout":
+            return self._timeout_message()
+        if reason:
+            return f"? UNKNOWN: Solver could not determine refinement (reason: {reason})"
+        return "? UNKNOWN: Solver could not determine refinement"
+
+    def _reset_solver_with_budget(self, deadline: Optional[float]) -> bool:
+        """重置求解器并为本次 check 设置剩余预算。"""
+        now = time.time()
+        if deadline is not None and now >= deadline:
+            return False
+
+        self.solver.reset()
+        if deadline is None:
+            timeout_ms = self.timeout_ms
+        else:
+            timeout_ms = int((deadline - now) * 1000)
+            timeout_ms = max(timeout_ms, 1)
+        self.solver.set("timeout", timeout_ms)
+        return True
     
     def check_refinement(self, evm_result, x86_result) -> Tuple[bool, Optional[str]]:
         """检查x86是否精化EVM（对所有输入，x86_result = evm_result）。
@@ -57,17 +84,21 @@ class RefinementChecker:
         Returns:
             (verified, message)，如果精化关系成立则verified为True
         """
+        # 将 timeout_ms 作为整个 refine 检查流程的总预算（而不是每次 check 的预算）。
+        deadline = time.time() + (self.timeout_ms / 1000.0)
+
         # 处理新格式：带内存引用的字典（直接内存比较）
         if isinstance(evm_result, dict) and isinstance(x86_result, dict):
-            return self._check_refinement_direct_memory(evm_result, x86_result)
+            return self._check_refinement_direct_memory(evm_result, x86_result, deadline)
         # 处理中间格式：带Array/BitVec的元组
         elif isinstance(evm_result, tuple) and isinstance(x86_result, tuple):
-            return self._check_refinement_with_length(evm_result, x86_result)
+            return self._check_refinement_with_length(evm_result, x86_result, deadline)
         else:
             # 旧格式：向后兼容
-            return self._check_refinement_legacy(evm_result, x86_result)
+            return self._check_refinement_legacy(evm_result, x86_result, deadline)
     
-    def _check_refinement_legacy(self, evm_result: BitVec, x86_result: BitVec) -> Tuple[bool, Optional[str]]:
+    def _check_refinement_legacy(self, evm_result: BitVec, x86_result: BitVec,
+                                 deadline: Optional[float] = None) -> Tuple[bool, Optional[str]]:
         """用于单个BitVec结果的旧版精化检查（向后兼容）。"""
         if evm_result.size() != 256 or x86_result.size() != 256:
             raise ValueError("Both results must be 256-bit BitVecs")
@@ -76,7 +107,11 @@ class RefinementChecker:
         # 我们检查：∃ inputs. evm_result ≠ x86_result
         # 如果UNSAT，则精化关系成立（它们总是相等）
 
-        self.solver.reset()
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
         self.solver.add(Distinct(evm_result, x86_result))
 
         start_time = time.time()
@@ -100,13 +135,14 @@ class RefinementChecker:
                 print(f"    └─ {msg}")
             return False, msg
         else:
-            msg = "? UNKNOWN: Solver could not determine refinement"
+            msg = self._unknown_message()
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
     
     def _check_refinement_with_length(self, evm_result,
-                                     x86_result) -> Tuple[bool, Optional[str]]:
+                                     x86_result,
+                                     deadline: Optional[float] = None) -> Tuple[bool, Optional[str]]:
         """通过长度和数据比较检查精化关系。
 
         Args:
@@ -128,7 +164,11 @@ class RefinementChecker:
 
         # 第一次检查：长度必须相等
         # 如果长度不同，程序不等价
-        self.solver.reset()
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
         self.solver.add(evm_length != x86_length)
 
         start_time = time.time()
@@ -144,10 +184,19 @@ class RefinementChecker:
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
+        elif result != unsat:
+            msg = self._unknown_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
 
         # 第二次检查：如果长度相等，数据必须相等
         # 处理Array和BitVec两种格式
-        self.solver.reset()
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
         self.solver.add(evm_length == x86_length)  # 长度相等
 
         # 检查数据是Array还是BitVec
@@ -197,12 +246,13 @@ class RefinementChecker:
                 print(f"    └─ {msg}")
             return False, msg
         else:
-            msg = "? UNKNOWN: Solver could not determine refinement"
+            msg = self._unknown_message()
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
     
-    def _check_refinement_direct_memory(self, evm_result: dict, x86_result: dict) -> Tuple[bool, Optional[str]]:
+    def _check_refinement_direct_memory(self, evm_result: dict, x86_result: dict,
+                                        deadline: Optional[float] = None) -> Tuple[bool, Optional[str]]:
         """通过直接比较内存内容检查精化关系。
 
         这是优化的方法：不是将所有字节提取到Array中，
@@ -242,7 +292,11 @@ class RefinementChecker:
 
         # 第一次检查：返回条件必须等价
         # EVM返回当且仅当x86返回
-        self.solver.reset()
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
         self.solver.add(evm_has_return != x86_has_return)
 
         start_time = time.time()
@@ -257,9 +311,18 @@ class RefinementChecker:
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
+        elif result != unsat:
+            msg = self._unknown_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
 
         # 第二次检查：如果两者都返回（或都不返回），长度必须相等
-        self.solver.reset()
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
         self.solver.add(evm_has_return)  # 假设两者都返回
         self.solver.add(x86_has_return)
         self.solver.add(evm_length != x86_length)
@@ -276,6 +339,11 @@ class RefinementChecker:
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
+        elif result != unsat:
+            msg = self._unknown_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
 
         # 第三次检查：如果长度相等且两者都返回，内存内容必须相等
         # 我们想检查：ForAll i. (0 <= i < length) =>
@@ -285,7 +353,11 @@ class RefinementChecker:
         #   EVM_memory[evm_offset + i] != x86_memory[x86_base_addr + x86_offset + i]
         # 如果这是UNSAT，则ForAll成立。
 
-        self.solver.reset()
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
         self.solver.add(evm_has_return)  # 两者都返回
         self.solver.add(x86_has_return)
         self.solver.add(evm_length == x86_length)  # 长度相等
@@ -328,8 +400,7 @@ class RefinementChecker:
                 print(f"    └─ {msg}")
             return False, msg
         else:
-            msg = "? UNKNOWN: Solver could not determine refinement"
+            msg = self._unknown_message()
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
-
