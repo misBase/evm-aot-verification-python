@@ -8,6 +8,7 @@ import capstone
 from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem, Not, And, Or
 from typing import List, Dict, Optional, Any, Tuple
 from .models import X86Block, X86Instruction, Register
+from .aot_profile import GO_HPC_EVM_PROFILE
 from .execution_state import ExecutionState
 from .inst_executor import InstructionExecutor
 from .disassembler import disassemble_hex, parse_operands
@@ -15,8 +16,8 @@ from common.uint256 import Uint256
 from state.smt_state import SMTState
 
 # RETURN指令的常量
-EVM_NATIVE_CALL_STATUS_CODE_RETURNED = 0  # evmNativeCallStatusCodeReturned = iota
-EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = 200  # 168 + 8 + 8 + 8 + 32
+EVM_NATIVE_CALL_STATUS_CODE_RETURNED = GO_HPC_EVM_PROFILE.status_codes["returned"]
+EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = GO_HPC_EVM_PROFILE.offsets["status_code"]
 AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE = Register.R13  # 指向callEngine实例的指针
 
 

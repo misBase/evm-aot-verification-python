@@ -146,7 +146,8 @@ class X86Program:
     def to_z3(self, state: SMTState,
              strategy_cls: type = X86DFSStrategy,
              max_depth: int = 100,
-             use_reachability_check: bool = True) -> Tuple[SMTState, Dict[str, Any]]:
+             use_reachability_check: bool = True,
+             enable_go_bridge: bool = True) -> Tuple[SMTState, Dict[str, Any]]:
         """使用 worklist 驱动的符号执行为整个程序构建Z3公式。
 
         参考 evm_ir 的设计：
@@ -161,6 +162,7 @@ class X86Program:
             strategy_cls: 搜索策略类（默认 DFS）
             max_depth: 最大执行深度
             use_reachability_check: 是否使用可达性检查
+            enable_go_bridge: 是否启用 ret -> GO_HOST -> returnAddress 建模
 
         Returns:
             (final_state, result_dict)元组，其中：
@@ -186,7 +188,8 @@ class X86Program:
             blocks=blocks,
             strategy_cls=strategy_cls,
             max_depth=max_depth,
-            use_reachability_check=use_reachability_check
+            use_reachability_check=use_reachability_check,
+            enable_go_bridge=enable_go_bridge,
         )
 
         # 执行符号执行
@@ -414,4 +417,3 @@ class X86Program:
         else:
             info = f"blocks=0 (sequential), " + info
         return f"X86Program({info})"
-

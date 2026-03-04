@@ -6,6 +6,7 @@
 # 核心模型和语义
 from .semantics import X86SemanticsModel, X86InstructionSemantics
 from .models import X86Block, X86Instruction, Register
+from .aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 
 # 新的 CFG 和符号执行架构 (参考 evm_ir)
 from .cfg_structures import X86EdgeType, X86CFGEdge, X86CFGNode, X86DynamicCFG
@@ -34,6 +35,8 @@ __all__ = [
     'X86Block',
     'X86Instruction',
     'Register',
+    'X86AOTProfile',
+    'GO_HPC_EVM_PROFILE',
 
     # 新的 CFG 和符号执行架构
     'X86EdgeType',
@@ -61,4 +64,3 @@ __all__ = [
     'X86Program',
     'identify_basic_blocks',
 ]
-

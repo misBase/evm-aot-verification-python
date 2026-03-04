@@ -5,9 +5,10 @@ x86-64 符号执行引擎（参考 evm_ir）。
 """
 
 from typing import List, Dict, Optional, Tuple
-from z3 import BitVecVal, Not, And, Or
+from z3 import BitVecVal, Not, And, Or, Solver, simplify, unsat
 
-from .models import X86Block, X86Instruction
+from .aot_profile import GO_HPC_EVM_PROFILE
+from .models import Register, X86Block, X86Instruction
 from .cfg_structures import X86DynamicCFG, X86EdgeType
 from .cfg_state import X86GlobalState
 from .cfg_strategies import X86DFSStrategy
@@ -25,11 +26,16 @@ class X86SymbolicExecutor:
     - 可达性检查剪枝不可达状态
     """
 
+    GO_HOST_NODE_BASE_ADDR = 0x7FFFFFFFFFFF0000
+    # 兼容旧测试/调用方：第一个 GO_HOST 节点地址
+    GO_HOST_NODE_ADDR = GO_HOST_NODE_BASE_ADDR
+
     def __init__(self,
                  blocks: List[X86Block],
                  strategy_cls: type = X86DFSStrategy,
                  max_depth: int = 100,
-                 use_reachability_check: bool = True):
+                 use_reachability_check: bool = True,
+                 enable_go_bridge: bool = True):
         """初始化符号执行引擎。
 
         Args:
@@ -37,11 +43,14 @@ class X86SymbolicExecutor:
             strategy_cls: 搜索策略类
             max_depth: 最大执行深度
             use_reachability_check: 是否使用可达性检查
+            enable_go_bridge: 是否启用 ret -> GO_HOST -> returnAddress 建模
         """
         self.blocks = blocks
         self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
         self.max_depth = max_depth
         self.use_reachability_check = use_reachability_check
+        self.enable_go_bridge = enable_go_bridge
+        self.aot_profile = GO_HPC_EVM_PROFILE
 
         # 创建动态 CFG
         self.cfg = X86DynamicCFG(blocks)
@@ -58,6 +67,9 @@ class X86SymbolicExecutor:
 
         # 终止状态列表
         self.final_states: List[X86GlobalState] = []
+
+        # 每个 CallGoFunction-ret 站点对应一个独立 GO_HOST 外部节点
+        self._go_host_addr_by_ret_block: Dict[int, int] = {}
 
     def manage_cfg(self, insn: X86Instruction, new_states: List[X86GlobalState],
                    from_addr: int) -> None:
@@ -104,6 +116,9 @@ class X86SymbolicExecutor:
 
                 self.cfg.add_edge(from_addr, to_addr, edge_type, condition,
                                 source_instruction=insn)
+        elif mnemonic == 'ret':
+            # ret 的 GO 往返边在 _handle_ret_with_go_bridge 中按实际执行动态添加
+            return
 
         else:
             # Fallthrough：添加顺序执行边
@@ -203,6 +218,9 @@ class X86SymbolicExecutor:
         for insn in block.instructions:
             new_mstate = insn.to_z3(new_mstate)
 
+        # 持久化块执行后的机器状态，供终止判定与结果合并使用
+        global_state.mstate = new_mstate
+
         # 获取最后一条指令来确定控制流
         if not block.instructions:
             # 空块，顺序执行到下一个块
@@ -216,7 +234,7 @@ class X86SymbolicExecutor:
         elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
             return self._handle_jcc(global_state, new_mstate, block, last_insn)
         elif mnemonic == 'ret':
-            return []  # 终止状态
+            return self._handle_ret_with_go_bridge(global_state, new_mstate, block, last_insn)
         else:
             # 顺序执行到下一个块
             return self._handle_fallthrough(global_state, new_mstate, block)
@@ -365,6 +383,139 @@ class X86SymbolicExecutor:
 
         return new_states
 
+    def _is_call_go_function_pattern(self, block: X86Block) -> bool:
+        """识别 ret 块是否匹配 CallGoFunction 模式。"""
+        if not self.enable_go_bridge:
+            return False
+
+        profile_offsets = self.aot_profile.offsets
+        status_offset = profile_offsets["status_code"]
+        ret_addr_offset = profile_offsets["return_address"]
+        has_status_write = False
+        has_return_addr_write = False
+        status_immediates = set()
+
+        for insn in block.instructions:
+            if not insn.mnemonic.lower().startswith("mov"):
+                continue
+            operands = parse_operands(insn)
+            if not operands.get("is_memory"):
+                continue
+            base_reg = operands.get("base_reg")
+            if base_reg != Register.R13:
+                continue
+
+            offset = operands.get("offset")
+            if offset == status_offset:
+                has_status_write = True
+                immediate = operands.get("immediate")
+                if immediate is not None:
+                    status_immediates.add(immediate & 0xFF)
+            elif offset == ret_addr_offset:
+                has_return_addr_write = True
+
+        if not (has_status_write and has_return_addr_write):
+            return False
+
+        # 若能静态识别 status 常量，要求其属于可恢复集合，避免误判为普通退出。
+        if status_immediates:
+            return any(
+                status_code in self.aot_profile.resumable_statuses
+                for status_code in status_immediates
+            )
+        return True
+
+    def _get_or_create_go_host_node_for_ret(self, ret_block_addr: int) -> int:
+        """为每个 ret 站点分配独立 GO_HOST 外部节点。"""
+        go_addr = self._go_host_addr_by_ret_block.get(ret_block_addr)
+        if go_addr is None:
+            go_index = len(self._go_host_addr_by_ret_block)
+            go_addr = self.GO_HOST_NODE_BASE_ADDR + go_index
+            self._go_host_addr_by_ret_block[ret_block_addr] = go_addr
+            self.cfg.get_or_create_external_node(go_addr, f"GO_HOST_{go_index}")
+        else:
+            self.cfg.get_or_create_external_node(go_addr, f"GO_HOST_{go_addr - self.GO_HOST_NODE_BASE_ADDR}")
+        return go_addr
+
+    def _load_exit_return_address(self, mstate: SMTState):
+        """读取 callEngine.exitContext.returnAddress（64-bit）。"""
+        r13_value = mstate.x86_registers.get_register(Register.R13)
+        ret_addr_offset = BitVecVal(self.aot_profile.offsets["return_address"], 64)
+        return mstate.x86_memory.load_64bit(r13_value + ret_addr_offset)
+
+    def _is_condition_possible(self, global_state: X86GlobalState, condition) -> bool:
+        """在当前路径约束下检查 condition 是否可满足。"""
+        solver = Solver()
+        solver.set(timeout=1000)
+        constraints = global_state.get_constraints()
+        for constraint in constraints:
+            solver.add(constraint)
+        for flag_cond in constraints.flag_constraints.values():
+            solver.add(flag_cond)
+        solver.add(condition)
+        result = solver.check()
+        # UNKNOWN 视为可能可达，避免不声音剪枝。
+        return result != unsat
+
+    def _handle_ret_with_go_bridge(self, global_state: X86GlobalState, mstate: SMTState,
+                                   block: X86Block, insn: X86Instruction) -> List[X86GlobalState]:
+        """处理 ret：支持 ret -> GO_HOST -> returnAddress 的动态建模。"""
+        import copy as copy_module
+        from utils.z3_helpers import analyze_jump_target
+
+        # 默认行为：ret 终止（仅在识别到 CallGoFunction 模式时建模 GO 往返）
+        if not self._is_call_go_function_pattern(block):
+            setattr(global_state, "_ret_terminal_branch", True)
+            return []
+
+        # 每个 CallGoFunction 站点拥有自己的 GO_HOST 节点
+        go_host_addr = self._get_or_create_go_host_node_for_ret(block.start_addr)
+        self.cfg.add_edge(
+            block.start_addr,
+            go_host_addr,
+            X86EdgeType.CALL,
+            source_instruction=insn,
+        )
+
+        # 以当前状态为模板构建恢复分支
+        resumed_states: List[X86GlobalState] = []
+        return_addr_expr = self._load_exit_return_address(mstate)
+        return_addr_analysis = analyze_jump_target(simplify(return_addr_expr))
+
+        if return_addr_analysis.is_static:
+            for target_addr, target_condition in return_addr_analysis.targets:
+                target_block = self.blocks_by_addr.get(target_addr)
+                if target_block is None:
+                    continue
+
+                if target_condition is not None and not self._is_condition_possible(global_state, target_condition):
+                    continue
+
+                resume_world_state = copy_module.deepcopy(global_state.world_state)
+                if target_condition is not None:
+                    resume_world_state.constraints.add(target_condition)
+                target_node = self.cfg.get_or_create_node(target_addr)
+
+                resumed_state = X86GlobalState(
+                    mstate=mstate.copy(),
+                    world_state=resume_world_state,
+                    node=target_node,
+                )
+                resumed_state.depth = global_state.depth + 1
+                resumed_states.append(resumed_state)
+
+                self.cfg.add_edge(
+                    go_host_addr,
+                    target_addr,
+                    X86EdgeType.RETURN,
+                    condition=target_condition,
+                )
+
+        # 仅动态结果决定是否终止：有恢复后继则非终止，否则终止。
+        setattr(global_state, "_ret_terminal_branch", len(resumed_states) == 0)
+
+        return resumed_states
+
     def _build_jump_condition(self, mnemonic: str, mstate: SMTState):
         """为条件跳转构建符号条件。
 
@@ -495,6 +646,15 @@ class X86SymbolicExecutor:
         last_insn = node.block.instructions[-1]
         mnemonic = last_insn.mnemonic.lower()
         if mnemonic == 'ret':
+            if not self.enable_go_bridge:
+                return True
+
+            # execute_state 已经为 ret 分流写入了标记，优先使用。
+            marked_terminal = getattr(global_state, "_ret_terminal_branch", None)
+            if marked_terminal is not None:
+                return bool(marked_terminal) and global_state.get_constraints().is_possible()
+
+            # 兜底：若未经过 execute_state，ret 默认按终止处理。
             return True
 
         # 非显式跳转/返回指令：若当前块已是最后一个块，则自然终止
@@ -546,7 +706,9 @@ class X86SymbolicExecutor:
 def build_x86_dynamic_cfg(blocks: List[X86Block],
                           initial_state: SMTState,
                           strategy_cls: type = X86DFSStrategy,
-                          max_depth: int = 100) -> Tuple[List[X86GlobalState], X86DynamicCFG]:
+                          max_depth: int = 100,
+                          use_reachability_check: bool = True,
+                          enable_go_bridge: bool = True) -> Tuple[List[X86GlobalState], X86DynamicCFG]:
     """构建动态 CFG 并执行符号执行。
 
     Args:
@@ -554,10 +716,18 @@ def build_x86_dynamic_cfg(blocks: List[X86Block],
         initial_state: 初始机器状态
         strategy_cls: 搜索策略类
         max_depth: 最大执行深度
+        use_reachability_check: 是否启用可达性检查
+        enable_go_bridge: 是否启用 ret->GO_HOST->returnAddress 建模
 
     Returns:
         (final_states, cfg) 元组
     """
-    executor = X86SymbolicExecutor(blocks, strategy_cls=strategy_cls, max_depth=max_depth)
+    executor = X86SymbolicExecutor(
+        blocks,
+        strategy_cls=strategy_cls,
+        max_depth=max_depth,
+        use_reachability_check=use_reachability_check,
+        enable_go_bridge=enable_go_bridge,
+    )
     final_states = executor.execute(initial_state)
     return final_states, executor.cfg

@@ -211,6 +211,137 @@ class TestX86SymbolicExecutor:
         assert len(final_states) >= 1
 
 
+class TestRetGoBridge:
+    """测试 ret -> GO_HOST -> returnAddress 动态建模。"""
+
+    def setup_method(self):
+        self.base_addr = 0x1000
+
+    def disasm_and_create_blocks(self, hex_code: str):
+        instructions = disassemble_hex(hex_code, base_addr=self.base_addr)
+        blocks = identify_basic_blocks(instructions)
+        return blocks
+
+    def create_initial_state(self):
+        state = SMTState()
+        state.x86_registers.set_register(Register.R13, BitVecVal(0, 64))
+        state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        return state
+
+    def test_ret_status_5_builds_go_and_resume_edges(self):
+        """status=5 时应构建 ret->GO_HOST 和 GO_HOST->resume。"""
+        # block0:
+        #   mov rax, 0x1017
+        #   mov [r13+0xf0], rax
+        #   mov byte ptr [r13+0xe0], 5
+        #   ret
+        # block1 (resume target):
+        #   mov byte ptr [r13+0xe0], 2
+        #   ret
+        hex_code = "48c7c017100000498985f000000041c685e000000005c341c685e000000002c3"
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        executor = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=False)
+        final_states = executor.execute(state)
+
+        call_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.CALL]
+        return_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.RETURN]
+
+        assert len(final_states) >= 1
+        assert len(call_edges) >= 1
+        assert any(e.node_to == 0x1017 for e in return_edges)
+        assert any(
+            e.edge_type == X86EdgeType.CALL and
+            any(r.edge_type == X86EdgeType.RETURN and r.node_from == e.node_to for r in return_edges)
+            for e in call_edges
+        )
+
+    @pytest.mark.parametrize("status_code", [0, 1, 2, 3, 12, 13, 14, 15])
+    def test_ret_non_resumable_status_is_terminal(self, status_code: int):
+        """非 CallGoFunction 模式（仅写 status）应直接终止。"""
+        hex_code = f"41c685e0000000{status_code:02x}c3"
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        executor = X86SymbolicExecutor(blocks, max_depth=10, use_reachability_check=False)
+        final_states = executor.execute(state)
+
+        call_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.CALL]
+        return_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.RETURN]
+
+        assert len(final_states) == 1
+        assert len(call_edges) == 0
+        assert len(return_edges) == 0
+
+    def test_ret_missing_return_address_keeps_terminal(self):
+        """CallGoFunction 模式下 returnAddress 非静态可解析时，保守按终止处理。"""
+        # 写 returnAddress（来自符号寄存器 rax）+ status=5 + ret
+        hex_code = "498985f000000041c685e000000005c3"
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        executor = X86SymbolicExecutor(blocks, max_depth=10, use_reachability_check=False)
+        final_states = executor.execute(state)
+
+        call_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.CALL]
+        return_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.RETURN]
+
+        assert len(final_states) == 1
+        assert len(call_edges) == 1
+        assert len(return_edges) == 0
+
+    def test_ret_go_bridge_consistent_across_reachability_switch(self):
+        """use_reachability_check 开关不改变 ret-go-bridge 语义规则。"""
+        hex_code = "48c7c017100000498985f000000041c685e000000005c341c685e000000002c3"
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        executor_on = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=True)
+        final_on = executor_on.execute(state)
+
+        # 重新创建 state，避免复用符号对象导致干扰
+        state2 = self.create_initial_state()
+        executor_off = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=False)
+        final_off = executor_off.execute(state2)
+
+        on_call_nodes = {e.node_to for e in executor_on.cfg.edges if e.edge_type == X86EdgeType.CALL}
+        off_call_nodes = {e.node_to for e in executor_off.cfg.edges if e.edge_type == X86EdgeType.CALL}
+        on_return_nodes = {e.node_from for e in executor_on.cfg.edges if e.edge_type == X86EdgeType.RETURN}
+        off_return_nodes = {e.node_from for e in executor_off.cfg.edges if e.edge_type == X86EdgeType.RETURN}
+
+        assert len(final_on) >= 1
+        assert len(final_off) >= 1
+        assert len(on_call_nodes & on_return_nodes) >= 1
+        assert len(off_call_nodes & off_return_nodes) >= 1
+
+    def test_multiple_call_go_pattern_have_multiple_go_host_nodes(self):
+        """每个 CallGoFunction 站点应对应一个独立 GO_HOST 节点。"""
+        # block0: returnAddress=0x1017, status=5, ret
+        # block1: returnAddress=0x7777(无对应块), status=5, ret
+        hex_code = (
+            "48c7c017100000498985f000000041c685e000000005c3"
+            "48c7c077770000498985f000000041c685e000000005c3"
+        )
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        executor = X86SymbolicExecutor(blocks, max_depth=30, use_reachability_check=False)
+        executor.execute(state)
+
+        call_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.CALL]
+        go_host_addrs = {e.node_to for e in call_edges}
+        go_host_labels = {
+            executor.cfg.nodes[addr].external_label
+            for addr in go_host_addrs
+            if addr in executor.cfg.nodes
+        }
+
+        assert len(call_edges) == 2
+        assert len(go_host_addrs) == 2
+        assert all(label and label.startswith("GO_HOST_") for label in go_host_labels)
+
+
 class TestHandleJmp:
     """测试 _handle_jmp 方法。"""
 
@@ -993,13 +1124,22 @@ class TestComplexScenarios:
 
         # 执行符号执行，动态构建CFG
         state = self.create_initial_state()
-        executor = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=False)
-        final_states = executor.execute(state, entry_addr=0x212 if any(b.start_addr == 0x212 for b in blocks) else 0x0)
+        executor = X86SymbolicExecutor(blocks, max_depth=32, use_reachability_check=False)
+        # 从机器码起始入口执行，避免跳过前导控制流（含 Go bridge 站点）
+        final_states = executor.execute(state, entry_addr=0x0)
         assert len(final_states) >= 1
 
         # 使用执行器动态构建的CFG
         cfg = executor.cfg
-        assert len(cfg.nodes) == len(blocks)
+        assert any(e.node_from == 0x328 and e.node_to == 0x364 for e in cfg.edges)
+        assert len(cfg.nodes) >= len(blocks)
+        go_host_nodes = [
+            addr for addr, node in cfg.nodes.items()
+            if node.external_label and node.external_label.startswith("GO_HOST_")
+        ]
+        call_edges = [e for e in cfg.edges if e.edge_type == X86EdgeType.CALL]
+        assert len(go_host_nodes) == len({e.node_to for e in call_edges})
+        assert len(go_host_nodes) >= 1
         # 边的数量会根据实际执行路径变化
         assert len(cfg.edges) > 0
 
@@ -1023,13 +1163,22 @@ class TestComplexScenarios:
 
         # 执行符号执行，动态构建CFG
         state = self.create_initial_state()
-        executor = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=False)
-        final_states = executor.execute(state, entry_addr=0x212 if any(b.start_addr == 0x212 for b in blocks) else 0x0)
+        executor = X86SymbolicExecutor(blocks, max_depth=32, use_reachability_check=100)
+        # 从机器码起始入口执行，避免跳过前导控制流（含 Go bridge 站点）
+        final_states = executor.execute(state, entry_addr=0x0)
         assert len(final_states) >= 1
 
         # 使用执行器动态构建的CFG
         cfg = executor.cfg
-        assert len(cfg.nodes) == len(blocks)
+        assert any(e.node_from == 0x328 and e.node_to == 0x364 for e in cfg.edges)
+        assert len(cfg.nodes) >= len(blocks)
+        go_host_nodes = [
+            addr for addr, node in cfg.nodes.items()
+            if node.external_label and node.external_label.startswith("GO_HOST_")
+        ]
+        call_edges = [e for e in cfg.edges if e.edge_type == X86EdgeType.CALL]
+        assert len(go_host_nodes) == len({e.node_to for e in call_edges})
+        assert len(go_host_nodes) >= 1
         # 边的数量会根据实际执行路径变化
         assert len(cfg.edges) > 0
 

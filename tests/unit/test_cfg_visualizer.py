@@ -153,6 +153,29 @@ class TestDOTGenerator:
         assert "xor" in dot or "ret" in dot
         assert "unconditional" in dot.lower()
 
+    def test_generate_x86_cfg_with_go_host_node(self):
+        """测试 x86 CFG 中 GO_HOST 外部节点可视化。"""
+        blocks = [
+            create_x86_block(start_addr=0x1000, instructions=[
+                X86Instruction(addr=0x1000, mnemonic="ret", op_str="", bytes=b"\xc3", size=1)
+            ]),
+            create_x86_block(start_addr=0x1010, instructions=[
+                X86Instruction(addr=0x1010, mnemonic="ret", op_str="", bytes=b"\xc3", size=1)
+            ]),
+        ]
+        cfg = X86DynamicCFG(blocks)
+        go_addr = 0x7FFFFFFFFFFFFFFE
+        cfg.get_or_create_external_node(go_addr, "GO_HOST")
+        cfg.add_edge(0x1000, go_addr, X86EdgeType.CALL)
+        cfg.add_edge(go_addr, 0x1010, X86EdgeType.RETURN)
+
+        generator = DOTGenerator(cfg)
+        dot = generator.generate(title="x86 CFG with GO bridge")
+
+        assert "GO_HOST" in dot
+        assert "call" in dot.lower()
+        assert "return" in dot.lower()
+
     # ---------------------------------------------------------------------
     # HTML 表格格式测试（参数化）
     # ---------------------------------------------------------------------

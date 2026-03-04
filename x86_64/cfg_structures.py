@@ -61,6 +61,7 @@ class X86CFGNode:
     对应一个 X86Block，存储到达此节点的状态列表。
     """
     block: X86Block
+    external_label: Optional[str] = None
     states: List[X86GlobalState] = field(default_factory=list)
     incoming_edges: List[X86CFGEdge] = field(default_factory=list)
     outgoing_edges: List[X86CFGEdge] = field(default_factory=list)
@@ -79,7 +80,8 @@ class X86CFGNode:
         self.outgoing_edges.append(edge)
 
     def __repr__(self):
-        return f"X86Node(0x{self.address:x}, states={len(self.states)}, in={len(self.incoming_edges)}, out={len(self.outgoing_edges)})"
+        label = f", external={self.external_label}" if self.external_label else ""
+        return f"X86Node(0x{self.address:x}{label}, states={len(self.states)}, in={len(self.incoming_edges)}, out={len(self.outgoing_edges)})"
 
 
 class X86DynamicCFG:
@@ -96,6 +98,7 @@ class X86DynamicCFG:
         """
         self.blocks = blocks
         self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
+        self.external_node_labels: Dict[int, str] = {}
         self.nodes: Dict[int, X86CFGNode] = {}  # addr -> X86CFGNode
         self.edges: List[X86CFGEdge] = []
 
@@ -117,10 +120,25 @@ class X86DynamicCFG:
         """
         if addr not in self.nodes:
             block = self.blocks_by_addr.get(addr)
-            if block is None:
+            if block is not None:
+                self.nodes[addr] = X86CFGNode(block=block)
+            elif addr in self.external_node_labels:
+                label = self.external_node_labels[addr]
+                external_block = X86Block(start_addr=addr, end_addr=addr, instructions=[])
+                self.nodes[addr] = X86CFGNode(block=external_block, external_label=label)
+            else:
                 raise ValueError(f"Block not found for addr=0x{addr:x}")
-            self.nodes[addr] = X86CFGNode(block=block)
         return self.nodes[addr]
+
+    def get_or_create_external_node(self, addr: int, label: str) -> X86CFGNode:
+        """Register and return an external pseudo node (e.g. GO_HOST)."""
+        self.external_node_labels[addr] = label
+        if addr in self.nodes:
+            node = self.nodes[addr]
+            if node.external_label is None:
+                node.external_label = label
+            return node
+        return self.get_or_create_node(addr)
 
     def add_edge(self, from_addr: int, to_addr: int, edge_type: X86EdgeType,
                  condition: Optional[BoolRef] = None,
