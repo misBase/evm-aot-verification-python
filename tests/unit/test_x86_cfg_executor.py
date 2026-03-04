@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """测试 x86-64 符号执行引擎功能。"""
 
+from pathlib import Path
+
 import pytest
 from z3 import BitVecVal, Bool
 
@@ -8,8 +10,9 @@ from x86_64.cfg_executor import X86SymbolicExecutor
 from x86_64.cfg import identify_basic_blocks
 from x86_64.disassembler import disassemble_hex, parse_operands
 from x86_64.models import Register, X86Instruction
-from x86_64.cfg_structures import X86EdgeType
+from x86_64.cfg_structures import X86DynamicCFG, X86EdgeType
 from x86_64.cfg_state import X86GlobalState, X86WorldState
+from visualization.cfg_visualizer import CFGVisualizer
 from state.smt_state import SMTState
 
 
@@ -977,6 +980,66 @@ class TestComplexScenarios:
 
         # 应该有多个终止状态
         assert len(final_states) >= 1
+
+    def test_muti_block_hex_cfg_visualization(self):
+        """测试 muti_block.hex 的完整 CFG 构建和可视化。"""
+        test_dir = Path(__file__).parent.parent
+        hex_file = test_dir / "data" / "muti_block.hex"
+        hex_data = hex_file.read_text().strip()
+
+        instructions = disassemble_hex(hex_data, base_addr=0x0)
+        blocks = identify_basic_blocks(instructions)
+        assert len(blocks) > 0
+
+        # 执行符号执行，动态构建CFG
+        state = self.create_initial_state()
+        executor = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=False)
+        final_states = executor.execute(state, entry_addr=0x212 if any(b.start_addr == 0x212 for b in blocks) else 0x0)
+        assert len(final_states) >= 1
+
+        # 使用执行器动态构建的CFG
+        cfg = executor.cfg
+        assert len(cfg.nodes) == len(blocks)
+        # 边的数量会根据实际执行路径变化
+        assert len(cfg.edges) > 0
+
+        visualizer = CFGVisualizer(cfg, cfg_type="x86")
+        dot = visualizer.generate_dot(title="Full Machine CFG from muti_block.hex")
+        assert "digraph CFG" in dot
+
+        output_file = Path("./muti_block_cfg.dot")
+        visualizer.save_to_file(str(output_file), title="Full Machine CFG from muti_block.hex")
+        assert output_file.exists()
+
+    def test_muti_block_08_hex_cfg_visualization(self):
+        """测试 muti_block_08.hex 的完整 CFG 构建和可视化。"""
+        test_dir = Path(__file__).parent.parent
+        hex_file = test_dir / "data" / "muti_block_08.hex"
+        hex_data = hex_file.read_text().strip()
+
+        instructions = disassemble_hex(hex_data, base_addr=0x0)
+        blocks = identify_basic_blocks(instructions)
+        assert len(blocks) > 0
+
+        # 执行符号执行，动态构建CFG
+        state = self.create_initial_state()
+        executor = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=False)
+        final_states = executor.execute(state, entry_addr=0x212 if any(b.start_addr == 0x212 for b in blocks) else 0x0)
+        assert len(final_states) >= 1
+
+        # 使用执行器动态构建的CFG
+        cfg = executor.cfg
+        assert len(cfg.nodes) == len(blocks)
+        # 边的数量会根据实际执行路径变化
+        assert len(cfg.edges) > 0
+
+        visualizer = CFGVisualizer(cfg, cfg_type="x86")
+        dot = visualizer.generate_dot(title="Full Machine CFG from muti_block_08.hex")
+        assert "digraph CFG" in dot
+
+        output_file = Path("./muti_block_08_cfg.dot")
+        visualizer.save_to_file(str(output_file), title="Full Machine CFG from muti_block_08.hex")
+        assert output_file.exists()
 
     def test_diamond_control_flow(self):
         """测试菱形控制流。"""

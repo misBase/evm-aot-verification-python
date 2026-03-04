@@ -83,20 +83,24 @@ class X86SymbolicExecutor:
                                 source_instruction=insn)
 
         elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
-            # 条件跳转：添加两条边（跳转和 fallthrough）
+            # 条件跳转：优先按真实跳转目标判定边类型，避免剪枝后仅剩一支时类型错标
+            target_addr = parse_operands(insn).get('jump_target')
             for i, state in enumerate(new_states):
                 if not state.node:
                     continue
                 to_addr = state.node.address
 
-                # 第一个状态是跳转分支，第二个是 fallthrough
-                if i == 0:
+                if target_addr is not None and to_addr == target_addr:
                     edge_type = X86EdgeType.CONDITIONAL_TRUE
-                    # 从状态约束中提取条件
                     condition = self._extract_jcc_condition(state)
                 else:
-                    edge_type = X86EdgeType.CONDITIONAL_FALSE
-                    condition = None  # fallthrough 条件是跳转条件的否定，在边类型中体现
+                    # 兜底：无法解析目标时退回顺序约定（第一个为 true）
+                    if target_addr is None and i == 0:
+                        edge_type = X86EdgeType.CONDITIONAL_TRUE
+                        condition = self._extract_jcc_condition(state)
+                    else:
+                        edge_type = X86EdgeType.CONDITIONAL_FALSE
+                        condition = None  # fallthrough 条件是跳转条件的否定，在边类型中体现
 
                 self.cfg.add_edge(from_addr, to_addr, edge_type, condition,
                                 source_instruction=insn)
