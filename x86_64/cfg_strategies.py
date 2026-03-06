@@ -130,6 +130,48 @@ class X86ExtensionStrategy(X86SearchStrategy):
         return self.super_strategy.get_strategic_global_state()
 
 
+class X86TopologicalStrategy(X86SearchStrategy):
+    """拓扑排序策略。
+
+    按拓扑序处理 work_list，保证处理某个 block 时其所有前驱都已处理完毕。
+    适用于无循环的 DAG 型 CFG，配合合流点合并优化使用。
+    """
+
+    def __init__(self, work_list: List[X86GlobalState], max_depth: int = 100,
+                 topo_order: Optional[Dict[int, int]] = None):
+        """初始化拓扑排序策略。
+
+        Args:
+            work_list: 工作列表
+            max_depth: 最大深度
+            topo_order: addr → 拓扑序号映射
+        """
+        super().__init__(work_list, max_depth)
+        self.topo_order = topo_order or {}
+
+    def get_strategic_global_state(self) -> Optional[X86GlobalState]:
+        """选择拓扑序最小的状态优先处理。
+
+        Returns:
+            X86GlobalState 或 None
+        """
+        if not self.work_list:
+            return None
+        # 找到拓扑序最小的状态
+        best_idx = 0
+        best_order = self.topo_order.get(
+            self.work_list[0].node.address if self.work_list[0].node else 0,
+            float('inf')
+        )
+        for i in range(1, len(self.work_list)):
+            addr = self.work_list[i].node.address if self.work_list[i].node else 0
+            order = self.topo_order.get(addr, float('inf'))
+            if order < best_order:
+                best_order = order
+                best_idx = i
+        return self.work_list.pop(best_idx)
+
+
 class X86BoundedLoopsStrategy(X86ExtensionStrategy):
     """有界循环策略。
 

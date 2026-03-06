@@ -23,13 +23,26 @@ class ParseError(VerificationError):
 
 class LogicError(VerificationError):
     """逻辑错误时引发的异常。
-    
+
     这可能发生在：
     - IR结构不一致（例如，静态跳转但目标块不存在）
     - 控制流图构建时的逻辑错误
     - 程序逻辑上的不一致
     """
-    pass
+    def __init__(self, error_code: str, error_info: str, message: str = ""):
+        """初始化LogicError。
+
+        Args:
+            error_code: 错误代码（例如，"dynamic_return_address"）
+            error_info: 关于错误的信息（例如，块地址）
+            message: 附加错误消息
+        """
+        self.error_code = error_code
+        self.error_info = error_info
+        error_msg = f"Logic error ({error_code}): {error_info}"
+        if message:
+            error_msg += f". {message}"
+        super().__init__(error_msg)
 
 
 class VerificationTimeout(VerificationError):

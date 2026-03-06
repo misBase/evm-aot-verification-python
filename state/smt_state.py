@@ -684,13 +684,22 @@ class SMTState:
         self.callvalue = BitVec('CallValue', 256)
         self.basefee = BitVec('BaseFee', 256)
 
+    @classmethod
+    def _create_empty(cls) -> 'SMTState':
+        """创建空的SMTState实例，跳过__init__以避免不必要的Z3对象创建。
+
+        Returns:
+            未初始化字段的SMTState实例
+        """
+        return cls.__new__(cls)
+
     def copy(self) -> 'SMTState':
         """创建状态的副本。
 
         Returns:
             新SMTState实例
         """
-        new_state = SMTState()
+        new_state = SMTState._create_empty()
         new_state.evm_stack = self.evm_stack.copy()
         new_state.evm_memory = self.evm_memory.copy()
         new_state.evm_storage = self.evm_storage.copy()
@@ -700,13 +709,13 @@ class SMTState:
         new_state.return_offset = self.return_offset
         new_state.return_length = self.return_length
         new_state.pc = self.pc
-        
+
         # 复制环境信息
         new_state.calldata = self.calldata
         new_state.calldatasize = self.calldatasize
         new_state.callvalue = self.callvalue
         new_state.basefee = self.basefee
-        
+
         return new_state
 
     @staticmethod

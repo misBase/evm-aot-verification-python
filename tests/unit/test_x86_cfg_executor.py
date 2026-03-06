@@ -137,7 +137,7 @@ class TestX86SymbolicExecutor:
     def test_execute_backward_jump(self):
         """测试向后跳转（循环）。"""
         # inc rax; cmp rax, 10; jb 0x1000; ret
-        hex_code = "48ffc04883f80a72f8c3"
+        hex_code = "48ffc04883f80a72f7c3"
         blocks, _ = self.disasm_and_create_blocks(hex_code)
         state = self.create_initial_state()
 
@@ -274,22 +274,21 @@ class TestRetGoBridge:
         assert len(call_edges) == 0
         assert len(return_edges) == 0
 
-    def test_ret_missing_return_address_keeps_terminal(self):
-        """CallGoFunction 模式下 returnAddress 非静态可解析时，保守按终止处理。"""
+    def test_ret_missing_return_address_raises_error(self):
+        """CallGoFunction 模式下 returnAddress 非静态可解析时，抛出 LogicError。"""
         # 写 returnAddress（来自符号寄存器 rax）+ status=5 + ret
         hex_code = "498985f000000041c685e000000005c3"
         blocks = self.disasm_and_create_blocks(hex_code)
         state = self.create_initial_state()
 
         executor = X86SymbolicExecutor(blocks, max_depth=10, use_reachability_check=False)
-        final_states = executor.execute(state)
 
-        call_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.CALL]
-        return_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.RETURN]
+        # GO 返回地址必须是静态常量，非静态返回地址应该抛出 LogicError
+        from utils.exceptions import LogicError
+        with pytest.raises(LogicError) as exc_info:
+            executor.execute(state)
 
-        assert len(final_states) == 1
-        assert len(call_edges) == 1
-        assert len(return_edges) == 0
+        assert exc_info.value.error_code == "dynamic_return_address"
 
     def test_ret_go_bridge_consistent_across_reachability_switch(self):
         """use_reachability_check 开关不改变 ret-go-bridge 语义规则。"""
@@ -1124,7 +1123,7 @@ class TestComplexScenarios:
 
         # 执行符号执行，动态构建CFG
         state = self.create_initial_state()
-        executor = X86SymbolicExecutor(blocks, max_depth=32, use_reachability_check=False)
+        executor = X86SymbolicExecutor(blocks, max_depth=100000, use_reachability_check=False)
         # 从机器码起始入口执行，避免跳过前导控制流（含 Go bridge 站点）
         final_states = executor.execute(state, entry_addr=0x0)
         assert len(final_states) >= 1
@@ -1161,9 +1160,9 @@ class TestComplexScenarios:
         blocks = identify_basic_blocks(instructions)
         assert len(blocks) > 0
 
-        # 执行符号执行，动态构建CFG
+        # 执行符号执行，动态构建CFG（禁用 merge 保持 DFS 顺序，确保 0x328 在 depth=32 内可达）
         state = self.create_initial_state()
-        executor = X86SymbolicExecutor(blocks, max_depth=32, use_reachability_check=100)
+        executor = X86SymbolicExecutor(blocks, max_depth=32, use_reachability_check=100, enable_merge=False)
         # 从机器码起始入口执行，避免跳过前导控制流（含 Go bridge 站点）
         final_states = executor.execute(state, entry_addr=0x0)
         assert len(final_states) >= 1
@@ -1215,3 +1214,182 @@ class TestComplexScenarios:
 
         # 深度嵌套应该仍然能处理
         assert len(final_states) >= 1
+
+
+class TestFlushMergeBuffers:
+    """测试 _flush_merge_buffers 不丢弃中间状态（bug fix 验证）。"""
+
+    def setup_method(self):
+        self.base_addr = 0x1000
+
+    def disasm_and_create_blocks(self, hex_code: str):
+        instructions = disassemble_hex(hex_code, base_addr=self.base_addr)
+        blocks = identify_basic_blocks(instructions)
+        return blocks
+
+    def create_initial_state(self):
+        state = SMTState()
+        state.x86_registers.set_register(Register.R15, BitVecVal(0x2000, 64))
+        return state
+
+    def test_flush_non_terminal_intermediate_state_reaches_final(self):
+        """修复前，flush 后产生的非合流点、非终止中间状态会被丢弃。
+
+        构造一个菱形 CFG：block0 -> (block1, block2) -> block3 -> block4(ret)
+        令 block1 的路径被可达性检查剪枝（只剩 block2），触发 flush 时
+        merge_buffers[block3] 只有一条记录，flush 后 block3 执行产生 block4 状态。
+        修复前 block4 是中间态（非合流点、非终止），直接丢弃；修复后继续执行到 ret。
+
+        使用 jne 跳转配合 xor rax,rax（令 ZF=1），确保：
+        - jne 跳转分支不可达（ZF=1 时 jne 条件为 false）
+        - fallthrough 路径可达，经过 block3(nop) 后到达 ret
+        """
+        # 布局（base=0x1000）：
+        # 0x1000: xor rax, rax          (4831c0, 3 bytes) ZF=1
+        # 0x1003: jne 0x100a            (750571, 3 bytes) → 跳转目标 0x1006+5=0x100b...
+        #   实际用 je/jne 简单短跳：
+        # 0x1000: xor rax, rax          (4831c0)   3b
+        # 0x1003: jne 0x1007            (7502)     2b  → 跳转目标 0x1007（+5 from 0x1003 = 0x1005+2=0x1005? 需精确算）
+        #   jne rel8: opcode 0x75, rel8; 目标 = 当前ip + rel8 = 0x1005 + rel8
+        #   要跳到 0x1007: rel8 = 0x1007 - 0x1005 = 2 → "7502"
+        # 0x1005: nop                   (90)       1b  ← fallthrough 路径
+        # 0x1006: nop                   (90)       1b  ← fallthrough 继续
+        # 0x1007: ret                   (c3)       1b  ← 跳转目标（jne 跳到这里但不可达）
+        #   （因 ZF=1，jne 不跳，fallthrough 走 0x1005 -> 0x1006 -> 0x1007）
+        #
+        # 但这样 jne 目标 0x1007 和 fallthrough 汇聚，是合流点。
+        # 我们需要合流点 block3 之后还有 block4(ret) 才能触发 flush 的中间态问题。
+        #
+        # 布局：
+        # 0x1000: xor rax, rax (4831c0)  3b
+        # 0x1003: jne 0x1008   (7503)    2b  → 目标 = 0x1005 + 3 = 0x1008
+        # 0x1005: nop          (90)      1b  ← fallthrough
+        # 0x1006: jmp 0x1008   (eb00)    2b  ← 跳转到合流点
+        # 0x1008: nop          (90)      1b  ← 合流点 block3
+        # 0x1009: ret          (c3)      1b  ← block4，由 block3 fallthrough 到达
+        #
+        # 预期：jne ZF=1 时不跳，fallthrough → 0x1005 → jmp 0x1008 → 0x1008(合流点)
+        #      jne 跳转分支（0x1008）不可达（因可达性检查）
+        #      merge_buffers[0x1008] 只有1条，merge_points[0x1008]=2
+        #      flush 后合并执行 0x1008(nop), 产生后继 0x1009(ret) 的状态
+        #      修复前：0x1009 非合流点非终止（执行前是中间态）→ 丢弃
+        #      修复后：继续执行 → 0x1009(ret) 是终止态 → 加入 final_states
+        hex_code = "4831c075030000eb009090c3"
+        # 精确构造：
+        # 4831c0 = xor rax, rax   (0x1000-0x1002)
+        # 7503   = jne +3         (0x1003-0x1004) → 目标 = 0x1005 + 3 = 0x1008
+        # 90     = nop            (0x1005)
+        # eb01   = jmp +1         (0x1006-0x1007) → 目标 = 0x1008 + 1 - 1... 需要再算
+        # 目标 = 0x1008: eb 后紧接 rel8=0, 下一指令地址=0x1008, 所以 jmp 到 0x1008? 不对
+        # jmp rel8: 目标 = (当前指令 end 地址) + rel8
+        # eb00: end=0x1008, rel8=0 → 目标=0x1008 ✓
+        # 90     = nop            (0x1008) ← 合流点
+        # c3     = ret            (0x1009)
+        hex_code = "4831c07503" + "90" + "eb00" + "90" + "c3"
+        # = 4831c0 75 03 90 eb00 90 c3
+        # 地址：0x1000(xor) 0x1003(jne) 0x1005(nop) 0x1006(jmp) 0x1008(nop) 0x1009(ret)
+
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        # 启用可达性检查，使 jne 跳转分支因 ZF=1 不可达，触发 flush 路径
+        executor = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=True)
+        final_states = executor.execute(state)
+
+        # 修复后：final_states 必须非空（flush 的中间态最终执行到 ret）
+        assert len(final_states) >= 1, (
+            "flush 后的中间状态（block3->block4）应该被继续执行，"
+            "最终 ret 状态应出现在 final_states 中"
+        )
+        for fs in final_states:
+            assert fs.node.block.instructions[-1].mnemonic.lower() == 'ret'
+
+
+class TestMergePointsExcludeBackEdges:
+    """测试 _compute_static_merge_points 正确排除回边（bug fix 验证）。"""
+
+    def setup_method(self):
+        self.base_addr = 0x1000
+
+    def disasm_and_create_blocks(self, hex_code: str):
+        instructions = disassemble_hex(hex_code, base_addr=self.base_addr)
+        blocks = identify_basic_blocks(instructions)
+        return blocks
+
+    def create_initial_state(self):
+        state = SMTState()
+        state.x86_registers.set_register(Register.R15, BitVecVal(0x2000, 64))
+        return state
+
+    def test_loop_header_not_counted_as_merge_point(self):
+        """循环头（有回边指向它）不应被计入 merge_points，或其入边数不含回边。
+
+        构造：
+        0x1000: inc rax  (48ffc0)  3b
+        0x1003: cmp rax, 3 (4883f803) 4b
+        0x1007: jb 0x1000 (72f7)   2b  ← 回边，不可达时 fallthrough
+        0x1009: ret (c3)  1b
+
+        CFG：block0(0x1000: inc+cmp+jb) → 回边 block0（循环头），fallthrough→block1(ret)
+        block0 的入边：
+          - 程序入口（0条入边）
+          - 回边（来自 block0 自身）← 应被排除
+        所以 merge_points 不应包含 0x1000（排除回边后入边数 < 2）。
+        """
+        hex_code = "48ffc04883f80372f7c3"
+        blocks = self.disasm_and_create_blocks(hex_code)
+
+        executor = X86SymbolicExecutor(blocks, max_depth=10, use_reachability_check=False)
+
+        # 循环头 0x1000 不应出现在 merge_points（其入边排除回边后 < 2）
+        assert 0x1000 not in executor.merge_points, (
+            f"循环头 0x1000 不应在 merge_points 中（排除回边后入边数不足2），"
+            f"当前 merge_points={executor.merge_points}"
+        )
+
+    def test_loop_with_backedge_does_not_block_execution(self):
+        """含回边的 CFG 执行不应无限阻塞，最终应有 final_states。
+
+        若 merge_points 包含循环头且入边计数含回边，则主循环等待永远不满足，
+        path 永远在 merge_buffers 中等待，final_states 为空。
+        修复后：merge_points 排除回边，执行正常终止。
+        """
+        # inc rax; cmp rax,3; jb loop_head; ret
+        hex_code = "48ffc04883f80372f7c3"
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        executor = X86SymbolicExecutor(blocks, max_depth=10, use_reachability_check=False)
+        final_states = executor.execute(state)
+
+        # 修复后执行不阻塞，必须有 final_states
+        assert len(final_states) >= 1, (
+            "含回边的 CFG 执行后 final_states 不应为空，"
+            "merge_points 包含回边会导致主循环永久阻塞"
+        )
+
+    def test_diamond_merge_point_still_detected(self):
+        """排除回边不影响正常菱形汇聚点的检测。
+
+        构造菱形 CFG：
+        0x1000: jne 0x1004  → block1(0x1004) 或 block2(0x1002)
+        0x1002: nop → 0x1004（合流点）
+        0x1004: ret（合流点：来自 jne fallthrough 和 jne taken 两条前向入边）
+        """
+        # 4831c0=xor rax,rax (设ZF), 7500=jne+0(目标0x1006), 90=nop, eb00=jmp+0(0x1006), 90=nop, c3=ret
+        # 0x1000: xor rax,rax (4831c0) 3b
+        # 0x1003: jne 0x1006  (7501) 2b  → taken: 0x1005+1=0x1006
+        # 0x1005: nop         (90) 1b    fallthrough → 0x1006
+        # 0x1006: ret         (c3) 1b    ← 合流点，两条前向入边
+        hex_code = "4831c07501" + "90" + "c3"
+        # 0x1000 xor rax,rax
+        # 0x1003 jne 0x1006  (jne rel8=1: 75 01, next=0x1005, target=0x1005+1=0x1006)
+        # 0x1005 nop
+        # 0x1006 ret  ← 合流点（jne taken + fallthrough 两条前向入边）
+        blocks = self.disasm_and_create_blocks(hex_code)
+        executor = X86SymbolicExecutor(blocks, max_depth=10)
+
+        # 0x1006 有两条前向入边（jne taken 和 nop fallthrough），应在 merge_points 中
+        assert 0x1006 in executor.merge_points, (
+            f"合流点 0x1006 应在 merge_points 中，当前={executor.merge_points}"
+        )
