@@ -387,78 +387,78 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
 
     elif kind == "SUB":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.sub_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "MUL":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.mul_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "DIV":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.div_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "SDIV":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.sdiv_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "MOD":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.mod_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "SMOD":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.smod_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "EXP":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.exp_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "LT":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.lt_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "GT":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.gt_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "SLT":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.slt_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "SGT":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.sgt_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
@@ -504,15 +504,15 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
 
     elif kind == "SIGNEXTEND":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.signextend_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "BYTE":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
+        b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.byte_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
         return state
@@ -591,8 +591,8 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     
     elif kind == "MSTORE":
         # MSTORE：弹出偏移量和值，将32字节存储到内存
-        value, stack_after_pop1 = state.evm_stack.pop()
-        offset_bv, stack_after_pop2 = stack_after_pop1.pop()
+        offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        value, stack_after_pop2 = stack_after_pop1.pop()
         new_memory_state = state.evm_memory.store_256bit(offset_bv, value)
         state.evm_stack = stack_after_pop2
         state.evm_memory = new_memory_state
@@ -617,8 +617,8 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
 
     elif kind == "SSTORE":
         # SSTORE: Pop key and value, store in storage
-        val, stack_after_pop1 = state.evm_stack.pop()
-        key, stack_after_pop2 = stack_after_pop1.pop()
+        key, stack_after_pop1 = state.evm_stack.pop()
+        val, stack_after_pop2 = stack_after_pop1.pop()
         state.evm_storage = state.evm_storage.sstore(key, val)
         state.evm_stack = stack_after_pop2
         return state
@@ -656,8 +656,8 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     elif kind == "SHA3":
         # SHA3: Pop offset and length, push symbolic hash
         # We model hash as an uninterpreted function of the memory content
-        length_bv, stack_after_pop1 = state.evm_stack.pop()
-        offset_bv, stack_after_pop2 = stack_after_pop1.pop()
+        offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        length_bv, stack_after_pop2 = stack_after_pop1.pop()
         
         # Use an uninterpreted function for SHA3
         # Since memory is an array, we can use a function that takes (Memory, offset, length)
@@ -675,9 +675,9 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     
     elif kind == "RETURN":
         # RETURN：弹出偏移量和长度，返回memory[offset:offset+length]
-        # 从栈中弹出长度和偏移量
-        length_bv, stack_after_pop1 = state.evm_stack.pop()
-        offset_bv, stack_after_pop2 = stack_after_pop1.pop()
+        # 从栈中弹出偏移量和长度
+        offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        length_bv, stack_after_pop2 = stack_after_pop1.pop()
         
         # 将长度截断为64位以便存储
         from z3 import Extract as Z3Extract
@@ -743,13 +743,13 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # 获取主题数量
         num_topics = op.immediate if op.immediate is not None else 0
 
+        # 弹出 offset 和 size（栈顶两个）
+        _, state.evm_stack = state.evm_stack.pop()
+        _, state.evm_stack = state.evm_stack.pop()
+
         # 弹出所有主题
         for _ in range(num_topics):
             _, state.evm_stack = state.evm_stack.pop()
-
-        # 弹出 size 和 offset
-        _, state.evm_stack = state.evm_stack.pop()
-        _, state.evm_stack = state.evm_stack.pop()
 
         return state
 

@@ -201,6 +201,159 @@ def test_shift_semantics():
     assert is_true(simplify(sar_pos_big_shift == BitVecVal(0, 256)))
 
 
+def _make_state_with_stack(*values):
+    """创建一个将values依次push到栈上的SMTState（最后一个值在栈顶）。"""
+    state = SMTState()
+    for v in values:
+        state.evm_stack = state.evm_stack.push(BitVecVal(v, 256))
+    return state
+
+
+def test_sub_opcode_stack_order():
+    """测试SUB从栈的弹出顺序：栈顶为被减数，次顶为减数。result = top - second"""
+    op = EvmOperator(kind="SUB", pc=0)
+    # 栈: [10(次顶), 3(栈顶)] -> 3 - 10 = ... 不对，应是 top - second = 3 - 10
+    # EVM SUB: a=pop(栈顶)=3, b=pop(次顶)=10, result=a-b=3-10 -> underflow
+    # 换: top=10, second=3 -> result=10-3=7
+    state = _make_state_with_stack(3, 10)  # 3先push，10后push（10在栈顶）
+    result_state = evm_operator_to_z3(op, state)
+    top, _ = result_state.evm_stack.pop()
+    assert is_true(simplify(top == BitVecVal(7, 256))), f"SUB: 10-3 should be 7, got {simplify(top)}"
+
+    # 反向验证：top=3, second=10 -> 3-10 underflow = 2^256-7
+    state2 = _make_state_with_stack(10, 3)
+    result_state2 = evm_operator_to_z3(op, state2)
+    top2, _ = result_state2.evm_stack.pop()
+    expected2 = BitVecVal((1 << 256) - 7, 256)
+    assert is_true(simplify(top2 == expected2)), f"SUB: 3-10 should wrap, got {simplify(top2)}"
+
+
+def test_div_opcode_stack_order():
+    """测试DIV从栈的弹出顺序：result = top / second"""
+    op = EvmOperator(kind="DIV", pc=0)
+    # top=10, second=3 -> 10/3=3
+    state = _make_state_with_stack(3, 10)
+    result_state = evm_operator_to_z3(op, state)
+    top, _ = result_state.evm_stack.pop()
+    assert is_true(simplify(top == BitVecVal(3, 256))), f"DIV: 10/3 should be 3, got {simplify(top)}"
+
+    # top=3, second=10 -> 3/10=0
+    state2 = _make_state_with_stack(10, 3)
+    result_state2 = evm_operator_to_z3(op, state2)
+    top2, _ = result_state2.evm_stack.pop()
+    assert is_true(simplify(top2 == BitVecVal(0, 256))), f"DIV: 3/10 should be 0, got {simplify(top2)}"
+
+
+def test_mod_opcode_stack_order():
+    """测试MOD从栈的弹出顺序：result = top % second"""
+    op = EvmOperator(kind="MOD", pc=0)
+    # top=10, second=3 -> 10%3=1
+    state = _make_state_with_stack(3, 10)
+    result_state = evm_operator_to_z3(op, state)
+    top, _ = result_state.evm_stack.pop()
+    assert is_true(simplify(top == BitVecVal(1, 256))), f"MOD: 10%3 should be 1, got {simplify(top)}"
+
+    # top=3, second=10 -> 3%10=3
+    state2 = _make_state_with_stack(10, 3)
+    result_state2 = evm_operator_to_z3(op, state2)
+    top2, _ = result_state2.evm_stack.pop()
+    assert is_true(simplify(top2 == BitVecVal(3, 256))), f"MOD: 3%10 should be 3, got {simplify(top2)}"
+
+
+def test_lt_opcode_stack_order():
+    """测试LT从栈的弹出顺序：result = (top < second) ? 1 : 0"""
+    op = EvmOperator(kind="LT", pc=0)
+    # top=3, second=10 -> 3 < 10 = 1
+    state = _make_state_with_stack(10, 3)
+    result_state = evm_operator_to_z3(op, state)
+    top, _ = result_state.evm_stack.pop()
+    assert is_true(simplify(top == BitVecVal(1, 256))), f"LT: 3<10 should be 1, got {simplify(top)}"
+
+    # top=10, second=3 -> 10 < 3 = 0
+    state2 = _make_state_with_stack(3, 10)
+    result_state2 = evm_operator_to_z3(op, state2)
+    top2, _ = result_state2.evm_stack.pop()
+    assert is_true(simplify(top2 == BitVecVal(0, 256))), f"LT: 10<3 should be 0, got {simplify(top2)}"
+
+
+def test_gt_opcode_stack_order():
+    """测试GT从栈的弹出顺序：result = (top > second) ? 1 : 0"""
+    op = EvmOperator(kind="GT", pc=0)
+    # top=10, second=3 -> 10 > 3 = 1
+    state = _make_state_with_stack(3, 10)
+    result_state = evm_operator_to_z3(op, state)
+    top, _ = result_state.evm_stack.pop()
+    assert is_true(simplify(top == BitVecVal(1, 256))), f"GT: 10>3 should be 1, got {simplify(top)}"
+
+    # top=3, second=10 -> 3 > 10 = 0
+    state2 = _make_state_with_stack(10, 3)
+    result_state2 = evm_operator_to_z3(op, state2)
+    top2, _ = result_state2.evm_stack.pop()
+    assert is_true(simplify(top2 == BitVecVal(0, 256))), f"GT: 3>10 should be 0, got {simplify(top2)}"
+
+
+def test_mstore_mload_opcode():
+    """测试MSTORE/MLOAD的栈顺序：MSTORE top=offset, second=value。"""
+    from state.smt_state import EVMMemoryState
+    mstore_op = EvmOperator(kind="MSTORE", pc=0)
+    mload_op = EvmOperator(kind="MLOAD", pc=0)
+
+    state = SMTState()
+    state.evm_memory = EVMMemoryState(msize=BitVecVal(0, 64))
+    # MSTORE: top=offset=32, second=value=0xDEADBEEF
+    state.evm_stack = state.evm_stack.push(BitVecVal(0xDEADBEEF, 256))  # value（先push）
+    state.evm_stack = state.evm_stack.push(BitVecVal(32, 256))           # offset（后push，栈顶）
+    state = evm_operator_to_z3(mstore_op, state)
+
+    # MLOAD: top=offset=32，应读回 0xDEADBEEF
+    state.evm_stack = state.evm_stack.push(BitVecVal(32, 256))
+    state = evm_operator_to_z3(mload_op, state)
+    loaded, _ = state.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(loaded == BitVecVal(0xDEADBEEF, 256))
+    assert solver.check() == sat, "MSTORE/MLOAD round-trip failed"
+
+
+def test_sstore_sload_opcode():
+    """测试SSTORE/SLOAD的栈顺序：SSTORE top=key, second=value。"""
+    sstore_op = EvmOperator(kind="SSTORE", pc=0)
+    sload_op = EvmOperator(kind="SLOAD", pc=0)
+
+    state = SMTState()
+    # SSTORE: top=key=0xAA, second=value=0x1234
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x1234, 256))  # value（先push）
+    state.evm_stack = state.evm_stack.push(BitVecVal(0xAA, 256))    # key（后push，栈顶）
+    state = evm_operator_to_z3(sstore_op, state)
+
+    # SLOAD: top=key=0xAA，应读回 0x1234
+    state.evm_stack = state.evm_stack.push(BitVecVal(0xAA, 256))
+    state = evm_operator_to_z3(sload_op, state)
+    loaded, _ = state.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(loaded == BitVecVal(0x1234, 256))
+    assert solver.check() == sat, "SSTORE/SLOAD round-trip failed"
+
+
+def test_return_opcode_stack_order():
+    """测试RETURN的栈顺序：top=offset, second=length。"""
+    from state.smt_state import EVMMemoryState
+    return_op = EvmOperator(kind="RETURN", pc=0)
+
+    state = SMTState()
+    state.evm_memory = EVMMemoryState(msize=BitVecVal(0, 64))
+    # RETURN: top=offset=64, second=length=32
+    state.evm_stack = state.evm_stack.push(BitVecVal(32, 256))   # length（先push）
+    state.evm_stack = state.evm_stack.push(BitVecVal(64, 256))   # offset（后push，栈顶）
+    state = evm_operator_to_z3(return_op, state)
+
+    solver = Solver()
+    solver.add(state.return_offset == BitVecVal(64, 64))
+    solver.add(state.return_length == BitVecVal(32, 64))
+    assert solver.check() == sat, "RETURN: offset/length stack order wrong"
+
+
 def test_mstore8_opcode():
     """测试MSTORE8写低8位 + 256位offset截断。"""
     op = EvmOperator(kind="MSTORE8", pc=0)
