@@ -4,8 +4,11 @@ x86-64 符号执行引擎（参考 evm_ir）。
 定义 X86SymbolicExecutor 类，实现 worklist 驱动的符号执行。
 """
 
+import logging
 from typing import List, Dict, Optional, Tuple, Set
 from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat
+
+logger = logging.getLogger(__name__)
 
 from .aot_profile import GO_HPC_EVM_PROFILE
 from .models import Register, X86Block, X86Instruction
@@ -441,16 +444,16 @@ class X86SymbolicExecutor:
                         last_insn = merged.node.block.instructions[-1]
                         self.manage_cfg(last_insn, new_states, merged.node.address)
 
-                    # 新状态可能又到达合流点，或需要继续执行
+                    # 新状态可能又到达合流点，或需要继续执行。
+                    # 注意：ret 结尾块也必须先执行一次，才能让 GO bridge
+                    # 有机会建立 ret -> GO_HOST -> returnAddress 边。
                     for ns in new_states:
                         ns_addr = ns.node.address if ns.node else None
                         if ns_addr is not None and ns_addr in self.merge_points:
                             buf2 = self.merge_buffers.setdefault(ns_addr, [])
                             buf2.append(ns)
-                        elif self._is_terminal_state(ns):
-                            self.final_states.append(ns)
                         else:
-                            # 非合流点非终止：继续执行，结果重新派发
+                            # 非合流点：继续执行，结果重新派发
                             self._flush_execute_state(ns)
 
                 if self._is_terminal_state(merged):
@@ -463,6 +466,11 @@ class X86SymbolicExecutor:
         depth >= max_depth 时停止递归，防止无限循环。
         """
         if state.depth >= self.max_depth:
+            node_addr = f"0x{state.node.address:x}" if state.node else "None"
+            logger.debug(
+                "[CFG] flush 剪枝：depth=%d >= max_depth=%d，停止递归 node=%s",
+                state.depth, self.max_depth, node_addr
+            )
             return
 
         self._detect_and_handle_loops(state)
@@ -483,9 +491,9 @@ class X86SymbolicExecutor:
                 if ns_addr is not None and ns_addr in self.merge_points:
                     buf2 = self.merge_buffers.setdefault(ns_addr, [])
                     buf2.append(ns)
-                elif self._is_terminal_state(ns):
-                    self.final_states.append(ns)
                 else:
+                    # ret 子块也必须先执行一次，才能正确建立 GO bridge
+                    # 或确认它真的是终止态。
                     self._flush_execute_state(ns)
 
         if self._is_terminal_state(state):
@@ -588,6 +596,12 @@ class X86SymbolicExecutor:
             node=target_node
         )
         new_state.depth = global_state.depth + 1
+        logger.debug(
+            "[CFG] jmp depth: %d -> %d，from=0x%x to=0x%x",
+            global_state.depth, new_state.depth,
+            global_state.node.address if global_state.node else 0,
+            target_addr
+        )
         return [new_state]
 
     def _handle_jcc(self, global_state: X86GlobalState, mstate: SMTState,
@@ -659,6 +673,12 @@ class X86SymbolicExecutor:
                 node=target_node
             )
             jump_state.depth = global_state.depth + 1
+            logger.debug(
+                "[CFG] jcc(taken) depth: %d -> %d，from=0x%x to=0x%x",
+                global_state.depth, jump_state.depth,
+                global_state.node.address if global_state.node else 0,
+                target_addr
+            )
             new_states.append(jump_state)
 
         # 分支 2：顺序执行（条件为假）
@@ -677,6 +697,12 @@ class X86SymbolicExecutor:
                 node=fallthrough_node
             )
             fallthrough_state.depth = global_state.depth + 1
+            logger.debug(
+                "[CFG] jcc(fallthrough) depth: %d -> %d，from=0x%x to=0x%x",
+                global_state.depth, fallthrough_state.depth,
+                global_state.node.address if global_state.node else 0,
+                fallthrough_addr
+            )
             new_states.append(fallthrough_state)
 
         return new_states
@@ -1001,6 +1027,8 @@ class X86SymbolicExecutor:
             # execute_state 已经为 ret 分流写入了标记，优先使用。
             marked_terminal = getattr(global_state, "_ret_terminal_branch", None)
             if marked_terminal is not None:
+                if not self.use_reachability_check:
+                    return bool(marked_terminal)
                 return bool(marked_terminal) and global_state.get_constraints().is_possible()
 
             # 兜底：若未经过 execute_state，ret 默认按终止处理。

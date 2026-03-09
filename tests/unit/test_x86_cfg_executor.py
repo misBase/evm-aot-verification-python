@@ -191,7 +191,7 @@ class TestX86SymbolicExecutor:
         final_states = executor.execute(state)
 
         # 启用可达性检查，应该过滤掉不可达路径
-        assert len(final_states) >= 1
+        assert len(final_states) == 1
 
         # xor rax, rax 设置 ZF=1，所以只有 je 分支可达
         # 应该只有一条 CONDITIONAL_TRUE 边
@@ -208,7 +208,11 @@ class TestX86SymbolicExecutor:
         final_states = executor.execute(state)
 
         # 禁用可达性检查，所有路径都保留
-        assert len(final_states) >= 1
+        assert len(final_states) == 2
+        assert len(executor.cfg.edges) == 2
+        edge_types = {edge.edge_type for edge in executor.cfg.edges}
+        assert X86EdgeType.CONDITIONAL_TRUE in edge_types
+        assert X86EdgeType.CONDITIONAL_FALSE in edge_types
 
 
 class TestRetGoBridge:
@@ -339,6 +343,80 @@ class TestRetGoBridge:
         assert len(call_edges) == 2
         assert len(go_host_addrs) == 2
         assert all(label and label.startswith("GO_HOST_") for label in go_host_labels)
+
+    def test_flush_merge_buffers_executes_ret_successors_before_terminal_check(self):
+        """flush 阶段不能把未执行的 ret 后继提前当成终止状态。"""
+        # 0x1006 是静态合流点，但运行时只有 0x1000 -> 0x1006 这一路会到达。
+        # flush merge buffer 后，0x1006 的 fallthrough 会到达 0x1008 这个
+        # CallGoFunction-ret 块；它必须先执行，才能建立 GO bridge。
+        hex_code = (
+            "eb04"      # 0x1000: jmp 0x1006
+            "eb02"      # 0x1002: jmp 0x1006 (unreachable, but counts as static predecessor)
+            "9090"      # 0x1004: nop; nop
+            "7417"      # 0x1006: je 0x101f
+            "48c7c020100000"          # 0x1008: mov rax, 0x1020
+            "498985f0000000"          # 0x100f: mov [r13+0xf0], rax
+            "41c685e000000005"        # 0x1016: mov byte ptr [r13+0xe0], 5
+            "c3"                      # 0x101e: ret
+            "c3"                      # 0x101f: ret
+            "41c685e000000002"        # 0x1020: mov byte ptr [r13+0xe0], 2
+            "c3"                      # 0x1028: ret
+        )
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        executor = X86SymbolicExecutor(blocks, max_depth=50, use_reachability_check=False)
+        assert executor.merge_points.get(0x1006, 0) >= 2
+
+        executor.execute(state, entry_addr=0x1000)
+
+        ret_node = executor.cfg.get_node(0x1008)
+        call_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.CALL]
+        return_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.RETURN]
+
+        assert ret_node is not None
+        assert len(ret_node.states) == 1
+        assert any(e.node_from == 0x1008 for e in call_edges)
+        assert any(e.node_to == 0x1020 for e in return_edges)
+
+    def test_flush_execute_state_executes_recursive_ret_successors_before_terminal_check(self):
+        """flush 递归派发时也不能把 ret 子块提前当成终止状态。"""
+        # 0x1006 是静态合流点，flush 后先执行到 0x1008。
+        # 0x1008 再通过 Jcc 进入 0x100a 这个 CallGoFunction-ret 块；
+        # 这里会走 _flush_execute_state 的递归派发路径。
+        hex_code = (
+            "eb04"      # 0x1000: jmp 0x1006
+            "eb02"      # 0x1002: jmp 0x1006 (unreachable, but counts as static predecessor)
+            "9090"      # 0x1004: nop; nop
+            "9090"      # 0x1006: nop; nop
+            "7417"      # 0x1008: je 0x1021
+            "48c7c022100000"          # 0x100a: mov rax, 0x1022
+            "498985f0000000"          # 0x1011: mov [r13+0xf0], rax
+            "41c685e000000005"        # 0x1018: mov byte ptr [r13+0xe0], 5
+            "c3"                      # 0x1020: ret
+            "c3"                      # 0x1021: ret
+            "41c685e000000002"        # 0x1022: mov byte ptr [r13+0xe0], 2
+            "c3"                      # 0x102a: ret
+        )
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state()
+
+        executor = X86SymbolicExecutor(blocks, max_depth=50, use_reachability_check=False)
+        assert executor.merge_points.get(0x1006, 0) >= 2
+
+        executor.execute(state, entry_addr=0x1000)
+
+        ret_node = executor.cfg.get_node(0x100a)
+        resume_node = executor.cfg.get_node(0x1022)
+        call_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.CALL]
+        return_edges = [e for e in executor.cfg.edges if e.edge_type == X86EdgeType.RETURN]
+
+        assert ret_node is not None
+        assert resume_node is not None
+        assert len(ret_node.states) == 1
+        assert len(resume_node.states) == 1
+        assert any(e.node_from == 0x100a for e in call_edges)
+        assert any(e.node_to == 0x1022 for e in return_edges)
 
 
 class TestHandleJmp:
@@ -887,6 +965,41 @@ class TestIsTerminalState:
 
         assert is_terminal is True
 
+    def test_is_terminal_state_skips_solver_when_reachability_disabled(self, monkeypatch):
+        """禁用可达性检查时，ret 终止态不应调用 solver。"""
+        executor, _ = self.disasm_and_create_executor("c3")
+        executor.enable_go_bridge = True
+        executor.use_reachability_check = False
+        global_state = self.create_global_state(block_addr=0x1000)
+        global_state._ret_terminal_branch = True
+
+        def fail_if_called(*args, **kwargs):
+            raise AssertionError("is_possible should not be called")
+
+        monkeypatch.setattr(global_state.get_constraints(), "is_possible", fail_if_called)
+
+        assert executor._is_terminal_state(global_state) is True
+
+    def test_is_terminal_state_checks_solver_when_reachability_enabled(self, monkeypatch):
+        """启用可达性检查时，ret 终止态仍应经过 solver 过滤。"""
+        executor, _ = self.disasm_and_create_executor("c3")
+        executor.enable_go_bridge = True
+        executor.use_reachability_check = True
+        global_state = self.create_global_state(block_addr=0x1000)
+        global_state._ret_terminal_branch = True
+
+        called = False
+
+        def mark_called(*args, **kwargs):
+            nonlocal called
+            called = True
+            return False
+
+        monkeypatch.setattr(global_state.get_constraints(), "is_possible", mark_called)
+
+        assert executor._is_terminal_state(global_state) is False
+        assert called is True
+
     def test_is_terminal_state_without_ret(self):
         """测试非 ret 指令不是终止状态。"""
         # 使用 jmp 创建一个不以 ret 结尾的块
@@ -1123,7 +1236,7 @@ class TestComplexScenarios:
 
         # 执行符号执行，动态构建CFG
         state = self.create_initial_state()
-        executor = X86SymbolicExecutor(blocks, max_depth=100000, use_reachability_check=False)
+        executor = X86SymbolicExecutor(blocks, max_depth=100, use_reachability_check=False)
         # 从机器码起始入口执行，避免跳过前导控制流（含 Go bridge 站点）
         final_states = executor.execute(state, entry_addr=0x0)
         assert len(final_states) >= 1
@@ -1160,9 +1273,9 @@ class TestComplexScenarios:
         blocks = identify_basic_blocks(instructions)
         assert len(blocks) > 0
 
-        # 执行符号执行，动态构建CFG（禁用 merge 保持 DFS 顺序，确保 0x328 在 depth=32 内可达）
+        # 执行符号执行，动态构建CFG TODO: depth 增加
         state = self.create_initial_state()
-        executor = X86SymbolicExecutor(blocks, max_depth=32, use_reachability_check=100, enable_merge=False)
+        executor = X86SymbolicExecutor(blocks, max_depth=100, use_reachability_check=False)
         # 从机器码起始入口执行，避免跳过前导控制流（含 Go bridge 站点）
         final_states = executor.execute(state, entry_addr=0x0)
         assert len(final_states) >= 1

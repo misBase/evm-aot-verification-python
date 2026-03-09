@@ -4,10 +4,13 @@ x86-64 搜索策略（参考 evm_ir）。
 定义 SearchStrategy 抽象基类和具体策略实现。
 """
 
+import logging
 from typing import List, Optional, Dict, Iterator
 from abc import ABC, abstractmethod
 
 from .cfg_state import X86GlobalState
+
+logger = logging.getLogger(__name__)
 
 
 class X86SearchStrategy(ABC):
@@ -61,6 +64,11 @@ class X86SearchStrategy(ABC):
 
             # 检查深度限制
             if global_state.depth >= self.max_depth:
+                node_addr = f"0x{global_state.node.address:x}" if global_state.node else "None"
+                logger.debug(
+                    "[CFG] 剪枝：depth=%d >= max_depth=%d，跳过状态 node=%s",
+                    global_state.depth, self.max_depth, node_addr
+                )
                 return self.__next__()  # 跳过超深度状态
 
             return global_state
