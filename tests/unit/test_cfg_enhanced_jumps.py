@@ -54,7 +54,7 @@ def test_jump_with_constant_target():
     )
 
     # 执行跳转处理
-    new_states = executor._handle_jump(global_state, mstate, block, BitVecVal(42, 256))
+    new_states = executor._handle_jump(global_state, mstate, block, target_value=BitVecVal(42, 256))
 
     assert len(new_states) == 1
     assert new_states[0].node.pc == 42
@@ -118,7 +118,7 @@ def test_jump_with_if_target():
     )
 
     # 执行跳转处理
-    new_states = executor._handle_jump(global_state, mstate, block, if_target)
+    new_states = executor._handle_jump(global_state, mstate, block, target_value=if_target)
 
     # 应该创建两个分支
     assert len(new_states) == 2
@@ -158,7 +158,7 @@ def test_jump_with_dynamic_target():
 
     # 应该抛出异常
     with pytest.raises(UnsupportedJumpError) as exc_info:
-        executor._handle_jump(global_state, mstate, block, x)
+        executor._handle_jump(global_state, mstate, block, target_value=x)
 
     assert exc_info.value.jump_type == "dynamic_jump"
 
@@ -322,7 +322,7 @@ def test_jump_with_if_creates_conditional_jump_edge():
     )
 
     # 直接调用 _handle_jump 方法处理跳转
-    new_states = executor._handle_jump(global_state, mstate, block, if_target)
+    new_states = executor._handle_jump(global_state, mstate, block, target_value=if_target)
 
     # 验证生成了两个目标状态
     assert len(new_states) == 2
@@ -427,3 +427,80 @@ def test_jumpi_multi_target_edge_types():
     ft_edges = [e for e in jumpi_edges if e.edge_type == EdgeType.CONDITIONAL_FALSE]
     assert len(ft_edges) == 1
     assert ft_edges[0].node_to == 5
+
+
+def test_dead_code_after_jump_is_ignored():
+    """测试 JUMP 后面的死代码指令被忽略，控制流由 JUMP 决定。"""
+    target_block = EVMBlock(
+        pc=42,
+        stack_depth=0,
+        min_depth=0,
+        max_depth=1024,
+        static_gas=1,
+        is_jump_target=True,
+        is_inner_block=False,
+        is_stop=False,
+        operations=[]
+    )
+    # block 中 JUMP 后面还有一条 ADD（死代码）
+    block = EVMBlock(
+        pc=0,
+        stack_depth=1,
+        min_depth=1,
+        max_depth=1024,
+        static_gas=1,
+        is_jump_target=False,
+        is_inner_block=False,
+        is_stop=False,
+        operations=[
+            EvmOperator(kind="JUMP", pc=0, immediate=None, is_static=False),
+            EvmOperator(kind="ADD",  pc=1, immediate=None, is_static=False),
+        ]
+    )
+
+    executor = SymbolicExecutor([block, target_block])
+
+    mstate = SMTState()
+    mstate.evm_stack = mstate.evm_stack.push(BitVecVal(42, 256))
+
+    node = CFGNode(block=block)
+    global_state = GlobalState(
+        mstate=mstate,
+        world_state=WorldState(),
+        node=node
+    )
+
+    # _find_control_flow_op 应该找到 JUMP 而不是 ADD
+    ops = [op for op in block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
+    idx, ctrl_op = executor._find_control_flow_op(ops)
+    assert idx == 0
+    assert ctrl_op.kind.upper() == "JUMP"
+
+
+def test_dead_code_after_stop_is_ignored():
+    """测试 STOP 后面的死代码被忽略，_is_terminal_state 以 STOP 为准。"""
+    block = EVMBlock(
+        pc=0,
+        stack_depth=0,
+        min_depth=0,
+        max_depth=1024,
+        static_gas=1,
+        is_jump_target=False,
+        is_inner_block=False,
+        is_stop=True,
+        operations=[
+            EvmOperator(kind="STOP", pc=0, immediate=None, is_static=False),
+            EvmOperator(kind="ADD",  pc=1, immediate=None, is_static=False),
+        ]
+    )
+
+    executor = SymbolicExecutor([block])
+
+    node = CFGNode(block=block)
+    global_state = GlobalState(
+        mstate=SMTState(),
+        world_state=WorldState(),
+        node=node
+    )
+
+    assert executor._is_terminal_state(global_state) is True

@@ -27,6 +27,9 @@ class SymbolicExecutor:
     - 可达性检查剪枝不可达状态
     """
 
+    _CONTROL_OPS = frozenset({"JUMP", "JUMPI", "STOP", "RETURN", "REVERT", "SELFDESTRUCT"})
+    _TERMINAL_OPS = frozenset({"STOP", "RETURN", "REVERT", "SELFDESTRUCT"})
+
     def __init__(self,
                  blocks: List[EVMBlock],
                  strategy_cls: type = DFSStrategy,
@@ -229,69 +232,67 @@ class SymbolicExecutor:
             global_state.mstate = current_mstate
             return self._handle_fallthrough(global_state, current_mstate, block)
 
-        # 检查最后一个指令是否是跳转指令
-        last_op = ops[-1]
-        last_kind = last_op.kind.upper()
-        
-        # 执行除最后一个跳转指令以外的所有指令
-        main_ops = ops[:-1] if last_kind in ["JUMP", "JUMPI"] else ops
-        
-        for op in main_ops:
-            kind = op.kind.upper()
-            
-            # 检查终止指令
-            if kind in ["STOP", "RETURN", "REVERT", "SELFDESTRUCT"]:
-                # 执行终止指令（可能包含堆栈弹出，如 RETURN/REVERT）
-                current_mstate = op.to_z3(current_mstate)
-                # 更新全局状态为终止时的状态
-                global_state.mstate = current_mstate
-                # 返回空列表（无后继状态）
-                return []
+        # 找到第一个控制流操作（JUMP/JUMPI/终止指令）
+        # 控制流操作之后的指令视为死代码，忽略
+        ctrl_idx, ctrl_op = self._find_control_flow_op(ops)
 
-            # 执行操作
+        if ctrl_op is None:
+            # 没有控制流操作，顺序执行所有指令
+            for op in ops:
+                current_mstate = op.to_z3(current_mstate)
+            global_state.mstate = current_mstate
+            return self._handle_fallthrough(global_state, current_mstate, block)
+
+        ctrl_kind = ctrl_op.kind.upper()
+        # 控制流操作之前的普通指令
+        main_ops = ops[:ctrl_idx]
+
+        for op in main_ops:
             current_mstate = op.to_z3(current_mstate)
 
-        # 处理跳转或顺序执行
-        if last_kind == "JUMP":
+        # 处理跳转或终止
+        if ctrl_kind == "JUMP":
             # 只有在非静态跳转时才从栈中提取目标值
             # 静态跳转的目标在 immediate 中，栈不会被弹出
-            if last_op.immediate is None or not last_op.is_static:
+            if ctrl_op.immediate is None or not ctrl_op.is_static:
                 target_value = current_mstate.evm_stack.peek(0)
             else:
                 target_value = None
 
             # 执行跳转指令（更新堆栈）
-            final_mstate = last_op.to_z3(current_mstate)
+            final_mstate = ctrl_op.to_z3(current_mstate)
             global_state.mstate = final_mstate
 
             # 传递提取的目标值给处理器
-            return self._handle_jump(global_state, final_mstate, block, target_value)
-            
-        elif last_kind == "JUMPI":
+            return self._handle_jump(global_state, final_mstate, block, ctrl_op, target_value)
+
+        elif ctrl_kind == "JUMPI":
             # 在执行 JUMPI 弹出前提取条件和目标
             # index=0: 条件值
             # index=1: 跳转目标（如果非静态）
             condition_value = current_mstate.evm_stack.peek(0)
 
             # 如果是非静态跳转，还需要提取目标值
-            if last_op.immediate is None or not last_op.is_static:
+            if ctrl_op.immediate is None or not ctrl_op.is_static:
                 target_value = current_mstate.evm_stack.peek(1)
             else:
                 target_value = None
 
             # 执行 JUMPI 指令（更新堆栈，弹出条件）
-            final_mstate = last_op.to_z3(current_mstate)
+            final_mstate = ctrl_op.to_z3(current_mstate)
             global_state.mstate = final_mstate
 
             # 传递提取的值给处理器
-            return self._handle_jumpi(global_state, final_mstate, block, condition_value, target_value)
-            
+            return self._handle_jumpi(global_state, final_mstate, block, ctrl_op, condition_value, target_value)
+
         else:
-            # 顺序执行到下一个块（已经在 main_ops 中执行完所有指令）
+            # 终止指令（STOP/RETURN/REVERT/SELFDESTRUCT）
+            current_mstate = ctrl_op.to_z3(current_mstate)
             global_state.mstate = current_mstate
-            return self._handle_fallthrough(global_state, current_mstate, block)
+            return []
 
     def _handle_jump(self, global_state: GlobalState, mstate: SMTState, block: EVMBlock,
+                     ctrl_op: Optional['EvmOperator'] = None,
                      target_value: Optional[Any] = None) -> List[GlobalState]:
         """处理 JUMP 指令。
 
@@ -299,6 +300,7 @@ class SymbolicExecutor:
             global_state: 当前全局状态
             mstate: 执行后的机器状态
             block: 当前块
+            ctrl_op: 产生控制流的 JUMP 操作（由调用者传入）；若为 None 则从 block 中查找
             target_value: 预先提取的跳转目标值（如果为 None 则尝试从 immediate 获取）
 
         Returns:
@@ -308,7 +310,13 @@ class SymbolicExecutor:
         from utils.exceptions import UnsupportedJumpError, LogicError
         from utils.z3_helpers import analyze_jump_target
 
-        last_op = block.operations[-1]
+        if ctrl_op is None:
+            ops = [op for op in block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
+            _, ctrl_op = self._find_control_flow_op(ops)
+        if ctrl_op is None:
+            from utils.exceptions import LogicError
+            raise LogicError(f"Block at pc={block.pc} has no JUMP control flow operation")
+        last_op = ctrl_op
 
         # 首先检查是否有 immediate（静态跳转）
         if last_op.immediate is not None and last_op.is_static:
@@ -396,6 +404,7 @@ class SymbolicExecutor:
         return new_states
 
     def _handle_jumpi(self, global_state: GlobalState, mstate: SMTState, block: EVMBlock,
+                      ctrl_op: Optional['EvmOperator'] = None,
                       condition_value: Optional[Any] = None,
                       target_value: Optional[Any] = None) -> List[GlobalState]:
         """处理 JUMPI 指令。
@@ -404,6 +413,7 @@ class SymbolicExecutor:
             global_state: 当前全局状态
             mstate: 执行后的机器状态
             block: 当前块
+            ctrl_op: 产生控制流的 JUMPI 操作（由调用者传入）；若为 None 则从 block 中查找
             condition_value: 预先提取的跳转条件
             target_value: 预先提取的跳转目标值（如果是静态跳转则为 None）
 
@@ -415,7 +425,13 @@ class SymbolicExecutor:
         from utils.z3_helpers import analyze_jump_target
         from z3 import And
 
-        last_op = block.operations[-1]
+        if ctrl_op is None:
+            ops = [op for op in block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
+            _, ctrl_op = self._find_control_flow_op(ops)
+        if ctrl_op is None:
+            from utils.exceptions import LogicError
+            raise LogicError(f"Block at pc={block.pc} has no JUMPI control flow operation")
+        last_op = ctrl_op
 
         # 确定跳转条件
         if condition_value is None:
@@ -574,19 +590,36 @@ class SymbolicExecutor:
 
         return [new_state]
 
+    def _find_control_flow_op(self, ops: List['EvmOperator']) -> Tuple[Optional[int], Optional['EvmOperator']]:
+        """在过滤后的操作列表中，找到第一个控制流操作（JUMP/JUMPI/终止指令）。
+
+        控制流操作之后的指令视为死代码，应忽略。
+
+        Returns:
+            (index, operation)，若未找到则返回 (None, None)
+        """
+        for i, op in enumerate(ops):
+            if op.kind.upper() in self._CONTROL_OPS:
+                return i, op
+        return None, None
+
     def _get_last_operation(self, global_state: GlobalState) -> Optional['EvmOperator']:
-        """获取块中的最后一个操作。
+        """获取块中的第一个控制流操作（JUMP/JUMPI/终止指令）。
+
+        控制流操作之后的指令视为死代码，以此确定实际控制流。
 
         Args:
             global_state: 全局状态
 
         Returns:
-            最后一个操作或 None
+            第一个控制流操作或 None
         """
         node = global_state.node
         if node is None or not node.block.operations:
             return None
-        return node.block.operations[-1]
+        ops = [op for op in node.block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
+        _, ctrl_op = self._find_control_flow_op(ops)
+        return ctrl_op
 
     def _is_terminal_state(self, global_state: GlobalState) -> bool:
         """检查是否是终止状态。
@@ -601,9 +634,11 @@ class SymbolicExecutor:
         if node is None or not node.block.operations:
             return False
 
-        last_op = node.block.operations[-1]
-        last_kind = last_op.kind.upper()
-        return last_kind in ["STOP", "RETURN", "REVERT", "SELFDESTRUCT"]
+        ops = [op for op in node.block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
+        _, ctrl_op = self._find_control_flow_op(ops)
+        if ctrl_op is None:
+            return False
+        return ctrl_op.kind.upper() in self._TERMINAL_OPS
 
     def _detect_and_handle_loops(self, global_state: GlobalState) -> None:
         """检测当前状态是否形成循环，并根据类型分类处理。
