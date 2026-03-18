@@ -261,12 +261,19 @@ class X86SymbolicExecutor:
         merged_mstate.return_offset = offset_expr
         merged_mstate.return_length = length_expr
 
-        # EVM 状态直接从第一个状态复制（x86 执行不修改 EVM 状态）
+        # EVM 状态：stack/memory/gas 从第一个状态复制，storage 需合并（Go函数可能修改）
         merged_mstate.evm_stack = states[0].mstate.evm_stack
         merged_mstate.evm_memory = states[0].mstate.evm_memory
-        merged_mstate.evm_storage = states[0].mstate.evm_storage
         merged_mstate.evm_gas = states[0].mstate.evm_gas
         merged_mstate.pc = states[0].mstate.pc
+
+        # 合并 EVM storage（Go host函数调用可能修改storage）
+        from state.smt_state import EVMStorageState
+        storage_expr = states[-1].mstate.evm_storage.Storage
+        for s in reversed(states[:-1]):
+            cond = s.get_constraints().as_bool()
+            storage_expr = If(cond, s.mstate.evm_storage.Storage, storage_expr)
+        merged_mstate.evm_storage = EVMStorageState(storage_array=storage_expr)
 
         # 环境信息共享
         merged_mstate.calldata = states[0].mstate.calldata
@@ -810,6 +817,46 @@ class X86SymbolicExecutor:
         operands = parse_operands(insn)
         return operands.get("immediate")
 
+    def _extract_status_code(self, block: X86Block) -> Optional[int]:
+        """从block中提取status_code立即数。
+
+        匹配: mov byte [r13+0xE0], <imm>
+        """
+        status_offset = self.aot_profile.offsets["status_code"]
+        for insn in block.instructions:
+            if self._is_mov_to_r13_offset(insn, status_offset):
+                return self._get_immediate_from_mov(insn)
+        return None
+
+    def _extract_function_index(self, block: X86Block, status_code: int) -> Optional[int]:
+        """从block中提取函数索引立即数。
+
+        statusCode=4: 从 mov dword [r13+0xE8], <imm> 提取 go_function_index
+        statusCode=5: 从 mov dword [r13+0xE4], <imm> 提取 builtin_function_index
+        """
+        if status_code == self.aot_profile.status_codes.get("call_go_host_function"):
+            offset = self.aot_profile.offsets["go_function_index"]
+        elif status_code == self.aot_profile.status_codes.get("call_builtin_function"):
+            offset = self.aot_profile.offsets["builtin_function_index"]
+        else:
+            return None
+
+        for insn in block.instructions:
+            if self._is_mov_to_r13_offset(insn, offset):
+                return self._get_immediate_from_mov(insn)
+        return None
+
+    def _extract_stack_pointer(self, block: X86Block) -> Optional[int]:
+        """从block中提取stack_pointer立即数。
+
+        匹配: mov qword [r13+0x28], <imm>
+        """
+        sp_offset = self.aot_profile.offsets["stack_pointer"]
+        for insn in block.instructions:
+            if self._is_mov_to_r13_offset(insn, sp_offset):
+                return self._get_immediate_from_mov(insn)
+        return None
+
     def _get_or_create_go_host_node_for_ret(self, ret_block_addr: int) -> int:
         """为每个 ret 站点分配独立 GO_HOST 外部节点。"""
         go_addr = self._go_host_addr_by_ret_block.get(ret_block_addr)
@@ -839,6 +886,21 @@ class X86SymbolicExecutor:
             setattr(global_state, "_ret_terminal_branch", True)
             return []
 
+        # 先提取返回地址（在应用Go函数效果之前，避免内存Store干扰）
+        return_addr_expr = self._load_exit_return_address(mstate)
+
+        # ---- 提取元数据并应用Go函数语义效果 ----
+        status_code = self._extract_status_code(block)
+        sp = self._extract_stack_pointer(block)
+
+        if status_code is not None and sp is not None:
+            func_index = self._extract_function_index(block, status_code)
+            from .go_function_semantics import GoFunctionSemantics
+            go_sem = GoFunctionSemantics(self.aot_profile)
+            mstate = go_sem.apply(status_code, func_index, sp, mstate)
+            # 更新 global_state 的 mstate，确保后续恢复分支使用更新后的状态
+            global_state.mstate = mstate
+
         # 每个 CallGoFunction 站点拥有自己的 GO_HOST 节点
         go_host_addr = self._get_or_create_go_host_node_for_ret(block.start_addr)
         self.cfg.add_edge(
@@ -850,7 +912,6 @@ class X86SymbolicExecutor:
 
         # 以当前状态为模板构建恢复分支
         resumed_states: List[X86GlobalState] = []
-        return_addr_expr = self._load_exit_return_address(mstate)
         return_addr_analysis = analyze_jump_target(simplify(return_addr_expr))
 
         # GO 返回地址必须是静态常量（RIP 相对寻址）

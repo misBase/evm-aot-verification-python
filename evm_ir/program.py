@@ -99,7 +99,8 @@ class EVMProgram:
                 'length': BitVecVal(0, 64),
                 'memory': state.evm_memory.Memory,
                 'base_addr': None,
-                'has_return': BoolVal(False)
+                'has_return': BoolVal(False),
+                'storage': state.evm_storage.Storage,
             }
             return state, result
 
@@ -115,7 +116,8 @@ class EVMProgram:
             'length': merged_state.return_length,
             'memory': merged_state.evm_memory.Memory,
             'base_addr': None,
-            'has_return': has_return
+            'has_return': has_return,
+            'storage': merged_state.evm_storage.Storage,
         }
 
         return merged_state, result
@@ -191,11 +193,21 @@ class EVMProgram:
         merged.evm_stack.SP = expr
 
         # 合并其他字段（x86、storage、gas 等）
-        # 这些字段在 EVM 执行中不使用，但为了完整性也合并
         merged.x86_memory = global_states[0].mstate.x86_memory
         merged.x86_registers = global_states[0].mstate.x86_registers
-        merged.evm_storage = global_states[0].mstate.evm_storage
         merged.evm_gas = global_states[0].mstate.evm_gas
+
+        # 合并 EVM storage（SLOAD/SSTORE 可能在不同路径产生不同的 storage）
+        from state.smt_state import EVMStorageState
+        if len(global_states) == 1:
+            merged.evm_storage = global_states[0].mstate.evm_storage
+        else:
+            first_storage = global_states[0].mstate.evm_storage.Storage
+            expr = first_storage
+            for gstate in reversed(global_states):
+                condition = gstate.get_constraints().as_bool()
+                expr = If(condition, gstate.mstate.evm_storage.Storage, expr)
+            merged.evm_storage = EVMStorageState(storage_array=expr)
 
         return merged
 

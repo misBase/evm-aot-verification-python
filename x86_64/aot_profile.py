@@ -6,7 +6,7 @@ Current project scope is go-hpc-evm only.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, FrozenSet
 
 
@@ -17,6 +17,8 @@ class X86AOTProfile:
     offsets: Dict[str, int]
     status_codes: Dict[str, int]
     resumable_statuses: FrozenSet[int]
+    builtin_functions: Dict[int, str] = field(default_factory=dict)
+    host_functions: Dict[int, str] = field(default_factory=dict)
 
 
 GO_HPC_EVM_PROFILE = X86AOTProfile(
@@ -48,4 +50,14 @@ GO_HPC_EVM_PROFILE = X86AOTProfile(
         "debug": 17,
     },
     resumable_statuses=frozenset({4, 5, 17}),
+    builtin_functions={
+        0: "memory_grow",
+        3: "div",
+        4: "mod",
+        5: "addmod",
+        6: "mulmod",
+        7: "exp",
+        8: "gas_cost",
+    },
+    host_functions={},  # Runtime-dependent; configure per contract
 )

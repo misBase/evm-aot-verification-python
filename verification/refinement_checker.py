@@ -389,13 +389,73 @@ class RefinementChecker:
             print(f"    ├─ Memory content check: {solve_time:.3f}s, result={result}")
 
         if result == unsat:
-            msg = "✓ VERIFIED: x86 refines EVM (return conditions, lengths, and memory contents are equivalent for all inputs)"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return True, msg
+            pass  # Memory contents equivalent, continue to storage check
         elif result == sat:
             model = self.solver.model()
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (memory contents differ)"
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+        else:
+            msg = self._unknown_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+
+        # 第四次检查：Storage等价性（如果结果中包含storage）
+        evm_storage = evm_result.get('storage')
+        x86_storage = x86_result.get('storage')
+
+        if evm_storage is not None and x86_storage is not None:
+            verified, msg = self._check_storage_equivalence(
+                evm_storage, x86_storage, deadline
+            )
+            if not verified:
+                return False, msg
+
+        msg = "✓ VERIFIED: x86 refines EVM (return conditions, lengths, memory contents, and storage are equivalent for all inputs)"
+        if self.verbose:
+            print(f"    └─ {msg}")
+        return True, msg
+
+    def _check_storage_equivalence(self, evm_storage, x86_storage,
+                                   deadline=None):
+        """检查EVM和x86的Storage是否等价。
+
+        反证法：是否存在key使得 Select(evm_storage, key) != Select(x86_storage, key)
+        如果UNSAT，则storage等价。
+
+        Args:
+            evm_storage: EVM侧的Storage Z3 Array
+            x86_storage: x86侧的Storage Z3 Array
+            deadline: 超时截止时间
+
+        Returns:
+            (verified, message)
+        """
+        from z3 import BitVec, Select, sat, unsat
+
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+
+        key = BitVec('storage_check_key', 256)
+        self.solver.add(Select(evm_storage, key) != Select(x86_storage, key))
+
+        import time
+        start_time = time.time()
+        result = self.solver.check()
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ Storage equivalence check: {solve_time:.3f}s, result={result}")
+
+        if result == unsat:
+            return True, "Storage equivalent"
+        elif result == sat:
+            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (storage differs)"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg

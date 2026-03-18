@@ -215,7 +215,8 @@ class X86Program:
             'length': merged_state.return_length,
             'memory': merged_state.x86_memory.Memory,
             'base_addr': r15_value,
-            'has_return': has_return
+            'has_return': has_return,
+            'storage': merged_state.evm_storage.Storage,
         }
 
         return merged_state, result
@@ -248,7 +249,8 @@ class X86Program:
             'length': BitVecVal(0, 64),
             'memory': state.x86_memory.Memory,
             'base_addr': r15_value,
-            'has_return': BoolVal(False)
+            'has_return': BoolVal(False),
+            'storage': state.evm_storage.Storage,
         }
         return state, result
 
@@ -314,6 +316,15 @@ class X86Program:
             expr = If(condition, gstate.mstate.x86_registers.get_register(Register.R15), expr)
         merged.x86_registers.set_register(Register.R15, expr)
 
+        # 合并 EVM storage（Go函数调用可能修改storage）
+        from state.smt_state import EVMStorageState
+        first_storage = global_states[0].mstate.evm_storage.Storage
+        expr = first_storage
+        for gstate in reversed(global_states):
+            condition = gstate.get_constraints().as_bool()
+            expr = If(condition, gstate.mstate.evm_storage.Storage, expr)
+        merged.evm_storage = EVMStorageState(storage_array=expr)
+
         return merged
     
     def _to_z3_sequential(self, state: SMTState, instructions: List[X86Instruction]) -> Tuple[SMTState, Dict[str, Any]]:
@@ -340,7 +351,8 @@ class X86Program:
             'length': state.return_length,
             'memory': state.x86_memory.Memory,
             'base_addr': r15_value,
-            'has_return': has_return
+            'has_return': has_return,
+            'storage': state.evm_storage.Storage,
         }
         
         return state, result
