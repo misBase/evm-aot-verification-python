@@ -850,12 +850,27 @@ class X86SymbolicExecutor:
         """从block中提取stack_pointer立即数。
 
         匹配: mov qword [r13+0x28], <imm>
+        如果block中没有立即数，则尝试从x86_memory读取[R13+stack_pointer]。
         """
         sp_offset = self.aot_profile.offsets["stack_pointer"]
         for insn in block.instructions:
             if self._is_mov_to_r13_offset(insn, sp_offset):
                 return self._get_immediate_from_mov(insn)
         return None
+
+    def _read_sp_from_memory(self, mstate: SMTState) -> Optional[int]:
+        """从x86_memory读取当前stack_pointer值。
+
+        当block中没有立即数时使用（跨block或寄存器间接赋值场景）。
+
+        Returns:
+            stack_pointer值（如果是常量），否则None
+        """
+        from utils.z3_helpers import get_bv_const_value
+        r13 = mstate.x86_registers.get_register(Register.R13)
+        sp_offset = BitVecVal(self.aot_profile.offsets["stack_pointer"], 64)
+        sp_bv = mstate.x86_memory.load_64bit(r13 + sp_offset)
+        return get_bv_const_value(simplify(sp_bv))
 
     def _get_or_create_go_host_node_for_ret(self, ret_block_addr: int) -> int:
         """为每个 ret 站点分配独立 GO_HOST 外部节点。"""
@@ -877,7 +892,11 @@ class X86SymbolicExecutor:
 
     def _handle_ret_with_go_bridge(self, global_state: X86GlobalState, mstate: SMTState,
                                    block: X86Block, insn: X86Instruction) -> List[X86GlobalState]:
-        """处理 ret：支持 ret -> GO_HOST -> returnAddress 的动态建模。"""
+        """处理 ret：支持 ret -> GO_HOST -> returnAddress 的动态建模。
+
+        Raises:
+            LogicError: 当func_index已知但映射到未知函数时（配置错误）
+        """
         import copy as copy_module
         from utils.z3_helpers import analyze_jump_target
 
@@ -893,13 +912,34 @@ class X86SymbolicExecutor:
         status_code = self._extract_status_code(block)
         sp = self._extract_stack_pointer(block)
 
-        if status_code is not None and sp is not None:
+        # 如果sp在当前block中没有立即数，尝试从内存读取
+        if sp is None:
+            sp = self._read_sp_from_memory(mstate)
+
+        # host/builtin调用如果有sp则应用Go函数语义
+        if status_code is not None and status_code in self.aot_profile.resumable_statuses:
             func_index = self._extract_function_index(block, status_code)
-            from .go_function_semantics import GoFunctionSemantics
-            go_sem = GoFunctionSemantics(self.aot_profile)
-            mstate = go_sem.apply(status_code, func_index, sp, mstate)
-            # 更新 global_state 的 mstate，确保后续恢复分支使用更新后的状态
-            global_state.mstate = mstate
+            # sp必须已知才能应用Go函数语义（_pop_uint256等需要int类型的sp）
+            if sp is not None:
+                from .go_function_semantics import GoFunctionSemantics, GoFunctionSemanticsError
+                go_sem = GoFunctionSemantics(self.aot_profile)
+                try:
+                    mstate = go_sem.apply(status_code, func_index, sp, mstate)
+                    # 更新 global_state 的 mstate，确保后续恢复分支使用更新后的状态
+                    global_state.mstate = mstate
+                except GoFunctionSemanticsError as e:
+                    # func_index已知但映射到未知函数 - 这是配置错误，应该报告
+                    from utils.exceptions import LogicError
+                    raise LogicError(
+                        "go_function_semantics_error",
+                        f"GO function semantics error at 0x{block.start_addr:x}: {e}",
+                        str(e)
+                    )
+            else:
+                logger.warning(
+                    "GO host/builtin call at 0x%x has status_code=%d but sp is unknown, skipping semantics",
+                    block.start_addr, status_code
+                )
 
         # 每个 CallGoFunction 站点拥有自己的 GO_HOST 节点
         go_host_addr = self._get_or_create_go_host_node_for_ret(block.start_addr)

@@ -8,6 +8,7 @@ from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And,
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
+from common.evm_ops import div_semantics as _div_semantics, mod_semantics as _mod_semantics, exp_semantics as _exp_semantics, addmod_semantics as _addmod_semantics, mulmod_semantics as _mulmod_semantics
 from state.smt_state import SMTState, EVMStackState, EVMMemoryState
 
 # RETURN指令的常量
@@ -59,17 +60,11 @@ class EVMOperationSemantics:
 
     def div_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM DIV操作的逻辑公式 (a / b)。"""
-        # EVM DIV: if b == 0, result is 0
-        a_bv = a if isinstance(a, BitVecRef) else self._to_uint256(a).to_bv256()
-        b_bv = b if isinstance(b, BitVecRef) else self._to_uint256(b).to_bv256()
-        return If(b_bv == 0, BitVecVal(0, 256), UDiv(a_bv, b_bv))
+        return _div_semantics(self._to_bv256(a), self._to_bv256(b))
 
     def mod_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM MOD操作的逻辑公式 (a % b)。"""
-        # EVM MOD: if b == 0, result is 0
-        a_bv = a if isinstance(a, BitVecRef) else self._to_uint256(a).to_bv256()
-        b_bv = b if isinstance(b, BitVecRef) else self._to_uint256(b).to_bv256()
-        return If(b_bv == 0, BitVecVal(0, 256), URem(a_bv, b_bv))
+        return _mod_semantics(self._to_bv256(a), self._to_bv256(b))
 
     def sdiv_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM SDIV操作的逻辑公式 (a sdiv b)。"""
@@ -151,8 +146,7 @@ class EVMOperationSemantics:
 
     def exp_semantics(self, base: BitVec, exponent: BitVec) -> BitVec:
         """构建EVM EXP操作的逻辑公式 (base^exponent)。"""
-        exp_func = Function('evm_exp', BitVecSort(256), BitVecSort(256), BitVecSort(256))
-        return exp_func(base, exponent)
+        return _exp_semantics(base, exponent)
 
     def signextend_semantics(self, index: BitVec, value: BitVec) -> BitVec:
         """构建EVM SIGNEXTEND操作的逻辑公式。"""
@@ -192,33 +186,11 @@ class EVMOperationSemantics:
 
     def addmod_semantics(self, a: BitVec, b: BitVec, mod: BitVec) -> BitVec:
         """构建EVM ADDMOD操作的逻辑公式。"""
-        a_bv = self._to_bv256(a)
-        b_bv = self._to_bv256(b)
-        mod_bv = self._to_bv256(mod)
-        zero_256 = BitVecVal(0, 256)
-
-        # 在扩展位宽下计算，避免 256 位加法先溢出
-        a_ext = ZeroExt(1, a_bv)      # 257-bit
-        b_ext = ZeroExt(1, b_bv)      # 257-bit
-        mod_ext = ZeroExt(1, mod_bv)  # 257-bit
-        res_ext = URem(a_ext + b_ext, mod_ext)
-
-        return If(mod_bv == zero_256, zero_256, Extract(255, 0, res_ext))
+        return _addmod_semantics(self._to_bv256(a), self._to_bv256(b), self._to_bv256(mod))
 
     def mulmod_semantics(self, a: BitVec, b: BitVec, mod: BitVec) -> BitVec:
         """构建EVM MULMOD操作的逻辑公式。"""
-        a_bv = self._to_bv256(a)
-        b_bv = self._to_bv256(b)
-        mod_bv = self._to_bv256(mod)
-        zero_256 = BitVecVal(0, 256)
-
-        # 在扩展位宽下计算，避免 256 位乘法先溢出
-        a_ext = ZeroExt(256, a_bv)      # 512-bit
-        b_ext = ZeroExt(256, b_bv)      # 512-bit
-        mod_ext = ZeroExt(256, mod_bv)  # 512-bit
-        res_ext = URem(a_ext * b_ext, mod_ext)
-
-        return If(mod_bv == zero_256, zero_256, Extract(255, 0, res_ext))
+        return _mulmod_semantics(self._to_bv256(a), self._to_bv256(b), self._to_bv256(mod))
 
     def shl_semantics(self, value: BitVec, shift: BitVec) -> BitVec:
         """构建EVM SHL操作的逻辑公式。"""

@@ -19,6 +19,12 @@ class X86AOTProfile:
     resumable_statuses: FrozenSet[int]
     builtin_functions: Dict[int, str] = field(default_factory=dict)
     host_functions: Dict[int, str] = field(default_factory=dict)
+    # Stack bias: added to Go's sp (in limbs) before computing address
+    # Formula: addr = R14 + (sp + stack_sp_bias_limbs) * 8
+    # This aligns Go's StackHolder addresses with memory_mapping:
+    #   memory_mapping: addr = R14 - 0x40 + stack_index * 0x20
+    # For alignment: (sp + bias) * 8 = -0x40 + stack_index * 0x20
+    stack_sp_bias_limbs: int = 0
 
 
 GO_HPC_EVM_PROFILE = X86AOTProfile(
