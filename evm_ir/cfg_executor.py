@@ -27,8 +27,8 @@ class SymbolicExecutor:
     - 可达性检查剪枝不可达状态
     """
 
-    _CONTROL_OPS = frozenset({"JUMP", "JUMPI", "STOP", "RETURN", "REVERT", "SELFDESTRUCT"})
-    _TERMINAL_OPS = frozenset({"STOP", "RETURN", "REVERT", "SELFDESTRUCT"})
+    _CONTROL_OPS = frozenset({"JUMP", "JUMPI", "STOP", "RETURN", "REVERT", "SELFDESTRUCT", "INVALID"})
+    _TERMINAL_OPS = frozenset({"STOP", "RETURN", "REVERT", "SELFDESTRUCT", "INVALID"})
 
     def __init__(self,
                  blocks: List[EVMBlock],

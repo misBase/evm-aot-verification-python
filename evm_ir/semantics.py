@@ -4,7 +4,7 @@ EVM IR语义建模。
 本模块使用Z3为EVM IR操作提供语义建模。
 """
 
-from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, URem, LShR, SignExt, ZeroExt, BitVecSort, Function, Select
+from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, URem, LShR, SignExt, ZeroExt, BitVecSort, BoolSort, Function, Lambda, Select, Store
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
@@ -13,6 +13,30 @@ from state.smt_state import SMTState, EVMStackState, EVMMemoryState
 
 # RETURN指令的常量
 MAX_RETURN_DATA_SIZE = 256  # 最大返回数据大小（字节）（256字节 = 2048位）
+
+
+def _truncate_to_64(value: BitVecRef) -> BitVecRef:
+    """将BitVec偏移量截断到64位。"""
+    if value.size() == 64:
+        return value
+    if value.size() == 256:
+        return Extract(63, 0, value)
+    raise ValueError(f"Expected 64-bit or 256-bit BitVec, got {value.size()} bits")
+
+
+def _uint256_to_u64_with_overflow_max(value: BitVecRef) -> BitVecRef:
+    """模拟 uint256.Uint64WithOverflow：溢出时返回 MaxUint64。"""
+    if value.size() == 64:
+        return value
+    if value.size() != 256:
+        raise ValueError(f"Expected 64-bit or 256-bit BitVec, got {value.size()} bits")
+    high_bits = Extract(255, 64, value)
+    low_bits = Extract(63, 0, value)
+    return If(
+        high_bits == BitVecVal(0, 192),
+        low_bits,
+        BitVecVal((1 << 64) - 1, 64),
+    )
 
 
 class EVMOperationSemantics:
@@ -603,21 +627,73 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     elif kind == "CALLDATALOAD":
         # CALLDATALOAD: Pop offset, push 32 bytes from calldata
         offset_bv, stack_after_pop = state.evm_stack.pop()
-        
-        # Truncate offset to 64-bit for array access
+
         if offset_bv.size() == 256:
             offset_64 = Extract(63, 0, offset_bv)
-        else:
+            offset_overflow = Extract(255, 64, offset_bv) != BitVecVal(0, 192)
+        elif offset_bv.size() == 64:
             offset_64 = offset_bv
-            
-        # Load 32 bytes and concat
+            offset_overflow = False
+        else:
+            raise ValueError(f"Offset must be 64 or 256 bits, got {offset_bv.size()}")
+
+        calldatasize_64 = _uint256_to_u64_with_overflow_max(state.calldatasize)
+
+        # 对齐 go-hpc-evm/opCallDataLoad + getData:
+        # - offset Uint64WithOverflow 失败时直接返回 0
+        # - 超出 calldatasize 的字节补 0
         bytes_list = []
         for i in range(32):
-            byte_val = Select(state.calldata, offset_64 + BitVecVal(i, 64))
+            byte_offset = offset_64 + BitVecVal(i, 64)
+            byte_val = If(
+                ULT(byte_offset, calldatasize_64),
+                Select(state.calldata, byte_offset),
+                BitVecVal(0, 8),
+            )
             bytes_list.append(byte_val)
-        
-        data_256 = Concat(*bytes_list)
+
+        loaded_data = Concat(*bytes_list)
+        data_256 = If(offset_overflow, BitVecVal(0, 256), loaded_data)
         state.evm_stack = stack_after_pop.push(data_256)
+        return state
+
+    elif kind == "CALLDATACOPY":
+        # 对齐 go-hpc-evm/opCallDataCopy:
+        # memOffset = pop(), dataOffset = pop(), length = pop()
+        mem_offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        data_offset_bv, stack_after_pop2 = stack_after_pop1.pop()
+        length_bv, stack_after_pop3 = stack_after_pop2.pop()
+
+        mem_offset_64 = _truncate_to_64(mem_offset_bv)
+        length_64 = _truncate_to_64(length_bv)
+        # Go 解释器对 dataOffset 使用 Uint64WithOverflow，溢出时钳到 MaxUint64
+        calldata_offset_64 = _uint256_to_u64_with_overflow_max(data_offset_bv)
+        calldatasize_64 = _uint256_to_u64_with_overflow_max(state.calldatasize)
+
+        copy_index = BitVec(f"calldatacopy_idx_{op.pc}", 64)
+        relative_index = copy_index - mem_offset_64
+        calldata_index = calldata_offset_64 + relative_index
+        in_copy_range = And(
+            UGE(copy_index, mem_offset_64),
+            ULT(relative_index, length_64),
+        )
+        copied_byte = If(
+            ULT(calldata_index, calldatasize_64),
+            Select(state.calldata, calldata_index),
+            BitVecVal(0, 8),
+        )
+        new_memory = Lambda(
+            copy_index,
+            If(in_copy_range, copied_byte, Select(state.evm_memory.Memory, copy_index)),
+        )
+        new_msize = If(
+            UGE(mem_offset_64 + length_64, state.evm_memory.MSize),
+            mem_offset_64 + length_64,
+            state.evm_memory.MSize,
+        )
+
+        state.evm_memory = EVMMemoryState(memory_array=new_memory, msize=new_msize)
+        state.evm_stack = stack_after_pop3
         return state
 
     elif kind == "CALLVALUE":
@@ -644,7 +720,113 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     elif kind == "BASEFEE":
         state.evm_stack = state.evm_stack.push(state.basefee)
         return state
-    
+
+    elif kind == "GAS":
+        # GAS: Push current gas counter onto stack
+        # Gas is 64-bit, zero-extend to 256-bit for stack
+        gas_256 = ZeroExt(192, state.evm_gas.Gas)
+        state.evm_stack = state.evm_stack.push(gas_256)
+        return state
+
+    elif kind == "STATICCALL":
+        # 对齐 go-hpc-evm/opStaticCall:
+        # gas = pop(); addr = pop(); inOffset = pop(); inSize = pop(); retOffset = pop(); retSize = pop()
+        gas_bv, stack1 = state.evm_stack.pop()
+        addr_bv, stack2 = stack1.pop()
+        args_offset_bv, stack3 = stack2.pop()
+        args_length_bv, stack4 = stack3.pop()
+        ret_offset_bv, stack5 = stack4.pop()
+        ret_length_bv, stack6 = stack5.pop()
+
+        args_offset_64 = _truncate_to_64(args_offset_bv)
+        args_length_64 = _truncate_to_64(args_length_bv)
+        ret_offset_64 = _truncate_to_64(ret_offset_bv)
+        ret_length_64 = _truncate_to_64(ret_length_bv)
+
+        # 没有完整宿主环境时，使用符号布尔量建模成功位，并保守建模返回区内存“可能被写入”。
+        success_func = Function(
+            f"staticcall_success_{op.pc}",
+            state.evm_memory.Memory.sort(),
+            gas_bv.sort(),
+            addr_bv.sort(),
+            BitVecSort(64),
+            BitVecSort(64),
+            BoolSort(),
+        )
+        copy_func = Function(
+            f"staticcall_copy_{op.pc}",
+            state.evm_memory.Memory.sort(),
+            gas_bv.sort(),
+            addr_bv.sort(),
+            BitVecSort(64),
+            BitVecSort(64),
+            BitVecSort(64),
+            BitVecSort(64),
+            BoolSort(),
+        )
+        ret_byte_func = Function(
+            f"staticcall_ret_byte_{op.pc}",
+            state.evm_memory.Memory.sort(),
+            gas_bv.sort(),
+            addr_bv.sort(),
+            BitVecSort(64),
+            BitVecSort(64),
+            BitVecSort(64),
+            BitVecSort(64),
+            BitVecSort(64),
+            BitVecSort(8),
+        )
+
+        call_succeeds = success_func(
+            state.evm_memory.Memory,
+            gas_bv,
+            addr_bv,
+            args_offset_64,
+            args_length_64,
+        )
+        copy_return_data = copy_func(
+            state.evm_memory.Memory,
+            gas_bv,
+            addr_bv,
+            args_offset_64,
+            args_length_64,
+            ret_offset_64,
+            ret_length_64,
+        )
+
+        ret_index = BitVec(f"staticcall_ret_idx_{op.pc}", 64)
+        ret_relative_index = ret_index - ret_offset_64
+        in_return_range = And(
+            copy_return_data,
+            UGE(ret_index, ret_offset_64),
+            ULT(ret_relative_index, ret_length_64),
+        )
+        returned_byte = ret_byte_func(
+            state.evm_memory.Memory,
+            gas_bv,
+            addr_bv,
+            args_offset_64,
+            args_length_64,
+            ret_offset_64,
+            ret_length_64,
+            ret_relative_index,
+        )
+        new_memory = Lambda(
+            ret_index,
+            If(in_return_range, returned_byte, Select(state.evm_memory.Memory, ret_index)),
+        )
+        grown_msize = If(
+            UGE(ret_offset_64 + ret_length_64, state.evm_memory.MSize),
+            ret_offset_64 + ret_length_64,
+            state.evm_memory.MSize,
+        )
+        new_msize = If(copy_return_data, grown_msize, state.evm_memory.MSize)
+
+        success = If(call_succeeds, BitVecVal(1, 256), BitVecVal(0, 256))
+        state.evm_memory = EVMMemoryState(memory_array=new_memory, msize=new_msize)
+        state.evm_stack = stack6.push(success)
+        return state
+
     elif kind == "RETURN":
         # RETURN：弹出偏移量和长度，返回memory[offset:offset+length]
         # 从栈中弹出偏移量和长度
@@ -723,6 +905,11 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         for _ in range(num_topics):
             _, state.evm_stack = state.evm_stack.pop()
 
+        return state
+
+    elif kind == "INVALID":
+        # INVALID: Marks the transaction as invalid / stops execution
+        # INVALID is a terminal operation like STOP
         return state
 
     else:

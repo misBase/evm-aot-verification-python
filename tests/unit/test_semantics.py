@@ -8,7 +8,7 @@ from x86_64.semantics import X86SemanticsModel
 from x86_64.models import Register
 from verification.refinement_checker import RefinementChecker
 from state.smt_state import SMTState, EVMMemoryState
-from z3 import BitVecVal, simplify, is_true, Solver, sat
+from z3 import And, BitVec, BitVecVal, Select, Store, simplify, is_true, Solver, sat, unsat
 
 # x86-64 ADD操作十六进制序列（来自AOT编译器输出）
 X86_ADD_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
@@ -383,3 +383,118 @@ def test_mstore8_opcode():
     assert solver2.check() == sat
 
 
+def test_calldatacopy_zero_padding_and_stack_order():
+    """测试 CALLDATACOPY 的弹栈顺序和越界零填充。"""
+    op = EvmOperator(kind="CALLDATACOPY", pc=0)
+
+    state = SMTState()
+    state.evm_memory = EVMMemoryState(msize=BitVecVal(0, 64))
+    state.calldatasize = BitVecVal(1, 256)
+    state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
+
+    # Go / EVM 语义：top=memOffset, second=dataOffset, third=length
+    state.evm_stack = state.evm_stack.push(BitVecVal(2, 256))   # length
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))   # dataOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(10, 256))  # memOffset (栈顶)
+
+    result_state = evm_operator_to_z3(op, state)
+
+    solver = Solver()
+    solver.add(Select(result_state.evm_memory.Memory, BitVecVal(10, 64)) == BitVecVal(0xAA, 8))
+    solver.add(Select(result_state.evm_memory.Memory, BitVecVal(11, 64)) == BitVecVal(0, 8))
+    solver.add(result_state.evm_memory.MSize == BitVecVal(12, 64))
+    assert solver.check() == sat
+
+
+def test_calldataload_zero_padding():
+    """测试 CALLDATALOAD 会对超出 calldata 的部分补 0。"""
+    op = EvmOperator(kind="CALLDATALOAD", pc=0)
+
+    state = SMTState()
+    state.calldatasize = BitVecVal(2, 256)
+    state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
+    state.calldata = Store(state.calldata, BitVecVal(1, 64), BitVecVal(0xBB, 8))
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))
+
+    result_state = evm_operator_to_z3(op, state)
+    loaded, _ = result_state.evm_stack.pop()
+
+    expected = (0xAA << 248) | (0xBB << 240)
+    solver = Solver()
+    solver.add(loaded == BitVecVal(expected, 256))
+    assert solver.check() == sat
+
+
+def test_calldataload_offset_overflow_returns_zero():
+    """测试 CALLDATALOAD 的 offset 超过 uint64 时返回 0。"""
+    op = EvmOperator(kind="CALLDATALOAD", pc=1)
+
+    state = SMTState()
+    state.calldatasize = BitVecVal(32, 256)
+    state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
+    state.evm_stack = state.evm_stack.push(BitVecVal((1 << 64), 256))
+
+    result_state = evm_operator_to_z3(op, state)
+    loaded, _ = result_state.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(loaded == BitVecVal(0, 256))
+    assert solver.check() == sat
+
+
+def test_calldatacopy_symbolic_length_writes_memory():
+    """测试 CALLDATACOPY 在符号长度下不会错误地保持内存不变。"""
+    op = EvmOperator(kind="CALLDATACOPY", pc=1)
+
+    state = SMTState()
+    state.calldatasize = BitVecVal(1, 256)
+    state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAB, 8))
+
+    symbolic_length = BitVec("calldatacopy_len", 256)
+    old_mem = Select(state.evm_memory.Memory, BitVecVal(5, 64))
+
+    state.evm_stack = state.evm_stack.push(symbolic_length)     # length
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))   # dataOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(5, 256))   # memOffset
+    result_state = evm_operator_to_z3(op, state)
+
+    solver = Solver()
+    solver.add(symbolic_length == BitVecVal(1, 256))
+    solver.add(old_mem != BitVecVal(0xAB, 8))
+    solver.add(Select(result_state.evm_memory.Memory, BitVecVal(5, 64)) == old_mem)
+    assert solver.check() == unsat
+
+
+def test_staticcall_result_is_symbolic_boolean_and_preserves_outside_memory():
+    """测试 STATICCALL 返回 0/1 符号值，并且返回区外内存保持不变。"""
+    op = EvmOperator(kind="STATICCALL", pc=2)
+
+    state = SMTState()
+    old_outside = Select(state.evm_memory.Memory, BitVecVal(19, 64))
+
+    # top=gas, then addr, inOffset, inSize, retOffset, retSize
+    state.evm_stack = state.evm_stack.push(BitVecVal(2, 256))       # retSize
+    state.evm_stack = state.evm_stack.push(BitVecVal(20, 256))      # retOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(4, 256))       # inSize
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))       # inOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x1234, 256))  # addr
+    state.evm_stack = state.evm_stack.push(BitVecVal(1000, 256))    # gas
+
+    result_state = evm_operator_to_z3(op, state)
+    success, _ = result_state.evm_stack.pop()
+
+    solver_false = Solver()
+    solver_false.add(success == BitVecVal(0, 256))
+    assert solver_false.check() == sat
+
+    solver_true = Solver()
+    solver_true.add(success == BitVecVal(1, 256))
+    assert solver_true.check() == sat
+
+    solver_other = Solver()
+    solver_other.add(And(success != BitVecVal(0, 256), success != BitVecVal(1, 256)))
+    assert solver_other.check() == unsat
+
+    solver_outside = Solver()
+    solver_outside.add(Select(result_state.evm_memory.Memory, BitVecVal(19, 64)) != old_outside)
+    assert solver_outside.check() == unsat
