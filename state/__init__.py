@@ -9,6 +9,8 @@ from .smt_state import (
     SMTState,
     EVMStackState,
     EVMMemoryState,
+    EVMStorageState,
+    EVMGasState,
     X86MemoryState,
     X86RegisterState,
 )
@@ -17,6 +19,8 @@ __all__ = [
     'SMTState',
     'EVMStackState',
     'EVMMemoryState',
+    'EVMStorageState',
+    'EVMGasState',
     'X86MemoryState',
     'X86RegisterState',
 ]
