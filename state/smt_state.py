@@ -10,6 +10,7 @@ from z3 import BitVec, Array, BitVecSort
 from state.evm_stack_state import EVMStackState
 from state.evm_memory_state import EVMMemoryState
 from state.evm_storage_state import EVMStorageState
+from state.evm_transient_storage_state import EVMTransientStorageState
 from state.evm_gas_state import EVMGasState
 from state.x86_state import X86MemoryState, X86RegisterState
 
@@ -19,6 +20,7 @@ __all__ = [
     'EVMStackState',
     'EVMMemoryState',
     'EVMStorageState',
+    'EVMTransientStorageState',
     'EVMGasState',
     'X86MemoryState',
     'X86RegisterState',
@@ -36,6 +38,7 @@ class SMTState:
         self.evm_stack = EVMStackState()
         self.evm_memory = EVMMemoryState()
         self.evm_storage = EVMStorageState()
+        self.evm_transient_storage = EVMTransientStorageState()
         self.evm_gas = EVMGasState()
         self.x86_memory = X86MemoryState()
         self.x86_registers = X86RegisterState()
@@ -76,6 +79,7 @@ class SMTState:
         new_state.evm_stack = self.evm_stack.copy()
         new_state.evm_memory = self.evm_memory.copy()
         new_state.evm_storage = self.evm_storage.copy()
+        new_state.evm_transient_storage = self.evm_transient_storage.copy()
         new_state.evm_gas = self.evm_gas.copy()
         new_state.x86_memory = self.x86_memory.copy()
         new_state.x86_registers = self.x86_registers.copy()
@@ -113,6 +117,7 @@ class SMTState:
         from verification.memory_mapping import StackMemoryMapper
         from z3 import IntVal, BitVecVal
         from x86_64.models import Register
+        from x86_64.aot_profile import GO_HPC_EVM_PROFILE
 
         # 验证输入数量
         if num_inputs < 0:
@@ -133,9 +138,13 @@ class SMTState:
 
         # 初始化callEngine中会被预热代码读取的关键字段：
         # [R13+16]  = memoryElement0Address
+        # [R13+40]  = stackPointer
         # [R13+48]  = stackBasePointerInBytes
         # [R13+56]  = stackElement0Address
         initial_state.x86_memory = initial_state.x86_memory.store_limb(16, zero_64)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            GO_HPC_EVM_PROFILE.offsets["stack_pointer"], zero_64
+        )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(48, zero_64)
         initial_state.x86_memory = initial_state.x86_memory.store_limb(56, zero_64)
 
@@ -156,10 +165,10 @@ class SMTState:
         for stack_val in input_stack:
             initial_state.evm_stack = initial_state.evm_stack.push(stack_val)
 
-        # 将EVM栈输入映射到x86内存布局
-        for stack_index, stack_value in enumerate(input_stack):
-            layout = StackMemoryMapper.stack_to_memory_layout(stack_value, stack_index)
-            for offset, limb in layout.items():
-                initial_state.x86_memory = initial_state.x86_memory.store_limb(offset, limb)
+        # 将 EVM 栈输入按当前 block 的栈窗口布局映射到 x86 内存。
+        # input_stack 的顺序是“压栈顺序”，最后一个元素才是逻辑栈顶。
+        initial_state.x86_memory = StackMemoryMapper.initialize_x86_memory_from_stack(
+            initial_state.x86_memory, input_stack
+        )
 
         return initial_state

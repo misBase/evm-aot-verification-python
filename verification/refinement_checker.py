@@ -413,7 +413,18 @@ class RefinementChecker:
             if not verified:
                 return False, msg
 
-        msg = "✓ VERIFIED: x86 refines EVM (return conditions, lengths, memory contents, and storage are equivalent for all inputs)"
+        # 第五次检查：Transient Storage等价性（如果结果中包含transient_storage）
+        evm_ts = evm_result.get('transient_storage')
+        x86_ts = x86_result.get('transient_storage')
+
+        if evm_ts is not None and x86_ts is not None:
+            verified, msg = self._check_transient_storage_equivalence(
+                evm_ts, x86_ts, deadline
+            )
+            if not verified:
+                return False, msg
+
+        msg = "✓ VERIFIED: x86 refines EVM (return conditions, lengths, memory contents, storage, and transient storage are equivalent for all inputs)"
         if self.verbose:
             print(f"    └─ {msg}")
         return True, msg
@@ -456,6 +467,53 @@ class RefinementChecker:
             return True, "Storage equivalent"
         elif result == sat:
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (storage differs)"
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+        else:
+            msg = self._unknown_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+
+    def _check_transient_storage_equivalence(self, evm_ts, x86_ts,
+                                              deadline=None):
+        """检查EVM和x86的Transient Storage是否等价。
+
+        反证法：是否存在key使得 Select(evm_ts, key) != Select(x86_ts, key)
+        如果UNSAT，则transient storage等价。
+
+        Args:
+            evm_ts: EVM侧的TransientStorage Z3 Array
+            x86_ts: x86侧的TransientStorage Z3 Array
+            deadline: 超时截止时间
+
+        Returns:
+            (verified, message)
+        """
+        from z3 import BitVec, Select, sat, unsat
+
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+
+        key = BitVec('transient_storage_check_key', 256)
+        self.solver.add(Select(evm_ts, key) != Select(x86_ts, key))
+
+        import time
+        start_time = time.time()
+        result = self.solver.check()
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ Transient storage equivalence check: {solve_time:.3f}s, result={result}")
+
+        if result == unsat:
+            return True, "Transient storage equivalent"
+        elif result == sat:
+            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (transient storage differs)"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg

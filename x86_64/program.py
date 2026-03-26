@@ -9,6 +9,7 @@ x86-64程序级模型。
 
 from typing import List, Dict, Any, Optional, Tuple
 from z3 import BitVec, BitVecVal, Concat, If, BoolVal, And, Not
+from .aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 from .models import X86Block, X86Instruction, Register
 from .semantics import X86SemanticsModel
 from .disassembler import disassemble_hex
@@ -28,7 +29,8 @@ class X86Program:
     def __init__(self, 
                  blocks: Optional[List[X86Block]] = None,
                  hex_sequence: Optional[str] = None,
-                 base_addr: int = 0):
+                 base_addr: int = 0,
+                 aot_profile: Optional[X86AOTProfile] = None):
         """初始化x86程序。
         
         Args:
@@ -39,6 +41,7 @@ class X86Program:
         self.blocks = blocks or []
         self.hex_sequence = hex_sequence
         self.base_addr = base_addr
+        self.aot_profile = aot_profile or GO_HPC_EVM_PROFILE
         self.semantics = X86SemanticsModel()
         
         # 如果提供了hex_sequence但没有块，则反汇编它
@@ -55,7 +58,8 @@ class X86Program:
             self.blocks_by_addr[block.start_addr] = block
     
     @classmethod
-    def from_hex(cls, hex_sequence: str, base_addr: int = 0) -> 'X86Program':
+    def from_hex(cls, hex_sequence: str, base_addr: int = 0,
+                 aot_profile: Optional[X86AOTProfile] = None) -> 'X86Program':
         """从十六进制编码的机器码创建X86Program。
         
         Args:
@@ -65,10 +69,11 @@ class X86Program:
         Returns:
             X86Program实例
         """
-        return cls(hex_sequence=hex_sequence, base_addr=base_addr)
+        return cls(hex_sequence=hex_sequence, base_addr=base_addr, aot_profile=aot_profile)
     
     @classmethod
-    def from_blocks(cls, blocks: List[X86Block]) -> 'X86Program':
+    def from_blocks(cls, blocks: List[X86Block],
+                    aot_profile: Optional[X86AOTProfile] = None) -> 'X86Program':
         """从块列表创建X86Program。
         
         Args:
@@ -77,7 +82,7 @@ class X86Program:
         Returns:
             X86Program实例
         """
-        return cls(blocks=blocks)
+        return cls(blocks=blocks, aot_profile=aot_profile)
     
     def get_entrypoint(self) -> Optional[X86Block]:
         """获取程序入口点（第一个块）。
@@ -148,7 +153,8 @@ class X86Program:
              max_depth: int = 100,
              use_reachability_check: bool = True,
              enable_go_bridge: bool = True,
-             enable_merge: bool = False) -> Tuple[SMTState, Dict[str, Any]]:
+             enable_merge: bool = False,
+             call_site_mapping=None) -> Tuple[SMTState, Dict[str, Any]]:
         """使用 worklist 驱动的符号执行为整个程序构建Z3公式。
 
         参考 evm_ir 的设计：
@@ -193,6 +199,8 @@ class X86Program:
             use_reachability_check=use_reachability_check,
             enable_go_bridge=enable_go_bridge,
             enable_merge=enable_merge,
+            call_site_mapping=call_site_mapping,
+            aot_profile=self.aot_profile,
         )
 
         # 执行符号执行
@@ -217,6 +225,7 @@ class X86Program:
             'base_addr': r15_value,
             'has_return': has_return,
             'storage': merged_state.evm_storage.Storage,
+            'transient_storage': merged_state.evm_transient_storage.TransientStorage,
         }
 
         return merged_state, result
@@ -251,6 +260,7 @@ class X86Program:
             'base_addr': r15_value,
             'has_return': BoolVal(False),
             'storage': state.evm_storage.Storage,
+            'transient_storage': state.evm_transient_storage.TransientStorage,
         }
         return state, result
 
@@ -317,13 +327,21 @@ class X86Program:
         merged.x86_registers.set_register(Register.R15, expr)
 
         # 合并 EVM storage（Go函数调用可能修改storage）
-        from state.smt_state import EVMStorageState
+        from state.smt_state import EVMStorageState, EVMTransientStorageState
         first_storage = global_states[0].mstate.evm_storage.Storage
         expr = first_storage
         for gstate in reversed(global_states):
             condition = gstate.get_constraints().as_bool()
             expr = If(condition, gstate.mstate.evm_storage.Storage, expr)
         merged.evm_storage = EVMStorageState(storage_array=expr)
+
+        # 合并 EVM transient storage
+        first_ts = global_states[0].mstate.evm_transient_storage.TransientStorage
+        expr = first_ts
+        for gstate in reversed(global_states):
+            condition = gstate.get_constraints().as_bool()
+            expr = If(condition, gstate.mstate.evm_transient_storage.TransientStorage, expr)
+        merged.evm_transient_storage = EVMTransientStorageState(storage_array=expr)
 
         return merged
     
@@ -353,10 +371,11 @@ class X86Program:
             'base_addr': r15_value,
             'has_return': has_return,
             'storage': state.evm_storage.Storage,
+            'transient_storage': state.evm_transient_storage.TransientStorage,
         }
-        
+
         return state, result
-    
+
     def _merge_path_results(self, path_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
         """使用嵌套If表达式合并路径结果。
         

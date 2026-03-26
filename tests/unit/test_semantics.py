@@ -465,11 +465,98 @@ def test_calldatacopy_symbolic_length_writes_memory():
     assert solver.check() == unsat
 
 
-def test_staticcall_result_is_symbolic_boolean_and_preserves_outside_memory():
-    """测试 STATICCALL 返回 0/1 符号值，并且返回区外内存保持不变。"""
+def test_extcodecopy_symbolically_writes_memory():
+    """测试 EXTCODECOPY 会符号化写入目标内存区间。"""
+    op = EvmOperator(kind="EXTCODECOPY", pc=7)
+
+    state = SMTState()
+    state.evm_memory = EVMMemoryState(msize=BitVecVal(0, 64))
+    old_inside = Select(state.evm_memory.Memory, BitVecVal(0x20, 64))
+    old_outside = Select(state.evm_memory.Memory, BitVecVal(0x1F, 64))
+
+    # top=addr, then destOffset, offset, size
+    state.evm_stack = state.evm_stack.push(BitVecVal(2, 256))        # size
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x10, 256))     # offset
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x20, 256))     # destOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x1234, 256))   # addr
+
+    result_state = evm_operator_to_z3(op, state)
+
+    solver_inside_can_change = Solver()
+    solver_inside_can_change.add(
+        Select(result_state.evm_memory.Memory, BitVecVal(0x20, 64)) != old_inside
+    )
+    assert solver_inside_can_change.check() == sat
+
+    solver_outside = Solver()
+    solver_outside.add(
+        Select(result_state.evm_memory.Memory, BitVecVal(0x1F, 64)) != old_outside
+    )
+    assert solver_outside.check() == unsat
+
+    solver_msize = Solver()
+    solver_msize.add(result_state.evm_memory.MSize == BitVecVal(0x22, 64))
+    assert solver_msize.check() == sat
+
+
+def test_extcodecopy_zero_size_leaves_memory_unchanged():
+    """测试 EXTCODECOPY 在 size=0 时不修改内存或 MSize。"""
+    op = EvmOperator(kind="EXTCODECOPY", pc=8)
+
+    state = SMTState()
+    state.evm_memory = EVMMemoryState(msize=BitVecVal(0x33, 64))
+    old_inside = Select(state.evm_memory.Memory, BitVecVal(0x20, 64))
+
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))        # size
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x10, 256))     # offset
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x20, 256))     # destOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x1234, 256))   # addr
+
+    result_state = evm_operator_to_z3(op, state)
+
+    solver_mem = Solver()
+    solver_mem.add(
+        Select(result_state.evm_memory.Memory, BitVecVal(0x20, 64)) != old_inside
+    )
+    assert solver_mem.check() == unsat
+
+    solver_msize = Solver()
+    solver_msize.add(result_state.evm_memory.MSize != BitVecVal(0x33, 64))
+    assert solver_msize.check() == unsat
+
+
+def test_extcodecopy_same_args_different_pc_are_independent():
+    """不同 pc 的 EXTCODECOPY 应该生成不同的结构化 UF。"""
+    state1 = SMTState()
+    state2 = SMTState()
+
+    for state in (state1, state2):
+        state.evm_stack = state.evm_stack.push(BitVecVal(2, 256))
+        state.evm_stack = state.evm_stack.push(BitVecVal(0x10, 256))
+        state.evm_stack = state.evm_stack.push(BitVecVal(0x20, 256))
+        state.evm_stack = state.evm_stack.push(BitVecVal(0x1234, 256))
+
+    result_state1 = evm_operator_to_z3(EvmOperator(kind="EXTCODECOPY", pc=7), state1)
+    result_state2 = evm_operator_to_z3(EvmOperator(kind="EXTCODECOPY", pc=9), state2)
+
+    solver = Solver()
+    solver.add(
+        Select(result_state1.evm_memory.Memory, BitVecVal(0x20, 64)) !=
+        Select(result_state2.evm_memory.Memory, BitVecVal(0x20, 64))
+    )
+    assert solver.check() == sat
+
+
+def test_staticcall_result_is_constrained_boolean_and_writes_return_data():
+    """测试 STATICCALL 返回值被约束为 {0, 1}，并符号写回返回数据。 
+
+    Go runtime 的 CALL 系列函数只 push 0（失败）或 1（成功）。
+    UF 原始结果通过 If(raw == 0, 0, 1) 映射到 {0, 1}。
+    """
     op = EvmOperator(kind="STATICCALL", pc=2)
 
     state = SMTState()
+    old_inside = Select(state.evm_memory.Memory, BitVecVal(20, 64))
     old_outside = Select(state.evm_memory.Memory, BitVecVal(19, 64))
 
     # top=gas, then addr, inOffset, inSize, retOffset, retSize
@@ -483,18 +570,46 @@ def test_staticcall_result_is_symbolic_boolean_and_preserves_outside_memory():
     result_state = evm_operator_to_z3(op, state)
     success, _ = result_state.evm_stack.pop()
 
-    solver_false = Solver()
-    solver_false.add(success == BitVecVal(0, 256))
-    assert solver_false.check() == sat
+    # success 是 256-bit 值，被约束为 {0, 1}
+    assert success.size() == 256
 
-    solver_true = Solver()
-    solver_true.add(success == BitVecVal(1, 256))
-    assert solver_true.check() == sat
+    # 验证 success 只能取 0 或 1（不能取 2 或其他值）
+    solver_check = Solver()
+    solver_check.add(success != BitVecVal(0, 256))
+    solver_check.add(success != BitVecVal(1, 256))
+    assert solver_check.check() == unsat, "STATICCALL result should be constrained to {0, 1}"
 
-    solver_other = Solver()
-    solver_other.add(And(success != BitVecVal(0, 256), success != BitVecVal(1, 256)))
-    assert solver_other.check() == unsat
+    solver_inside = Solver()
+    solver_inside.add(Select(result_state.evm_memory.Memory, BitVecVal(20, 64)) == old_inside)
+    assert solver_inside.check() == sat
+
+    solver_inside_can_change = Solver()
+    solver_inside_can_change.add(Select(result_state.evm_memory.Memory, BitVecVal(20, 64)) != old_inside)
+    assert solver_inside_can_change.check() == sat
 
     solver_outside = Solver()
     solver_outside.add(Select(result_state.evm_memory.Memory, BitVecVal(19, 64)) != old_outside)
     assert solver_outside.check() == unsat
+
+
+def test_staticcall_same_args_different_pc_are_independent():
+    """不同 pc 的 STATICCALL 应该生成不同的结构化 UF。"""
+    state1 = SMTState()
+    state2 = SMTState()
+    for state in (state1, state2):
+        state.evm_stack = state.evm_stack.push(BitVecVal(2, 256))
+        state.evm_stack = state.evm_stack.push(BitVecVal(20, 256))
+        state.evm_stack = state.evm_stack.push(BitVecVal(4, 256))
+        state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))
+        state.evm_stack = state.evm_stack.push(BitVecVal(0x1234, 256))
+        state.evm_stack = state.evm_stack.push(BitVecVal(1000, 256))
+
+    result_state1 = evm_operator_to_z3(EvmOperator(kind="STATICCALL", pc=2), state1)
+    result_state2 = evm_operator_to_z3(EvmOperator(kind="STATICCALL", pc=3), state2)
+    success1, _ = result_state1.evm_stack.pop()
+    success2, _ = result_state2.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(success1 == BitVecVal(1, 256))
+    solver.add(success2 == BitVecVal(0, 256))
+    assert solver.check() == sat

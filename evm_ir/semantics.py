@@ -4,10 +4,11 @@ EVM IR语义建模。
 本模块使用Z3为EVM IR操作提供语义建模。
 """
 
-from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, URem, LShR, SignExt, ZeroExt, BitVecSort, BoolSort, Function, Lambda, Select, Store
+from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, URem, LShR, SignExt, ZeroExt, Lambda, Select
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
+import common.evm_ops as _evm_ops
 from common.evm_ops import div_semantics as _div_semantics, mod_semantics as _mod_semantics, exp_semantics as _exp_semantics, addmod_semantics as _addmod_semantics, mulmod_semantics as _mulmod_semantics
 from state.smt_state import SMTState, EVMStackState, EVMMemoryState
 
@@ -37,6 +38,53 @@ def _uint256_to_u64_with_overflow_max(value: BitVecRef) -> BitVecRef:
         low_bits,
         BitVecVal((1 << 64) - 1, 64),
     )
+
+
+def _write_call_return_data(memory_state: EVMMemoryState,
+                            ret_offset_bv: BitVecRef,
+                            ret_size_bv: BitVecRef,
+                            return_byte_fn,
+                            effect_id: int,
+                            should_copy=None) -> EVMMemoryState:
+    """Apply symbolic call return-data writes to EVM memory."""
+    return _write_symbolic_memory_slice(
+        memory_state,
+        ret_offset_bv,
+        ret_size_bv,
+        return_byte_fn,
+        effect_tag=f"call_ret_idx_{effect_id}",
+        should_copy=should_copy,
+    )
+
+
+def _write_symbolic_memory_slice(memory_state: EVMMemoryState,
+                                 dest_offset_bv: BitVecRef,
+                                 size_bv: BitVecRef,
+                                 byte_fn,
+                                 effect_tag: str,
+                                 should_copy=None) -> EVMMemoryState:
+    """Apply a symbolic byte slice write to EVM memory."""
+    dest_offset_64 = _truncate_to_64(dest_offset_bv)
+    size_64 = _truncate_to_64(size_bv)
+    zero_64 = BitVecVal(0, 64)
+    idx = BitVec(effect_tag, 64)
+    relative = idx - dest_offset_64
+    in_range = And(
+        size_64 != zero_64,
+        UGE(idx, dest_offset_64),
+        ULT(relative, size_64),
+    )
+    write_cond = in_range if should_copy is None else And(should_copy, in_range)
+    updated_memory = Lambda(idx, If(write_cond, byte_fn(relative), Select(memory_state.Memory, idx)))
+
+    end_offset = dest_offset_64 + size_64
+    grown_msize = If(
+        And(size_64 != zero_64, UGE(end_offset, memory_state.MSize)),
+        end_offset,
+        memory_state.MSize,
+    )
+    updated_msize = grown_msize if should_copy is None else If(should_copy, grown_msize, memory_state.MSize)
+    return EVMMemoryState(memory_array=updated_memory, msize=updated_msize)
 
 
 class EVMOperationSemantics:
@@ -702,18 +750,9 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
 
     elif kind == "SHA3":
-        # SHA3: Pop offset and length, push symbolic hash
-        # We model hash as an uninterpreted function of the memory content
         offset_bv, stack_after_pop1 = state.evm_stack.pop()
         length_bv, stack_after_pop2 = stack_after_pop1.pop()
-        
-        # Use an uninterpreted function for SHA3
-        # Since memory is an array, we can use a function that takes (Memory, offset, length)
-        # For simplicity, we can use a fresh symbolic value or a function
-        sha3_func = Function('sha3', state.evm_memory.Memory.sort(), 
-                             offset_bv.sort(), length_bv.sort(), BitVecSort(256))
-        hash_val = sha3_func(state.evm_memory.Memory, offset_bv, length_bv)
-        
+        hash_val = _evm_ops.sha3_semantics(state.evm_memory.Memory, offset_bv, length_bv)
         state.evm_stack = stack_after_pop2.push(hash_val)
         return state
 
@@ -728,103 +767,213 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         state.evm_stack = state.evm_stack.push(gas_256)
         return state
 
-    elif kind == "STATICCALL":
-        # 对齐 go-hpc-evm/opStaticCall:
-        # gas = pop(); addr = pop(); inOffset = pop(); inSize = pop(); retOffset = pop(); retSize = pop()
+    elif kind == "BALANCE":
+        addr_bv, stack1 = state.evm_stack.pop()
+        result = _evm_ops.balance_semantics(addr_bv)
+        state.evm_stack = stack1.push(result)
+        return state
+
+    elif kind == "SELFBALANCE":
+        result = _evm_ops.self_balance_semantics()
+        state.evm_stack = state.evm_stack.push(result)
+        return state
+
+    elif kind == "EXTCODESIZE":
+        addr_bv, stack1 = state.evm_stack.pop()
+        result = _evm_ops.ext_code_size_semantics(addr_bv)
+        state.evm_stack = stack1.push(result)
+        return state
+
+    elif kind == "EXTCODECOPY":
+        addr_bv, stack1 = state.evm_stack.pop()
+        dest_offset_bv, stack2 = stack1.pop()
+        offset_bv, stack3 = stack2.pop()
+        size_bv, stack4 = stack3.pop()
+        state.evm_memory = _write_symbolic_memory_slice(
+            state.evm_memory,
+            dest_offset_bv,
+            size_bv,
+            lambda byte_index: _evm_ops.ext_code_copy_byte(
+                addr_bv, offset_bv, byte_index, effect_id=op.pc,
+            ),
+            effect_tag=f"extcodecopy_idx_{op.pc}",
+        )
+        state.evm_stack = stack4
+        return state
+
+    elif kind == "EXTCODEHASH":
+        addr_bv, stack1 = state.evm_stack.pop()
+        result = _evm_ops.ext_code_hash_semantics(addr_bv)
+        state.evm_stack = stack1.push(result)
+        return state
+
+    elif kind == "BLOCKHASH":
+        block_number_bv, stack1 = state.evm_stack.pop()
+        result = _evm_ops.block_hash_semantics(block_number_bv)
+        state.evm_stack = stack1.push(result)
+        return state
+
+    elif kind == "SELFDESTRUCT":
+        _, stack1 = state.evm_stack.pop()
+        state.evm_stack = stack1
+        return state
+
+    elif kind == "CREATE":
+        value_bv, stack1 = state.evm_stack.pop()
+        offset_bv, stack2 = stack1.pop()
+        size_bv, stack3 = stack2.pop()
+        result = _evm_ops.create_semantics(
+            value_bv, offset_bv, size_bv, state.evm_memory.Memory, effect_id=op.pc
+        )
+        state.evm_stack = stack3.push(result)
+        return state
+
+    elif kind == "CREATE2":
+        value_bv, stack1 = state.evm_stack.pop()
+        offset_bv, stack2 = stack1.pop()
+        size_bv, stack3 = stack2.pop()
+        salt_bv, stack4 = stack3.pop()
+        result = _evm_ops.create2_semantics(
+            value_bv, offset_bv, size_bv, salt_bv, state.evm_memory.Memory, effect_id=op.pc
+        )
+        state.evm_stack = stack4.push(result)
+        return state
+
+    elif kind == "CALL":
+        gas_bv, stack1 = state.evm_stack.pop()
+        addr_bv, stack2 = stack1.pop()
+        value_bv, stack3 = stack2.pop()
+        args_offset_bv, stack4 = stack3.pop()
+        args_size_bv, stack5 = stack4.pop()
+        ret_offset_bv, stack6 = stack5.pop()
+        ret_size_bv, stack7 = stack6.pop()
+        result = _evm_ops.call_semantics(
+            gas_bv, addr_bv, value_bv,
+            args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+            state.evm_memory.Memory, effect_id=op.pc)
+        old_memory = state.evm_memory
+        should_copy = _evm_ops.call_should_copy_return_data(
+            gas_bv, addr_bv, value_bv,
+            args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+            old_memory.Memory, effect_id=op.pc,
+        )
+        state.evm_memory = _write_call_return_data(
+            old_memory,
+            ret_offset_bv,
+            ret_size_bv,
+            lambda byte_index: _evm_ops.call_return_byte(
+                gas_bv, addr_bv, value_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_id=op.pc,
+            should_copy=should_copy,
+        )
+        state.evm_stack = stack7.push(result)
+        return state
+
+    elif kind == "CALLCODE":
+        gas_bv, stack1 = state.evm_stack.pop()
+        addr_bv, stack2 = stack1.pop()
+        value_bv, stack3 = stack2.pop()
+        args_offset_bv, stack4 = stack3.pop()
+        args_size_bv, stack5 = stack4.pop()
+        ret_offset_bv, stack6 = stack5.pop()
+        ret_size_bv, stack7 = stack6.pop()
+        result = _evm_ops.callcode_semantics(
+            gas_bv, addr_bv, value_bv,
+            args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+            state.evm_memory.Memory, effect_id=op.pc)
+        old_memory = state.evm_memory
+        should_copy = _evm_ops.callcode_should_copy_return_data(
+            gas_bv, addr_bv, value_bv,
+            args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+            old_memory.Memory, effect_id=op.pc,
+        )
+        state.evm_memory = _write_call_return_data(
+            old_memory,
+            ret_offset_bv,
+            ret_size_bv,
+            lambda byte_index: _evm_ops.callcode_return_byte(
+                gas_bv, addr_bv, value_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_id=op.pc,
+            should_copy=should_copy,
+        )
+        state.evm_stack = stack7.push(result)
+        return state
+
+    elif kind == "DELEGATECALL":
         gas_bv, stack1 = state.evm_stack.pop()
         addr_bv, stack2 = stack1.pop()
         args_offset_bv, stack3 = stack2.pop()
-        args_length_bv, stack4 = stack3.pop()
+        args_size_bv, stack4 = stack3.pop()
         ret_offset_bv, stack5 = stack4.pop()
-        ret_length_bv, stack6 = stack5.pop()
+        ret_size_bv, stack6 = stack5.pop()
+        result = _evm_ops.delegate_call_semantics(
+            gas_bv, addr_bv,
+            args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+            state.evm_memory.Memory, effect_id=op.pc)
+        old_memory = state.evm_memory
+        should_copy = _evm_ops.delegate_call_should_copy_return_data(
+            gas_bv, addr_bv,
+            args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+            old_memory.Memory, effect_id=op.pc,
+        )
+        state.evm_memory = _write_call_return_data(
+            old_memory,
+            ret_offset_bv,
+            ret_size_bv,
+            lambda byte_index: _evm_ops.delegate_call_return_byte(
+                gas_bv, addr_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_id=op.pc,
+            should_copy=should_copy,
+        )
+        state.evm_stack = stack6.push(result)
+        return state
 
-        args_offset_64 = _truncate_to_64(args_offset_bv)
-        args_length_64 = _truncate_to_64(args_length_bv)
-        ret_offset_64 = _truncate_to_64(ret_offset_bv)
-        ret_length_64 = _truncate_to_64(ret_length_bv)
+    elif kind == "STATICCALL":
+        gas_bv, stack1 = state.evm_stack.pop()
+        addr_bv, stack2 = stack1.pop()
+        args_offset_bv, stack3 = stack2.pop()
+        args_size_bv, stack4 = stack3.pop()
+        ret_offset_bv, stack5 = stack4.pop()
+        ret_size_bv, stack6 = stack5.pop()
+        result = _evm_ops.static_call_semantics(
+            gas_bv, addr_bv,
+            args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+            state.evm_memory.Memory, effect_id=op.pc)
+        old_memory = state.evm_memory
+        state.evm_memory = _write_call_return_data(
+            old_memory,
+            ret_offset_bv,
+            ret_size_bv,
+            lambda byte_index: _evm_ops.static_call_return_byte(
+                gas_bv, addr_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_id=op.pc,
+        )
+        state.evm_stack = stack6.push(result)
+        return state
 
-        # 没有完整宿主环境时，使用符号布尔量建模成功位，并保守建模返回区内存“可能被写入”。
-        success_func = Function(
-            f"staticcall_success_{op.pc}",
-            state.evm_memory.Memory.sort(),
-            gas_bv.sort(),
-            addr_bv.sort(),
-            BitVecSort(64),
-            BitVecSort(64),
-            BoolSort(),
-        )
-        copy_func = Function(
-            f"staticcall_copy_{op.pc}",
-            state.evm_memory.Memory.sort(),
-            gas_bv.sort(),
-            addr_bv.sort(),
-            BitVecSort(64),
-            BitVecSort(64),
-            BitVecSort(64),
-            BitVecSort(64),
-            BoolSort(),
-        )
-        ret_byte_func = Function(
-            f"staticcall_ret_byte_{op.pc}",
-            state.evm_memory.Memory.sort(),
-            gas_bv.sort(),
-            addr_bv.sort(),
-            BitVecSort(64),
-            BitVecSort(64),
-            BitVecSort(64),
-            BitVecSort(64),
-            BitVecSort(64),
-            BitVecSort(8),
-        )
+    elif kind == "TLOAD":
+        key_bv, stack1 = state.evm_stack.pop()
+        result = state.evm_transient_storage.tload(key_bv)
+        state.evm_stack = stack1.push(result)
+        return state
 
-        call_succeeds = success_func(
-            state.evm_memory.Memory,
-            gas_bv,
-            addr_bv,
-            args_offset_64,
-            args_length_64,
-        )
-        copy_return_data = copy_func(
-            state.evm_memory.Memory,
-            gas_bv,
-            addr_bv,
-            args_offset_64,
-            args_length_64,
-            ret_offset_64,
-            ret_length_64,
-        )
-
-        ret_index = BitVec(f"staticcall_ret_idx_{op.pc}", 64)
-        ret_relative_index = ret_index - ret_offset_64
-        in_return_range = And(
-            copy_return_data,
-            UGE(ret_index, ret_offset_64),
-            ULT(ret_relative_index, ret_length_64),
-        )
-        returned_byte = ret_byte_func(
-            state.evm_memory.Memory,
-            gas_bv,
-            addr_bv,
-            args_offset_64,
-            args_length_64,
-            ret_offset_64,
-            ret_length_64,
-            ret_relative_index,
-        )
-        new_memory = Lambda(
-            ret_index,
-            If(in_return_range, returned_byte, Select(state.evm_memory.Memory, ret_index)),
-        )
-        grown_msize = If(
-            UGE(ret_offset_64 + ret_length_64, state.evm_memory.MSize),
-            ret_offset_64 + ret_length_64,
-            state.evm_memory.MSize,
-        )
-        new_msize = If(copy_return_data, grown_msize, state.evm_memory.MSize)
-
-        success = If(call_succeeds, BitVecVal(1, 256), BitVecVal(0, 256))
-        state.evm_memory = EVMMemoryState(memory_array=new_memory, msize=new_msize)
-        state.evm_stack = stack6.push(success)
+    elif kind == "TSTORE":
+        key_bv, stack1 = state.evm_stack.pop()
+        val_bv, stack2 = stack1.pop()
+        state.evm_transient_storage = state.evm_transient_storage.tstore(key_bv, val_bv)
+        state.evm_stack = stack2
         return state
 
     elif kind == "RETURN":

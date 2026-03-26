@@ -21,9 +21,8 @@ class X86AOTProfile:
     host_functions: Dict[int, str] = field(default_factory=dict)
     # Stack bias: added to Go's sp (in limbs) before computing address
     # Formula: addr = R14 + (sp + stack_sp_bias_limbs) * 8
-    # This aligns Go's StackHolder addresses with memory_mapping:
-    #   memory_mapping: addr = R14 - 0x40 + stack_index * 0x20
-    # For alignment: (sp + bias) * 8 = -0x40 + stack_index * 0x20
+    # 默认情况下真实 amd64 AOT 的物理栈从 R14+0 开始，
+    # 仅在某些验证适配场景下才需要额外 bias。
     stack_sp_bias_limbs: int = 0
 
 
@@ -58,12 +57,15 @@ GO_HPC_EVM_PROFILE = X86AOTProfile(
     resumable_statuses=frozenset({4, 5, 17}),
     builtin_functions={
         0: "memory_grow",
-        3: "div",
-        4: "mod",
-        5: "addmod",
-        6: "mulmod",
-        7: "exp",
-        8: "gas_cost",
+        1: "stack_grow",       # no-op in Go runtime
+        2: "calldatacopy",     # no-op in Go runtime
+        3: "returndatacopy",   # no-op in Go runtime
+        4: "div",
+        5: "mod",
+        6: "addmod",
+        7: "mulmod",
+        8: "exp",
+        9: "gas_cost",
     },
     host_functions={},  # Runtime-dependent; configure per contract
 )

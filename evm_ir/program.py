@@ -101,6 +101,7 @@ class EVMProgram:
                 'base_addr': None,
                 'has_return': BoolVal(False),
                 'storage': state.evm_storage.Storage,
+                'transient_storage': state.evm_transient_storage.TransientStorage,
             }
             return state, result
 
@@ -118,6 +119,7 @@ class EVMProgram:
             'base_addr': None,
             'has_return': has_return,
             'storage': merged_state.evm_storage.Storage,
+            'transient_storage': merged_state.evm_transient_storage.TransientStorage,
         }
 
         return merged_state, result
@@ -198,7 +200,7 @@ class EVMProgram:
         merged.evm_gas = global_states[0].mstate.evm_gas
 
         # 合并 EVM storage（SLOAD/SSTORE 可能在不同路径产生不同的 storage）
-        from state.smt_state import EVMStorageState
+        from state.smt_state import EVMStorageState, EVMTransientStorageState
         if len(global_states) == 1:
             merged.evm_storage = global_states[0].mstate.evm_storage
         else:
@@ -208,6 +210,17 @@ class EVMProgram:
                 condition = gstate.get_constraints().as_bool()
                 expr = If(condition, gstate.mstate.evm_storage.Storage, expr)
             merged.evm_storage = EVMStorageState(storage_array=expr)
+
+        # 合并 EVM transient storage（TSTORE/TLOAD 可能在不同路径产生不同的 transient storage）
+        if len(global_states) == 1:
+            merged.evm_transient_storage = global_states[0].mstate.evm_transient_storage
+        else:
+            first_ts = global_states[0].mstate.evm_transient_storage.TransientStorage
+            expr = first_ts
+            for gstate in reversed(global_states):
+                condition = gstate.get_constraints().as_bool()
+                expr = If(condition, gstate.mstate.evm_transient_storage.TransientStorage, expr)
+            merged.evm_transient_storage = EVMTransientStorageState(storage_array=expr)
 
         return merged
 

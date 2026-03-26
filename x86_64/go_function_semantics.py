@@ -1,38 +1,17 @@
 """
-Go函数Z3语义建模。
+Go host/builtin 函数的 Z3 语义建模。
 
-通过x86内存的Store/Select操作建模Go host/builtin函数的Pop/Push效果。
-x86侧的EVM栈数据存放在[R14 + sp * 8]处，每个Uint256占4个64-bit limb。
-
-Go runtime的StackHolder接口：
-  Pop:  sp_new = sp - 4; value = load_256bit(R14 + sp_new * 8)
-  Push: store_256bit(R14 + sp * 8, value); sp_new = sp + 4
-
-⚠️ 栈地址对齐警告 ⚠️
-Go runtime的sp以limb为单位（sp=1表示[R14+8]），而EVM验证映射
-（verification/memory_mapping.py）使用 R14-0x40 作为stack[0]的基址，
-元素间距0x20。
-
-这意味着：
-- Go runtime sp=0 → R14（地址 R14+0）
-- memory_mapping stack[0] → R14-0x40（地址 R14-0x40）
-
-两者相差 0x40（64字节 = 8 limbs = 2 Uint256s）。
-
-如果Go compiler初始化sp=8，则：
-- Go sp=8 → R14+0x40
-- memory_mapping stack[4] → R14-0x40+4*0x20=R14+0x40 ✓ 对齐
-
-所以对齐前提是：Go runtime的sp初始化值必须是8（或任何使得
-[R14+sp*8]等于[R14-0x40+stack_index*0x20]的固定偏移）。
-
-如果sp初始化不同，会导致栈读写出错位！
+本文件通过 x86 内存读写模拟 Go runtime 的 Uint256 Pop/Push 效果。
+这里的 `R14` 表示当前 block 的栈基准，Go runtime 按 `R14 + sp * 8`
+访问栈，其中 `sp` 以 limb 为单位（1 limb = 8 字节，1 Uint256 = 4 limbs）。
+逻辑栈顶不是固定地址，而是当前 `R14 + (sp-4) * 8` 处的值。
+具体地址换算规则以 `_compute_stack_address()` 和 Pop/Push 语义为准。
 """
 
 import logging
 from typing import Optional, Tuple
 
-from z3 import BitVec, BitVecVal, BitVecSort, Function
+from z3 import And, BitVec, BitVecVal, If, Lambda, Select, UGE, ULT
 
 from .aot_profile import X86AOTProfile
 from state.smt_state import SMTState
@@ -40,48 +19,23 @@ from common import evm_ops
 
 logger = logging.getLogger(__name__)
 
-# Each Uint256 occupies 4 limbs * 8 bytes = 32 bytes
+# 每个 Uint256 占 4 个 limb，每个 limb 为 8 字节，共 32 字节
 LIMBS_PER_UINT256 = 4
+LIMB_SIZE_BYTES = 8
 
-# Stack address alignment constants
-# These must match the Go compiler's actual initialization
-# verification/memory_mapping.py uses R14-0x40 as stack[0] base with 0x20 spacing
-STACK_BASE_OFFSET = -0x40  # from memory_mapping.py
-STACK_ELEMENT_SIZE = 0x20  # from memory_mapping.py
+# 栈地址对齐常量
+# 这里的地址偏移相对于当前 block 的 R14 栈基准
+STACK_BASE_OFFSET = 0
+STACK_ELEMENT_SIZE = 0x20
 
-# Stack address alignment with memory_mapping
+# 当前 block 栈窗口中的地址关系
 #
-# Two different address formulas are in use:
-#
-# 1. Go's StackHolder model: addr = R14 + sp * 8
-#    - sp is in limbs (1 limb = 8 bytes)
-#    - Stack grows upward from R14
-#    - sp represents bytes used / 8
-#
-# 2. memory_mapping (verification): addr = R14 - 0x40 + stack_index * 0x20
-#    - stack_index is 0=top, 1=second, etc.
-#    - Stack grows downward from R14-0x40
-#    - Each element is 0x20 bytes (4 limbs = 1 Uint256)
-#
-# RELATIONSHIP:
-#   Go's "top of stack" is at address (sp - 4) * 8 from R14 (after sp increment for push)
-#   memory_mapping's stack[0] is at R14 - 0x40
-#
-#   For Go sp=N with a single value pushed:
-#     Go view: value at [sp-4] = [N-4]
-#     memory_mapping view: value at stack[0] = R14 - 0x40
-#
-#   Setting R14 + (sp-4)*8 = R14 - 0x40 + stack_index*0x20:
-#     (sp-4)*8 = -0x40 + stack_index*0x20
-#     stack_index = (sp*8 + 0x40) / 0x20 = (sp + 4) / 4
-#
-# KEY INSIGHT: Go sp and memory_mapping stack_index are related by:
-#   stack_index = (sp + 4) / 4  (integer division)
-#
-# Verified: sp=4 -> stack_index=2, sp=8 -> stack_index=3, sp=12 -> stack_index=4
-#
-# This means Go's StackHolder and memory_mapping describe the SAME memory layout
-# but with different indexing conventions!
+# Go 物理栈地址：R14 + sp * 8
+# 当前逻辑栈顶 stack[0] 的基址是 R14 + (sp-4) * 8，
+# stack[1] 的基址是 R14 + (sp-8) * 8。
+# 只有在 block 入口且 sp=0 的预置栈窗口中，才会退化为：
+#   stack[0] -> R14 - 0x20
+#   stack[1] -> R14 - 0x40
 
 
 class GoFunctionSemanticsError(Exception):
@@ -95,24 +49,16 @@ class StackAlignmentError(Exception):
 
 
 def validate_sp_alignment(sp: int) -> bool:
-    """验证 sp 值是否与 memory_mapping 对齐。
-
-    Go: addr = R14 + sp * 8 (sp in limbs)
-    EVM verification: addr = R14 + (-0x40 + stack_index * 0x20)
-
-    对齐条件: R14 + sp*8 = R14 + (-0x40 + stack_index*0x20)
-    即: sp*8 + 0x40 = stack_index * 0x20
-    即: (sp*8 + 0x40) % 0x20 == 0
-    即: (sp + 4) % 4 == 0 (简化后)
+    """验证 sp 是否对齐到 Uint256 槽位边界。
 
     Args:
         sp: 栈指针值（limbs）
 
     Returns:
-        True if aligned
+        若对齐则返回 True
     """
-    # Check if (sp + 4) is divisible by 4, which means sp*8 + 0x40 is divisible by 0x20
-    return (sp + 4) % 4 == 0
+    # 一个 Uint256 占 4 个 limb，因此 sp 必须落在 4-limb 边界上。
+    return sp % LIMBS_PER_UINT256 == 0
 
 
 def get_aligned_sp_for_address(address_offset: int) -> int:
@@ -124,9 +70,9 @@ def get_aligned_sp_for_address(address_offset: int) -> int:
     Returns:
         对齐的 sp 值（limbs）
     """
-    # address_offset = sp * 8 + 0x40 (to align with memory_mapping)
-    # So: sp = (address_offset - 0x40) / 8
-    # But we need the result to be a limb index
+    # 当前 block 栈窗口地址满足：address_offset = sp * 8
+    # 因此：sp = address_offset / 8
+    # 结果仍以 limb 为单位
     return (address_offset - STACK_BASE_OFFSET) // 8
 
 
@@ -137,18 +83,10 @@ class GoFunctionSemantics:
         self.aot_profile = aot_profile
 
     def _compute_stack_address(self, sp: int) -> int:
-        """将 Go 的 sp 转换为 memory_mapping 的栈地址。
-
-        Go sp: addr = R14 + sp * 8
-        memory_mapping: addr = R14 - 0x40 + stack_index * 0x20
-
-        关系: sp * 8 = -0x40 + stack_index * 0x20
-             stack_index = (sp * 8 + 0x40) / 0x20 = (sp + 8) / 4
-        验证: sp=8 → stack_index=(8+8)//4=4 → addr=R14-0x40+4*0x20=R14+0x40 ✓
-              sp=12 → stack_index=(12+8)//4=5 → addr=R14-0x40+5*0x20=R14+0x60 ✓
+        """将 Go 的 sp 转换为当前 block 栈窗口中的地址偏移。
 
         如果 aot_profile.stack_sp_bias_limbs 不为 0，使用:
-        stack_index = (sp + 8 + bias) // 4
+        addr = R14 + (sp + bias) * 8
 
         Args:
             sp: Go 栈指针（limbs）
@@ -157,8 +95,7 @@ class GoFunctionSemantics:
             相对于 R14 的字节偏移
         """
         bias = getattr(self.aot_profile, 'stack_sp_bias_limbs', 0)
-        stack_index = (sp + 8 + bias) // 4
-        return STACK_BASE_OFFSET + stack_index * STACK_ELEMENT_SIZE
+        return STACK_BASE_OFFSET + (sp + bias) * LIMB_SIZE_BYTES
 
     def _pop_uint256(self, sp: int, mstate: SMTState) -> Tuple[BitVec, int, SMTState]:
         """从x86内存中弹出一个Uint256值。
@@ -177,7 +114,7 @@ class GoFunctionSemantics:
         # 先递减 sp（Go 的 Pop: sp -= 4, then read at [sp]）
         new_sp = sp - LIMBS_PER_UINT256
 
-        # 使用 memory_mapping 的公式计算地址
+        # 按当前 block 栈窗口布局计算地址
         addr_offset = self._compute_stack_address(new_sp)
         r14 = mstate.x86_registers.get_register(Register.R14)
         base_offset = r14 + BitVecVal(addr_offset, 64)
@@ -199,7 +136,7 @@ class GoFunctionSemantics:
         """
         from x86_64.models import Register
 
-        # 使用 memory_mapping 的公式计算地址
+        # 按当前 block 栈窗口布局计算地址
         addr_offset = self._compute_stack_address(sp)
         r14 = mstate.x86_registers.get_register(Register.R14)
         base_offset = r14 + BitVecVal(addr_offset, 64)
@@ -229,7 +166,7 @@ class GoFunctionSemantics:
         return mstate
 
     def apply(self, status_code: int, func_index: Optional[int],
-              sp: int, mstate: SMTState) -> SMTState:
+              sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
         """分发并应用Go函数的语义效果。
 
         Args:
@@ -244,18 +181,16 @@ class GoFunctionSemantics:
         Raises:
             StackAlignmentError: 当 sp 不满足对齐要求时
         """
-        # 验证 sp 对齐：sp 必须是 4 的倍数，以确保与 memory_mapping 对齐
-        # stack_index = (sp + 4) // 4 要求 sp + 4 能被 4 整除
-        # 这等价于 sp % 4 == 0
+        # 验证 sp 对齐：一个 Uint256 占 4 个 limb，因此 sp 必须是 4 的倍数
         if not validate_sp_alignment(sp):
             raise StackAlignmentError(
-                f"Go sp={sp} is not aligned with memory_mapping. "
+                f"Go sp={sp} is not aligned to Uint256 stack slots. "
                 f"Expected sp % 4 == 0 (i.e., sp in {{0, 4, 8, 12, ...}}). "
                 f"Current sp may cause incorrect stack address calculation."
             )
 
         if status_code == self.aot_profile.status_codes["call_go_host_function"]:
-            return self._dispatch_host_function(func_index, sp, mstate)
+            return self._dispatch_host_function(func_index, sp, mstate, evm_pc=evm_pc)
         elif status_code == self.aot_profile.status_codes["call_builtin_function"]:
             return self._dispatch_builtin_function(func_index, sp, mstate)
         else:
@@ -268,7 +203,8 @@ class GoFunctionSemantics:
     # ---- Host函数分发 (statusCode=4) ----
 
     def _dispatch_host_function(self, func_index: Optional[int],
-                                sp: int, mstate: SMTState) -> SMTState:
+                                sp: int, mstate: SMTState,
+                                evm_pc: Optional[int] = None) -> SMTState:
         """分发host函数调用。
 
         host函数的func_index映射依赖于编译时注册顺序，
@@ -278,8 +214,8 @@ class GoFunctionSemantics:
             GoFunctionSemanticsError: 当func_index为已知但映射到未知函数时
         """
         if func_index is None:
-            # func_index not found in block - this can happen in test scenarios
-            # or when CFG is being built without full metadata
+            # block 中未找到 func_index。
+            # 这可能出现在测试场景，或 CFG 构建时缺少完整元数据。
             logger.warning(
                 "GoFunctionSemantics: host func_index not found in block, skipping semantics"
             )
@@ -294,10 +230,31 @@ class GoFunctionSemantics:
                 f"Ensure host_functions mapping includes this index."
             )
 
+        scoped_handler = {
+            "create": self._handle_create,
+            "create2": self._handle_create2,
+            "call": self._handle_call,
+            "callCode": self._handle_call_code,
+            "delegateCall": self._handle_delegate_call,
+            "staticCall": self._handle_static_call,
+            "extCodeCopy": self._handle_ext_code_copy,
+        }.get(func_name)
+        if scoped_handler is not None:
+            return scoped_handler(sp, mstate, evm_pc)
+
         handler = {
             "sload": self._handle_sload,
             "sstore": self._handle_sstore,
             "sha3": self._handle_sha3,
+            "balance": self._handle_balance,
+            "selfBalance": self._handle_self_balance,
+            "extCodeSize": self._handle_ext_code_size,
+            "extCodeHash": self._handle_ext_code_hash,
+            "blockHash": self._handle_block_hash,
+            "selfDestruct": self._handle_self_destruct,
+            "log": self._handle_log,
+            "tload": self._handle_tload,
+            "tstore": self._handle_tstore,
         }.get(func_name)
 
         if handler is None:
@@ -306,6 +263,57 @@ class GoFunctionSemantics:
             )
 
         return handler(sp, mstate)
+
+    def _truncate_to_64(self, value: BitVec) -> BitVec:
+        """将256位偏移量截断到64位。"""
+        from z3 import Extract
+
+        if value.size() == 64:
+            return value
+        if value.size() == 256:
+            return Extract(63, 0, value)
+        raise ValueError(f"Expected 64-bit or 256-bit BitVec, got {value.size()} bits")
+
+    def _write_call_return_data(self, mstate: SMTState, ret_offset: BitVec, ret_size: BitVec,
+                                return_byte_fn, effect_id: int,
+                                should_copy=None) -> SMTState:
+        """将符号化的调用返回数据写入 x86 内存。"""
+        return self._write_symbolic_memory_slice(
+            mstate,
+            ret_offset,
+            ret_size,
+            return_byte_fn,
+            effect_tag=f"call_ret_idx_{effect_id}",
+            should_copy=should_copy,
+        )
+
+    def _write_symbolic_memory_slice(self, mstate: SMTState, dest_offset: BitVec, size: BitVec,
+                                     byte_fn, effect_tag: str,
+                                     should_copy=None) -> SMTState:
+        """将一个符号化字节切片写入 x86 内存。"""
+        from state.smt_state import X86MemoryState
+        from x86_64.models import Register
+
+        dest_offset_64 = self._truncate_to_64(dest_offset)
+        size_64 = self._truncate_to_64(size)
+        zero_64 = BitVecVal(0, 64)
+        r15 = mstate.x86_registers.get_register(Register.R15)
+        base_addr = r15 + dest_offset_64
+
+        idx = BitVec(effect_tag, 64)
+        relative = idx - base_addr
+        in_range = And(
+            size_64 != zero_64,
+            UGE(idx, base_addr),
+            ULT(relative, size_64),
+        )
+        write_cond = in_range if should_copy is None else And(should_copy, in_range)
+        new_memory = Lambda(
+            idx,
+            If(write_cond, byte_fn(relative), Select(mstate.x86_memory.Memory, idx)),
+        )
+        mstate.x86_memory = X86MemoryState(memory_array=new_memory)
+        return mstate
 
     def _handle_sload(self, sp: int, mstate: SMTState) -> SMTState:
         """SLOAD: pop key, push Select(Storage, key)。"""
@@ -324,24 +332,279 @@ class GoFunctionSemantics:
         return mstate
 
     def _handle_sha3(self, sp: int, mstate: SMTState) -> SMTState:
-        """SHA3: pop offset, pop length, push sha3(memory, offset, length)。
-
-        使用x86_memory建模，因为x86指令（MSTORE等）只更新x86_memory。
-        这确保与EVM IR侧的SHA3语义等价（两侧都基于同一内存模型）。
-        """
+        """SHA3: pop offset, pop length, push sha3(memory, offset, length)。"""
         offset_bv, sp, mstate = self._pop_uint256(sp, mstate)
         length_bv, sp, mstate = self._pop_uint256(sp, mstate)
-
-        sha3_func = Function(
-            'sha3',
-            mstate.x86_memory.Memory.sort(),
-            offset_bv.sort(),
-            length_bv.sort(),
-            BitVecSort(256),
-        )
-        hash_val = sha3_func(mstate.x86_memory.Memory, offset_bv, length_bv)
-
+        hash_val = evm_ops.sha3_semantics(mstate.x86_memory.Memory, offset_bv, length_bv)
         sp, mstate = self._push_uint256(sp, hash_val, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_balance(self, sp: int, mstate: SMTState) -> SMTState:
+        """BALANCE: pop address, push balance(address)。"""
+        addr, sp, mstate = self._pop_uint256(sp, mstate)
+        result = evm_ops.balance_semantics(addr)
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_self_balance(self, sp: int, mstate: SMTState) -> SMTState:
+        """SELFBALANCE: 压入当前合约余额（无栈输入）。"""
+        result = evm_ops.self_balance_semantics()
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_ext_code_size(self, sp: int, mstate: SMTState) -> SMTState:
+        """EXTCODESIZE: pop address, push extcodesize(address)。"""
+        addr, sp, mstate = self._pop_uint256(sp, mstate)
+        result = evm_ops.ext_code_size_semantics(addr)
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_ext_code_copy(self, sp: int, mstate: SMTState,
+                              evm_pc: Optional[int] = None) -> SMTState:
+        """EXTCODECOPY: 弹出 address、destOffset、offset、size，并符号化写入 x86 内存。"""
+        addr, sp, mstate = self._pop_uint256(sp, mstate)
+        dest_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        offset, sp, mstate = self._pop_uint256(sp, mstate)
+        size, sp, mstate = self._pop_uint256(sp, mstate)
+        effect_suffix = evm_pc if evm_pc is not None else "global"
+        mstate = self._write_symbolic_memory_slice(
+            mstate,
+            dest_offset,
+            size,
+            lambda byte_index: evm_ops.ext_code_copy_byte(
+                addr, offset, byte_index, effect_id=evm_pc,
+            ),
+            effect_tag=f"extcodecopy_idx_{effect_suffix}",
+        )
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_ext_code_hash(self, sp: int, mstate: SMTState) -> SMTState:
+        """EXTCODEHASH: pop address, push extcodehash(address)。"""
+        addr, sp, mstate = self._pop_uint256(sp, mstate)
+        result = evm_ops.ext_code_hash_semantics(addr)
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_block_hash(self, sp: int, mstate: SMTState) -> SMTState:
+        """BLOCKHASH: pop blockNumber, push blockhash(blockNumber)。"""
+        block_number, sp, mstate = self._pop_uint256(sp, mstate)
+        result = evm_ops.block_hash_semantics(block_number)
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_self_destruct(self, sp: int, mstate: SMTState) -> SMTState:
+        """SELFDESTRUCT: 弹出 address（终止执行，无返回值）。"""
+        _addr, sp, mstate = self._pop_uint256(sp, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_log(self, sp: int, mstate: SMTState) -> SMTState:
+        """LOG: 先弹出 n_topics、mStart、mSize，再弹出 n_topics 个 topic。
+
+        Go 的 host.Log() 语义大致为：
+          size := c.PopUint256()  // N = topic 数量
+          mStart := c.PopUint256()
+          mSize := c.PopUint256()
+          for i := 0; i < N; i++ { topics[i] = c.PopUint256() }
+
+        AOT 编译器会在调用 host bridge 前把 N 压栈。
+        因此总计弹栈 N + 3 次，不压回结果。
+
+        这里虽然从栈中读取 n_topics，但在 AOT 场景下它应始终是常量
+        （LOG0..LOG4），所以验证时通常可被 Z3 直接化简。
+        为安全起见，最多只弹 4 个 topic。
+        """
+        from z3 import is_bv_value
+        n_topics_bv, sp, mstate = self._pop_uint256(sp, mstate)
+        _mstart, sp, mstate = self._pop_uint256(sp, mstate)
+        _msize, sp, mstate = self._pop_uint256(sp, mstate)
+
+        # 确定需要额外弹出的 topic 数量
+        # AOT 编译器压入的是常量 N（0-4），这里可以直接提取
+        if is_bv_value(n_topics_bv):
+            n = n_topics_bv.as_long()
+            if n > 4:
+                n = 4  # EVM 最多 4 个 topic
+        else:
+            # 如果这里是符号值，则保守地按 0 个 topic 处理
+            # 按 AOT 约定这在实践中不应发生
+            logger.warning("LOG: n_topics is symbolic, cannot determine topic count")
+            n = 0
+
+        for _ in range(n):
+            _topic, sp, mstate = self._pop_uint256(sp, mstate)
+
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_create(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
+        """CREATE: pop value, offset, size; push new_address。"""
+        value, sp, mstate = self._pop_uint256(sp, mstate)
+        offset, sp, mstate = self._pop_uint256(sp, mstate)
+        size, sp, mstate = self._pop_uint256(sp, mstate)
+        result = evm_ops.create_semantics(value, offset, size, mstate.x86_memory.Memory, effect_id=evm_pc)
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_create2(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
+        """CREATE2: pop value, offset, size, salt; push new_address。"""
+        value, sp, mstate = self._pop_uint256(sp, mstate)
+        offset, sp, mstate = self._pop_uint256(sp, mstate)
+        size, sp, mstate = self._pop_uint256(sp, mstate)
+        salt, sp, mstate = self._pop_uint256(sp, mstate)
+        result = evm_ops.create2_semantics(
+            value, offset, size, salt, mstate.x86_memory.Memory, effect_id=evm_pc
+        )
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
+        """CALL: pop gas, addr, value, argsOffset, argsSize, retOffset, retSize; push success。"""
+        gas, sp, mstate = self._pop_uint256(sp, mstate)
+        addr, sp, mstate = self._pop_uint256(sp, mstate)
+        value, sp, mstate = self._pop_uint256(sp, mstate)
+        args_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        args_size, sp, mstate = self._pop_uint256(sp, mstate)
+        ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        ret_size, sp, mstate = self._pop_uint256(sp, mstate)
+        old_memory = mstate.x86_memory.Memory
+        result = evm_ops.call_semantics(
+            gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+            old_memory, effect_id=evm_pc)
+        if evm_pc is not None:
+            should_copy = evm_ops.call_should_copy_return_data(
+                gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+                old_memory, effect_id=evm_pc,
+            )
+            mstate = self._write_call_return_data(
+                mstate,
+                ret_offset,
+                ret_size,
+                lambda byte_index: evm_ops.call_return_byte(
+                    gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+                    old_memory, byte_index, effect_id=evm_pc,
+                ),
+                effect_id=evm_pc,
+                should_copy=should_copy,
+            )
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_call_code(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
+        """CALLCODE: 与 CALL 的参数签名相同，压入 success。"""
+        gas, sp, mstate = self._pop_uint256(sp, mstate)
+        addr, sp, mstate = self._pop_uint256(sp, mstate)
+        value, sp, mstate = self._pop_uint256(sp, mstate)
+        args_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        args_size, sp, mstate = self._pop_uint256(sp, mstate)
+        ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        ret_size, sp, mstate = self._pop_uint256(sp, mstate)
+        old_memory = mstate.x86_memory.Memory
+        result = evm_ops.callcode_semantics(
+            gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+            old_memory, effect_id=evm_pc)
+        if evm_pc is not None:
+            should_copy = evm_ops.callcode_should_copy_return_data(
+                gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+                old_memory, effect_id=evm_pc,
+            )
+            mstate = self._write_call_return_data(
+                mstate,
+                ret_offset,
+                ret_size,
+                lambda byte_index: evm_ops.callcode_return_byte(
+                    gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+                    old_memory, byte_index, effect_id=evm_pc,
+                ),
+                effect_id=evm_pc,
+                should_copy=should_copy,
+            )
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_delegate_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
+        """DELEGATECALL: 弹出 gas、addr、argsOffset、argsSize、retOffset、retSize，压入 success。"""
+        gas, sp, mstate = self._pop_uint256(sp, mstate)
+        addr, sp, mstate = self._pop_uint256(sp, mstate)
+        args_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        args_size, sp, mstate = self._pop_uint256(sp, mstate)
+        ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        ret_size, sp, mstate = self._pop_uint256(sp, mstate)
+        old_memory = mstate.x86_memory.Memory
+        result = evm_ops.delegate_call_semantics(
+            gas, addr, args_offset, args_size, ret_offset, ret_size,
+            old_memory, effect_id=evm_pc)
+        if evm_pc is not None:
+            should_copy = evm_ops.delegate_call_should_copy_return_data(
+                gas, addr, args_offset, args_size, ret_offset, ret_size,
+                old_memory, effect_id=evm_pc,
+            )
+            mstate = self._write_call_return_data(
+                mstate,
+                ret_offset,
+                ret_size,
+                lambda byte_index: evm_ops.delegate_call_return_byte(
+                    gas, addr, args_offset, args_size, ret_offset, ret_size,
+                    old_memory, byte_index, effect_id=evm_pc,
+                ),
+                effect_id=evm_pc,
+                should_copy=should_copy,
+            )
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_static_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
+        """STATICCALL: 弹出 gas、addr、argsOffset、argsSize、retOffset、retSize，压入 success。"""
+        gas, sp, mstate = self._pop_uint256(sp, mstate)
+        addr, sp, mstate = self._pop_uint256(sp, mstate)
+        args_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        args_size, sp, mstate = self._pop_uint256(sp, mstate)
+        ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
+        ret_size, sp, mstate = self._pop_uint256(sp, mstate)
+        old_memory = mstate.x86_memory.Memory
+        result = evm_ops.static_call_semantics(
+            gas, addr, args_offset, args_size, ret_offset, ret_size,
+            old_memory, effect_id=evm_pc)
+        if evm_pc is not None:
+            mstate = self._write_call_return_data(
+                mstate,
+                ret_offset,
+                ret_size,
+                lambda byte_index: evm_ops.static_call_return_byte(
+                    gas, addr, args_offset, args_size, ret_offset, ret_size,
+                    old_memory, byte_index, effect_id=evm_pc,
+                ),
+                effect_id=evm_pc,
+            )
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_tload(self, sp: int, mstate: SMTState) -> SMTState:
+        """TLOAD: pop key, push transient_storage[key]。"""
+        key, sp, mstate = self._pop_uint256(sp, mstate)
+        result = mstate.evm_transient_storage.tload(key)
+        sp, mstate = self._push_uint256(sp, result, mstate)
+        mstate = self._update_sp_in_memory(sp, mstate)
+        return mstate
+
+    def _handle_tstore(self, sp: int, mstate: SMTState) -> SMTState:
+        """TSTORE: pop key, pop value, store to transient storage。"""
+        key, sp, mstate = self._pop_uint256(sp, mstate)
+        val, sp, mstate = self._pop_uint256(sp, mstate)
+        mstate.evm_transient_storage = mstate.evm_transient_storage.tstore(key, val)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
@@ -355,8 +618,8 @@ class GoFunctionSemantics:
             GoFunctionSemanticsError: 当func_index为已知但映射到未知函数时
         """
         if func_index is None:
-            # func_index not found in block - this can happen in test scenarios
-            # or when CFG is being built without full metadata
+            # block 中未找到 func_index。
+            # 这可能出现在测试场景，或 CFG 构建时缺少完整元数据。
             logger.warning(
                 "GoFunctionSemantics: builtin func_index not found in block, skipping semantics"
             )
@@ -372,12 +635,15 @@ class GoFunctionSemantics:
             )
 
         handler = {
+            "memory_grow": self._handle_builtin_memory_grow,
+            "stack_grow": self._handle_builtin_noop,      # 当前 amd64 AOT 未实际使用
+            "calldatacopy": self._handle_builtin_noop,    # 拷贝语义由编译出的 x86 指令实现
+            "returndatacopy": self._handle_builtin_noop,  # 拷贝语义由编译出的 x86 指令实现
             "div": self._handle_builtin_div,
             "mod": self._handle_builtin_mod,
-            "exp": self._handle_builtin_exp,
             "addmod": self._handle_builtin_addmod,
             "mulmod": self._handle_builtin_mulmod,
-            "memory_grow": self._handle_builtin_memory_grow,
+            "exp": self._handle_builtin_exp,
             "gas_cost": self._handle_builtin_gas_cost,
         }.get(func_name)
 
@@ -388,8 +654,17 @@ class GoFunctionSemantics:
 
         return handler(sp, mstate)
 
+    def _handle_builtin_noop(self, sp: int, mstate: SMTState) -> SMTState:  # noqa: ARG002
+        """当前按空操作处理的 builtin。
+
+        - stack_grow: 当前 amd64 AOT 未实际走到这里。
+        - calldatacopy / returndatacopy: 真正的拷贝效果在编译出的 x86 指令中完成，
+          这里不再重复建模。
+        """
+        return mstate
+
     def _handle_builtin_div(self, sp: int, mstate: SMTState) -> SMTState:
-        """DIV builtin: pop a, pop b, push a/b (EVM semantics: 0 if b==0)。"""
+        """DIV builtin: 弹出 a、b，压入 a/b（按 EVM 语义，b==0 时返回 0）。"""
         a, sp, mstate = self._pop_uint256(sp, mstate)
         b, sp, mstate = self._pop_uint256(sp, mstate)
         result = evm_ops.div_semantics(a, b)
@@ -398,7 +673,7 @@ class GoFunctionSemantics:
         return mstate
 
     def _handle_builtin_mod(self, sp: int, mstate: SMTState) -> SMTState:
-        """MOD builtin: pop a, pop b, push a%b (EVM semantics: 0 if b==0)。"""
+        """MOD builtin: 弹出 a、b，压入 a%b（按 EVM 语义，b==0 时返回 0）。"""
         a, sp, mstate = self._pop_uint256(sp, mstate)
         b, sp, mstate = self._pop_uint256(sp, mstate)
         result = evm_ops.mod_semantics(a, b)
@@ -407,7 +682,7 @@ class GoFunctionSemantics:
         return mstate
 
     def _handle_builtin_exp(self, sp: int, mstate: SMTState) -> SMTState:
-        """EXP builtin: pop base, pop exponent, push base^exponent。
+        """EXP builtin: 弹出 base、exponent，压入 base^exponent。
 
         使用与IR侧相同的未解释函数。
         """
@@ -419,7 +694,7 @@ class GoFunctionSemantics:
         return mstate
 
     def _handle_builtin_addmod(self, sp: int, mstate: SMTState) -> SMTState:
-        """ADDMOD builtin: pop a, pop b, pop mod, push (a+b)%mod。"""
+        """ADDMOD builtin: 弹出 a、b、mod，压入 (a+b)%mod。"""
         a, sp, mstate = self._pop_uint256(sp, mstate)
         b, sp, mstate = self._pop_uint256(sp, mstate)
         mod, sp, mstate = self._pop_uint256(sp, mstate)
@@ -429,7 +704,7 @@ class GoFunctionSemantics:
         return mstate
 
     def _handle_builtin_mulmod(self, sp: int, mstate: SMTState) -> SMTState:
-        """MULMOD builtin: pop a, pop b, pop mod, push (a*b)%mod。"""
+        """MULMOD builtin: 弹出 a、b、mod，压入 (a*b)%mod。"""
         a, sp, mstate = self._pop_uint256(sp, mstate)
         b, sp, mstate = self._pop_uint256(sp, mstate)
         mod, sp, mstate = self._pop_uint256(sp, mstate)
@@ -439,38 +714,33 @@ class GoFunctionSemantics:
         return mstate
 
     def _handle_builtin_memory_grow(self, sp: int, mstate: SMTState) -> SMTState:
-        """MEMORYGROW builtin: pop num_words, push previous_memory_size。
+        """处理 MEMORYGROW builtin。
 
-        EVM memory_grow takes the number of words to expand and returns
-        the previous memory size in words. Since we don't track actual
-        memory size in this symbolic model, we use an uninterpreted function.
+        当前验证模型将它抽象为空操作，原因如下：
+
+        1. 真实的 go-hpc-evm AOT 实现中，memory_grow 不是从 EVM 栈取参数，
+           而是从 callEngine / evmArchContext 中读取 growNumber。
+        2. 该 builtin 的主要副作用是扩展内存 buffer，并更新
+           memoryElement0Address / memorySliceLen 这类运行时元数据。
+        3. 本项目当前主要验证的是“栈效果”和“内存内容”的等价性，x86 内存也被
+           建模为一个可按地址读写的无限 Z3 Array，因此不会显式验证 buffer 扩容、
+           长度变化或扩容后的基址重定位。
+
+        因此，这里不做栈 pop/push，也不修改 SMT 状态中的内存元数据。
+
+        TODO:
+        后续如果要更精确地贴近 go-hpc-evm AOT，需要补充对 callEngine 中
+        growNumber、memoryElement0Address、memorySliceLen 等字段的建模，
+        并在 memory_grow 后同步更新这些可观察状态，以验证内存扩容相关语义。
         """
-        num_words, sp, mstate = self._pop_uint256(sp, mstate)
-
-        memory_grow_func = Function(
-            'evm_memory_grow',
-            BitVecSort(256),
-            BitVecSort(256),
-        )
-        result = memory_grow_func(num_words)
-
-        sp, mstate = self._push_uint256(sp, result, mstate)
-        mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
     def _handle_builtin_gas_cost(self, sp: int, mstate: SMTState) -> SMTState:
-        """GAS builtin: push remaining gas.
+        """GAS_COST builtin: 弹出 gas 数值（Go: c.PopUint256().Uint64()，随后扣减 gasLimit）。
 
-        EVM GAS opcode returns the amount of gas available in the current
-        execution context. Since gas tracking is complex and not the focus
-        of our semantic equivalence verification, we use an uninterpreted
-        function that returns a symbolic gas value.
-
-        Note: GAS is special - it doesn't consume stack arguments.
+        Go runtime 的 dealWithGasCost 会弹出 1 个值，不压回结果。
+        这里不对 gas 余额做等价性建模。
         """
-        gas_func = Function('evm_gas', BitVecSort(256))
-        result = gas_func()  # no arguments, returns BitVec(256)
-
-        sp, mstate = self._push_uint256(sp, result, mstate)
+        _gas, sp, mstate = self._pop_uint256(sp, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate

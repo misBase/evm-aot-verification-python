@@ -11,6 +11,7 @@ from typing import Tuple, Optional, Dict, Any
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
 from .refinement_checker import RefinementChecker
+from .call_site_mapping import build_call_site_mapping
 from state.smt_state import SMTState
 
 
@@ -77,12 +78,14 @@ class ProgramEquivalenceChecker:
             print("    ├─ Identifying basic blocks and CFG paths")
 
         x86_start = time.time()
-        x86_state, x86_result = x86_program.to_z3(initial_state)
+        call_site_mapping = build_call_site_mapping(evm_program, x86_program)
+        x86_state, x86_result = x86_program.to_z3(initial_state, call_site_mapping=call_site_mapping)
         x86_build_time = time.time() - x86_start
 
         if self.verbose:
             x86_has_return = x86_state.return_length != BitVecVal(0, 64)
             print(f"    ├─ x86 return condition: length != 0 (symbolic, merged from all paths)")
+            print(f"    ├─ Shared host call-site mappings: {len(call_site_mapping)}")
             # 估算公式复杂度
             formula_size = self._estimate_formula_size(x86_result)
             print(f"    ├─ Formula size: ~{formula_size} expressions")

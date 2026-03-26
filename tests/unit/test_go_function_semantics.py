@@ -25,46 +25,42 @@ def _make_profile_with_host(host_map):
 
 
 R13_BASE = 0x10000  # callEngine base, separate from stack area
-R14_BASE = 0x20000  # stack base
+R14_BASE = 0x20000  # 当前 block 的栈基准
 
 
-def _make_state_with_stack(values, sp_start=8):
+def _make_state_with_stack(values, sp_start=0):
     """Create an SMTState with Uint256 values in x86 memory.
 
-    Uses memory_mapping formula: addr = R14 - 0x40 + stack_index * 0x20
-    where stack_index = (sp + 8) // 4
-
-    This ensures test setup matches the actual Go semantics implementation.
+    这里按当前 block 的栈窗口布局初始化已有栈值：
+    最后一个 value 是逻辑栈顶，位于 R14-0x20；再下面一个位于 R14-0x40。
 
     Args:
-        values: list of 256-bit integer values to push
-        sp_start: initial sp (in limbs). Default 8 matches Go compiler.
+        values: list of 256-bit integer values in push order
+        sp_start: block-local 初始 sp（单位：limb），默认 0
 
     Returns:
-        (state, sp_after_push) tuple
+        (state, sp_start) tuple
     """
-    from x86_64.go_function_semantics import STACK_BASE_OFFSET, STACK_ELEMENT_SIZE
+    from x86_64.go_function_semantics import STACK_ELEMENT_SIZE
 
     state = SMTState()
     state.x86_registers.set_register(Register.R13, BitVecVal(R13_BASE, 64))
     state.x86_registers.set_register(Register.R14, BitVecVal(R14_BASE, 64))
 
-    sp = sp_start
-    for val in values:
-        # Use memory_mapping formula: stack_index = (sp + 8) // 4
-        stack_index = (sp + 8) // 4
-        addr_offset = STACK_BASE_OFFSET + stack_index * STACK_ELEMENT_SIZE
+    depth = len(values)
+    for push_index, val in enumerate(values):
+        stack_index = depth - 1 - push_index
+        addr_offset = -((stack_index + 1) * STACK_ELEMENT_SIZE)
         base_offset = BitVecVal(R14_BASE + addr_offset, 64)
         state.x86_memory = state.x86_memory.store_256bit(base_offset, BitVecVal(val, 256))
-        sp += LIMBS_PER_UINT256
 
-    return state, sp
+    return state, sp_start
 
 
 def _compute_stack_addr(r14_base: int, sp: int) -> int:
-    """Compute memory address for given sp using memory_mapping formula.
+    """Compute memory address for given block-local sp.
 
-    Formula: addr = r14 + (-0x40 + ((sp + 8) // 4) * 0x20)
+    Formula: addr = r14 + sp * 8
     This matches GoFunctionSemantics._compute_stack_address with bias=0.
 
     Args:
@@ -74,11 +70,8 @@ def _compute_stack_addr(r14_base: int, sp: int) -> int:
     Returns:
         Absolute memory address
     """
-    from x86_64.go_function_semantics import STACK_BASE_OFFSET, STACK_ELEMENT_SIZE
-    # Formula matches GoFunctionSemantics._compute_stack_address with bias=0
-    stack_index = (sp + 8) // 4
-    addr_offset = STACK_BASE_OFFSET + stack_index * STACK_ELEMENT_SIZE
-    return r14_base + addr_offset
+    from x86_64.go_function_semantics import LIMB_SIZE_BYTES
+    return r14_base + sp * LIMB_SIZE_BYTES
 
 
 class TestPopPush:
@@ -197,7 +190,7 @@ class TestSloadSstore:
 
         state = sem.apply(4, 1, sload_sp, state)
 
-        # Read the SLOAD result from stack - use memory_mapping formula
+        # 按当前 block 的栈窗口地址规则读取 SLOAD 压回的结果
         result_sp = sload_sp - LIMBS_PER_UINT256
         result_addr = _compute_stack_addr(R14_BASE, result_sp)
         result = state.x86_memory.load_256bit(BitVecVal(result_addr, 64))
@@ -205,6 +198,89 @@ class TestSloadSstore:
         solver = Solver()
         solver.add(result != BitVecVal(data_val, 256))
         assert solver.check() == unsat, "SSTORE/SLOAD roundtrip should preserve value"
+
+
+class TestCallFamilyEffects:
+    """Test scoped call identities and return-data writes."""
+
+    def test_staticcall_writes_symbolic_return_data(self):
+        profile = _make_profile_with_host({0: "staticCall"})
+        sem = GoFunctionSemantics(profile)
+
+        # Stack bottom-to-top:
+        # retSize, retOffset, argsSize, argsOffset, addr, gas
+        state, sp = _make_state_with_stack([2, 0x40, 4, 0, 0x1234, 1000])
+        state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
+        old_outside = state.x86_memory.load_byte(BitVecVal(0x3F, 64))
+
+        state = sem.apply(4, 0, sp, state, evm_pc=0x20)
+
+        solver_inside = Solver()
+        solver_inside.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
+        assert solver_inside.check() == sat
+
+        solver_outside = Solver()
+        solver_outside.add(state.x86_memory.load_byte(BitVecVal(0x3F, 64)) != old_outside)
+        assert solver_outside.check() == unsat
+
+    def test_staticcall_same_args_different_pc_are_independent(self):
+        profile = _make_profile_with_host({0: "staticCall"})
+        sem = GoFunctionSemantics(profile)
+
+        state1, sp1 = _make_state_with_stack([2, 0x40, 4, 0, 0x1234, 1000])
+        state2, sp2 = _make_state_with_stack([2, 0x40, 4, 0, 0x1234, 1000])
+
+        state1 = sem.apply(4, 0, sp1, state1, evm_pc=0x20)
+        state2 = sem.apply(4, 0, sp2, state2, evm_pc=0x24)
+
+        result_sp1 = sp1 - 6 * LIMBS_PER_UINT256
+        result_sp2 = sp2 - 6 * LIMBS_PER_UINT256
+        result1 = state1.x86_memory.load_256bit(BitVecVal(_compute_stack_addr(R14_BASE, result_sp1), 64))
+        result2 = state2.x86_memory.load_256bit(BitVecVal(_compute_stack_addr(R14_BASE, result_sp2), 64))
+
+        solver = Solver()
+        solver.add(result1 == BitVecVal(1, 256))
+        solver.add(result2 == BitVecVal(0, 256))
+        assert solver.check() == sat
+
+
+class TestExtCodeCopyEffects:
+    """Test EXTCODECOPY symbolic memory writes on the x86 side."""
+
+    def test_extcodecopy_writes_symbolic_bytes_to_x86_memory(self):
+        profile = _make_profile_with_host({0: "extCodeCopy"})
+        sem = GoFunctionSemantics(profile)
+
+        # Stack bottom-to-top: size, offset, destOffset, addr
+        state, sp = _make_state_with_stack([2, 0x10, 0x40, 0x1234])
+        state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
+        old_outside = state.x86_memory.load_byte(BitVecVal(0x3F, 64))
+
+        state = sem.apply(4, 0, sp, state, evm_pc=0x30)
+
+        solver_inside = Solver()
+        solver_inside.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
+        assert solver_inside.check() == sat
+
+        solver_outside = Solver()
+        solver_outside.add(state.x86_memory.load_byte(BitVecVal(0x3F, 64)) != old_outside)
+        assert solver_outside.check() == unsat
+
+    def test_extcodecopy_zero_size_leaves_x86_memory_unchanged(self):
+        profile = _make_profile_with_host({0: "extCodeCopy"})
+        sem = GoFunctionSemantics(profile)
+
+        state, sp = _make_state_with_stack([0, 0x10, 0x40, 0x1234])
+        state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
+
+        state = sem.apply(4, 0, sp, state, evm_pc=0x30)
+
+        solver = Solver()
+        solver.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
+        assert solver.check() == unsat
 
 
 class TestBuiltinFunctions:
@@ -223,12 +299,12 @@ class TestBuiltinFunctions:
     def test_builtin_gas_cost(self):
         """GAS builtin: push remaining gas (uninterpreted function)."""
         # Use builtin_functions mapping that includes gas_cost
-        # gas_cost is at index 8 in GO_HPC_EVM_PROFILE.builtin_functions
+        # gas_cost is at index 9 in GO_HPC_EVM_PROFILE.builtin_functions
         profile = X86AOTProfile(
             offsets=GO_HPC_EVM_PROFILE.offsets,
             status_codes=GO_HPC_EVM_PROFILE.status_codes,
             resumable_statuses=GO_HPC_EVM_PROFILE.resumable_statuses,
-            builtin_functions={8: "gas_cost"},  # gas_cost at index 8
+            builtin_functions={9: "gas_cost"},  # gas_cost at index 9
             host_functions={},
         )
         sem = GoFunctionSemantics(profile)
@@ -237,7 +313,7 @@ class TestBuiltinFunctions:
         state, sp = _make_state_with_stack([])
 
         # gas_cost handler should not crash
-        state = sem.apply(5, 8, sp, state)
+        state = sem.apply(5, 9, sp, state)
 
         # Verify result was pushed at correct position (at current sp)
         result_addr = _compute_stack_addr(R14_BASE, sp)
@@ -254,7 +330,7 @@ class TestBuiltinFunctions:
         # Stack bottom-to-top: [3, 100] => top=100, second=3
         # DIV pops a=100, b=3, pushes 100/3 = 33
         state, sp = _make_state_with_stack([3, 100])
-        state = sem.apply(5, 3, sp, state)
+        state = sem.apply(5, 4, sp, state)
 
         result = self._read_result_after_binary_op(state, sp)
 
@@ -272,7 +348,7 @@ class TestBuiltinFunctions:
         # But for div-by-zero: we need divisor=0
         # pop a=42, pop b=0 => 42/0 = 0 (EVM semantics)
         state, sp = _make_state_with_stack([0, 42])
-        state = sem.apply(5, 3, sp, state)
+        state = sem.apply(5, 4, sp, state)
 
         result = self._read_result_after_binary_op(state, sp)
 
@@ -289,7 +365,7 @@ class TestBuiltinFunctions:
         # Stack bottom-to-top: [3, 100] => top=100, second=3
         # MOD pops a=100, b=3, pushes 100%3 = 1
         state, sp = _make_state_with_stack([3, 100])
-        state = sem.apply(5, 4, sp, state)
+        state = sem.apply(5, 5, sp, state)
 
         result = self._read_result_after_binary_op(state, sp)
 
@@ -307,7 +383,7 @@ class TestBuiltinFunctions:
         # Stack bottom-to-top: [10, 2] => top=2 (base), second=10 (exp)
         # EXP pops base=2, exp=10, pushes evm_exp(2, 10)
         state, sp = _make_state_with_stack([10, 2])
-        state = sem.apply(5, 7, sp, state)
+        state = sem.apply(5, 8, sp, state)
 
         result = self._read_result_after_binary_op(state, sp)
 

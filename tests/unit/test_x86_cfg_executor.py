@@ -4,8 +4,9 @@
 from pathlib import Path
 
 import pytest
-from z3 import BitVecVal, Bool
+from z3 import BitVecVal, Bool, Solver, sat
 
+from x86_64.aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 from x86_64.cfg_executor import X86SymbolicExecutor
 from x86_64.cfg import identify_basic_blocks
 from x86_64.disassembler import disassemble_hex, parse_operands
@@ -218,6 +219,10 @@ class TestX86SymbolicExecutor:
 class TestRetGoBridge:
     """测试 ret -> GO_HOST -> returnAddress 动态建模。"""
 
+    R13_BASE = 0x10000
+    R14_BASE = 0x20000
+    STACK_ELEMENT_SIZE = 0x20
+
     def setup_method(self):
         self.base_addr = 0x1000
 
@@ -228,9 +233,39 @@ class TestRetGoBridge:
 
     def create_initial_state(self):
         state = SMTState()
-        state.x86_registers.set_register(Register.R13, BitVecVal(0, 64))
+        state.x86_registers.set_register(Register.R13, BitVecVal(self.R13_BASE, 64))
+        state.x86_registers.set_register(Register.R14, BitVecVal(self.R14_BASE, 64))
         state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
         return state
+
+    def create_initial_state_with_stack(self, values, sp_in_memory=0):
+        """创建带预置栈窗口的初始状态。
+
+        values 按压栈顺序给出，最后一个元素是逻辑栈顶。
+        """
+        state = self.create_initial_state()
+        stack_depth = len(values)
+        for push_index, value in enumerate(values):
+            stack_index = stack_depth - 1 - push_index
+            addr = self.R14_BASE - (stack_index + 1) * self.STACK_ELEMENT_SIZE
+            state.x86_memory = state.x86_memory.store_256bit(
+                BitVecVal(addr, 64), BitVecVal(value, 256)
+            )
+
+        sp_addr = self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
+        state.x86_memory = state.x86_memory.store_64bit(
+            BitVecVal(sp_addr, 64), BitVecVal(sp_in_memory % (1 << 64), 64)
+        )
+        return state
+
+    def _make_profile_with_host(self, host_functions):
+        return X86AOTProfile(
+            offsets=GO_HPC_EVM_PROFILE.offsets,
+            status_codes=GO_HPC_EVM_PROFILE.status_codes,
+            resumable_statuses=GO_HPC_EVM_PROFILE.resumable_statuses,
+            builtin_functions=GO_HPC_EVM_PROFILE.builtin_functions,
+            host_functions=host_functions,
+        )
 
     def test_ret_status_5_builds_go_and_resume_edges(self):
         """status=5 时应构建 ret->GO_HOST 和 GO_HOST->resume。"""
@@ -417,6 +452,131 @@ class TestRetGoBridge:
         assert len(resume_node.states) == 1
         assert any(e.node_from == 0x100a for e in call_edges)
         assert any(e.node_to == 0x1022 for e in return_edges)
+
+    def test_ret_go_bridge_applies_builtin_side_effect_before_resume(self):
+        """builtin 语义应先更新 mstate，再把更新后的状态带到恢复块。"""
+        # block0:
+        #   mov rax, 0x102a
+        #   mov [r13+0xf0], rax
+        #   mov byte ptr [r13+0xe0], 5
+        #   mov dword ptr [r13+0xe4], 4   ; builtin div
+        #   mov qword ptr [r13+0x28], 0   ; sp = 0
+        #   ret
+        # block1:
+        #   ret
+        hex_code = (
+            "48c7c02a100000"
+            "498985f0000000"
+            "41c685e000000005"
+            "41c785e400000004000000"
+            "49c7452800000000"
+            "c3"
+            "c3"
+        )
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state_with_stack([3, 100], sp_in_memory=0)
+
+        executor = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=False)
+        executor.execute(state)
+
+        resume_node = executor.cfg.get_node(0x102a)
+        assert resume_node is not None
+        assert len(resume_node.states) == 1
+
+        resumed_mstate = resume_node.states[0].mstate
+        result = resumed_mstate.x86_memory.load_256bit(BitVecVal(self.R14_BASE - 0x40, 64))
+        sp_bv = resumed_mstate.x86_memory.load_64bit(
+            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64)
+        )
+
+        solver = Solver()
+        solver.add(result == BitVecVal(33, 256))
+        solver.add(sp_bv == BitVecVal((1 << 64) - 4, 64))
+        assert solver.check() == sat
+
+    def test_ret_go_bridge_applies_host_side_effect_before_resume(self):
+        """host 语义应在恢复前更新 storage 等可观察状态。"""
+        # block0:
+        #   mov rax, 0x102a
+        #   mov [r13+0xf0], rax
+        #   mov byte ptr [r13+0xe0], 4
+        #   mov dword ptr [r13+0xe8], 0   ; host sstore
+        #   mov qword ptr [r13+0x28], 0   ; sp = 0
+        #   ret
+        # block1:
+        #   ret
+        hex_code = (
+            "48c7c02a100000"
+            "498985f0000000"
+            "41c685e000000004"
+            "41c785e800000000000000"
+            "49c7452800000000"
+            "c3"
+            "c3"
+        )
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state_with_stack([0x1234, 0x42], sp_in_memory=0)
+        profile = self._make_profile_with_host({0: "sstore"})
+
+        executor = X86SymbolicExecutor(
+            blocks,
+            max_depth=20,
+            use_reachability_check=False,
+            aot_profile=profile,
+        )
+        executor.execute(state)
+
+        resume_node = executor.cfg.get_node(0x102a)
+        assert resume_node is not None
+        assert len(resume_node.states) == 1
+
+        resumed_mstate = resume_node.states[0].mstate
+        loaded = resumed_mstate.evm_storage.sload(BitVecVal(0x42, 256))
+        sp_bv = resumed_mstate.x86_memory.load_64bit(
+            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64)
+        )
+
+        solver = Solver()
+        solver.add(loaded == BitVecVal(0x1234, 256))
+        solver.add(sp_bv == BitVecVal((1 << 64) - 8, 64))
+        assert solver.check() == sat
+
+    def test_ret_go_bridge_reads_sp_from_memory_when_block_omits_sp_write(self):
+        """block 里没有 stack_pointer 立即数时，也应从内存读取 sp 并应用副作用。"""
+        # block0:
+        #   mov rax, 0x1022
+        #   mov [r13+0xf0], rax
+        #   mov byte ptr [r13+0xe0], 5
+        #   mov dword ptr [r13+0xe4], 9   ; builtin gas_cost
+        #   ret
+        # block1:
+        #   ret
+        hex_code = (
+            "48c7c022100000"
+            "498985f0000000"
+            "41c685e000000005"
+            "41c785e400000009000000"
+            "c3"
+            "c3"
+        )
+        blocks = self.disasm_and_create_blocks(hex_code)
+        state = self.create_initial_state_with_stack([0x55], sp_in_memory=0)
+
+        executor = X86SymbolicExecutor(blocks, max_depth=20, use_reachability_check=False)
+        executor.execute(state)
+
+        resume_node = executor.cfg.get_node(0x1022)
+        assert resume_node is not None
+        assert len(resume_node.states) == 1
+
+        resumed_mstate = resume_node.states[0].mstate
+        sp_bv = resumed_mstate.x86_memory.load_64bit(
+            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64)
+        )
+
+        solver = Solver()
+        solver.add(sp_bv == BitVecVal((1 << 64) - 4, 64))
+        assert solver.check() == sat
 
 
 class TestHandleJmp:

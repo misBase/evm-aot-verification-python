@@ -18,6 +18,7 @@ from state.smt_state import SMTState
 # RETURN指令的常量
 EVM_NATIVE_CALL_STATUS_CODE_RETURNED = GO_HPC_EVM_PROFILE.status_codes["returned"]
 EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = GO_HPC_EVM_PROFILE.offsets["status_code"]
+EVM_CALL_ENGINE_STACK_CONTEXT_STACK_POINTER_OFFSET = GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
 AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE = Register.R13  # 指向callEngine实例的指针
 
 
@@ -897,30 +898,33 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         # 对于其他状态码，我们不设置return_offset/return_length
         # 这与Go代码匹配：只有case evmNativeCallStatusCodeReturned设置返回值
         
-        # 重要：x86-64不直接操作evm_stack或evm_memory
-        # x86-64使用x86内存（通过R14用于栈，R15用于EVM内存）
-        # 从x86内存获取offset和length（EVM栈通过R14存储在x86内存中）
-        # Go代码：offset, size := c.PopUint64(), c.PopUint64()
-        # 这意味着：首先弹出offset（stack[0]），然后弹出size（stack[1]）
-        # x86内存中的栈布局：stack[0]在R14-0x40，stack[1]在R14-0x20
-        
+        # 重要：x86-64不直接操作 evm_stack 或 evm_memory。
+        # 这里需要从 x86 栈内存中提取 RETURN 的两个参数。
+        # Go 代码：offset, size := c.PopUint64(), c.PopUint64()
+        # 因此逻辑栈顶 stack[0] 是 offset，stack[1] 是 size。
+        #
+        # 这里的 R14 是当前 block 的栈基准，不是整个物理栈起点。
+        # 栈顶位置由当前 stack_pointer 决定：
+        # stack[0] 基址 = R14 + (sp-4)*8，
+        # stack[1] 基址 = R14 + (sp-8)*8。
+
         # 获取R14寄存器值（栈基址指针）
         r14_value = state.x86_registers.get_register(Register.R14)
-        
-        # 使用绝对地址从x86内存中提取栈值
-        # stack[0]（顶部）= offset在R14-0x40，stack[1] = size（length）在R14-0x20
-        # 我们需要从x86内存加载256位值（4×64位limb）
-        
-        # Stack[0]（offset）：从R14-0x40加载（4×64位limb）
-        stack0_base = r14_value + BitVecVal(-0x40, 64)
+
+        # 读取当前 stack_pointer（单位：limb）
+        sp_offset = BitVecVal(EVM_CALL_ENGINE_STACK_CONTEXT_STACK_POINTER_OFFSET, 64)
+        sp_bv = state.x86_memory.load_64bit(r13_value + sp_offset)
+
+        # 使用当前 sp 反推出逻辑栈顶两项的物理地址
+        limb_size = BitVecVal(8, 64)
+        stack0_base = r14_value + (sp_bv - BitVecVal(4, 64)) * limb_size
         offset_z0 = state.x86_memory.load_64bit(stack0_base)
         offset_z1 = state.x86_memory.load_64bit(stack0_base + BitVecVal(8, 64))
         offset_z2 = state.x86_memory.load_64bit(stack0_base + BitVecVal(16, 64))
         offset_z3 = state.x86_memory.load_64bit(stack0_base + BitVecVal(24, 64))
         offset_stack_value = Concat(offset_z3, offset_z2, offset_z1, offset_z0)  # 256位值
-        
-        # Stack[1]（size/length）：从R14-0x20加载（4×64位limb）
-        stack1_base = r14_value + BitVecVal(-0x20, 64)
+
+        stack1_base = r14_value + (sp_bv - BitVecVal(8, 64)) * limb_size
         size_z0 = state.x86_memory.load_64bit(stack1_base)
         size_z1 = state.x86_memory.load_64bit(stack1_base + BitVecVal(8, 64))
         size_z2 = state.x86_memory.load_64bit(stack1_base + BitVecVal(16, 64))

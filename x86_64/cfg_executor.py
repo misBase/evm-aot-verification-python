@@ -5,12 +5,12 @@ x86-64 符号执行引擎（参考 evm_ir）。
 """
 
 import logging
-from typing import List, Dict, Optional, Tuple, Set
+from typing import Any, List, Dict, Optional, Tuple, Set
 from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat
 
 logger = logging.getLogger(__name__)
 
-from .aot_profile import GO_HPC_EVM_PROFILE
+from .aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 from .models import Register, X86Block, X86Instruction
 from .cfg_structures import X86DynamicCFG, X86EdgeType
 from .cfg_state import X86GlobalState, X86WorldState, X86Constraints
@@ -39,7 +39,9 @@ class X86SymbolicExecutor:
                  max_depth: int = 100,
                  use_reachability_check: bool = True,
                  enable_go_bridge: bool = True,
-                 enable_merge: bool = True):
+                 enable_merge: bool = True,
+                 call_site_mapping: Optional[Any] = None,
+                 aot_profile: Optional[X86AOTProfile] = None):
         """初始化符号执行引擎。
 
         Args:
@@ -57,7 +59,8 @@ class X86SymbolicExecutor:
         self.use_reachability_check = use_reachability_check
         self.enable_go_bridge = enable_go_bridge
         self.enable_merge = enable_merge
-        self.aot_profile = GO_HPC_EVM_PROFILE
+        self.call_site_mapping = call_site_mapping
+        self.aot_profile = aot_profile or GO_HPC_EVM_PROFILE
 
         # 创建动态 CFG
         self.cfg = X86DynamicCFG(blocks)
@@ -268,12 +271,19 @@ class X86SymbolicExecutor:
         merged_mstate.pc = states[0].mstate.pc
 
         # 合并 EVM storage（Go host函数调用可能修改storage）
-        from state.smt_state import EVMStorageState
+        from state.smt_state import EVMStorageState, EVMTransientStorageState
         storage_expr = states[-1].mstate.evm_storage.Storage
         for s in reversed(states[:-1]):
             cond = s.get_constraints().as_bool()
             storage_expr = If(cond, s.mstate.evm_storage.Storage, storage_expr)
         merged_mstate.evm_storage = EVMStorageState(storage_array=storage_expr)
+
+        # 合并 EVM transient storage
+        ts_expr = states[-1].mstate.evm_transient_storage.TransientStorage
+        for s in reversed(states[:-1]):
+            cond = s.get_constraints().as_bool()
+            ts_expr = If(cond, s.mstate.evm_transient_storage.TransientStorage, ts_expr)
+        merged_mstate.evm_transient_storage = EVMTransientStorageState(storage_array=ts_expr)
 
         # 环境信息共享
         merged_mstate.calldata = states[0].mstate.calldata
@@ -924,7 +934,10 @@ class X86SymbolicExecutor:
                 from .go_function_semantics import GoFunctionSemantics, GoFunctionSemanticsError
                 go_sem = GoFunctionSemantics(self.aot_profile)
                 try:
-                    mstate = go_sem.apply(status_code, func_index, sp, mstate)
+                    evm_pc = None
+                    if status_code == self.aot_profile.status_codes["call_go_host_function"] and self.call_site_mapping is not None:
+                        evm_pc = self.call_site_mapping.get_evm_pc(block.start_addr)
+                    mstate = go_sem.apply(status_code, func_index, sp, mstate, evm_pc=evm_pc)
                     # 更新 global_state 的 mstate，确保后续恢复分支使用更新后的状态
                     global_state.mstate = mstate
                 except GoFunctionSemanticsError as e:
