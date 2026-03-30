@@ -15,7 +15,8 @@ from z3 import And, BitVec, BitVecVal, If, Lambda, Select, UGE, ULT
 
 from .aot_profile import X86AOTProfile
 from state.smt_state import SMTState
-from common import evm_ops
+from common import uninterpreted
+from common import arithmetic
 
 logger = logging.getLogger(__name__)
 
@@ -335,7 +336,7 @@ class GoFunctionSemantics:
         """SHA3: pop offset, pop length, push sha3(memory, offset, length)。"""
         offset_bv, sp, mstate = self._pop_uint256(sp, mstate)
         length_bv, sp, mstate = self._pop_uint256(sp, mstate)
-        hash_val = evm_ops.sha3_semantics(mstate.x86_memory.Memory, offset_bv, length_bv)
+        hash_val = uninterpreted.sha3_semantics(mstate.x86_memory.Memory, offset_bv, length_bv)
         sp, mstate = self._push_uint256(sp, hash_val, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -343,14 +344,14 @@ class GoFunctionSemantics:
     def _handle_balance(self, sp: int, mstate: SMTState) -> SMTState:
         """BALANCE: pop address, push balance(address)。"""
         addr, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.balance_semantics(addr)
+        result = uninterpreted.balance_semantics(addr)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
     def _handle_self_balance(self, sp: int, mstate: SMTState) -> SMTState:
         """SELFBALANCE: 压入当前合约余额（无栈输入）。"""
-        result = evm_ops.self_balance_semantics()
+        result = uninterpreted.self_balance_semantics()
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -358,7 +359,7 @@ class GoFunctionSemantics:
     def _handle_ext_code_size(self, sp: int, mstate: SMTState) -> SMTState:
         """EXTCODESIZE: pop address, push extcodesize(address)。"""
         addr, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.ext_code_size_semantics(addr)
+        result = uninterpreted.ext_code_size_semantics(addr)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -375,7 +376,7 @@ class GoFunctionSemantics:
             mstate,
             dest_offset,
             size,
-            lambda byte_index: evm_ops.ext_code_copy_byte(
+            lambda byte_index: uninterpreted.ext_code_copy_byte(
                 addr, offset, byte_index, effect_id=evm_pc,
             ),
             effect_tag=f"extcodecopy_idx_{effect_suffix}",
@@ -386,7 +387,7 @@ class GoFunctionSemantics:
     def _handle_ext_code_hash(self, sp: int, mstate: SMTState) -> SMTState:
         """EXTCODEHASH: pop address, push extcodehash(address)。"""
         addr, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.ext_code_hash_semantics(addr)
+        result = uninterpreted.ext_code_hash_semantics(addr)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -394,7 +395,7 @@ class GoFunctionSemantics:
     def _handle_block_hash(self, sp: int, mstate: SMTState) -> SMTState:
         """BLOCKHASH: pop blockNumber, push blockhash(blockNumber)。"""
         block_number, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.block_hash_semantics(block_number)
+        result = uninterpreted.block_hash_semantics(block_number)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -449,7 +450,7 @@ class GoFunctionSemantics:
         value, sp, mstate = self._pop_uint256(sp, mstate)
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.create_semantics(value, offset, size, mstate.x86_memory.Memory, effect_id=evm_pc)
+        result = uninterpreted.create_semantics(value, offset, size, mstate.x86_memory.Memory, effect_id=evm_pc)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -460,7 +461,7 @@ class GoFunctionSemantics:
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
         salt, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.create2_semantics(
+        result = uninterpreted.create2_semantics(
             value, offset, size, salt, mstate.x86_memory.Memory, effect_id=evm_pc
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
@@ -477,11 +478,11 @@ class GoFunctionSemantics:
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
         old_memory = mstate.x86_memory.Memory
-        result = evm_ops.call_semantics(
+        result = uninterpreted.call_semantics(
             gas, addr, value, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=evm_pc)
         if evm_pc is not None:
-            should_copy = evm_ops.call_should_copy_return_data(
+            should_copy = uninterpreted.call_should_copy_return_data(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
                 old_memory, effect_id=evm_pc,
             )
@@ -489,7 +490,7 @@ class GoFunctionSemantics:
                 mstate,
                 ret_offset,
                 ret_size,
-                lambda byte_index: evm_ops.call_return_byte(
+                lambda byte_index: uninterpreted.call_return_byte(
                     gas, addr, value, args_offset, args_size, ret_offset, ret_size,
                     old_memory, byte_index, effect_id=evm_pc,
                 ),
@@ -510,11 +511,11 @@ class GoFunctionSemantics:
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
         old_memory = mstate.x86_memory.Memory
-        result = evm_ops.callcode_semantics(
+        result = uninterpreted.callcode_semantics(
             gas, addr, value, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=evm_pc)
         if evm_pc is not None:
-            should_copy = evm_ops.callcode_should_copy_return_data(
+            should_copy = uninterpreted.callcode_should_copy_return_data(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
                 old_memory, effect_id=evm_pc,
             )
@@ -522,7 +523,7 @@ class GoFunctionSemantics:
                 mstate,
                 ret_offset,
                 ret_size,
-                lambda byte_index: evm_ops.callcode_return_byte(
+                lambda byte_index: uninterpreted.callcode_return_byte(
                     gas, addr, value, args_offset, args_size, ret_offset, ret_size,
                     old_memory, byte_index, effect_id=evm_pc,
                 ),
@@ -542,11 +543,11 @@ class GoFunctionSemantics:
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
         old_memory = mstate.x86_memory.Memory
-        result = evm_ops.delegate_call_semantics(
+        result = uninterpreted.delegate_call_semantics(
             gas, addr, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=evm_pc)
         if evm_pc is not None:
-            should_copy = evm_ops.delegate_call_should_copy_return_data(
+            should_copy = uninterpreted.delegate_call_should_copy_return_data(
                 gas, addr, args_offset, args_size, ret_offset, ret_size,
                 old_memory, effect_id=evm_pc,
             )
@@ -554,7 +555,7 @@ class GoFunctionSemantics:
                 mstate,
                 ret_offset,
                 ret_size,
-                lambda byte_index: evm_ops.delegate_call_return_byte(
+                lambda byte_index: uninterpreted.delegate_call_return_byte(
                     gas, addr, args_offset, args_size, ret_offset, ret_size,
                     old_memory, byte_index, effect_id=evm_pc,
                 ),
@@ -574,7 +575,7 @@ class GoFunctionSemantics:
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
         old_memory = mstate.x86_memory.Memory
-        result = evm_ops.static_call_semantics(
+        result = uninterpreted.static_call_semantics(
             gas, addr, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=evm_pc)
         if evm_pc is not None:
@@ -582,7 +583,7 @@ class GoFunctionSemantics:
                 mstate,
                 ret_offset,
                 ret_size,
-                lambda byte_index: evm_ops.static_call_return_byte(
+                lambda byte_index: uninterpreted.static_call_return_byte(
                     gas, addr, args_offset, args_size, ret_offset, ret_size,
                     old_memory, byte_index, effect_id=evm_pc,
                 ),
@@ -667,7 +668,7 @@ class GoFunctionSemantics:
         """DIV builtin: 弹出 a、b，压入 a/b（按 EVM 语义，b==0 时返回 0）。"""
         a, sp, mstate = self._pop_uint256(sp, mstate)
         b, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.div_semantics(a, b)
+        result = arithmetic.div_semantics(a, b)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -676,7 +677,7 @@ class GoFunctionSemantics:
         """MOD builtin: 弹出 a、b，压入 a%b（按 EVM 语义，b==0 时返回 0）。"""
         a, sp, mstate = self._pop_uint256(sp, mstate)
         b, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.mod_semantics(a, b)
+        result = arithmetic.mod_semantics(a, b)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -688,7 +689,7 @@ class GoFunctionSemantics:
         """
         base, sp, mstate = self._pop_uint256(sp, mstate)
         exponent, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.exp_semantics(base, exponent)
+        result = arithmetic.exp_semantics(base, exponent)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -698,7 +699,7 @@ class GoFunctionSemantics:
         a, sp, mstate = self._pop_uint256(sp, mstate)
         b, sp, mstate = self._pop_uint256(sp, mstate)
         mod, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.addmod_semantics(a, b, mod)
+        result = arithmetic.addmod_semantics(a, b, mod)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -708,7 +709,7 @@ class GoFunctionSemantics:
         a, sp, mstate = self._pop_uint256(sp, mstate)
         b, sp, mstate = self._pop_uint256(sp, mstate)
         mod, sp, mstate = self._pop_uint256(sp, mstate)
-        result = evm_ops.mulmod_semantics(a, b, mod)
+        result = arithmetic.mulmod_semantics(a, b, mod)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate

@@ -1,11 +1,8 @@
-"""EVM操作的纯Z3语义函数。
+"""EVM host function 的 Z3 未解释函数（uninterpreted function）语义。
 
-这些函数操作BitVec(256)，无状态，供evm_ir和x86_64两侧共用。
-
-Host function 语义统一使用未解释函数（uninterpreted function）建模：
-  - 相同的函数名确保两侧生成相同的 Z3 符号，从而允许 Z3 证明等价性。
-  - 涉及 memory 的函数（sha3、call 系列、create 系列）接受 memory array 参数，
-    两侧传入同一个 SMTState 里的 memory array（共享 Z3 Array）。
+相同的函数名确保 EVM IR 侧和 x86 侧生成相同的 Z3 符号，从而允许 Z3 证明等价性。
+涉及 memory 的函数（sha3、call 系列、create 系列）接受 memory array 参数，
+两侧传入同一个 SMTState 里的 memory array（共享 Z3 Array）。
 """
 from typing import Optional
 
@@ -15,55 +12,9 @@ from z3 import (
     BitVecVal,
     BoolRef,
     BoolSort,
-    Extract,
     Function,
     If,
-    UDiv,
-    URem,
-    ZeroExt,
 )
-
-
-def div_semantics(a, b):
-    """EVM DIV: a / b，b==0时返回0。"""
-    return If(b == BitVecVal(0, 256), BitVecVal(0, 256), UDiv(a, b))
-
-
-def mod_semantics(a, b):
-    """EVM MOD: a % b，b==0时返回0。"""
-    return If(b == BitVecVal(0, 256), BitVecVal(0, 256), URem(a, b))
-
-
-def exp_semantics(base, exponent):
-    """EVM EXP: base^exponent，使用未解释函数。"""
-    exp_func = Function('evm_exp', BitVecSort(256), BitVecSort(256), BitVecSort(256))
-    return exp_func(base, exponent)
-
-
-def addmod_semantics(a, b, mod):
-    """EVM ADDMOD: (a + b) % mod，mod==0时返回0。"""
-    zero = BitVecVal(0, 256)
-    a_ext = ZeroExt(1, a)
-    b_ext = ZeroExt(1, b)
-    mod_ext = ZeroExt(1, mod)
-    res_ext = URem(a_ext + b_ext, mod_ext)
-    return If(mod == zero, zero, Extract(255, 0, res_ext))
-
-
-def mulmod_semantics(a, b, mod):
-    """EVM MULMOD: (a * b) % mod，mod==0时返回0。"""
-    zero = BitVecVal(0, 256)
-    a_ext = ZeroExt(256, a)
-    b_ext = ZeroExt(256, b)
-    mod_ext = ZeroExt(256, mod)
-    res_ext = URem(a_ext * b_ext, mod_ext)
-    return If(mod == zero, zero, Extract(255, 0, res_ext))
-
-
-# ---------------------------------------------------------------------------
-# Host function 语义（未解释函数）
-# ---------------------------------------------------------------------------
-# 所有函数使用固定名称，确保 EVM IR 侧和 x86 侧生成相同的 Z3 符号。
 
 
 def sha3_semantics(memory, offset: BitVecRef, length: BitVecRef) -> BitVecRef:

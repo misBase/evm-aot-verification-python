@@ -8,8 +8,8 @@ from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And,
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
-import common.evm_ops as _evm_ops
-from common.evm_ops import div_semantics as _div_semantics, mod_semantics as _mod_semantics, exp_semantics as _exp_semantics, addmod_semantics as _addmod_semantics, mulmod_semantics as _mulmod_semantics
+from common import uninterpreted
+from common.arithmetic import div_semantics as _div_semantics, mod_semantics as _mod_semantics, exp_semantics as _exp_semantics, addmod_semantics as _addmod_semantics, mulmod_semantics as _mulmod_semantics
 from state.smt_state import SMTState, EVMStackState, EVMMemoryState
 
 # RETURN指令的常量
@@ -752,7 +752,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     elif kind == "SHA3":
         offset_bv, stack_after_pop1 = state.evm_stack.pop()
         length_bv, stack_after_pop2 = stack_after_pop1.pop()
-        hash_val = _evm_ops.sha3_semantics(state.evm_memory.Memory, offset_bv, length_bv)
+        hash_val = uninterpreted.sha3_semantics(state.evm_memory.Memory, offset_bv, length_bv)
         state.evm_stack = stack_after_pop2.push(hash_val)
         return state
 
@@ -769,18 +769,18 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
 
     elif kind == "BALANCE":
         addr_bv, stack1 = state.evm_stack.pop()
-        result = _evm_ops.balance_semantics(addr_bv)
+        result = uninterpreted.balance_semantics(addr_bv)
         state.evm_stack = stack1.push(result)
         return state
 
     elif kind == "SELFBALANCE":
-        result = _evm_ops.self_balance_semantics()
+        result = uninterpreted.self_balance_semantics()
         state.evm_stack = state.evm_stack.push(result)
         return state
 
     elif kind == "EXTCODESIZE":
         addr_bv, stack1 = state.evm_stack.pop()
-        result = _evm_ops.ext_code_size_semantics(addr_bv)
+        result = uninterpreted.ext_code_size_semantics(addr_bv)
         state.evm_stack = stack1.push(result)
         return state
 
@@ -793,7 +793,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             state.evm_memory,
             dest_offset_bv,
             size_bv,
-            lambda byte_index: _evm_ops.ext_code_copy_byte(
+            lambda byte_index: uninterpreted.ext_code_copy_byte(
                 addr_bv, offset_bv, byte_index, effect_id=op.pc,
             ),
             effect_tag=f"extcodecopy_idx_{op.pc}",
@@ -803,13 +803,13 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
 
     elif kind == "EXTCODEHASH":
         addr_bv, stack1 = state.evm_stack.pop()
-        result = _evm_ops.ext_code_hash_semantics(addr_bv)
+        result = uninterpreted.ext_code_hash_semantics(addr_bv)
         state.evm_stack = stack1.push(result)
         return state
 
     elif kind == "BLOCKHASH":
         block_number_bv, stack1 = state.evm_stack.pop()
-        result = _evm_ops.block_hash_semantics(block_number_bv)
+        result = uninterpreted.block_hash_semantics(block_number_bv)
         state.evm_stack = stack1.push(result)
         return state
 
@@ -822,7 +822,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         value_bv, stack1 = state.evm_stack.pop()
         offset_bv, stack2 = stack1.pop()
         size_bv, stack3 = stack2.pop()
-        result = _evm_ops.create_semantics(
+        result = uninterpreted.create_semantics(
             value_bv, offset_bv, size_bv, state.evm_memory.Memory, effect_id=op.pc
         )
         state.evm_stack = stack3.push(result)
@@ -833,7 +833,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         offset_bv, stack2 = stack1.pop()
         size_bv, stack3 = stack2.pop()
         salt_bv, stack4 = stack3.pop()
-        result = _evm_ops.create2_semantics(
+        result = uninterpreted.create2_semantics(
             value_bv, offset_bv, size_bv, salt_bv, state.evm_memory.Memory, effect_id=op.pc
         )
         state.evm_stack = stack4.push(result)
@@ -847,12 +847,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         args_size_bv, stack5 = stack4.pop()
         ret_offset_bv, stack6 = stack5.pop()
         ret_size_bv, stack7 = stack6.pop()
-        result = _evm_ops.call_semantics(
+        result = uninterpreted.call_semantics(
             gas_bv, addr_bv, value_bv,
             args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
             state.evm_memory.Memory, effect_id=op.pc)
         old_memory = state.evm_memory
-        should_copy = _evm_ops.call_should_copy_return_data(
+        should_copy = uninterpreted.call_should_copy_return_data(
             gas_bv, addr_bv, value_bv,
             args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
             old_memory.Memory, effect_id=op.pc,
@@ -861,7 +861,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             old_memory,
             ret_offset_bv,
             ret_size_bv,
-            lambda byte_index: _evm_ops.call_return_byte(
+            lambda byte_index: uninterpreted.call_return_byte(
                 gas_bv, addr_bv, value_bv,
                 args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
                 old_memory.Memory, byte_index, effect_id=op.pc,
@@ -880,12 +880,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         args_size_bv, stack5 = stack4.pop()
         ret_offset_bv, stack6 = stack5.pop()
         ret_size_bv, stack7 = stack6.pop()
-        result = _evm_ops.callcode_semantics(
+        result = uninterpreted.callcode_semantics(
             gas_bv, addr_bv, value_bv,
             args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
             state.evm_memory.Memory, effect_id=op.pc)
         old_memory = state.evm_memory
-        should_copy = _evm_ops.callcode_should_copy_return_data(
+        should_copy = uninterpreted.callcode_should_copy_return_data(
             gas_bv, addr_bv, value_bv,
             args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
             old_memory.Memory, effect_id=op.pc,
@@ -894,7 +894,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             old_memory,
             ret_offset_bv,
             ret_size_bv,
-            lambda byte_index: _evm_ops.callcode_return_byte(
+            lambda byte_index: uninterpreted.callcode_return_byte(
                 gas_bv, addr_bv, value_bv,
                 args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
                 old_memory.Memory, byte_index, effect_id=op.pc,
@@ -912,12 +912,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         args_size_bv, stack4 = stack3.pop()
         ret_offset_bv, stack5 = stack4.pop()
         ret_size_bv, stack6 = stack5.pop()
-        result = _evm_ops.delegate_call_semantics(
+        result = uninterpreted.delegate_call_semantics(
             gas_bv, addr_bv,
             args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
             state.evm_memory.Memory, effect_id=op.pc)
         old_memory = state.evm_memory
-        should_copy = _evm_ops.delegate_call_should_copy_return_data(
+        should_copy = uninterpreted.delegate_call_should_copy_return_data(
             gas_bv, addr_bv,
             args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
             old_memory.Memory, effect_id=op.pc,
@@ -926,7 +926,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             old_memory,
             ret_offset_bv,
             ret_size_bv,
-            lambda byte_index: _evm_ops.delegate_call_return_byte(
+            lambda byte_index: uninterpreted.delegate_call_return_byte(
                 gas_bv, addr_bv,
                 args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
                 old_memory.Memory, byte_index, effect_id=op.pc,
@@ -944,7 +944,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         args_size_bv, stack4 = stack3.pop()
         ret_offset_bv, stack5 = stack4.pop()
         ret_size_bv, stack6 = stack5.pop()
-        result = _evm_ops.static_call_semantics(
+        result = uninterpreted.static_call_semantics(
             gas_bv, addr_bv,
             args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
             state.evm_memory.Memory, effect_id=op.pc)
@@ -953,7 +953,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             old_memory,
             ret_offset_bv,
             ret_size_bv,
-            lambda byte_index: _evm_ops.static_call_return_byte(
+            lambda byte_index: uninterpreted.static_call_return_byte(
                 gas_bv, addr_bv,
                 args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
                 old_memory.Memory, byte_index, effect_id=op.pc,
