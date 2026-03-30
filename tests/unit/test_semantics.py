@@ -5,7 +5,8 @@ from common.uint256 import Uint256
 from evm_ir.semantics import EVMIRSemantics, EVMOperationSemantics, evm_operator_to_z3
 from evm_ir.models import EvmOperator
 from x86_64.semantics import X86SemanticsModel
-from x86_64.models import Register
+from x86_64.aot_profile import GO_HPC_EVM_PROFILE
+from x86_64.models import Register, X86Instruction
 from verification.refinement_checker import RefinementChecker
 from state.smt_state import SMTState, EVMMemoryState
 from z3 import And, BitVec, BitVecVal, Select, Store, simplify, is_true, Solver, sat, unsat
@@ -352,6 +353,83 @@ def test_return_opcode_stack_order():
     solver.add(state.return_offset == BitVecVal(64, 64))
     solver.add(state.return_length == BitVecVal(32, 64))
     assert solver.check() == sat, "RETURN: offset/length stack order wrong"
+
+
+def test_revert_opcode_stack_order():
+    """测试REVERT的栈顺序：top=offset, second=length。"""
+    revert_op = EvmOperator(kind="REVERT", pc=0)
+
+    state = SMTState()
+    state.evm_stack = state.evm_stack.push(BitVecVal(32, 256))   # length（先push）
+    state.evm_stack = state.evm_stack.push(BitVecVal(64, 256))   # offset（后push，栈顶）
+    state = evm_operator_to_z3(revert_op, state)
+
+    solver = Solver()
+    solver.add(state.return_offset == BitVecVal(64, 64))
+    solver.add(state.return_length == BitVecVal(32, 64))
+    assert solver.check() == sat, "REVERT: offset/length stack order wrong"
+
+
+def _make_x86_ret_state(status_code: int, stack_values, sp: int = 0,
+                        r13_base: int = 0x10000, r14_base: int = 0x20000) -> SMTState:
+    """创建一个用于测试 x86 RET 的状态。
+
+    stack_values 按压栈顺序给出，最后一个元素是逻辑栈顶。
+    """
+    state = SMTState()
+    state.x86_registers.set_register(Register.R13, BitVecVal(r13_base, 64))
+    state.x86_registers.set_register(Register.R14, BitVecVal(r14_base, 64))
+
+    status_addr = r13_base + GO_HPC_EVM_PROFILE.offsets["status_code"]
+    sp_addr = r13_base + GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
+    state.x86_memory = state.x86_memory.store_byte(
+        BitVecVal(status_addr, 64), BitVecVal(status_code, 8)
+    )
+    state.x86_memory = state.x86_memory.store_64bit(
+        BitVecVal(sp_addr, 64), BitVecVal(sp % (1 << 64), 64)
+    )
+
+    stack_depth = len(stack_values)
+    for push_index, value in enumerate(stack_values):
+        stack_index = stack_depth - 1 - push_index
+        addr = r14_base - (stack_index + 1) * 0x20
+        state.x86_memory = state.x86_memory.store_256bit(
+            BitVecVal(addr, 64), BitVecVal(value, 256)
+        )
+
+    return state
+
+
+def test_x86_ret_reverted_extracts_return_data():
+    """x86 RET 在 REVERTED 状态下也应提取 offset/length。"""
+    ret_insn = X86Instruction(addr=0, mnemonic="ret", op_str="", bytes=b"\xc3", size=1)
+    state = _make_x86_ret_state(
+        GO_HPC_EVM_PROFILE.status_codes["reverted"],
+        [32, 64],
+    )
+
+    state = ret_insn.to_z3(state)
+
+    solver = Solver()
+    solver.add(state.return_offset == BitVecVal(64, 64))
+    solver.add(state.return_length == BitVecVal(32, 64))
+    assert solver.check() == sat, "x86 RET(REVERTED) should expose revert data"
+
+
+def test_x86_ret_invalid_has_no_return_data():
+    """x86 RET 在 INVALID 状态下不应设置返回数据。"""
+    ret_insn = X86Instruction(addr=0, mnemonic="ret", op_str="", bytes=b"\xc3", size=1)
+    state = _make_x86_ret_state(
+        GO_HPC_EVM_PROFILE.status_codes["invalid"],
+        [0xFE],
+    )
+
+    state = ret_insn.to_z3(state)
+
+    solver = Solver()
+    solver.add(state.return_offset == BitVecVal(0, 64))
+    solver.add(state.return_length == BitVecVal(0, 64))
+    assert solver.check() == sat, "x86 RET(INVALID) should not expose return data"
 
 
 def test_mstore8_opcode():

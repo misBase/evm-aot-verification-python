@@ -1029,8 +1029,28 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
 
     elif kind == "REVERT":
         # REVERT: offset, length = pop, pop
-        _, state.evm_stack = state.evm_stack.pop()
-        _, state.evm_stack = state.evm_stack.pop()
+        offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        length_bv, stack_after_pop2 = stack_after_pop1.pop()
+
+        # 与 RETURN 一样，只在状态中记录偏移量和长度；
+        # 具体数据内容由后续比较阶段直接从内存读取。
+        if length_bv.size() == 256:
+            return_length_64 = Extract(63, 0, length_bv)
+        elif length_bv.size() == 64:
+            return_length_64 = length_bv
+        else:
+            raise ValueError(f"Unexpected length BitVec size: {length_bv.size()}")
+
+        if offset_bv.size() == 256:
+            return_offset_64 = Extract(63, 0, offset_bv)
+        elif offset_bv.size() == 64:
+            return_offset_64 = offset_bv
+        else:
+            raise ValueError(f"Unexpected offset BitVec size: {offset_bv.size()}")
+
+        state.return_offset = return_offset_64
+        state.return_length = return_length_64
+        state.evm_stack = stack_after_pop2
         return state
 
     elif kind == "STOP":

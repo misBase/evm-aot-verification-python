@@ -17,6 +17,8 @@ from state.smt_state import SMTState
 
 # RETURN指令的常量
 EVM_NATIVE_CALL_STATUS_CODE_RETURNED = GO_HPC_EVM_PROFILE.status_codes["returned"]
+EVM_NATIVE_CALL_STATUS_CODE_REVERTED = GO_HPC_EVM_PROFILE.status_codes["reverted"]
+EVM_NATIVE_CALL_STATUS_CODE_INVALID = GO_HPC_EVM_PROFILE.status_codes["invalid"]
 EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = GO_HPC_EVM_PROFILE.offsets["status_code"]
 EVM_CALL_ENGINE_STACK_CONTEXT_STACK_POINTER_OFFSET = GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
 AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE = Register.R13  # 指向callEngine实例的指针
@@ -876,7 +878,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         return state
     
     elif mnemonic == 'ret':
-        # RET指令：检查退出状态码，如果需要则提取返回数据
+        # RET 指令：检查退出状态码，并在需要时提取返回/回退数据
         # 从x86内存读取状态码：[R13 + evmCallEngineExitContextNativeCallStatusCodeOffset]
         
         # 获取R13寄存器值（callEngine指针）
@@ -889,19 +891,19 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         # 从x86内存读取状态码（8位字节）
         status_code = state.x86_memory.load_byte(status_code_addr)
         
-        # 检查状态码是否为RETURNED（0）
-        # 重要：只有当status_code == RETURNED时，我们才应该设置返回值
-        # 其他状态码（REVERTED、STOPPED、INVALID等）有不同的行为
+        # RETURNED / REVERTED 都会从栈中读取 offset、size。
+        # INVALID 只会弹出一个 opcode，当前模型不单独暴露该错误值。
         status_code_is_returned = (status_code == BitVecVal(EVM_NATIVE_CALL_STATUS_CODE_RETURNED, 8))
-        
-        # 只有当状态码为RETURNED时才提取返回数据
-        # 对于其他状态码，我们不设置return_offset/return_length
-        # 这与Go代码匹配：只有case evmNativeCallStatusCodeReturned设置返回值
+        status_code_is_reverted = (status_code == BitVecVal(EVM_NATIVE_CALL_STATUS_CODE_REVERTED, 8))
+        status_code_has_return_data = Or(status_code_is_returned, status_code_is_reverted)
+        status_code_is_invalid = (status_code == BitVecVal(EVM_NATIVE_CALL_STATUS_CODE_INVALID, 8))
         
         # 重要：x86-64不直接操作 evm_stack 或 evm_memory。
-        # 这里需要从 x86 栈内存中提取 RETURN 的两个参数。
-        # Go 代码：offset, size := c.PopUint64(), c.PopUint64()
-        # 因此逻辑栈顶 stack[0] 是 offset，stack[1] 是 size。
+        # 这里需要从 x86 栈内存中提取栈顶参数。
+        # Go 代码：
+        # - RETURNED / REVERTED: offset, size := c.PopUint64(), c.PopUint64()
+        # - INVALID: op := c.PopUint64()
+        # 因此逻辑栈顶 stack[0] 是 offset/opcode，stack[1] 是 size（若存在）。
         #
         # 这里的 R14 是当前 block 的栈基准，不是整个物理栈起点。
         # 栈顶位置由当前 stack_pointer 决定：
@@ -931,8 +933,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         size_z3 = state.x86_memory.load_64bit(stack1_base + BitVecVal(24, 64))
         size_stack_value = Concat(size_z3, size_z2, size_z1, size_z0)  # 256位值
         
-        # 将256位栈值截断为64位用于offset和length
-        # Go代码使用PopUint64()，所以我们需要64位值
+        # 将256位栈值截断为64位，模拟 Go 的 PopUint64()
         from z3 import Extract as Z3Extract
         if size_stack_value.size() == 256:
             length_bv = Z3Extract(63, 0, size_stack_value)  # 提取低64位
@@ -948,26 +949,22 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         else:
             raise ValueError(f"Unexpected offset value size: {offset_stack_value.size()}")
         
-        # 重要：对return_offset和return_length使用条件符号值
-        # 只有当status_code == RETURNED时才设置返回值
+        # 对 return_offset / return_length 使用条件符号值：
+        # - RETURNED / REVERTED：设置为栈中的 offset、size
+        # - 其他状态：保持为 0
         # 不同的状态码有不同的行为（来自Go代码）：
-        # - RETURNED（0）：返回数据（offset, size）- 这是我们验证的
-        # - REVERTED：返回错误数据（不同的语义，不是成功返回）
+        # - RETURNED（0）：返回数据（offset, size）
+        # - REVERTED（1）：返回回退数据（offset, size）
         # - STOPPED：返回nil, nil（无返回数据）
-        # - INVALID：返回错误（无返回数据）
-        # 
-        # 使用If表达式有条件地设置返回值：
-        # - 如果status_code == RETURNED：使用提取的offset和length
-        # - 否则：使用0（无返回值）
-        
-        # 使用If表达式有条件地设置返回值
-        # 这允许符号地处理多条路径
+        # - INVALID：返回错误；当前模型只保留“无返回数据”这一可观察效果
         zero_64 = BitVecVal(0, 64)
-        
-        # 只有当status_code == RETURNED时才设置返回值
-        # 否则，保持为0（无返回值）
-        state.return_offset = If(status_code_is_returned, offset_bv, zero_64)
-        state.return_length = If(status_code_is_returned, length_bv, zero_64)
+
+        # INVALID 会消费栈顶 opcode，但当前状态模型没有单独的错误对象；
+        # 这里保留“无返回数据”的外部可观察语义。
+        _invalid_opcode = If(status_code_is_invalid, offset_bv, zero_64)
+
+        state.return_offset = If(status_code_has_return_data, offset_bv, zero_64)
+        state.return_length = If(status_code_has_return_data, length_bv, zero_64)
         
         return state
 
