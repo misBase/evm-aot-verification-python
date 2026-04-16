@@ -7,7 +7,7 @@ Current project scope is go-hpc-evm only.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet
+from typing import Dict, FrozenSet, Optional
 
 
 @dataclass(frozen=True)
@@ -24,6 +24,14 @@ class X86AOTProfile:
     # 默认情况下真实 amd64 AOT 的物理栈从 R14+0 开始，
     # 仅在某些验证适配场景下才需要额外 bias。
     stack_sp_bias_limbs: int = 0
+
+    def resolve_host_function_name(self, func_index: int) -> Optional[str]:
+        """Resolve a go-hpc-evm host function index via the active ABI table."""
+        return self.host_functions.get(func_index)
+
+    def resolve_builtin_function_name(self, func_index: int) -> Optional[str]:
+        """Resolve a builtin function index via the active AOT profile table."""
+        return self.builtin_functions.get(func_index)
 
 
 GO_HPC_EVM_PROFILE = X86AOTProfile(
@@ -67,5 +75,26 @@ GO_HPC_EVM_PROFILE = X86AOTProfile(
         8: "exp",
         9: "gas_cost",
     },
-    host_functions={},  # Runtime-dependent; configure per contract
+    host_functions={
+        # Fixed indices matching Go's DefaultHostSpecs() (c87c1d7)
+        1: "sha3",
+        2: "call",
+        3: "callCode",
+        4: "delegateCall",
+        5: "staticCall",
+        6: "create",
+        7: "create2",
+        8: "selfDestruct",
+        9: "sload",
+        10: "sstore",
+        11: "balance",
+        12: "selfBalance",
+        13: "extCodeSize",
+        14: "extCodeCopy",
+        15: "extCodeHash",
+        16: "blockHash",
+        17: "log",
+        18: "tload",
+        19: "tstore",
+    },
 )

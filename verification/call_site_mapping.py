@@ -126,7 +126,6 @@ def _enumerate_x86_host_bridge_sites(x86_program: X86Program) -> List[Tuple[int,
         aot_profile=x86_program.aot_profile,
     )
     host_status = executor.aot_profile.status_codes["call_go_host_function"]
-    host_functions = executor.aot_profile.host_functions
 
     sites: List[Tuple[int, str]] = []
     for block in blocks:
@@ -138,12 +137,12 @@ def _enumerate_x86_host_bridge_sites(x86_program: X86Program) -> List[Tuple[int,
                 raise ValueError(
                     f"missing host func_index for x86 host bridge block 0x{block.start_addr:x}"
                 )
-            func_name = host_functions.get(func_index)
+            func_name = executor.aot_profile.resolve_host_function_name(func_index)
             if func_name is None:
                 raise ValueError(
-                    f"missing host function name for func_index={func_index} at "
+                    f"unknown host func_index={func_index} at "
                     f"x86 host bridge block 0x{block.start_addr:x}; "
-                    "configure x86_program.aot_profile.host_functions"
+                    "this index is not defined by the active go-hpc-evm host ABI table"
                 )
             sites.append((block.start_addr, func_name))
     return sites

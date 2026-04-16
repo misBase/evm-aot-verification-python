@@ -53,8 +53,8 @@ def _host_bridge_hex(go_func_index: int) -> str:
 
 def test_build_call_site_mapping_validates_matching_host_kind():
     evm_program = _make_evm_program("BALANCE", pc=0x20)
-    profile = _make_profile({7: "balance"})
-    x86_program = X86Program.from_hex(_host_bridge_hex(7), base_addr=0x1000, aot_profile=profile)
+    profile = _make_profile({11: "balance"})
+    x86_program = X86Program.from_hex(_host_bridge_hex(11), base_addr=0x1000, aot_profile=profile)
 
     mapping = build_call_site_mapping(evm_program, x86_program)
 
@@ -64,8 +64,8 @@ def test_build_call_site_mapping_validates_matching_host_kind():
 
 def test_build_call_site_mapping_rejects_host_kind_mismatch():
     evm_program = _make_evm_program("BALANCE", pc=0x20)
-    profile = _make_profile({7: "staticCall"})
-    x86_program = X86Program.from_hex(_host_bridge_hex(7), base_addr=0x1000, aot_profile=profile)
+    profile = _make_profile({11: "staticCall"})
+    x86_program = X86Program.from_hex(_host_bridge_hex(11), base_addr=0x1000, aot_profile=profile)
 
     with pytest.raises(ValueError, match="host call-site kind mismatch"):
         build_call_site_mapping(evm_program, x86_program)

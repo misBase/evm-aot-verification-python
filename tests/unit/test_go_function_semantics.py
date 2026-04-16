@@ -125,13 +125,13 @@ class TestSloadSstore:
         key_val = 0x42
         data_val = 0x1234
 
-        profile = _make_profile_with_host({0: "sstore"})
+        profile = _make_profile_with_host({10: "sstore"})
         sem = GoFunctionSemantics(profile)
 
         # Stack: [key, value] (key on top, pushed last)
         state, sp = _make_state_with_stack([data_val, key_val])
 
-        state = sem.apply(4, 0, sp, state)
+        state = sem.apply(4, 10, sp, state)
 
         # Verify storage was updated
         loaded = state.evm_storage.sload(BitVecVal(key_val, 256))
@@ -144,7 +144,7 @@ class TestSloadSstore:
         key_val = 0x42
         data_val = 0x9999
 
-        profile = _make_profile_with_host({0: "sload"})
+        profile = _make_profile_with_host({9: "sload"})
         sem = GoFunctionSemantics(profile)
 
         # Pre-populate storage
@@ -153,7 +153,7 @@ class TestSloadSstore:
             BitVecVal(key_val, 256), BitVecVal(data_val, 256)
         )
 
-        state = sem.apply(4, 0, sp, state)
+        state = sem.apply(4, 9, sp, state)
 
         # After SLOAD: key was popped, result was pushed.
         # sp should be the same (pop 1 + push 1 = net 0)
@@ -171,12 +171,12 @@ class TestSloadSstore:
         key_val = 0x10
         data_val = 0xABCD
 
-        profile = _make_profile_with_host({0: "sstore", 1: "sload"})
+        profile = _make_profile_with_host({10: "sstore", 9: "sload"})
         sem = GoFunctionSemantics(profile)
 
         # SSTORE: push value and key to stack
         state, sp = _make_state_with_stack([data_val, key_val])
-        state = sem.apply(4, 0, sp, state)
+        state = sem.apply(4, 10, sp, state)
 
         # After SSTORE, sp decremented by 2 * 4 limbs = 8
         new_sp = sp - 2 * LIMBS_PER_UINT256
@@ -188,7 +188,7 @@ class TestSloadSstore:
         )
         sload_sp = new_sp + LIMBS_PER_UINT256
 
-        state = sem.apply(4, 1, sload_sp, state)
+        state = sem.apply(4, 9, sload_sp, state)
 
         # 按当前 block 的栈窗口地址规则读取 SLOAD 压回的结果
         result_sp = sload_sp - LIMBS_PER_UINT256
@@ -204,7 +204,7 @@ class TestCallFamilyEffects:
     """Test scoped call identities and return-data writes."""
 
     def test_staticcall_writes_symbolic_return_data(self):
-        profile = _make_profile_with_host({0: "staticCall"})
+        profile = _make_profile_with_host({5: "staticCall"})
         sem = GoFunctionSemantics(profile)
 
         # Stack bottom-to-top:
@@ -214,7 +214,7 @@ class TestCallFamilyEffects:
         old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
         old_outside = state.x86_memory.load_byte(BitVecVal(0x3F, 64))
 
-        state = sem.apply(4, 0, sp, state, evm_pc=0x20)
+        state = sem.apply(4, 5, sp, state, evm_pc=0x20)
 
         solver_inside = Solver()
         solver_inside.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
@@ -225,14 +225,14 @@ class TestCallFamilyEffects:
         assert solver_outside.check() == unsat
 
     def test_staticcall_same_args_different_pc_are_independent(self):
-        profile = _make_profile_with_host({0: "staticCall"})
+        profile = _make_profile_with_host({5: "staticCall"})
         sem = GoFunctionSemantics(profile)
 
         state1, sp1 = _make_state_with_stack([2, 0x40, 4, 0, 0x1234, 1000])
         state2, sp2 = _make_state_with_stack([2, 0x40, 4, 0, 0x1234, 1000])
 
-        state1 = sem.apply(4, 0, sp1, state1, evm_pc=0x20)
-        state2 = sem.apply(4, 0, sp2, state2, evm_pc=0x24)
+        state1 = sem.apply(4, 5, sp1, state1, evm_pc=0x20)
+        state2 = sem.apply(4, 5, sp2, state2, evm_pc=0x24)
 
         result_sp1 = sp1 - 6 * LIMBS_PER_UINT256
         result_sp2 = sp2 - 6 * LIMBS_PER_UINT256
@@ -249,7 +249,7 @@ class TestExtCodeCopyEffects:
     """Test EXTCODECOPY symbolic memory writes on the x86 side."""
 
     def test_extcodecopy_writes_symbolic_bytes_to_x86_memory(self):
-        profile = _make_profile_with_host({0: "extCodeCopy"})
+        profile = _make_profile_with_host({14: "extCodeCopy"})
         sem = GoFunctionSemantics(profile)
 
         # Stack bottom-to-top: size, offset, destOffset, addr
@@ -258,7 +258,7 @@ class TestExtCodeCopyEffects:
         old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
         old_outside = state.x86_memory.load_byte(BitVecVal(0x3F, 64))
 
-        state = sem.apply(4, 0, sp, state, evm_pc=0x30)
+        state = sem.apply(4, 14, sp, state, evm_pc=0x30)
 
         solver_inside = Solver()
         solver_inside.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
@@ -269,14 +269,14 @@ class TestExtCodeCopyEffects:
         assert solver_outside.check() == unsat
 
     def test_extcodecopy_zero_size_leaves_x86_memory_unchanged(self):
-        profile = _make_profile_with_host({0: "extCodeCopy"})
+        profile = _make_profile_with_host({14: "extCodeCopy"})
         sem = GoFunctionSemantics(profile)
 
         state, sp = _make_state_with_stack([0, 0x10, 0x40, 0x1234])
         state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
         old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
 
-        state = sem.apply(4, 0, sp, state, evm_pc=0x30)
+        state = sem.apply(4, 14, sp, state, evm_pc=0x30)
 
         solver = Solver()
         solver.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
@@ -487,7 +487,7 @@ class TestErrorHandling:
 
     def test_host_func_index_none_warns_and_skips(self):
         """Host function with func_index=None should warn and skip (not error)."""
-        profile = _make_profile_with_host({0: "sload"})
+        profile = _make_profile_with_host({9: "sload"})
         sem = GoFunctionSemantics(profile)
 
         state, sp = _make_state_with_stack([0x42])
@@ -589,7 +589,7 @@ class TestSha3Memory:
         """
         from z3 import Function, BitVecSort, SolverFor
 
-        profile = _make_profile_with_host({0: "sha3"})
+        profile = _make_profile_with_host({1: "sha3"})
         sem = GoFunctionSemantics(profile)
 
         # Create state with x86_memory containing data at offset 0
@@ -610,7 +610,7 @@ class TestSha3Memory:
         sp, state = sem._push_uint256(sp, BitVecVal(0, 256), state)   # offset
 
         # Apply SHA3
-        state = sem.apply(4, 0, sp, state)
+        state = sem.apply(4, 1, sp, state)
 
         # The sha3 function should be applied to x86_memory
         # Verify by checking that sha3_func is called with x86_memory.Memory

@@ -500,7 +500,7 @@ class TestRetGoBridge:
         #   mov rax, 0x102a
         #   mov [r13+0xf0], rax
         #   mov byte ptr [r13+0xe0], 4
-        #   mov dword ptr [r13+0xe8], 0   ; host sstore
+        #   mov dword ptr [r13+0xe8], 10  ; host sstore
         #   mov qword ptr [r13+0x28], 0   ; sp = 0
         #   ret
         # block1:
@@ -509,14 +509,14 @@ class TestRetGoBridge:
             "48c7c02a100000"
             "498985f0000000"
             "41c685e000000004"
-            "41c785e800000000000000"
+            "41c785e80000000a000000"
             "49c7452800000000"
             "c3"
             "c3"
         )
         blocks = self.disasm_and_create_blocks(hex_code)
         state = self.create_initial_state_with_stack([0x1234, 0x42], sp_in_memory=0)
-        profile = self._make_profile_with_host({0: "sstore"})
+        profile = self._make_profile_with_host({10: "sstore"})
 
         executor = X86SymbolicExecutor(
             blocks,

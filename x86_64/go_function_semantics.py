@@ -208,8 +208,8 @@ class GoFunctionSemantics:
                                 evm_pc: Optional[int] = None) -> SMTState:
         """分发host函数调用。
 
-        host函数的func_index映射依赖于编译时注册顺序，
-        需要通过aot_profile.host_functions查找。
+        go-hpc-evm 的 host func_index 采用固定 ABI，
+        需要通过 aot_profile 的 host 函数表解析。
 
         Raises:
             GoFunctionSemanticsError: 当func_index为已知但映射到未知函数时
@@ -222,13 +222,12 @@ class GoFunctionSemantics:
             )
             return mstate
 
-        host_functions = getattr(self.aot_profile, 'host_functions', {})
-        func_name = host_functions.get(func_index)
+        func_name = self.aot_profile.resolve_host_function_name(func_index)
 
         if func_name is None:
             raise GoFunctionSemanticsError(
                 f"unknown host func_index={func_index}. "
-                f"Ensure host_functions mapping includes this index."
+                "This index is not defined by the active go-hpc-evm host ABI table."
             )
 
         scoped_handler = {
