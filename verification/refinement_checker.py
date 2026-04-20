@@ -5,7 +5,7 @@
 """
 
 import time
-from z3 import BitVec, SolverFor, Distinct, unsat, sat, set_option, Array, Select, And, ForAll
+from z3 import BitVec, SolverFor, Distinct, unsat, sat, set_option, Select, And, ForAll
 from typing import Tuple, Optional
 
 
@@ -61,195 +61,23 @@ class RefinementChecker:
         self.solver.set("timeout", timeout_ms)
         return True
     
-    def check_refinement(self, evm_result, x86_result) -> Tuple[bool, Optional[str]]:
+    def check_refinement(self, evm_result: dict, x86_result: dict) -> Tuple[bool, Optional[str]]:
         """检查x86是否精化EVM（对所有输入，x86_result = evm_result）。
-        
+
         此方法验证精化关系：
           ∀ inputs. x86_output(inputs) = evm_output(inputs)
-          
-        支持旧格式（单个BitVec）和新格式（数据和长度的元组）。
-        
+
         Args:
-            evm_result: 以下之一：
-                - EVM输出的逻辑公式（256位BitVec）- 旧格式
-                - (data, length)元组，其中：
-                    - data: EVM输出的逻辑公式（固定大小BitVec）
-                    - length: EVM输出长度的逻辑公式（64位BitVec）
-            x86_result: 以下之一：
-                - x86输出的逻辑公式（256位BitVec）- 旧格式
-                - (data, length)元组，其中：
-                    - data: x86输出的逻辑公式（固定大小BitVec）
-                    - length: x86输出长度的逻辑公式（64位BitVec）
-            
+            evm_result: 包含 offset, length, memory, base_addr, has_return, storage, transient_storage 的字典
+            x86_result: 同上格式的字典
+
         Returns:
             (verified, message)，如果精化关系成立则verified为True
         """
         # 将 timeout_ms 作为整个 refine 检查流程的总预算（而不是每次 check 的预算）。
         deadline = time.time() + (self.timeout_ms / 1000.0)
 
-        # 处理新格式：带内存引用的字典（直接内存比较）
-        if isinstance(evm_result, dict) and isinstance(x86_result, dict):
-            return self._check_refinement_direct_memory(evm_result, x86_result, deadline)
-        # 处理中间格式：带Array/BitVec的元组
-        elif isinstance(evm_result, tuple) and isinstance(x86_result, tuple):
-            return self._check_refinement_with_length(evm_result, x86_result, deadline)
-        else:
-            # 旧格式：向后兼容
-            return self._check_refinement_legacy(evm_result, x86_result, deadline)
-    
-    def _check_refinement_legacy(self, evm_result: BitVec, x86_result: BitVec,
-                                 deadline: Optional[float] = None) -> Tuple[bool, Optional[str]]:
-        """用于单个BitVec结果的旧版精化检查（向后兼容）。"""
-        if evm_result.size() != 256 or x86_result.size() != 256:
-            raise ValueError("Both results must be 256-bit BitVecs")
-
-        # 为了证明精化关系：证明不存在使它们不同的输入
-        # 我们检查：∃ inputs. evm_result ≠ x86_result
-        # 如果UNSAT，则精化关系成立（它们总是相等）
-
-        if not self._reset_solver_with_budget(deadline):
-            msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        self.solver.add(Distinct(evm_result, x86_result))
-
-        start_time = time.time()
-        result = self.solver.check()
-        solve_time = time.time() - start_time
-
-        if self.verbose:
-            stats = self.solver.statistics()
-            print(f"    ├─ Solve time: {solve_time:.3f}s")
-            print(f"    ├─ Z3 result: {result}")
-
-        if result == unsat:
-            msg = "✓ VERIFIED: x86 refines EVM (semantically equivalent for all inputs)"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return True, msg
-        elif result == sat:
-            model = self.solver.model()
-            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        else:
-            msg = self._unknown_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-    
-    def _check_refinement_with_length(self, evm_result,
-                                     x86_result,
-                                     deadline: Optional[float] = None) -> Tuple[bool, Optional[str]]:
-        """通过长度和数据比较检查精化关系。
-
-        Args:
-            evm_result: (data, length)元组，其中：
-                - data: Array[BitVec[64], BitVec[8]]或BitVec（用于向后兼容）
-                - length: EVM输出长度的逻辑公式（64位BitVec）
-            x86_result: (data, length)元组，其中：
-                - data: Array[BitVec[64], BitVec[8]]或BitVec（用于向后兼容）
-                - length: x86输出长度的逻辑公式（64位BitVec）
-
-        Returns:
-            (verified, message)，如果精化关系成立则verified为True
-        """
-        evm_data, evm_length = evm_result
-        x86_data, x86_length = x86_result
-
-        if evm_length.size() != 64 or x86_length.size() != 64:
-            raise ValueError("Length must be 64-bit BitVec")
-
-        # 第一次检查：长度必须相等
-        # 如果长度不同，程序不等价
-        if not self._reset_solver_with_budget(deadline):
-            msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        self.solver.add(evm_length != x86_length)
-
-        start_time = time.time()
-        result = self.solver.check()
-        solve_time = time.time() - start_time
-
-        if self.verbose:
-            print(f"    ├─ Length equality check: {solve_time:.3f}s, result={result}")
-
-        if result == sat:
-            # 长度可能不同 - 不等价
-            msg = "✗ COUNTEREXAMPLE: Return lengths differ"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        elif result != unsat:
-            msg = self._unknown_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-
-        # 第二次检查：如果长度相等，数据必须相等
-        # 处理Array和BitVec两种格式
-        if not self._reset_solver_with_budget(deadline):
-            msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        self.solver.add(evm_length == x86_length)  # 长度相等
-
-        # 检查数据是Array还是BitVec
-        if isinstance(evm_data, Array) and isinstance(x86_data, Array):
-            # Array格式：仅比较到length字节
-            # 我们想检查：Exists i. (i < length) && (evm_data[i] != x86_data[i])
-            # 如果UNSAT，则ForAll i. (i < length) => (evm_data[i] == x86_data[i])
-            from z3 import BitVecVal, ULT
-
-            # 创建符号索引变量
-            i = BitVec('return_data_index', 64)
-
-            # 约束：i < length
-            index_in_range = ULT(i, evm_length)
-
-            # 比较位置i处的字节
-            evm_byte = Select(evm_data, i)
-            x86_byte = Select(x86_data, i)
-
-            # 添加约束：i < length AND evm_data[i] != x86_data[i]
-            # 如果这是可满足的，我们找到了反例
-            self.solver.add(index_in_range)
-            self.solver.add(evm_byte != x86_byte)
-
-        else:
-            # BitVec格式（向后兼容）：比较整个固定大小数据
-            if evm_data.size() != x86_data.size():
-                raise ValueError(f"Data sizes must match: EVM={evm_data.size()}, x86={x86_data.size()}")
-            self.solver.add(Distinct(evm_data, x86_data))  # But data differs
-
-        start_time = time.time()
-        result = self.solver.check()
-        solve_time = time.time() - start_time
-
-        if self.verbose:
-            print(f"    ├─ Data equality check: {solve_time:.3f}s, result={result}")
-
-        if result == unsat:
-            msg = "✓ VERIFIED: x86 refines EVM (lengths and data are equivalent for all inputs)"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return True, msg
-        elif result == sat:
-            model = self.solver.model()
-            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (data differs)"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        else:
-            msg = self._unknown_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
+        return self._check_refinement_direct_memory(evm_result, x86_result, deadline)
     
     def _check_refinement_direct_memory(self, evm_result: dict, x86_result: dict,
                                         deadline: Optional[float] = None) -> Tuple[bool, Optional[str]]:

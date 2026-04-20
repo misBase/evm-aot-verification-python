@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import pytest
 from typing import List, Dict
-from z3 import BitVecVal, BitVec
+from z3 import BitVecVal, BitVec, Distinct, Solver, unsat
 from common.uint256 import Uint256
 from evm_ir.semantics import EVMIRSemantics
 from evm_ir.json_parser import load_ir_from_json
@@ -130,8 +130,7 @@ def test_verifier_import():
 
 def test_verify_add_symbolic(
     evm_semantics: EVMIRSemantics,
-    x86_add_program: X86Program,
-    refinement_checker_verbose: RefinementChecker
+    x86_add_program: X86Program
 ):
     """测试符号ADD验证 - 证明对所有输入的正确性。
 
@@ -160,12 +159,14 @@ def test_verify_add_symbolic(
     x86_result_dict = x86_add_program.build_program_semantics(initial_memory)
     x86_result = x86_result_dict['semantic_formula']
 
-    # 检查精化关系（证明对所有输入的等价性）
-    verified, msg = refinement_checker_verbose.check_refinement(evm_result, x86_result)
+    # 检查精化关系（证明对所有输入的等价性）：Distinct 应 UNSAT
+    s = Solver()
+    s.add(Distinct(evm_result, x86_result))
+    verified = s.check() == unsat
 
     assert verified, (
         f"Symbolic ADD verification failed. "
-        f"This should prove equivalence for all 256-bit inputs. Error: {msg}"
+        f"This should prove equivalence for all 256-bit inputs."
     )
 
 

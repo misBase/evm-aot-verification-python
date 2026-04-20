@@ -53,22 +53,24 @@ def test_add_semantics():
 
 def test_refinement_checker():
     """使用具体值测试精化检查器。"""
-    checker = RefinementChecker(timeout_ms=5000, verbose=False)
-    
+    from z3 import Distinct, Solver
+
     # 使用等价值测试
     evm_result = BitVecVal(0x70, 256)
     x86_result = BitVecVal(0x70, 256)
-    
-    verified, msg = checker.check_refinement(evm_result, x86_result)
-    assert verified, f"Equivalent values should verify, but got: {msg}"
-    
+
+    s = Solver()
+    s.add(Distinct(evm_result, x86_result))
+    assert s.check() == unsat, "Equivalent values should be unsat for Distinct"
+
     # 使用不同值测试
     evm_result2 = BitVecVal(0x70, 256)
     x86_result2 = BitVecVal(0x71, 256)
-    
-    verified2, msg2 = checker.check_refinement(evm_result2, x86_result2)
-    assert not verified2, \
-        f"Different values should not verify (0x70 != 0x71), but verification passed: {msg2}"
+
+    s2 = Solver()
+    s2.add(Distinct(evm_result2, x86_result2))
+    assert s2.check() == sat, \
+        f"Different values should be sat for Distinct (0x70 != 0x71)"
 
 
 def _to_bv256(value: int):

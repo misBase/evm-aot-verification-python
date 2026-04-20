@@ -6,7 +6,6 @@
 """
 
 import time
-from z3 import BitVec, IntVal
 from typing import Tuple, Optional, Dict, Any
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
@@ -64,9 +63,9 @@ class ProgramEquivalenceChecker:
 
         if self.verbose:
             print(f"    ├─ EVM stack depth: {evm_state.evm_stack.depth}")
-            from z3 import BitVecVal
-            evm_has_return = evm_state.return_length != BitVecVal(0, 64)
-            print(f"    ├─ EVM return condition: length != 0 (symbolic, merged from all paths)")
+            from z3 import BitVecVal, simplify
+            evm_has_return = simplify(evm_state.return_length != BitVecVal(0, 64))
+            print(f"    ├─ EVM has return: {evm_has_return}")
             # 估算公式复杂度
             formula_size = self._estimate_formula_size(evm_result)
             print(f"    ├─ Formula size: ~{formula_size} expressions")
@@ -83,8 +82,8 @@ class ProgramEquivalenceChecker:
         x86_build_time = time.time() - x86_start
 
         if self.verbose:
-            x86_has_return = x86_state.return_length != BitVecVal(0, 64)
-            print(f"    ├─ x86 return condition: length != 0 (symbolic, merged from all paths)")
+            x86_has_return = simplify(x86_state.return_length != BitVecVal(0, 64))
+            print(f"    ├─ x86 has return: {x86_has_return}")
             print(f"    ├─ Shared host call-site mappings: {len(call_site_mapping)}")
             # 估算公式复杂度
             formula_size = self._estimate_formula_size(x86_result)
@@ -94,20 +93,10 @@ class ProgramEquivalenceChecker:
         # 步骤3：输出提取（已在to_z3中完成，但验证）
         if self.verbose:
             print("\n[3] Extracting outputs...")
-            if isinstance(evm_result, dict):
-                print(f"    ├─ EVM result: direct memory comparison (offset, length, memory)")
-            elif isinstance(evm_result, tuple):
-                evm_data, evm_length = evm_result
-                print(f"    ├─ EVM result: data ({evm_data.size()} bits), length ({evm_length.size()} bits)")
-            else:
-                print(f"    ├─ EVM result: {evm_result.size()}-bit BitVec")
-            if isinstance(x86_result, dict):
-                print(f"    └─ x86 result: direct memory comparison (offset, length, memory, base_addr)")
-            elif isinstance(x86_result, tuple):
-                x86_data, x86_length = x86_result
-                print(f"    └─ x86 result: data ({x86_data.size()} bits), length ({x86_length.size()} bits)")
-            else:
-                print(f"    └─ x86 result: {x86_result.size()}-bit BitVec")
+            keys = ", ".join(evm_result.keys())
+            print(f"    ├─ EVM result: dict with keys: ({keys})")
+            keys = ", ".join(x86_result.keys())
+            print(f"    └─ x86 result: dict with keys: ({keys})")
 
         # 步骤4：等价性检查
         if self.verbose:
@@ -124,32 +113,10 @@ class ProgramEquivalenceChecker:
 
         return verified, message
 
-    def _estimate_formula_size(self, result: Any) -> str:
-        """估算公式大小（表达式数量）。
-
-        Args:
-            result: Z3 结果对象
-
-        Returns:
-            估算的表达式数量字符串
-        """
-        from z3 import BitVec, Array, Bool
-
-        if isinstance(result, dict):
-            # 直接内存比较格式
-            count = 0
-            for key in ['offset', 'length', 'has_return']:
-                if key in result:
-                    count += 1
-            # 内存数组通常包含大量表达式
-            if 'memory' in result:
-                count += 20  # 估算
-            return f"{count}"
-        elif isinstance(result, tuple):
-            # (data, length) 格式
-            return "2-10"
-        elif isinstance(result, BitVec):
-            return "1"
-        else:
-            return "1"
+    def _estimate_formula_size(self, result: dict) -> str:
+        """估算公式大小（表达式数量）。"""
+        count = sum(1 for key in ('offset', 'length', 'has_return') if key in result)
+        if 'memory' in result:
+            count += 20
+        return f"{count}"
     
