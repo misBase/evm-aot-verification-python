@@ -9,8 +9,6 @@ from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem
 from typing import List, Dict, Optional, Any, Tuple
 from .models import X86Block, X86Instruction, Register
 from .aot_profile import GO_HPC_EVM_PROFILE
-from .execution_state import ExecutionState
-from .inst_executor import InstructionExecutor
 from .disassembler import disassemble_hex, parse_operands
 from common.uint256 import Uint256
 from state.smt_state import SMTState
@@ -24,141 +22,43 @@ EVM_CALL_ENGINE_STACK_CONTEXT_STACK_POINTER_OFFSET = GO_HPC_EVM_PROFILE.offsets[
 AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE = Register.R13  # 指向callEngine实例的指针
 
 
-class X86InstructionSemantics:
-    """单个x86-64指令的语义建模。"""
-
-    @staticmethod
-    def _memory_key(base_reg: Register, offset: int) -> str:
-        base_name = base_reg.value if hasattr(base_reg, 'value') else str(base_reg)
-        return f"{base_name}:{offset:+d}"
-    
-    def mov_reg_mem_semantics(self, dest_reg: Register, base_reg: Register, 
-                              offset: int, mem_vars: Dict[Any, BitVec]) -> BitVec:
-        """建模MOV reg, [base+offset]指令。
-        
-        Args:
-            dest_reg: 目标寄存器
-            base_reg: 基址寄存器（对于栈访问应为R14）
-            offset: 内存偏移量
-            mem_vars: 将偏移量映射到符号内存变量的字典
-            
-        Returns:
-            加载到目标寄存器的值
-        """
-        key = self._memory_key(base_reg, offset)
-        if key not in mem_vars:
-            mem_vars[key] = BitVec(f"mem_{key.replace(':', '_')}", 64)
-        return mem_vars[key]
-    
-    def add_reg_mem_semantics(self, dest_reg: Register, base_reg: Register,
-                              offset: int, mem_vars: Dict[Any, BitVec],
-                              carry_in: Optional[BitVec] = None) -> Tuple[BitVec, BitVec]:
-        """建模ADD/ADC reg, [base+offset]指令。
-        
-        Args:
-            dest_reg: 目标寄存器
-            base_reg: 基址寄存器
-            offset: 内存偏移量
-            mem_vars: 将偏移量映射到符号内存变量的字典
-            carry_in: 可选的进位输入（用于ADC）
-            
-        Returns:
-            (result, carry_out)元组，两者都是64位BitVecs
-        """
-        # 获取当前寄存器值（假设它在mem_vars中，使用特殊键）
-        # 为简单起见，我们将单独跟踪它
-        reg_val_key = f"reg_{dest_reg.value}"
-        if reg_val_key not in mem_vars:
-            # 初始化寄存器值
-            mem_vars[reg_val_key] = BitVec(f"{dest_reg.value}_init", 64)
-        
-        reg_val = mem_vars[reg_val_key]
-        mem_val = self.mov_reg_mem_semantics(dest_reg, base_reg, offset, mem_vars)
-        
-        # 执行带可选进位的加法
-        if carry_in is not None:
-            # ADC：带进位加法
-            reg_ext = Concat(BitVecVal(0, 1), reg_val)
-            mem_ext = Concat(BitVecVal(0, 1), mem_val)
-            carry_ext = Concat(BitVecVal(0, 64), carry_in)
-            sum_ext = reg_ext + mem_ext + carry_ext
-        else:
-            # ADD：简单加法
-            reg_ext = Concat(BitVecVal(0, 1), reg_val)
-            mem_ext = Concat(BitVecVal(0, 1), mem_val)
-            sum_ext = reg_ext + mem_ext
-        
-        result = Extract(63, 0, sum_ext)
-        carry_out = Extract(64, 64, sum_ext)
-        
-        # 更新寄存器值
-        mem_vars[reg_val_key] = result
-        
-        return result, carry_out
-    
-    def mov_mem_reg_semantics(self, base_reg: Register, offset: int,
-                              src_reg: Register, mem_vars: Dict[Any, BitVec]) -> None:
-        """建模MOV [base+offset], reg指令。
-        
-        Args:
-            base_reg: 基址寄存器
-            offset: 内存偏移量
-            src_reg: 源寄存器
-            mem_vars: 将偏移量映射到符号内存变量的字典
-        """
-        # 存储到x86内存（按 base+offset 编址）
-        reg_val_key = f"reg_{src_reg.value}"
-        if reg_val_key not in mem_vars:
-            mem_vars[reg_val_key] = BitVec(f"{src_reg.value}_init", 64)
-        mem_vars[self._memory_key(base_reg, offset)] = mem_vars[reg_val_key]
-
-
 class X86SemanticsModel:
     """x86-64指令序列的语义建模。"""
-    
-    def __init__(self):
-        """初始化x86语义模型。"""
-        self.instr_semantics = X86InstructionSemantics()
-        self.executor = InstructionExecutor()
-    
-    def execute_instruction_sequence(self, 
+
+    def execute_instruction_sequence(self,
                                     instructions: List[X86Instruction],
                                     initial_memory: Dict[int, BitVec],
                                     result_registers: Optional[List[Register]] = None) -> BitVec:
         """执行指令序列并提取结果。
-        
-        此方法创建执行状态，执行指令序列，
-        并从寄存器状态中提取最终结果。
-        
+
         Args:
             instructions: 要执行的X86Instruction对象列表
-            initial_memory: 初始内存状态（将偏移量映射到BitVec值的字典）
+            initial_memory: 初始内存状态（将偏移量映射到BitVec值的字典，key为Python int）
             result_registers: 要从中提取结果的寄存器列表（从高到低顺序）。
-                            如果为None，对于ADD序列默认为[RBX, RDX, RCX, RAX]。
-                            每个寄存器应为64位，它们将被连接
-                            形成256位结果。
-            
+                            如果为None，默认为[RBX, RDX, RCX, RAX]。
+
         Returns:
             表示256位结果的逻辑公式，作为BitVec
         """
-        # 使用初始内存创建执行状态
-        state = ExecutionState(initial_memory=initial_memory)
-        
-        # 执行指令序列
-        self.executor.execute_sequence(state, instructions)
-        
-        # 从寄存器中提取结果
+        state = SMTState()
+        # 设基址寄存器为0，使 [R14 + offset] 退化为 [offset]
+        state.x86_registers.set_register(Register.R13, BitVecVal(0, 64))
+        state.x86_registers.set_register(Register.R14, BitVecVal(0, 64))
+        state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+
+        # 写入初始内存（Python int key 转为 BitVecVal(64) 以支持负偏移的补码地址）
+        for offset, val in initial_memory.items():
+            addr = BitVecVal(offset, 64)
+            state.x86_memory = state.x86_memory.store_limb(addr, val)
+
+        for insn in instructions:
+            state = insn.to_z3(state)
+
         if result_registers is None:
-            # ADD序列的默认值：result = [rbx, rdx, rcx, rax]
             result_registers = [Register.RBX, Register.RDX, Register.RCX, Register.RAX]
-        
-        # 获取寄存器值并组合成256位结果
-        reg_values = [state.get_register(reg) for reg in result_registers]
-        
-        # 组合成256位结果（从高到低）
-        result = Concat(*reg_values)
-        
-        return result
+
+        reg_values = [state.x86_registers.get_register(reg) for reg in result_registers]
+        return Concat(*reg_values)
     
     def build_instructions_from_hex(self, hex_str: str, base_addr: int = 0) -> List[X86Instruction]:
         """从十六进制编码的机器码构建指令序列。
@@ -284,20 +184,14 @@ class X86SemanticsModel:
             }
         
         # 否则，从块中执行指令
-        # 这是当我们有X86Instruction对象时的回退
         if len(block.instructions) > 0:
-            state = ExecutionState(initial_memory=mem_vars)
-            self.executor.execute_sequence(state, block.instructions)
-            
-            # 如果未指定，从默认寄存器中提取结果
-            if result_registers is None:
-                result_registers = [Register.RBX, Register.RDX, Register.RCX, Register.RAX]
-            
-            reg_values = [state.get_register(reg) for reg in result_registers]
-            result = Concat(*reg_values)
-            
+            result = self.execute_instruction_sequence(
+                block.instructions,
+                mem_vars,
+                result_registers=result_registers
+            )
             return {
-                'output_memory': state.memory,
+                'output_memory': {},
                 'semantic_formula': result,
                 'output_count': 1
             }

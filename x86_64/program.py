@@ -122,29 +122,16 @@ class X86Program:
             - semantic_formula: 程序的总体语义公式
             - executed_instructions: 已执行指令的列表
         """
-        from .execution_state import ExecutionState
-        
-        # 创建执行状态
-        state = ExecutionState(initial_memory=initial_memory.copy())
-        
-        # 执行所有指令
-        if self.instructions:
-            self.semantics.executor.execute_sequence(state, self.instructions)
-        else:
-            # 从块中执行指令
-            for block in self.blocks:
-                self.semantics.executor.execute_sequence(state, block.instructions)
-        
-        # 从默认寄存器中提取结果（用于256位结果）
-        result_registers = [Register.RBX, Register.RDX, Register.RCX, Register.RAX]
-        reg_values = [state.get_register(reg) for reg in result_registers]
-        semantic_formula = Concat(*reg_values)
-
+        instructions = self.instructions if self.instructions else [
+            insn for block in self.blocks for insn in block.instructions
+        ]
+        semantic_formula = self.semantics.execute_instruction_sequence(
+            instructions, initial_memory
+        )
         return {
-            'output_memory': state.memory,
+            'output_memory': {},
             'semantic_formula': semantic_formula,
-            'executed_instructions': self.instructions if self.instructions else
-                                    [insn for block in self.blocks for insn in block.instructions],
+            'executed_instructions': instructions,
             'output_count': 1
         }
     

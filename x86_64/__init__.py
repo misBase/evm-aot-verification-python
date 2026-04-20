@@ -4,7 +4,7 @@
 """
 
 # 核心模型和语义
-from .semantics import X86SemanticsModel, X86InstructionSemantics
+from .semantics import X86SemanticsModel
 from .models import X86Block, X86Instruction, Register
 from .aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 
@@ -21,9 +21,6 @@ from .cfg_strategies import (
 )
 from .cfg_executor import X86SymbolicExecutor, build_x86_dynamic_cfg
 
-# 遗留 API (已弃用)
-from .execution_state import ExecutionState
-from .inst_executor import InstructionExecutor
 from .disassembler import disassemble_hex, parse_operands
 from .program import X86Program
 from .cfg import identify_basic_blocks
@@ -31,7 +28,6 @@ from .cfg import identify_basic_blocks
 __all__ = [
     # 核心模型和语义
     'X86SemanticsModel',
-    'X86InstructionSemantics',
     'X86Block',
     'X86Instruction',
     'Register',
@@ -56,9 +52,6 @@ __all__ = [
     'X86SymbolicExecutor',
     'build_x86_dynamic_cfg',
 
-    # 遗留 API (已弃用)
-    'ExecutionState',
-    'InstructionExecutor',
     'disassemble_hex',
     'parse_operands',
     'X86Program',
