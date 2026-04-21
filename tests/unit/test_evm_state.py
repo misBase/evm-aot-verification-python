@@ -15,49 +15,49 @@ class TestEVMStackState:
     def test_initial_stack(self):
         """测试初始栈状态。"""
         stack = EVMStackState()
-        assert stack.depth == 0
         # SP和Stack是符号变量，无法直接比较
 
     def test_push_single_value(self):
         """测试推送单个值到栈上。"""
-        stack = EVMStackState(initial_depth=0, sp=IntVal(0))
+        stack = EVMStackState(sp=IntVal(0))
         value = BitVecVal(42, 256)
         new_stack = stack.push(value)
 
-        # 验证深度增加
-        assert new_stack.depth == 1
-
         # 验证可以推送的值
         solver = Solver()
-        # 栈顶应该是推送的值
-        solver.add(new_stack.Stack == new_stack.Stack)
         # SP应该是1
         solver.add(new_stack.SP == IntVal(1))
         assert solver.check() == sat
 
     def test_pop_single_value(self):
         """测试从栈中弹出单个值。"""
-        stack = EVMStackState(initial_depth=1, sp=IntVal(1))
+        stack = EVMStackState(sp=IntVal(1))
         value, new_stack = stack.pop()
 
-        # 验证深度减少
-        assert new_stack.depth == 0
+        # SP应该是0
+        solver = Solver()
+        solver.add(new_stack.SP == IntVal(0))
+        assert solver.check() == sat
 
     def test_dup1(self):
         """测试DUP1操作：复制栈顶元素。"""
-        stack = EVMStackState(initial_depth=1, sp=IntVal(1))
+        stack = EVMStackState(sp=IntVal(1))
         new_stack = stack.dup(1)
 
-        # 验证深度增加
-        assert new_stack.depth == 2
+        # SP应该是2
+        solver = Solver()
+        solver.add(new_stack.SP == IntVal(2))
+        assert solver.check() == sat
 
     def test_dup2(self):
         """测试DUP2操作：复制次栈顶元素。"""
-        stack = EVMStackState(initial_depth=2, sp=IntVal(2))
+        stack = EVMStackState(sp=IntVal(2))
         new_stack = stack.dup(2)
 
-        # 验证深度增加
-        assert new_stack.depth == 3
+        # SP应该是3
+        solver = Solver()
+        solver.add(new_stack.SP == IntVal(3))
+        assert solver.check() == sat
 
     def test_dup_invalid_range(self):
         """测试DUP操作的无效范围。"""
@@ -73,11 +73,13 @@ class TestEVMStackState:
 
     def test_swap1(self):
         """测试SWAP1操作：交换栈顶和次栈顶元素。"""
-        stack = EVMStackState(initial_depth=2, sp=IntVal(2))
+        stack = EVMStackState(sp=IntVal(2))
         new_stack = stack.swap(1)
 
-        # 验证深度不变
-        assert new_stack.depth == 2
+        # SP不变
+        solver = Solver()
+        solver.add(new_stack.SP == IntVal(2))
+        assert solver.check() == sat
 
     def test_swap_invalid_range(self):
         """测试SWAP操作的无效范围。"""
@@ -93,7 +95,7 @@ class TestEVMStackState:
 
     def test_peek(self):
         """测试peek操作：查看栈值而不弹出。"""
-        stack = EVMStackState(initial_depth=1, sp=IntVal(1))
+        stack = EVMStackState(sp=IntVal(1))
 
         # peek(0)应该返回栈顶
         value = stack.peek(0)
@@ -101,7 +103,7 @@ class TestEVMStackState:
 
     def test_back(self):
         """测试back操作：获取栈中back(n)位置的值。"""
-        stack = EVMStackState(initial_depth=2, sp=IntVal(2))
+        stack = EVMStackState(sp=IntVal(2))
 
         # back(0)应该返回栈顶
         value0 = stack.back(0)
@@ -113,11 +115,13 @@ class TestEVMStackState:
 
     def test_copy(self):
         """测试复制栈状态。"""
-        stack = EVMStackState(initial_depth=1, sp=IntVal(1))
+        stack = EVMStackState(sp=IntVal(1))
         new_stack = stack.copy()
 
-        # 验证深度相同
-        assert new_stack.depth == stack.depth
+        # SP应该相同
+        solver = Solver()
+        solver.add(new_stack.SP == stack.SP)
+        assert solver.check() == sat
 
 
 class TestEVMStorageState:
@@ -289,9 +293,13 @@ class TestSMTState:
         state.evm_stack = state.evm_stack.push(value1)
         state.evm_stack = state.evm_stack.push(value2)
 
-        # 验证栈深度
-        assert state.evm_stack.depth == 2
+        # 验证SP为2
+        solver = Solver()
+        solver.add(state.evm_stack.SP == IntVal(2))
+        assert solver.check() == sat
 
         # 弹出一个值 - pop返回一个元组
         popped_value, new_stack_state = state.evm_stack.pop()
-        assert new_stack_state.depth == 1
+        solver = Solver()
+        solver.add(new_stack_state.SP == IntVal(1))
+        assert solver.check() == sat

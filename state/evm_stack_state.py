@@ -14,11 +14,10 @@ class EVMStackState:
     栈顶元素：Stack[SP-1]
     """
 
-    def __init__(self, initial_depth: int = 0, stack_array: Optional[Array] = None, sp: Optional[Int] = None):
+    def __init__(self, stack_array: Optional[Array] = None, sp: Optional[Int] = None):
         """初始化EVM栈状态。
 
         Args:
-            initial_depth: 初始栈深度（用于向后兼容）
             stack_array: 可选的现有Stack数组
             sp: 可选的现有SP指针
         """
@@ -33,9 +32,6 @@ class EVMStackState:
             self.SP = Int('SP')
         else:
             self.SP = sp
-
-        # 为了向后兼容，跟踪深度
-        self.depth = initial_depth
 
     def dup(self, n: int) -> 'EVMStackState':
         """DUP操作：复制栈上的第n个元素到栈顶。
@@ -58,7 +54,7 @@ class EVMStackState:
         new_sp = self.SP + 1
         new_stack = Store(self.Stack, self.SP, value)
 
-        new_state = EVMStackState(initial_depth=self.depth + 1, stack_array=new_stack, sp=new_sp)
+        new_state = EVMStackState(stack_array=new_stack, sp=new_sp)
         return new_state
 
     def swap(self, n: int) -> 'EVMStackState':
@@ -87,7 +83,7 @@ class EVMStackState:
         # 存储栈顶：Stack[SP-1] = other_value
         new_stack = Store(new_stack, self.SP - 1, other_value)
 
-        new_state = EVMStackState(initial_depth=self.depth, stack_array=new_stack, sp=self.SP)
+        new_state = EVMStackState(stack_array=new_stack, sp=self.SP)
         return new_state
 
     def push(self, value: BitVec) -> 'EVMStackState':
@@ -110,7 +106,7 @@ class EVMStackState:
         new_stack = Store(self.Stack, self.SP, value)
 
         # 创建新状态
-        new_state = EVMStackState(initial_depth=self.depth + 1, stack_array=new_stack, sp=new_sp)
+        new_state = EVMStackState(stack_array=new_stack, sp=new_sp)
         return new_state
 
     def pop(self) -> tuple[BitVec, 'EVMStackState']:
@@ -127,7 +123,7 @@ class EVMStackState:
         new_sp = self.SP - 1
         # Stack保持不变（我们不修改它，只更改SP）
 
-        new_state = EVMStackState(initial_depth=max(0, self.depth - 1), stack_array=self.Stack, sp=new_sp)
+        new_state = EVMStackState(stack_array=self.Stack, sp=new_sp)
         return value, new_state
 
     def peek(self, index: int = 0) -> BitVec:
@@ -177,5 +173,5 @@ class EVMStackState:
         """
         # 注意：在Z3中，数组和整数是不可变表达式，
         # 所以我们可以直接重用它们
-        new_state = EVMStackState(initial_depth=self.depth, stack_array=self.Stack, sp=self.SP)
+        new_state = EVMStackState(stack_array=self.Stack, sp=self.SP)
         return new_state

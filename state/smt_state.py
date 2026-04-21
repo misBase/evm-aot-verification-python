@@ -149,7 +149,7 @@ class SMTState:
         initial_state.x86_memory = initial_state.x86_memory.store_limb(56, zero_64)
 
         # 使用SP = 0初始化EVM栈
-        initial_state.evm_stack = EVMStackState(initial_depth=0, sp=IntVal(0))
+        initial_state.evm_stack = EVMStackState(sp=IntVal(0))
 
         # 如果没有输入，直接返回空状态
         if num_inputs == 0:

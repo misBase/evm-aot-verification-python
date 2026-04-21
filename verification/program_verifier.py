@@ -62,7 +62,6 @@ class ProgramEquivalenceChecker:
         evm_build_time = time.time() - evm_start
 
         if self.verbose:
-            print(f"    ├─ EVM stack depth: {evm_state.evm_stack.depth}")
             from z3 import BitVecVal, simplify
             evm_has_return = simplify(evm_state.return_length != BitVecVal(0, 64))
             print(f"    ├─ EVM has return: {evm_has_return}")
