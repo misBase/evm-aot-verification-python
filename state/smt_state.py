@@ -128,25 +128,33 @@ class SMTState:
         # 创建基础状态
         initial_state = SMTState()
 
-        # 与AOT约定对齐：
-        # R13: callEngine基址，R14: stack基址，R15: memory基址
-        # 在验证环境中统一设为0，便于与相对偏移建模拼接。
-        zero_64 = BitVecVal(0, 64)
-        initial_state.x86_registers.set_register(Register.R13, zero_64)
-        initial_state.x86_registers.set_register(Register.R14, zero_64)
-        initial_state.x86_registers.set_register(Register.R15, zero_64)
+        # R13 是 callEngine 的符号基址，运行时由 Go 决定，验证时视为任意值。
+        # R14（栈基址）和 R15（内存基址）从 callEngine 字段中读取：
+        #   [R13+16]  = memoryElement0Address  -> R15
+        #   [R13+56]  = stackElement0Address   -> R14
+        r13 = BitVec('R13', 64)
+        initial_state.x86_registers.set_register(Register.R13, r13)
 
-        # 初始化callEngine中会被预热代码读取的关键字段：
-        # [R13+16]  = memoryElement0Address
-        # [R13+40]  = stackPointer
-        # [R13+48]  = stackBasePointerInBytes
-        # [R13+56]  = stackElement0Address
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(16, zero_64)
+        # 为 callEngine 中会被读取的字段创建符号值
+        r14 = BitVec('R14_stack_base', 64)   # stackElement0Address
+        r15 = BitVec('R15_mem_base', 64)     # memoryElement0Address
+
+        # 写入 callEngine 字段（相对于 R13 的偏移）：
+        # [R13+0x10] = memoryElement0Address -> R15
+        # [R13+0x28] = stackPointer（limb 数 delta，初始为 0）
+        # [R13+0x30] = stackPointer 字节偏移（add r14, [r13+0x30]，初始为 0）
+        # [R13+0x38] = stackElement0Address -> R14 基址
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x10, 64), r15)
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            GO_HPC_EVM_PROFILE.offsets["stack_pointer"], zero_64
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64),
+            BitVecVal(0, 64)
         )
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(48, zero_64)
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(56, zero_64)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x30, 64), BitVecVal(0, 64))
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x38, 64), r14)
+
+        # R14/R15 从 callEngine 字段读取，与内存中存储的值保持一致
+        initial_state.x86_registers.set_register(Register.R14, r14)
+        initial_state.x86_registers.set_register(Register.R15, r15)
 
         # 使用SP = 0初始化EVM栈
         initial_state.evm_stack = EVMStackState(sp=IntVal(0))
@@ -166,9 +174,10 @@ class SMTState:
             initial_state.evm_stack = initial_state.evm_stack.push(stack_val)
 
         # 将 EVM 栈输入按当前 block 的栈窗口布局映射到 x86 内存。
-        # input_stack 的顺序是“压栈顺序”，最后一个元素才是逻辑栈顶。
+        # input_stack 的顺序是”压栈顺序”，最后一个元素才是逻辑栈顶。
+        # 传入 r14 使地址计算为 r14 + rel_offset，与 GoFunctionSemantics 一致。
         initial_state.x86_memory = StackMemoryMapper.initialize_x86_memory_from_stack(
-            initial_state.x86_memory, input_stack
+            initial_state.x86_memory, input_stack, base=r14
         )
 
         return initial_state

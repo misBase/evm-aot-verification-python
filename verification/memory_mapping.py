@@ -5,8 +5,8 @@ EVM栈和x86-64内存之间的内存映射。
 用于验证目的。
 """
 
-from typing import List, Dict
-from z3 import BitVec, Concat, Extract
+from typing import List, Dict, Optional
+from z3 import BitVec, BitVecVal, Concat, Extract
 from common.uint256 import Uint256
 from state.smt_state import SMTState, EVMStackState, X86MemoryState
 
@@ -14,7 +14,7 @@ from state.smt_state import SMTState, EVMStackState, X86MemoryState
 class StackMemoryMapper:
     """在EVM栈和x86-64内存布局之间映射。
 
-    这里的 R14 不是整个物理栈的起点，而是“当前 block 的栈基准”。
+    这里的 R14 不是整个物理栈的起点，而是"当前 block 的栈基准"。
     当前逻辑栈顶 stack[0] 的基址取决于当前 sp，本模块只建模一种特例：
     block 入口且 sp=0 时预置的已有栈窗口。此时：
 
@@ -107,35 +107,39 @@ class StackMemoryMapper:
     @staticmethod
     def initialize_x86_memory_from_stack(
         x86_memory: X86MemoryState,
-        stack_values: List[BitVec]
+        stack_values: List[BitVec],
+        base: Optional[BitVec] = None,
     ) -> X86MemoryState:
         """从EVM栈值初始化x86内存。
-        
+
         Args:
             x86_memory: 要初始化的X86MemoryState
             stack_values: 256位BitVec栈值列表
-            
+            base: 栈基址（R14），偏移量相对于该值计算；为 None 时使用 0
+
         Returns:
             具有初始化内存的新X86MemoryState
         """
+        base_bv = base if base is not None else BitVecVal(0, 64)
         new_memory = x86_memory
         stack_depth = len(stack_values)
         for push_index, stack_value in enumerate(stack_values):
-            # stack_values 按“压栈顺序”给出：最后一个元素是逻辑栈顶。
+            # stack_values 按"压栈顺序"给出：最后一个元素是逻辑栈顶。
             stack_index = stack_depth - 1 - push_index
-            base_offset = StackMemoryMapper.stack_index_to_base_offset(stack_index)
+            rel_offset = StackMemoryMapper.stack_index_to_base_offset(stack_index)
+            abs_base = base_bv + BitVecVal(rel_offset, 64)
             z0 = Extract(63, 0, stack_value)
             z1 = Extract(127, 64, stack_value)
             z2 = Extract(191, 128, stack_value)
             z3 = Extract(255, 192, stack_value)
             layout = {
-                base_offset: z0,
-                base_offset + 8: z1,
-                base_offset + 16: z2,
-                base_offset + 24: z3,
+                abs_base: z0,
+                abs_base + BitVecVal(8, 64): z1,
+                abs_base + BitVecVal(16, 64): z2,
+                abs_base + BitVecVal(24, 64): z3,
             }
-            for offset, limb in layout.items():
-                new_memory = new_memory.store_limb(offset, limb)
+            for addr, limb in layout.items():
+                new_memory = new_memory.store_limb(addr, limb)
         return new_memory
 
     @staticmethod
