@@ -27,23 +27,36 @@ from state.smt_state import SMTState
 # ===========================
 # 这些是从AOT编译器输出中提取的
 
-# ADD操作序列（地址0x6c-0x9b）
-# 包括：8条计算指令 + 4条存储指令
-# 指令：
-#   mov rax, [r14-0x40]   ; 加载 val1.z0
-#   add rax, [r14-0x20]   ; 加上 val2.z0，设置进位
-#   mov rcx, [r14-0x38]   ; 加载 val1.z1
-#   adc rcx, [r14-0x18]   ; 加上 val2.z1 + 进位
-#   mov rdx, [r14-0x30]   ; 加载 val1.z2
-#   adc rdx, [r14-0x10]   ; 加上 val2.z2 + 进位
-#   mov rbx, [r14-0x28]   ; 加载 val1.z3
-#   adc rbx, [r14-0x08]   ; 加上 val2.z3 + 进位
-#   mov [r14-0x40], rax   ; 存储 result.z0
-#   mov [r14-0x38], rcx   ; 存储 result.z1
-#   mov [r14-0x30], rdx   ; 存储 result.z2
-#   mov [r14-0x28], rbx   ; 存储 result.z3
-X86_ADD_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
-X86_ADD_BASE_ADDR = 0x6c
+# ADD裸核心（无 prologue/epilogue），用于符号等价性测试
+# 假设 R14 已是有效栈指针，直接读写相对 R14 的内存：
+#   mov rax, [r14-0x40]   ; 加载 a.z0
+#   add rax, [r14-0x20]   ; rax += b.z0，设置 CF
+#   mov rcx, [r14-0x38]   ; 加载 a.z1
+#   adc rcx, [r14-0x18]   ; rcx += b.z1 + CF
+#   mov rdx, [r14-0x30]   ; 加载 a.z2
+#   adc rdx, [r14-0x10]   ; rdx += b.z2 + CF
+#   mov rbx, [r14-0x28]   ; 加载 a.z3
+#   adc rbx, [r14-0x08]   ; rbx += b.z3 + CF
+#   mov [r14-0x40], rax   ; 写回 result.z0
+#   mov [r14-0x38], rcx   ; 写回 result.z1
+#   mov [r14-0x30], rdx   ; 写回 result.z2
+#   mov [r14-0x28], rbx   ; 写回 result.z3
+X86_ADD_CORE_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
+X86_ADD_CORE_BASE_ADDR = 0x6c
+
+# ADD完整函数（地址0x0-0x4c），AOT编译器输出，用于程序级等价性测试
+# prologue：从 callEngine(R13) 恢复 R14/R15
+#   mov r14, [r13+0x38]   ; 加载 stackBase
+#   add r14, [r13+0x30]   ; stackBase += stackPointer offset → R14 指向当前栈顶
+#   mov r15, [r13+0x10]   ; 加载 memoryBase
+# 核心 256-bit ADD（同 X86_ADD_CORE_HEX_SEQUENCE）：
+#   ADD裸核心
+# epilogue：更新 callEngine 状态后返回
+#   mov byte [r13+0xe0], 2        ; status = 2（正常返回）
+#   mov qword [r13+0x28], -4      ; sp -= 4 limbs（弹出 b，a 原地更新为结果）
+#   ret
+X86_ADD_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed841c685e00000000249c74528fcffffffc3"
+X86_ADD_BASE_ADDR = 0x0
 
 # 完整的ADD程序序列，包含控制流（地址0x0-0xac）
 # 包括初始化、错误处理和ADD操作
@@ -67,8 +80,8 @@ def evm_semantics() -> EVMIRSemantics:
 
 @pytest.fixture
 def x86_add_program() -> X86Program:
-    """提供x86-64 ADD程序的测试夹具。"""
-    return X86Program.from_hex(X86_ADD_HEX_SEQUENCE, base_addr=X86_ADD_BASE_ADDR)
+    """提供x86-64 ADD裸核心程序的测试夹具（无 prologue/epilogue，供符号测试用）。"""
+    return X86Program.from_hex(X86_ADD_CORE_HEX_SEQUENCE, base_addr=X86_ADD_CORE_BASE_ADDR)
 
 
 @pytest.fixture
