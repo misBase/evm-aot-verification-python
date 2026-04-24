@@ -21,6 +21,51 @@ EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = GO_HPC_EVM_PROFILE
 EVM_CALL_ENGINE_STACK_CONTEXT_STACK_POINTER_OFFSET = GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
 AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE = Register.R13  # 指向callEngine实例的指针
 
+# callEngine 的 stack_pointer byte offset（profile 里没单独列出，这里显式定义）。
+# 由 Go prologue `add r14, [r13+0x30]` 使用。
+CALLENGINE_STACK_POINTER_BYTE_OFFSET = 0x30
+
+# callEngine 字段 side-channel：识别到 mov [r13+offset], imm/reg 时同步到 SMTState 的显式字段。
+# (offset, expected_size_bytes) -> side-channel attribute name
+_CALLENGINE_FIELD_MAP = {
+    (GO_HPC_EVM_PROFILE.offsets["stack_pointer"],           8): "callengine_stack_pointer_limbs",
+    (CALLENGINE_STACK_POINTER_BYTE_OFFSET,                  8): "callengine_stack_byte_offset",
+    (GO_HPC_EVM_PROFILE.offsets["status_code"],             1): "callengine_status_code",
+    (GO_HPC_EVM_PROFILE.offsets["builtin_function_index"],  4): "callengine_builtin_func_index",
+    (GO_HPC_EVM_PROFILE.offsets["go_function_index"],       4): "callengine_go_func_index",
+}
+
+
+def _maybe_update_callengine_field(state: SMTState, operands: dict, size_bytes: Optional[int],
+                                   value64: "BitVec") -> None:
+    """识别写入 [r13+KNOWN_OFFSET] 的指令，若命中则同步更新 SMTState 上的
+    callEngine side-channel 字段。
+
+    保留对 x86_memory 的 Store（由调用点自己做），此函数只写显式字段。
+    适用于任何写内存的指令（mov/add/or/xor/shl/shr/not/setcc 等）。
+
+    识别条件：base_reg == R13、无 index、offset 是 Python int、(offset, size) 命中表。
+    """
+    if operands.get('base_reg') != Register.R13:
+        return
+    if operands.get('index_reg') is not None:
+        return
+    off = operands.get('offset')
+    if not isinstance(off, int):
+        return
+    key = (off, size_bytes)
+    attr = _CALLENGINE_FIELD_MAP.get(key)
+    if attr is None:
+        return
+    # 根据 size 取合适宽度的 slice
+    if size_bytes == 1:
+        setattr(state, attr, Extract(7, 0, value64))
+    elif size_bytes == 4:
+        setattr(state, attr, Extract(31, 0, value64))
+    else:
+        # 8 字节：value64 已经是 64-bit
+        setattr(state, attr, value64)
+
 
 class X86SemanticsModel:
     """x86-64指令序列的语义建模。"""
@@ -496,6 +541,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             reg_val = _read_register_by_size(src_reg, src_size)
             new_memory_state = _store_memory_by_size(memory_offset, memory_size, reg_val)
             state.x86_memory = new_memory_state
+            _maybe_update_callengine_field(state, operands, memory_size, reg_val)
         
         elif operands['dest_reg'] and operands['src_reg']:
             # MOV reg1, reg2
@@ -519,6 +565,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             memory_offset = _effective_address()
             imm_val = _imm_to_bv64(memory_size)
             state.x86_memory = _store_memory_by_size(memory_offset, memory_size, imm_val)
+            _maybe_update_callengine_field(state, operands, memory_size, imm_val)
         
         return state
 
@@ -575,6 +622,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
             state.x86_memory = _store_memory_by_size(memory_offset, memory_size, result)
             _update_add_like_flags(lhs_val, rhs_val, result, carry_out)
+            _maybe_update_callengine_field(state, operands, memory_size, result)
             return state
 
         if not operands['dest_reg']:
@@ -1012,6 +1060,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             result = lhs << count64
             state.x86_memory = _store_memory_by_size(addr, mem_size, result)
             _set_shift_flags(lhs, result, count64, is_left=True)
+            _maybe_update_callengine_field(state, operands, mem_size, result)
             return state
 
         if not operands['dest_reg']:
@@ -1035,6 +1084,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             result = LShR(lhs, count64)
             state.x86_memory = _store_memory_by_size(addr, mem_size, result)
             _set_shift_flags(lhs, result, count64, is_left=False)
+            _maybe_update_callengine_field(state, operands, mem_size, result)
             return state
 
         if not operands['dest_reg']:
@@ -1054,7 +1104,9 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             addr = _effective_address()
             mem_size = operands.get('memory_size')
             value = _load_memory_by_size(addr, mem_size)
-            state.x86_memory = _store_memory_by_size(addr, mem_size, ~value)
+            result = ~value
+            state.x86_memory = _store_memory_by_size(addr, mem_size, result)
+            _maybe_update_callengine_field(state, operands, mem_size, result)
             return state
 
         if not operands['dest_reg']:
@@ -1085,6 +1137,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             addr = _effective_address()
             mem_size = operands.get('memory_size') or 1
             state.x86_memory = _store_memory_by_size(addr, mem_size, value64)
+            _maybe_update_callengine_field(state, operands, mem_size, value64)
             return state
 
         if operands['dest_reg']:

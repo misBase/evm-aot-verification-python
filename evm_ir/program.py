@@ -198,6 +198,10 @@ class EVMProgram:
         merged.x86_memory = global_states[0].mstate.x86_memory
         merged.x86_registers = global_states[0].mstate.x86_registers
         merged.evm_gas = global_states[0].mstate.evm_gas
+        # 保留 create_initial_state() 注入的调试元数据。
+        # 这些字段是路径不变量，后续 fixed-slot 栈检查会使用。
+        merged.stack_base = global_states[0].mstate.stack_base
+        merged.stack_num_inputs = global_states[0].mstate.stack_num_inputs
 
         # 合并 EVM storage（SLOAD/SSTORE 可能在不同路径产生不同的 storage）
         from state.smt_state import EVMStorageState, EVMTransientStorageState

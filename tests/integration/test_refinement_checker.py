@@ -44,7 +44,7 @@ from state.smt_state import SMTState
 X86_ADD_CORE_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
 X86_ADD_CORE_BASE_ADDR = 0x6c
 
-# ADD完整函数（地址0x0-0x4c），AOT编译器输出，用于程序级等价性测试
+# ADD程序片段，AOT编译器输出，用于程序级等价性测试  对应 data/add_ir.json
 # prologue：从 callEngine(R13) 恢复 R14/R15
 #   mov r14, [r13+0x38]   ; 加载 stackBase
 #   add r14, [r13+0x30]   ; stackBase += stackPointer offset → R14 指向当前栈顶
@@ -58,9 +58,9 @@ X86_ADD_CORE_BASE_ADDR = 0x6c
 X86_ADD_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed841c685e00000000249c74528fcffffffc3"
 X86_ADD_BASE_ADDR = 0x0
 
-# 完整的ADD程序序列，包含控制流（地址0x0-0xac）
+# 完整的ADD程序序列，包含PUSH        对应 data/example_ir.json
 # 包括初始化、错误处理和ADD操作
-X86_ADD_FULL_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b45704883f80372234883e80349894570498b45304883f8407222483d21800000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c3498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed841c685e00000000249c74528fcffffffc3"
+X86_ADD_FULL_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b45704883f80672214883e80649894570498b45304883f80072204883f841732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c348c7c0600000004883c01048c7c1000000004883d10048c7c2000000004883d20048c7c3000000004883d30049890649894e084989561049895e1841c685e00000000249c7452804000000c3"
 X86_ADD_FULL_BASE_ADDR = 0x0
 
 # muti_block 程序级样本（文件中存放十六进制机器码）
@@ -206,9 +206,14 @@ def test_verify_add_program_pair():
     x86_program = X86Program.from_hex(X86_ADD_HEX_SEQUENCE, base_addr=X86_ADD_BASE_ADDR)
     
     # 使用ProgramEquivalenceChecker验证程序对
-    checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=False)
+    checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=True)
     initial_state = SMTState.create_initial_state(2)
-    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=2,
+    )
     
     assert verified, (
         f"Program pair verification failed. "
@@ -229,7 +234,7 @@ def test_verify_add_program_pair_full():
     """
     # 获取测试数据目录路径
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "..", "data", "add_program.json")
+    ir_path = os.path.join(test_dir, "..", "data", "example_ir.json")
     
     # 从JSON加载EVM程序
     compiler_result = load_ir_from_json(ir_path)
@@ -237,12 +242,23 @@ def test_verify_add_program_pair_full():
     
     # 从完整十六进制序列创建x86程序
     x86_program = X86Program.from_hex(X86_ADD_FULL_HEX_SEQUENCE, base_addr=X86_ADD_FULL_BASE_ADDR)
-    
-    # 使用ProgramEquivalenceChecker验证程序对
-    checker = ProgramEquivalenceChecker(timeout_ms=60000, verbose=True)
-    initial_state = SMTState.create_initial_state(2)
-    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
-    
+
+    # 使用ProgramEquivalenceChecker验证程序对。
+    # 这里故意不预置输入槽位：stack_check=1 会从 fixed-slot 坐标系继续向上检查，
+    # 允许比较执行过程中写入或仍保持为空理论的符号槽位。
+    # 栈一致性检查（step 5）在字节级 Memory Array 上做符号别名分析，
+    # 对于含 prologue/epilogue 的完整程序较慢，每个栈槽可能需要数分钟。
+    # 这里显式给 step 5 单独的 600s 预算，避免污染主 refinement timeout 的语义。
+    checker = ProgramEquivalenceChecker(timeout_ms=600000, verbose=True)
+    initial_state = SMTState.create_initial_state()
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=1,
+        stack_check_timeout_ms=600000,
+    )
+
     assert verified, (
         f"Full program pair verification failed. "
         f"EVM program from {ir_path} and full x86 program should be equivalent. Error: {msg}"

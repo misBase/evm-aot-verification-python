@@ -161,9 +161,10 @@ class GoFunctionSemantics:
 
         r13 = mstate.x86_registers.get_register(Register.R13)
         sp_offset = BitVecVal(self.aot_profile.offsets["stack_pointer"], 64)
-        mstate.x86_memory = mstate.x86_memory.store_64bit(
-            r13 + sp_offset, BitVecVal(sp, 64)
-        )
+        sp_bv = BitVecVal(sp, 64)
+        mstate.x86_memory = mstate.x86_memory.store_64bit(r13 + sp_offset, sp_bv)
+        # 同步 callEngine side-channel（保持与 x86 mov [r13+0x28], ... 的路径一致）
+        mstate.callengine_stack_pointer_limbs = sp_bv
         return mstate
 
     def apply(self, status_code: int, func_index: Optional[int],

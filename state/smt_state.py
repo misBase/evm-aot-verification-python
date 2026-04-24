@@ -33,6 +33,14 @@ class SMTState:
     管理所有符号状态：EVM栈/内存/Storage/Gas、x86内存/寄存器。
     """
 
+    CALLENGINE_SIDE_CHANNEL_FIELDS = (
+        "callengine_stack_pointer_limbs",
+        "callengine_stack_byte_offset",
+        "callengine_status_code",
+        "callengine_builtin_func_index",
+        "callengine_go_func_index",
+    )
+
     def __init__(self):
         """初始化统一SMT状态。"""
         self.evm_stack = EVMStackState()
@@ -51,8 +59,23 @@ class SMTState:
         self.return_offset: BitVec = BitVecVal(0, 64)  # 返回偏移量（64位），0 = 无返回
         self.return_length: BitVec = BitVecVal(0, 64)  # 返回长度（64位），0 = 无返回
 
+        # callEngine 字段的显式 side-channel。
+        # x86 指令执行器识别到 mov [r13+KNOWN_OFFSET], ... 时同步更新这些字段，
+        # 同时保留对 x86_memory 的写入（side-channel 是冗余快路径）。
+        # 目的：让栈一致性检查、状态码检查直接读 BitVec 字段，
+        # 避免 Z3 穿透 100+ 层 Memory Store 链做 array 理论推理。
+        self.callengine_stack_pointer_limbs: BitVec = BitVecVal(0, 64)   # [R13+0x28]
+        self.callengine_stack_byte_offset:   BitVec = BitVecVal(0, 64)   # [R13+0x30]
+        self.callengine_status_code:         BitVec = BitVecVal(0, 8)    # [R13+0xE0]
+        self.callengine_builtin_func_index:  BitVec = BitVecVal(0, 32)   # [R13+0xE4]
+        self.callengine_go_func_index:       BitVec = BitVecVal(0, 32)   # [R13+0xE8]
+
         # PC（程序计数器）
         self.pc: int = 0
+
+        # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
+        self.stack_base = None
+        self.stack_num_inputs = 0
 
         # 环境信息
         self.calldata = Array('CallData', BitVecSort(64), BitVecSort(8))
@@ -85,6 +108,7 @@ class SMTState:
         new_state.x86_registers = self.x86_registers.copy()
         new_state.return_offset = self.return_offset
         new_state.return_length = self.return_length
+        self.copy_callengine_side_channels_to(new_state)
         new_state.pc = self.pc
 
         # 复制环境信息
@@ -92,11 +116,60 @@ class SMTState:
         new_state.calldatasize = self.calldatasize
         new_state.callvalue = self.callvalue
         new_state.basefee = self.basefee
+        new_state.stack_base = getattr(self, 'stack_base', None)
+        new_state.stack_num_inputs = getattr(self, 'stack_num_inputs', 0)
 
         return new_state
 
+    def copy_callengine_side_channels_to(self, other: 'SMTState') -> None:
+        """复制 callEngine side-channel 字段到另一个 SMTState。"""
+        for field in self.CALLENGINE_SIDE_CHANNEL_FIELDS:
+            setattr(other, field, getattr(self, field))
+
+    @classmethod
+    def merge_callengine_side_channels(cls, merged_state: 'SMTState',
+                                       states: list['SMTState'],
+                                       conditions,
+                                       default_from_end: bool = False) -> None:
+        """将多条路径上的 callEngine side-channel 字段合并到 merged_state。
+
+        Args:
+            merged_state: 接收合并结果的 SMTState
+            states: 待合并的 SMTState 列表
+            conditions: 与 states 对齐的路径条件（BoolRef）列表
+            default_from_end: 是否以最后一个状态作为嵌套 If 的默认分支
+        """
+        if not states:
+            return
+        if len(states) != len(conditions):
+            raise ValueError(
+                f"states and conditions must have the same length, "
+                f"got {len(states)} and {len(conditions)}"
+            )
+
+        from z3 import If
+
+        default_index = len(states) - 1 if default_from_end else 0
+        default_state = states[default_index]
+        merged_values = {
+            field: getattr(default_state, field)
+            for field in cls.CALLENGINE_SIDE_CHANNEL_FIELDS
+        }
+
+        if default_from_end:
+            iter_pairs = reversed(list(zip(states[:-1], conditions[:-1], strict=False)))
+        else:
+            iter_pairs = reversed(list(zip(states, conditions, strict=False)))
+
+        for state, cond in iter_pairs:
+            for field in cls.CALLENGINE_SIDE_CHANNEL_FIELDS:
+                merged_values[field] = If(cond, getattr(state, field), merged_values[field])
+
+        for field, value in merged_values.items():
+            setattr(merged_state, field, value)
+
     @staticmethod
-    def create_initial_state(num_inputs: int = 2) -> 'SMTState':
+    def create_initial_state(num_inputs: int = 0) -> 'SMTState':
         """创建具有符号输入的初始SMT状态。
 
         创建一个新状态，包含：
@@ -104,7 +177,7 @@ class SMTState:
         - 映射到x86内存布局的EVM栈
 
         Args:
-            num_inputs: 要创建的符号输入数量（默认2，适用于二元操作如ADD、SUB等）
+            num_inputs: 要创建的符号输入数量（默认0）
 
         Returns:
             具有符号输入的已初始化SMTState
@@ -144,6 +217,7 @@ class SMTState:
         # [R13+0x28] = stackPointer（limb 数 delta，初始为 0）
         # [R13+0x30] = stackPointer 字节偏移（add r14, [r13+0x30]，初始为 0）
         # [R13+0x38] = stackElement0Address -> R14 基址
+        # [R13+0x70] = gas，固定为足够大的具体值，确保 gas 检查走 success path
         initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x10, 64), r15)
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
             r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64),
@@ -151,10 +225,11 @@ class SMTState:
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x30, 64), BitVecVal(0, 64))
         initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x38, 64), r14)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x70, 64), BitVecVal(1000000000, 64))
 
-        # R14/R15 从 callEngine 字段读取，与内存中存储的值保持一致
-        initial_state.x86_registers.set_register(Register.R14, r14)
-        initial_state.x86_registers.set_register(Register.R15, r15)
+        # 保存原始 stack_base 和输入数量，供栈一致性检查使用
+        initial_state.stack_base = r14
+        initial_state.stack_num_inputs = num_inputs
 
         # 使用SP = 0初始化EVM栈
         initial_state.evm_stack = EVMStackState(sp=IntVal(0))
@@ -173,8 +248,9 @@ class SMTState:
         for stack_val in input_stack:
             initial_state.evm_stack = initial_state.evm_stack.push(stack_val)
 
-        # 将 EVM 栈输入按当前 block 的栈窗口布局映射到 x86 内存。
-        # input_stack 的顺序是”压栈顺序”，最后一个元素才是逻辑栈顶。
+        # 将 EVM 栈输入按“固定槽位窗口”映射到 x86 内存：
+        # slot 0 是栈底，slot N-1 是栈顶，预置区间为 [r14 - N*0x20, ..., r14 - 0x20]。
+        # input_stack 仍按“压栈顺序”给出，因此第一个输入会落到最底部槽位。
         # 传入 r14 使地址计算为 r14 + rel_offset，与 GoFunctionSemantics 一致。
         initial_state.x86_memory = StackMemoryMapper.initialize_x86_memory_from_stack(
             initial_state.x86_memory, input_stack, base=r14

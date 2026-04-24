@@ -288,6 +288,15 @@ class X86Program:
             expr = If(condition, gstate.mstate.return_length, expr)
         merged.return_length = expr
 
+        # 合并 callEngine side-channel 字段（与 return_offset/length 同模式）
+        callengine_states = [gstate.mstate for gstate in global_states]
+        callengine_conditions = [gstate.get_constraints().as_bool() for gstate in global_states]
+        SMTState.merge_callengine_side_channels(
+            merged,
+            callengine_states,
+            callengine_conditions,
+        )
+
         # 合并 x86 内存
         first_memory = global_states[0].mstate.x86_memory.Memory
         expr = first_memory
@@ -329,6 +338,10 @@ class X86Program:
             condition = gstate.get_constraints().as_bool()
             expr = If(condition, gstate.mstate.evm_transient_storage.TransientStorage, expr)
         merged.evm_transient_storage = EVMTransientStorageState(storage_array=expr)
+
+        # 保留 create_initial_state() 注入的调试元数据。
+        merged.stack_base = global_states[0].mstate.stack_base
+        merged.stack_num_inputs = global_states[0].mstate.stack_num_inputs
 
         return merged
     

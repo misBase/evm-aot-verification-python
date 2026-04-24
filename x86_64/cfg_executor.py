@@ -264,6 +264,16 @@ class X86SymbolicExecutor:
         merged_mstate.return_offset = offset_expr
         merged_mstate.return_length = length_expr
 
+        # 合并 callEngine side-channel 字段（与 return_offset/length 同模式）
+        callengine_states = [state.mstate for state in states]
+        callengine_conditions = [state.get_constraints().as_bool() for state in states]
+        SMTState.merge_callengine_side_channels(
+            merged_mstate,
+            callengine_states,
+            callengine_conditions,
+            default_from_end=True,
+        )
+
         # EVM 状态：stack/memory/gas 从第一个状态复制，storage 需合并（Go函数可能修改）
         merged_mstate.evm_stack = states[0].mstate.evm_stack
         merged_mstate.evm_memory = states[0].mstate.evm_memory
@@ -290,6 +300,8 @@ class X86SymbolicExecutor:
         merged_mstate.calldatasize = states[0].mstate.calldatasize
         merged_mstate.callvalue = states[0].mstate.callvalue
         merged_mstate.basefee = states[0].mstate.basefee
+        merged_mstate.stack_base = states[0].mstate.stack_base
+        merged_mstate.stack_num_inputs = states[0].mstate.stack_num_inputs
 
         # 合并约束 = Or(所有原路径条件)
         merged_world = X86WorldState()
