@@ -183,6 +183,8 @@ class GlobalState:
         self.world_state = world_state if world_state is not None else WorldState()
         self.edge_type_hint: Optional['EdgeType'] = None  # 边类型提示
         self.node = node
+        self.loop_time = {}
+
 
         # 执行深度（用于循环检测）
         self.depth = 0
@@ -202,6 +204,8 @@ class GlobalState:
             node=self.node
         )
         new_state.depth = self.depth
+        new_state.loop_time = self.loop_time.copy()  # 添加这行
+
         return new_state
 
     def __deepcopy__(self, memo):
@@ -217,6 +221,7 @@ class GlobalState:
             node=self.node
         )
         new_state.depth = self.depth
+        new_state.loop_time = self.loop_time.copy()  # 添加这行
         return new_state
 
     def get_constraints(self) -> Constraints:

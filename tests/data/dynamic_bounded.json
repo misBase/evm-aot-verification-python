@@ -1,0 +1,171 @@
+{
+    "control_frames": [
+        {
+            "pc": 0,
+            "stack_depth": 0,
+            "min_depth": 0,
+            "max_depth": 1022,
+            "static_gas": 9,
+            "is_jump_target": false,
+            "is_stop": false,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 1,
+                    "pc": 0
+                },
+                {
+                    "immediate": "0",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 0
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 2
+                },
+                {
+                    "immediate": "3",
+                    "is_static": true,
+                    "kind": "JUMP",
+                    "param": 1,
+                    "pc": 2
+                }
+            ]
+        },
+        {
+            "pc": 3,
+            "stack_depth": 1,
+            "min_depth": 1,
+            "max_depth": 1022,
+            "static_gas": 26,
+            "is_jump_target": true,
+            "is_stop": false,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 2,
+                    "pc": 3
+                },
+                {
+                    "kind": "DUP",
+                    "param": 2,
+                    "pc": 3
+                },
+                {
+                    "kind": "DUP",
+                    "param": 2,
+                    "pc": 4
+                },
+                {
+                    "kind": "LT",
+                    "pc": 5
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 9
+                },
+                {
+                    "immediate": "14",
+                    "is_static": true,
+                    "kind": "JUMPI",
+                    "param": 2,
+                    "pc": 9
+                }
+            ]
+        },
+        {
+            "pc": 9,
+            "stack_depth": 1,
+            "min_depth": 1,
+            "max_depth": 1022,
+            "static_gas": 9,
+            "is_jump_target": false,
+            "is_stop": false,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "pc": 9
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 13
+                },
+                {
+                    "immediate": "29",
+                    "is_static": true,
+                    "kind": "JUMP",
+                    "param": 1,
+                    "pc": 13
+                }
+            ]
+        },
+        {
+            "pc": 14,
+            "stack_depth": 1,
+            "min_depth": 1,
+            "max_depth": 1022,
+            "static_gas": 13,
+            "is_jump_target": true,
+            "is_stop": false,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 3,
+                    "pc": 14
+                },
+                {
+                    "immediate": "1",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 14
+                },
+                {
+                    "kind": "ADD",
+                    "pc": 16
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 20
+                },
+                {
+                    "immediate": "3",
+                    "is_static": true,
+                    "kind": "JUMP",
+                    "param": 1,
+                    "pc": 20
+                }
+            ]
+        },
+        {
+            "pc": 29,
+            "stack_depth": 1,
+            "min_depth": 1,
+            "max_depth": 1022,
+            "static_gas": 1,
+            "is_jump_target": true,
+            "is_stop": true,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 4,
+                    "pc": 29
+                },
+                {
+                    "kind": "STOP",
+                    "pc": 30
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 30
+                },
+                {
+                    "immediate": "30",
+                    "is_static": true,
+                    "kind": "JUMP",
+                    "pc": 30
+                }
+            ]
+        }
+    ]
+}
