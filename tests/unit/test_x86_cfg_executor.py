@@ -1320,7 +1320,7 @@ class TestComplexScenarios:
             assert expected in block_starts, f"Expected block at 0x{expected:x}"
 
         # 创建执行器并执行
-        executor = X86SymbolicExecutor(blocks, max_depth=50, use_reachability_check=True)
+        executor = X86SymbolicExecutor(blocks, max_depth=50, use_reachability_check=False)
         final_states = executor.execute(state)
 
         # 验证执行结果

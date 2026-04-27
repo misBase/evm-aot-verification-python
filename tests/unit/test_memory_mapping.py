@@ -17,6 +17,14 @@ def test_slot_index_to_base_offset_two_slots():
     assert StackMemoryMapper.slot_index_to_base_offset(1, 2) == -0x20
 
 
+def test_x86_memory_default_zero_initialized():
+    """新建 x86 内存时，未写入字节默认应为 0。"""
+    memory = X86MemoryState()
+
+    _assert_bv_eq(memory.load_byte(BitVecVal(0, 64)), BitVecVal(0, 8))
+    _assert_bv_eq(memory.load_byte(BitVecVal(0x1234, 64)), BitVecVal(0, 8))
+
+
 def test_slot_index_to_base_offset_single_slot():
     """单槽位窗口时，唯一槽位应位于 -0x20。"""
     assert StackMemoryMapper.slot_index_to_base_offset(0, 1) == -0x20

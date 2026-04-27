@@ -734,6 +734,19 @@ class GoFunctionSemantics:
         growNumber、memoryElement0Address、memorySliceLen 等字段的建模，
         并在 memory_grow 后同步更新这些可观察状态，以验证内存扩容相关语义。
         """
+        from z3 import BitVecVal
+        from x86_64.models import Register
+
+        new_page_count = mstate.callengine_builtin_arg0
+        new_size_bytes = new_page_count << BitVecVal(5, 64)
+        mstate.callengine_memory_size_bytes = new_size_bytes
+
+        # 保持 x86_memory 中的 callEngine 元数据同步，避免慢路径读到旧值。
+        r13 = mstate.x86_registers.get_register(Register.R13)
+        mstate.x86_memory = mstate.x86_memory.store_64bit(
+            r13 + BitVecVal(0x18, 64),
+            new_size_bytes,
+        )
         return mstate
 
     def _handle_builtin_gas_cost(self, sp: int, mstate: SMTState) -> SMTState:

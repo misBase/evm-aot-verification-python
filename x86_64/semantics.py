@@ -28,11 +28,18 @@ CALLENGINE_STACK_POINTER_BYTE_OFFSET = 0x30
 # callEngine 字段 side-channel：识别到 mov [r13+offset], imm/reg 时同步到 SMTState 的显式字段。
 # (offset, expected_size_bytes) -> side-channel attribute name
 _CALLENGINE_FIELD_MAP = {
+    (0x10,                                              8): "callengine_memory_base",
+    (0x18,                                              8): "callengine_memory_size_bytes",
+    (0x20,                                              8): "callengine_memory_gas_used",
     (GO_HPC_EVM_PROFILE.offsets["stack_pointer"],           8): "callengine_stack_pointer_limbs",
     (CALLENGINE_STACK_POINTER_BYTE_OFFSET,                  8): "callengine_stack_byte_offset",
+    (0x38,                                              8): "callengine_stack_base",
+    (0x70,                                              8): "callengine_gas_remaining",
     (GO_HPC_EVM_PROFILE.offsets["status_code"],             1): "callengine_status_code",
     (GO_HPC_EVM_PROFILE.offsets["builtin_function_index"],  4): "callengine_builtin_func_index",
     (GO_HPC_EVM_PROFILE.offsets["go_function_index"],       4): "callengine_go_func_index",
+    (GO_HPC_EVM_PROFILE.offsets["return_address"],      8): "callengine_return_address",
+    (0x108,                                             8): "callengine_builtin_arg0",
 }
 
 
@@ -65,6 +72,28 @@ def _maybe_update_callengine_field(state: SMTState, operands: dict, size_bytes: 
     else:
         # 8 字节：value64 已经是 64-bit
         setattr(state, attr, value64)
+
+
+def _maybe_read_callengine_field(state: SMTState, operands: dict,
+                                 size_bytes: Optional[int]) -> Optional["BitVec"]:
+    """识别读取 [r13+KNOWN_OFFSET] 的指令，若命中则直接走 side-channel 快路径。"""
+    if operands.get('base_reg') != Register.R13:
+        return None
+    if operands.get('index_reg') is not None:
+        return None
+    off = operands.get('offset')
+    if not isinstance(off, int):
+        return None
+    attr = _CALLENGINE_FIELD_MAP.get((off, size_bytes))
+    if attr is None:
+        return None
+
+    value = getattr(state, attr)
+    if size_bytes == 1:
+        return ZeroExt(56, value)
+    if size_bytes == 4:
+        return ZeroExt(32, value)
+    return value
 
 
 class X86SemanticsModel:
@@ -354,6 +383,9 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         state.x86_registers.set_flag('SF', Extract(63, 63, result64))
 
     def _load_memory_by_size(addr64, size_bytes: Optional[int]):
+        callengine_value = _maybe_read_callengine_field(state, operands, size_bytes)
+        if callengine_value is not None:
+            return callengine_value
         if size_bytes == 1:
             return ZeroExt(56, state.x86_memory.load_byte(addr64))
         if size_bytes == 2:
@@ -821,17 +853,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     
     elif mnemonic == 'ret':
         # RET 指令：检查退出状态码，并在需要时提取返回/回退数据
-        # 从x86内存读取状态码：[R13 + evmCallEngineExitContextNativeCallStatusCodeOffset]
-        
-        # 获取R13寄存器值（callEngine指针）
-        r13_value = state.x86_registers.get_register(AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE)
-        
-        # 计算状态码内存地址
-        status_code_offset = BitVecVal(EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET, 64)
-        status_code_addr = r13_value + status_code_offset
-        
-        # 从x86内存读取状态码（8位字节）
-        status_code = state.x86_memory.load_byte(status_code_addr)
+        # 优先读取 callEngine side-channel，避免在 ret 上再次穿透 x86_memory 的长 Store 链。
+        status_code = state.callengine_status_code
         
         # RETURNED / REVERTED 都会从栈中读取 offset、size。
         # INVALID 只会弹出一个 opcode，当前模型不单独暴露该错误值。
@@ -856,40 +879,16 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         r14_value = state.x86_registers.get_register(Register.R14)
 
         # 读取当前 stack_pointer（单位：limb）
-        sp_offset = BitVecVal(EVM_CALL_ENGINE_STACK_CONTEXT_STACK_POINTER_OFFSET, 64)
-        sp_bv = state.x86_memory.load_64bit(r13_value + sp_offset)
+        sp_bv = state.callengine_stack_pointer_limbs
 
         # 使用当前 sp 反推出逻辑栈顶两项的物理地址
         limb_size = BitVecVal(8, 64)
         stack0_base = r14_value + (sp_bv - BitVecVal(4, 64)) * limb_size
-        offset_z0 = state.x86_memory.load_64bit(stack0_base)
-        offset_z1 = state.x86_memory.load_64bit(stack0_base + BitVecVal(8, 64))
-        offset_z2 = state.x86_memory.load_64bit(stack0_base + BitVecVal(16, 64))
-        offset_z3 = state.x86_memory.load_64bit(stack0_base + BitVecVal(24, 64))
-        offset_stack_value = Concat(offset_z3, offset_z2, offset_z1, offset_z0)  # 256位值
-
         stack1_base = r14_value + (sp_bv - BitVecVal(8, 64)) * limb_size
-        size_z0 = state.x86_memory.load_64bit(stack1_base)
-        size_z1 = state.x86_memory.load_64bit(stack1_base + BitVecVal(8, 64))
-        size_z2 = state.x86_memory.load_64bit(stack1_base + BitVecVal(16, 64))
-        size_z3 = state.x86_memory.load_64bit(stack1_base + BitVecVal(24, 64))
-        size_stack_value = Concat(size_z3, size_z2, size_z1, size_z0)  # 256位值
-        
-        # 将256位栈值截断为64位，模拟 Go 的 PopUint64()
-        from z3 import Extract as Z3Extract
-        if size_stack_value.size() == 256:
-            length_bv = Z3Extract(63, 0, size_stack_value)  # 提取低64位
-        elif size_stack_value.size() == 64:
-            length_bv = size_stack_value
-        else:
-            raise ValueError(f"Unexpected size value size: {size_stack_value.size()}")
-        
-        if offset_stack_value.size() == 256:
-            offset_bv = Z3Extract(63, 0, offset_stack_value)  # 提取低64位
-        elif offset_stack_value.size() == 64:
-            offset_bv = offset_stack_value
-        else:
-            raise ValueError(f"Unexpected offset value size: {offset_stack_value.size()}")
+        # Go runtime 在这里消费的是 PopUint64()，只观察每个 256-bit 栈值的低 64-bit limb。
+        # 直接读取 z0 可显著减轻 return 条件和 return data 公式的体积。
+        offset_bv = state.x86_memory.load_64bit(stack0_base)
+        length_bv = state.x86_memory.load_64bit(stack1_base)
         
         # 对 return_offset / return_length 使用条件符号值：
         # - RETURNED / REVERTED：设置为栈中的 offset、size

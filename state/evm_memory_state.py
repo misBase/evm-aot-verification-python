@@ -3,7 +3,7 @@ EVM 内存状态建模。
 """
 
 from typing import Optional
-from z3 import BitVec, BitVecVal, Array, BitVecSort, Select, Store
+from z3 import BitVec, BitVecVal, Array, BitVecSort, K, Select, Store
 
 
 class EVMMemoryState:
@@ -26,14 +26,16 @@ class EVMMemoryState:
             msize: 可选的现有MSize变量
         """
         # Memory : Array[BitVec[64], BitVec[8]] - 地址是64位，值是8位（字节）
+        # EVM 内存在未写入前默认为 0。
         if memory_array is None:
-            self.Memory = Array('Memory', BitVecSort(64), BitVecSort(8))
+            self.Memory = K(BitVecSort(64), BitVecVal(0, 8))
         else:
             self.Memory = memory_array
 
         # MSize : BitVec[64] - 跟踪最大访问地址（内存大小）
+        # 初始内存为空，因此 MSize 从 0 开始。
         if msize is None:
-            self.MSize = BitVec('MSize', 64)
+            self.MSize = BitVecVal(0, 64)
         else:
             self.MSize = msize
 

@@ -1,0 +1,298 @@
+; Disassembly of mstore_return.hex (base_addr=0x0000)
+; EVM program: PUSH 9, PUSH 0, MSTORE, PUSH 32, PUSH 0, RETURN
+;
+; Instruction types used: add, bswap, cmp, div, jae, jb, je, jmp, jne,
+;                         lea, mov, movabs, mul, nop, or, ret, shl, shr,
+;                         sub, test
+
+; --- Prologue: restore R14/R15, check gas and stack bounds ---
+0x0000: mov r14, qword ptr [r13 + 0x38]
+0x0004: add r14, qword ptr [r13 + 0x30]
+0x0008: mov r15, qword ptr [r13 + 0x10]
+0x000c: mov rax, qword ptr [r13 + 0x70]
+0x0010: cmp rax, 0xf
+0x0014: jb 0x39                              ; gas underflow -> out-of-gas
+0x0016: sub rax, 0xf
+0x001a: mov qword ptr [r13 + 0x70], rax
+0x001e: mov rax, qword ptr [r13 + 0x30]
+0x0022: cmp rax, 0
+0x0026: jb 0x4a                              ; stack underflow
+0x0028: cmp rax, 0x7fc1
+0x002e: jae 0x5b                             ; stack overflow
+0x0030: mov r14, qword ptr [r13 + 0x38]
+0x0034: add r14, rax
+0x0037: jmp 0x6c
+
+; --- Error exits ---
+0x0039: mov byte ptr [r13 + 0xe0], 0xc       ; status = out-of-gas
+0x0041: mov qword ptr [r13 + 0x28], 0
+0x0049: ret
+0x004a: mov byte ptr [r13 + 0xe0], 0xe       ; status = stack underflow
+0x0052: mov qword ptr [r13 + 0x28], 0
+0x005a: ret
+0x005b: mov byte ptr [r13 + 0xe0], 0xf       ; status = stack overflow
+0x0063: mov qword ptr [r13 + 0x28], 0
+0x006b: ret
+
+; --- PUSH 9, PUSH 0: write uint256(9) onto EVM stack at [R14] ---
+; Stack layout: z0(LSB) at [R14], z1 at [R14+8], z2 at [R14+16], z3(MSB) at [R14+24]
+0x006c: mov qword ptr [r14], 9               ; z0 = 9
+0x0073: mov qword ptr [r14 + 8], 0           ; z1 = 0
+0x007b: mov qword ptr [r14 + 0x10], 0        ; z2 = 0
+0x0083: mov qword ptr [r14 + 0x18], 0        ; z3 = 0
+; Second slot (PUSH 0 for MSTORE offset): all zero
+0x008b: mov qword ptr [r14 + 0x20], 0
+0x0093: mov qword ptr [r14 + 0x28], 0
+0x009b: mov qword ptr [r14 + 0x30], 0
+0x00a3: mov qword ptr [r14 + 0x38], 0
+
+; --- MSTORE: MemoryGrow builtin call (first invocation) ---
+; Check high limbs of offset (must be zero for valid address)
+0x00ab: mov rcx, 0
+0x00b2: or rcx, qword ptr [r14 + 0x28]
+0x00b6: or rcx, qword ptr [r14 + 0x30]
+0x00ba: or rcx, qword ptr [r14 + 0x38]
+0x00be: nop
+0x00c0: test rcx, rcx
+0x00c3: jne 0x222                            ; offset too large -> invalid
+; Compute required memory size: offset + 32
+0x00c9: mov rcx, qword ptr [r14 + 0x20]      ; rcx = offset (low 64 bits)
+0x00cd: mov rbx, 0x20
+0x00d4: add rbx, rcx                         ; rbx = offset + 32
+0x00d7: nop word ptr [rax + rax]
+0x00e0: cmp rbx, rcx
+0x00e3: jb 0x222                             ; overflow check
+; Compute page count: ceil((offset+32) / 32)
+0x00e9: mov rax, 0x20
+0x00f0: mov rsi, 0xffffffffffffffff
+0x00f7: shl rsi, 5
+0x00fb: nop dword ptr [rax + rax]
+0x0100: cmp rsi, rbx
+0x0103: jb 0x10f
+0x0105: add rbx, 0x1f
+0x0109: shr rbx, 5
+0x010d: jmp 0x119
+0x010f: movabs rbx, 0x800000000000000
+0x0119: test rbx, rbx
+0x011c: je 0x12a
+0x011e: mul rbx
+0x0121: jb 0x222
+0x0127: mov rbx, rax
+0x012a: mov rdi, rbx                         ; rdi = new page count
+; Compute gas cost for memory expansion
+0x012d: test rbx, rbx
+0x0130: je 0x1ca
+0x0136: movabs rcx, 0x1fffffffe0
+0x0140: cmp rcx, rbx
+0x0143: jb 0x1b9                             ; too large -> out-of-gas
+0x0145: mov rcx, 0xffffffffffffffff
+0x014c: shl rcx, 5
+0x0150: cmp rcx, rbx
+0x0153: jb 0x15f
+0x0155: add rbx, 0x1f
+0x0159: shr rbx, 5
+0x015d: jmp 0x169
+0x015f: movabs rbx, 0x800000000000000
+0x0169: mov rcx, rbx
+0x016c: shl rbx, 5
+0x0170: mov rsi, qword ptr [r13 + 0x18]      ; rsi = current memory size
+0x0174: cmp rsi, rbx
+0x0177: jae 0x1ca                            ; no growth needed
+0x0179: mov rax, rcx
+0x017c: mul rax                              ; gas cost = pages^2 / 512 + 3*pages
+0x017f: mov rbx, rax
+0x0182: mov rsi, 3
+0x0189: mov rax, rcx
+0x018c: mul rsi
+0x018f: mov rcx, rax
+0x0192: mov rax, rbx
+0x0195: mov rbx, 0x200
+0x019c: mov rdx, 0
+0x01a3: div rbx
+0x01a6: add rcx, rax
+0x01a9: mov rax, rcx
+0x01ac: mov rsi, qword ptr [r13 + 0x20]
+0x01b0: sub rcx, rsi
+0x01b3: mov qword ptr [r13 + 0x20], rax      ; update gas used
+0x01b7: jmp 0x1d1
+0x01b9: mov byte ptr [r13 + 0xe0], 0xc       ; out-of-gas
+0x01c1: mov qword ptr [r13 + 0x28], 8
+0x01c9: ret
+0x01ca: mov rcx, 0
+; Deduct gas and invoke MemoryGrow builtin (status=5, sp=8 -> suspend)
+0x01d1: mov rsi, qword ptr [r13 + 0x70]
+0x01d5: cmp rsi, rcx
+0x01d8: jb 0x233
+0x01da: sub rsi, rcx
+0x01dd: mov qword ptr [r13 + 0x70], rsi
+0x01e1: mov qword ptr [r13 + 0x108], rdi     ; arg: new page count
+0x01e8: mov dword ptr [r13 + 0xe4], 0        ; builtin func index = 0 (MemoryGrow)
+0x01f3: lea r8, [rip + 0x18]                 ; return address after builtin
+0x01fa: mov qword ptr [r13 + 0xf0], r8
+0x0201: mov byte ptr [r13 + 0xe0], 5         ; status = call builtin
+0x0209: mov qword ptr [r13 + 0x28], 8
+0x0211: ret
+
+; --- Resume after MemoryGrow (MSTORE): restore R14/R15 ---
+0x0212: mov r14, qword ptr [r13 + 0x38]
+0x0216: add r14, qword ptr [r13 + 0x30]
+0x021a: mov r15, qword ptr [r13 + 0x10]
+0x021e: nop
+0x0220: jmp 0x244
+
+; --- Error exits (MSTORE path) ---
+0x0222: mov byte ptr [r13 + 0xe0], 0xd       ; invalid memory access
+0x022a: mov qword ptr [r13 + 0x28], 8
+0x0232: ret
+0x0233: mov byte ptr [r13 + 0xe0], 0xc       ; out-of-gas
+0x023b: mov qword ptr [r13 + 0x28], 8
+0x0243: ret
+
+; --- MSTORE core: write uint256(9) big-endian into EVM memory at R15+rcx ---
+; Stack: z3(MSB)=[R14+0x18], z2=[R14+0x10], z1=[R14+8], z0(LSB)=[R14]
+; offset in rcx = [R14+0x20] (= 0)
+0x0244: mov rcx, qword ptr [r14 + 0x20]      ; rcx = memory offset (= 0)
+0x0248: mov rax, qword ptr [r14 + 0x18]      ; rax = z3 (= 0)
+0x024c: bswap rax                            ; big-endian: MSB limb first
+0x024f: mov qword ptr [r15 + rcx], rax       ; memory[offset+0..7]  = bswap(z3)
+0x0253: mov rax, qword ptr [r14 + 0x10]      ; rax = z2 (= 0)
+0x0257: bswap rax
+0x025a: mov qword ptr [r15 + rcx + 8], rax   ; memory[offset+8..15] = bswap(z2)
+0x025f: mov rax, qword ptr [r14 + 8]         ; rax = z1 (= 0)
+0x0263: bswap rax
+0x0266: mov qword ptr [r15 + rcx + 0x10], rax ; memory[offset+16..23] = bswap(z1)
+0x026b: mov rax, qword ptr [r14]             ; rax = z0 (= 9)
+0x026e: bswap rax                            ; = 0x0900000000000000
+0x0271: mov qword ptr [r15 + rcx + 0x18], rax ; memory[offset+24..31] = bswap(z0)
+; Result: memory[0..30]=0x00, memory[31]=0x09  (big-endian uint256(9))
+
+; --- PUSH 32, PUSH 0: write RETURN parameters onto EVM stack ---
+0x0276: mov qword ptr [r14], 0x20            ; z0 = 32 (return length)
+0x027d: mov qword ptr [r14 + 8], 0
+0x0285: mov qword ptr [r14 + 0x10], 0
+0x028d: mov qword ptr [r14 + 0x18], 0
+0x0295: mov qword ptr [r14 + 0x20], 0        ; z0 = 0 (return offset)
+0x029d: mov qword ptr [r14 + 0x28], 0
+0x02a5: mov qword ptr [r14 + 0x30], 0
+0x02ad: mov qword ptr [r14 + 0x38], 0
+
+; --- RETURN: MemoryGrow builtin call (second invocation) ---
+; Check high limbs of return offset (must be zero)
+0x02b5: mov rcx, 0
+0x02bc: or rcx, qword ptr [r14 + 8]
+0x02c0: or rcx, qword ptr [r14 + 0x10]
+0x02c4: or rcx, qword ptr [r14 + 0x18]
+0x02c8: test rcx, rcx
+0x02cb: jne 0x442
+; If length == 0, skip memory growth
+0x02d1: mov rbx, qword ptr [r14]             ; rbx = length (= 32)
+0x02d4: test rbx, rbx
+0x02d7: je 0x309
+; Check high limbs of length
+0x02d9: mov rcx, 0
+0x02e0: or rcx, qword ptr [r14 + 0x28]
+0x02e4: or rcx, qword ptr [r14 + 0x30]
+0x02e8: or rcx, qword ptr [r14 + 0x38]
+0x02ec: test rcx, rcx
+0x02ef: jne 0x442
+; Compute required size: offset + length
+0x02f5: mov rcx, qword ptr [r14 + 0x20]      ; rcx = offset (= 0)
+0x02f9: add rbx, rcx                         ; rbx = offset + length (= 32)
+0x02fc: nop dword ptr [rax]
+0x0300: cmp rbx, rcx
+0x0303: jb 0x442                             ; overflow check
+; Compute page count (same logic as MSTORE path)
+0x0309: mov rax, 0x20
+0x0310: mov rsi, 0xffffffffffffffff
+0x0317: shl rsi, 5
+0x031b: nop dword ptr [rax + rax]
+0x0320: cmp rsi, rbx
+0x0323: jb 0x32f
+0x0325: add rbx, 0x1f
+0x0329: shr rbx, 5
+0x032d: jmp 0x339
+0x032f: movabs rbx, 0x800000000000000
+0x0339: test rbx, rbx
+0x033c: je 0x34a
+0x033e: mul rbx
+0x0341: jb 0x442
+0x0347: mov rbx, rax
+0x034a: mov rdi, rbx
+; Compute gas cost
+0x034d: test rbx, rbx
+0x0350: je 0x3ea
+0x0356: movabs rcx, 0x1fffffffe0
+0x0360: cmp rcx, rbx
+0x0363: jb 0x3d9
+0x0365: mov rcx, 0xffffffffffffffff
+0x036c: shl rcx, 5
+0x0370: cmp rcx, rbx
+0x0373: jb 0x37f
+0x0375: add rbx, 0x1f
+0x0379: shr rbx, 5
+0x037d: jmp 0x389
+0x037f: movabs rbx, 0x800000000000000
+0x0389: mov rcx, rbx
+0x038c: shl rbx, 5
+0x0390: mov rsi, qword ptr [r13 + 0x18]
+0x0394: cmp rsi, rbx
+0x0397: jae 0x3ea
+0x0399: mov rax, rcx
+0x039c: mul rax
+0x039f: mov rbx, rax
+0x03a2: mov rsi, 3
+0x03a9: mov rax, rcx
+0x03ac: mul rsi
+0x03af: mov rcx, rax
+0x03b2: mov rax, rbx
+0x03b5: mov rbx, 0x200
+0x03bc: mov rdx, 0
+0x03c3: div rbx
+0x03c6: add rcx, rax
+0x03c9: mov rax, rcx
+0x03cc: mov rsi, qword ptr [r13 + 0x20]
+0x03d0: sub rcx, rsi
+0x03d3: mov qword ptr [r13 + 0x20], rax
+0x03d7: jmp 0x3f1
+0x03d9: mov byte ptr [r13 + 0xe0], 0xc       ; out-of-gas
+0x03e1: mov qword ptr [r13 + 0x28], 8
+0x03e9: ret
+0x03ea: mov rcx, 0
+; Deduct gas and invoke MemoryGrow builtin
+0x03f1: mov rsi, qword ptr [r13 + 0x70]
+0x03f5: cmp rsi, rcx
+0x03f8: jb 0x453
+0x03fa: sub rsi, rcx
+0x03fd: mov qword ptr [r13 + 0x70], rsi
+0x0401: mov qword ptr [r13 + 0x108], rdi
+0x0408: mov dword ptr [r13 + 0xe4], 0        ; builtin func index = 0 (MemoryGrow)
+0x0413: lea r8, [rip + 0x18]
+0x041a: mov qword ptr [r13 + 0xf0], r8
+0x0421: mov byte ptr [r13 + 0xe0], 5         ; status = call builtin
+0x0429: mov qword ptr [r13 + 0x28], 8
+0x0431: ret
+
+; --- Resume after MemoryGrow (RETURN): restore R14/R15 ---
+0x0432: mov r14, qword ptr [r13 + 0x38]
+0x0436: add r14, qword ptr [r13 + 0x30]
+0x043a: mov r15, qword ptr [r13 + 0x10]
+0x043e: nop
+0x0440: jmp 0x464
+
+; --- Error exits (RETURN path) ---
+0x0442: mov byte ptr [r13 + 0xe0], 0xd       ; invalid memory access
+0x044a: mov qword ptr [r13 + 0x28], 8
+0x0452: ret
+0x0453: mov byte ptr [r13 + 0xe0], 0xc       ; out-of-gas
+0x045b: mov qword ptr [r13 + 0x28], 8
+0x0463: ret
+
+; --- RETURN: set status RETURNED, emit return offset/length via sp ---
+0x0464: mov byte ptr [r13 + 0xe0], 0         ; status = 0 (RETURNED)
+0x046c: mov qword ptr [r13 + 0x28], 8        ; sp = 8 (2 items: offset+length on stack)
+0x0474: ret
+
+; --- STOP path (unreachable in this program) ---
+0x0475: mov byte ptr [r13 + 0xe0], 2         ; status = 2 (STOPPED)
+0x047d: mov qword ptr [r13 + 0x28], 0
+0x0485: ret

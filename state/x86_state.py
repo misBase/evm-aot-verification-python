@@ -3,7 +3,7 @@ x86-64 内存和寄存器状态建模。
 """
 
 from typing import Dict, Optional, TYPE_CHECKING
-from z3 import BitVec, BitVecVal, Array, BitVecSort, Select, Store
+from z3 import BitVec, BitVecVal, Array, BitVecSort, K, Select, Store
 
 if TYPE_CHECKING:
     from x86_64.models import Register
@@ -24,8 +24,9 @@ class X86MemoryState:
             memory_array: 可选的现有Memory数组
         """
         # Memory : Array[BitVec[64], BitVec[8]] - 偏移量是64位，值是8位（字节）
+        # x86 内存在未写入前默认为 0。
         if memory_array is None:
-            self.Memory = Array('X86Memory', BitVecSort(64), BitVecSort(8))
+            self.Memory = K(BitVecSort(64), BitVecVal(0, 8))
         else:
             self.Memory = memory_array
 

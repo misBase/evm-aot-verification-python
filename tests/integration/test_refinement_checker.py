@@ -265,6 +265,45 @@ def test_verify_add_program_pair_full():
     )
 
 
+def test_verify_mstore_return_program_pair():
+    """验证 mstore_return.json 与 mstore_return.hex 的 return 结果一致性。
+
+    EVM IR 程序：PUSH 9, PUSH 0, MSTORE, PUSH 32, PUSH 0, RETURN
+    将值 9 写入 memory[0:32]，然后返回 memory[0:32]（值 9 的 256 位表示）。
+    所有值为具体常量，无符号输入。
+
+    RefinementChecker 验证三项属性：
+    1. Return 条件一致（双方都 return）
+    2. Return 长度一致（都是 32 字节）
+    3. Return 区域的内存内容一致
+    """
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "mstore_return.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "mstore_return.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=60000000, verbose=True)
+    initial_state = SMTState.create_initial_state()
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+    )
+
+    assert verified, (
+        f"mstore_return program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent return results. Error: {msg}"
+    )
+
+
 @pytest.mark.skip(reason="Not impl well")
 def test_verify_muti_block_program_pair_full():
     """使用 muti_block.json 与 muti_block.hex 进行全量程序等价验证。"""

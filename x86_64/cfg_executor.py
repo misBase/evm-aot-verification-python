@@ -676,7 +676,7 @@ class X86SymbolicExecutor:
                 )
             # 如果只是解析失败，目标块设为 None（后续处理会跳过该分支）
         
-        target_block = self.blocks_by_addr.get(target_addr) if target_addr else None
+        target_block = self.blocks_by_addr.get(target_addr) if target_addr is not None else None
 
         mnemonic = insn.mnemonic.lower()
 
@@ -889,9 +889,7 @@ class X86SymbolicExecutor:
             stack_pointer值（如果是常量），否则None
         """
         from utils.z3_helpers import get_bv_const_value
-        r13 = mstate.x86_registers.get_register(Register.R13)
-        sp_offset = BitVecVal(self.aot_profile.offsets["stack_pointer"], 64)
-        sp_bv = mstate.x86_memory.load_64bit(r13 + sp_offset)
+        sp_bv = mstate.callengine_stack_pointer_limbs
         return get_bv_const_value(simplify(sp_bv))
 
     def _get_or_create_go_host_node_for_ret(self, ret_block_addr: int) -> int:
@@ -908,9 +906,7 @@ class X86SymbolicExecutor:
 
     def _load_exit_return_address(self, mstate: SMTState):
         """读取 callEngine.exitContext.returnAddress（64-bit）。"""
-        r13_value = mstate.x86_registers.get_register(Register.R13)
-        ret_addr_offset = BitVecVal(self.aot_profile.offsets["return_address"], 64)
-        return mstate.x86_memory.load_64bit(r13_value + ret_addr_offset)
+        return mstate.callengine_return_address
 
     def _handle_ret_with_go_bridge(self, global_state: X86GlobalState, mstate: SMTState,
                                    block: X86Block, insn: X86Instruction) -> List[X86GlobalState]:

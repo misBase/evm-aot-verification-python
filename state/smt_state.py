@@ -34,11 +34,18 @@ class SMTState:
     """
 
     CALLENGINE_SIDE_CHANNEL_FIELDS = (
+        "callengine_memory_base",
+        "callengine_memory_size_bytes",
+        "callengine_memory_gas_used",
         "callengine_stack_pointer_limbs",
         "callengine_stack_byte_offset",
+        "callengine_stack_base",
+        "callengine_gas_remaining",
         "callengine_status_code",
         "callengine_builtin_func_index",
         "callengine_go_func_index",
+        "callengine_return_address",
+        "callengine_builtin_arg0",
     )
 
     def __init__(self):
@@ -64,11 +71,18 @@ class SMTState:
         # 同时保留对 x86_memory 的写入（side-channel 是冗余快路径）。
         # 目的：让栈一致性检查、状态码检查直接读 BitVec 字段，
         # 避免 Z3 穿透 100+ 层 Memory Store 链做 array 理论推理。
+        self.callengine_memory_base:         BitVec = BitVecVal(0, 64)   # [R13+0x10]
+        self.callengine_memory_size_bytes:   BitVec = BitVecVal(0, 64)   # [R13+0x18]
+        self.callengine_memory_gas_used:     BitVec = BitVecVal(0, 64)   # [R13+0x20]
         self.callengine_stack_pointer_limbs: BitVec = BitVecVal(0, 64)   # [R13+0x28]
         self.callengine_stack_byte_offset:   BitVec = BitVecVal(0, 64)   # [R13+0x30]
+        self.callengine_stack_base:          BitVec = BitVecVal(0, 64)   # [R13+0x38]
+        self.callengine_gas_remaining:       BitVec = BitVecVal(0, 64)   # [R13+0x70]
         self.callengine_status_code:         BitVec = BitVecVal(0, 8)    # [R13+0xE0]
         self.callengine_builtin_func_index:  BitVec = BitVecVal(0, 32)   # [R13+0xE4]
         self.callengine_go_func_index:       BitVec = BitVecVal(0, 32)   # [R13+0xE8]
+        self.callengine_return_address:      BitVec = BitVecVal(0, 64)   # [R13+0xF0]
+        self.callengine_builtin_arg0:        BitVec = BitVecVal(0, 64)   # [R13+0x108]
 
         # PC（程序计数器）
         self.pc: int = 0
@@ -214,11 +228,22 @@ class SMTState:
 
         # 写入 callEngine 字段（相对于 R13 的偏移）：
         # [R13+0x10] = memoryElement0Address -> R15
+        # [R13+0x18] = current memory size（bytes，初始为 0）
+        # [R13+0x20] = accumulated memory gas cost（初始为 0）
         # [R13+0x28] = stackPointer（limb 数 delta，初始为 0）
         # [R13+0x30] = stackPointer 字节偏移（add r14, [r13+0x30]，初始为 0）
         # [R13+0x38] = stackElement0Address -> R14 基址
         # [R13+0x70] = gas，固定为足够大的具体值，确保 gas 检查走 success path
+        initial_state.callengine_memory_base = r15
+        initial_state.callengine_memory_size_bytes = BitVecVal(0, 64)
+        initial_state.callengine_memory_gas_used = BitVecVal(0, 64)
+        initial_state.callengine_stack_pointer_limbs = BitVecVal(0, 64)
+        initial_state.callengine_stack_byte_offset = BitVecVal(0, 64)
+        initial_state.callengine_stack_base = r14
+        initial_state.callengine_gas_remaining = BitVecVal(1000000000, 64)
         initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x10, 64), r15)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x18, 64), BitVecVal(0, 64))
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x20, 64), BitVecVal(0, 64))
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
             r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64),
             BitVecVal(0, 64)

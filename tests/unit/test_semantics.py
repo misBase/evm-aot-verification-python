@@ -22,6 +22,17 @@ def test_basic_imports():
     pass
 
 
+def test_evm_memory_default_zero_initialized():
+    """测试 EVM 内存默认是全 0，且 MSize 初始为 0。"""
+    mem = EVMMemoryState()
+
+    solver = Solver()
+    solver.add(mem.get_byte(BitVecVal(0, 64)) == BitVecVal(0, 8))
+    solver.add(mem.get_byte(BitVecVal(123, 64)) == BitVecVal(0, 8))
+    solver.add(mem.MSize == BitVecVal(0, 64))
+    assert solver.check() == sat
+
+
 def test_add_semantics():
     """测试EVM和x86-64的ADD语义。"""
     # 测试EVM ADD语义
