@@ -44,7 +44,7 @@ from state.smt_state import SMTState
 X86_ADD_CORE_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
 X86_ADD_CORE_BASE_ADDR = 0x6c
 
-# ADD程序片段，AOT编译器输出，用于程序级等价性测试  对应 data/add_ir.json
+# ADD程序片段，AOT编译器输出，用于程序级等价性测试  对应 data/add_raw.json
 # prologue：从 callEngine(R13) 恢复 R14/R15
 #   mov r14, [r13+0x38]   ; 加载 stackBase
 #   add r14, [r13+0x30]   ; stackBase += stackPointer offset → R14 指向当前栈顶
@@ -58,7 +58,7 @@ X86_ADD_CORE_BASE_ADDR = 0x6c
 X86_ADD_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed841c685e00000000249c74528fcffffffc3"
 X86_ADD_BASE_ADDR = 0x0
 
-# 完整的ADD程序序列，包含PUSH        对应 data/example_ir.json
+# 完整的ADD程序序列，包含PUSH        对应 data/add_with_push.json
 # 包括初始化、错误处理和ADD操作
 X86_ADD_FULL_HEX_SEQUENCE = "4d8b75384d0375304d8b7d10498b45704883f80672214883e80649894570498b45304883f80072204883f841732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c348c7c0600000004883c01048c7c1000000004883d10048c7c2000000004883d20048c7c3000000004883d30049890649894e084989561049895e1841c685e00000000249c7452804000000c3"
 X86_ADD_FULL_BASE_ADDR = 0x0
@@ -190,13 +190,13 @@ def test_verify_add_program_pair():
     类似于main.py中的验证工作流。
     
     此测试使用：
-    - add_ir.json: 包含ADD操作的EVM IR JSON文件
+    - add_raw.json: 包含ADD操作的EVM IR JSON文件
     - X86_ADD_HEX_SEQUENCE: ADD操作的x86-64机器码
     - ProgramEquivalenceChecker: 程序级验证器
     """
     # 获取测试数据目录路径
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "..", "data", "add_ir.json")
+    ir_path = os.path.join(test_dir, "..", "data", "add_raw.json")
     
     # 从JSON加载EVM程序
     compiler_result = load_ir_from_json(ir_path)
@@ -222,19 +222,19 @@ def test_verify_add_program_pair():
 
 
 def test_verify_add_program_pair_full():
-    """使用add_program.json和完整x86十六进制序列测试程序级验证。
-    
-    此测试验证从add_program.json加载的EVM程序（包含TAG、ADD、BLOCKEND、STOP操作）
+    """add_with_push.json和完整x86十六进制序列测试程序级验证。
+
+    add_with_push.json加载的EVM程序（包含TAG、PUSH、PUSH、ADD、STOP操作）
     与包含控制流、错误处理和ADD操作的完整x86-64程序序列之间的等价性。
-    
+
     此测试使用：
-    - add_program.json: 包含TAG、ADD、BLOCKEND、STOP操作的EVM IR JSON文件
+    - add_with_push.json: 包含TAG、PUSH、PUSH、ADD、STOP操作的EVM IR JSON文件
     - X86_ADD_FULL_HEX_SEQUENCE: 包含控制流的完整x86-64机器码
     - ProgramEquivalenceChecker: 程序级验证器
     """
     # 获取测试数据目录路径
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "..", "data", "example_ir.json")
+    ir_path = os.path.join(test_dir, "..", "data", "add_with_push.json")
     
     # 从JSON加载EVM程序
     compiler_result = load_ir_from_json(ir_path)

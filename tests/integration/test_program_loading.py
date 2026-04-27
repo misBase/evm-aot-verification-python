@@ -18,7 +18,7 @@ def test_evm_program_from_json():
     """测试从JSON创建EVM程序。"""
     # 获取测试IR文件路径
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "..", "data", "example_ir.json")
+    ir_path = os.path.join(test_dir, "..", "data", "add_with_push.json")
     
     # 加载并创建程序
     compiler_result = load_ir_from_json(ir_path)
@@ -48,7 +48,7 @@ def test_evm_program_contains_add_operation():
     """
     # 获取测试IR文件路径
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "..", "data", "example_ir.json")
+    ir_path = os.path.join(test_dir, "..", "data", "add_with_push.json")
     
     # 加载EVM程序
     compiler_result = load_ir_from_json(ir_path)

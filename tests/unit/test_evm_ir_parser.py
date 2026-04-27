@@ -10,7 +10,7 @@ def test_json_parsing():
     """测试从JSON文件解析EVM IR。"""
     # 获取示例IR文件的路径
     test_dir = os.path.dirname(__file__)
-    ir_file = os.path.join(test_dir, "..", "data", "example_ir.json")
+    ir_file = os.path.join(test_dir, "..", "data", "add_with_push.json")
     
     # 从JSON加载IR
     ir_result = load_ir_from_json(ir_file)
