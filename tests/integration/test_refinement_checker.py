@@ -304,6 +304,42 @@ def test_verify_mstore_return_program_pair():
     )
 
 
+def test_verify_sstore_load_program_pair():
+    """验证 sstore_load.json 与 sstore_load.hex 的 storage 和栈结果一致性。
+
+    EVM IR 程序：PUSH 199, PUSH 10, SSTORE, PUSH 10, SLOAD, STOP
+    将值 199 写入 storage[10]，再从 storage[10] 读回并保留在栈顶。
+
+    RefinementChecker 验证 storage 等可观察状态一致，并额外检查 1 个栈元素。
+    """
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "sstore_load.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "sstore_load.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=600000, verbose=True)
+    initial_state = SMTState.create_initial_state()
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=1,
+        stack_check_timeout_ms=600000,
+    )
+
+    assert verified, (
+        f"sstore_load program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent storage and stack results. Error: {msg}"
+    )
+
+
 @pytest.mark.skip(reason="Not impl well")
 def test_verify_muti_block_program_pair_full():
     """使用 muti_block.json 与 muti_block.hex 进行全量程序等价验证。"""
