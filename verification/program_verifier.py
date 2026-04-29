@@ -72,8 +72,8 @@ class ProgramEquivalenceChecker:
 
         if self.verbose:
             from z3 import BitVecVal, simplify
-            evm_has_return = simplify(evm_state.return_length != BitVecVal(0, 64))
-            print(f"    ├─ EVM has return: {evm_has_return}")
+            evm_has_return_data = simplify(evm_state.return_length != BitVecVal(0, 64))
+            print(f"    ├─ EVM has non-empty return data: {evm_has_return_data}")
             # 估算公式复杂度
             formula_size = self._estimate_formula_size(evm_result)
             print(f"    ├─ Formula size: ~{formula_size} expressions")
@@ -90,8 +90,8 @@ class ProgramEquivalenceChecker:
         x86_build_time = time.time() - x86_start
 
         if self.verbose:
-            x86_has_return = simplify(x86_state.return_length != BitVecVal(0, 64))
-            print(f"    ├─ x86 has return: {x86_has_return}")
+            x86_has_return_data = simplify(x86_state.return_length != BitVecVal(0, 64))
+            print(f"    ├─ x86 has non-empty return data: {x86_has_return_data}")
             print(f"    ├─ Shared host call-site mappings: {len(call_site_mapping)}")
             # 估算公式复杂度
             formula_size = self._estimate_formula_size(x86_result)
@@ -164,7 +164,7 @@ class ProgramEquivalenceChecker:
 
     def _estimate_formula_size(self, result: dict) -> str:
         """估算公式大小（表达式数量）。"""
-        count = sum(1 for key in ('offset', 'length', 'has_return') if key in result)
+        count = sum(1 for key in ('offset', 'length', 'has_return_data') if key in result)
         if 'memory' in result:
             count += 20
         return f"{count}"

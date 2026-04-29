@@ -441,7 +441,7 @@ class TestEVMProgramIntegration:
         assert 'offset' in result
         assert 'length' in result
         assert 'memory' in result
-        assert 'has_return' in result
+        assert 'has_return_data' in result
 
     def test_evm_program_with_bfs_strategy(self):
         """测试 EVMProgram 使用 BFS 策略。"""

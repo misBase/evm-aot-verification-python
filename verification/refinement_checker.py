@@ -5,7 +5,7 @@
 """
 
 import time
-from z3 import BitVec, BitVecVal, SolverFor, Distinct, unsat, sat, set_option, Select, And, ForAll
+from z3 import BitVecVal, Select, SolverFor, sat, set_option, unsat
 from typing import TYPE_CHECKING, Tuple, Optional
 
 from state.smt_state import MemoryDomain
@@ -73,7 +73,7 @@ class RefinementChecker:
           ∀ inputs. x86_output(inputs) = evm_output(inputs)
 
         Args:
-            evm_result: 包含 offset, length, memory, base_addr, has_return, storage, transient_storage 的字典
+            evm_result: 包含 offset, length, memory, base_addr, has_return_data, storage, transient_storage 的字典
             x86_result: 同上格式的字典
 
         Returns:
@@ -86,61 +86,66 @@ class RefinementChecker:
     
     def _check_refinement_direct_memory(self, evm_result: dict, x86_result: dict,
                                         deadline: Optional[float] = None) -> Tuple[bool, Optional[str]]:
-        """通过直接比较内存内容检查精化关系。
+        """通过直接比较 return data 内容检查精化关系。
 
-        这是优化的方法：不是将所有字节提取到Array中，
-        而是使用量词直接比较内存内容：
+        当前抽象只比较“是否暴露非空 return data”以及对应的字节内容，
+        不区分 RETURN、REVERT、STOP 等 halt 语义。
+
+        这里通过搜索“存在一个范围内字节不同的反例”，等价地验证：
           ForAll i. (0 <= i < length) =>
             EVM_memory[evm_offset + i] == x86_memory[x86_base_addr + x86_offset + i]
 
         Args:
             evm_result: 包含以下键的字典：
-                - 'offset': EVM内存中的64位BitVec偏移量（0 = 无返回）
-                - 'length': 64位BitVec长度（0 = 无返回）
+                - 'offset': EVM内存中的64位BitVec偏移量
+                - 'length': 64位BitVec长度（0 表示当前抽象下不暴露非空 return data）
                 - 'memory': Array[BitVec[64], BitVec[8]] - EVM内存
                 - 'base_addr': None（EVM使用直接偏移量，None表示直接寻址）
-                - 'has_return': BitVec条件（length != 0）
+                - 'has_return_data': Z3 BoolRef（由 length != 0 构造）
             x86_result: 包含以下键的字典：
-                - 'offset': 64位BitVec偏移量（0 = 无返回）
-                - 'length': 64位BitVec长度（0 = 无返回）
+                - 'offset': 64位BitVec偏移量
+                - 'length': 64位BitVec长度（0 表示当前抽象下不暴露非空 return data）
                 - 'memory': Array[BitVec[64], BitVec[8]] - x86内存
                 - 'base_addr': 64位BitVec（R15寄存器值，EVM内存基址指针）
-                - 'has_return': BitVec条件（length != 0）
+                - 'has_return_data': Z3 BoolRef（由 length != 0 构造）
+
+        注意：
+            x86_64/semantics.py 中的 status_code_has_return_data 是 status-derived；
+            这里读取的 has_return_data 是对外结果层的 length-derived 条件。
 
         Returns:
             (verified, message)，如果精化关系成立则verified为True
         """
-        from z3 import ForAll, Implies, And, ULT, UGE, BitVec, Select, BitVecVal, sat, unsat
+        from z3 import And, ULT, UGE, BitVec, Select, BitVecVal, sat, unsat
 
         evm_offset = evm_result['offset']
         evm_length = evm_result['length']
         evm_memory = evm_result['memory']
-        evm_has_return = evm_result.get('has_return', evm_length != BitVecVal(0, 64))
+        evm_has_return_data = evm_result.get('has_return_data', evm_length != BitVecVal(0, 64))
 
         x86_offset = x86_result['offset']
         x86_length = x86_result['length']
         x86_memory = x86_result['memory']
         x86_base_addr = x86_result['base_addr']
-        x86_has_return = x86_result.get('has_return', x86_length != BitVecVal(0, 64))
+        x86_has_return_data = x86_result.get('has_return_data', x86_length != BitVecVal(0, 64))
 
-        # 第一次检查：返回条件必须等价
-        # EVM返回当且仅当x86返回
+        # 第一次检查：非空 return data 条件必须等价
         if not self._reset_solver_with_budget(deadline):
             msg = self._timeout_message()
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
-        self.solver.add(evm_has_return != x86_has_return)
+        self.solver.add(evm_has_return_data != x86_has_return_data)
 
         start_time = time.time()
         result = self.solver.check()
         solve_time = time.time() - start_time
 
         if self.verbose:
-            print(f"    ├─ Return condition check: {solve_time:.3f}s, result={result}")
+            print(f"    ├─ Non-empty return-data condition check: {solve_time:.3f}s, result={result}")
 
         if result == sat:
-            msg = "✗ COUNTEREXAMPLE: Return conditions differ (one returns, the other doesn't)"
+            msg = "✗ COUNTEREXAMPLE: Non-empty return-data conditions differ"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
@@ -150,14 +155,14 @@ class RefinementChecker:
                 print(f"    └─ {msg}")
             return False, msg
 
-        # 第二次检查：如果两者都返回（或都不返回），长度必须相等
+        # 第二次检查：如果两者都有非空 return data，长度必须相等
         if not self._reset_solver_with_budget(deadline):
             msg = self._timeout_message()
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
-        self.solver.add(evm_has_return)  # 假设两者都返回
-        self.solver.add(x86_has_return)
+        self.solver.add(evm_has_return_data)  # 假设两者都有非空 return data
+        self.solver.add(x86_has_return_data)
         self.solver.add(evm_length != x86_length)
 
         start_time = time.time()
@@ -168,7 +173,7 @@ class RefinementChecker:
             print(f"    ├─ Length equality check: {solve_time:.3f}s, result={result}")
 
         if result == sat:
-            msg = "✗ COUNTEREXAMPLE: Return lengths differ"
+            msg = "✗ COUNTEREXAMPLE: Non-empty return-data lengths differ"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
@@ -178,8 +183,8 @@ class RefinementChecker:
                 print(f"    └─ {msg}")
             return False, msg
 
-        # 第三次检查：如果长度相等且两者都返回，内存内容必须相等
-        # 我们想检查：ForAll i. (0 <= i < length) =>
+        # 第三次检查：如果长度相等且两者都有非空 return data，内容必须相等
+        # 我们想等价地验证：ForAll i. (0 <= i < length) =>
         #   EVM_memory[evm_offset + i] == x86_memory[x86_base_addr + x86_offset + i]
         #
         # 我们检查否定：Exists i. (0 <= i < length) AND
@@ -191,8 +196,8 @@ class RefinementChecker:
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
-        self.solver.add(evm_has_return)  # 两者都返回
-        self.solver.add(x86_has_return)
+        self.solver.add(evm_has_return_data)  # 两者都有非空 return data
+        self.solver.add(x86_has_return_data)
         self.solver.add(evm_length == x86_length)  # 长度相等
 
         # 创建符号索引变量
@@ -257,7 +262,7 @@ class RefinementChecker:
             if not verified:
                 return False, msg
 
-        msg = "✓ VERIFIED: x86 refines EVM (return conditions, lengths, memory contents, storage, and transient storage are equivalent for all inputs)"
+        msg = "✓ VERIFIED: x86 refines EVM (non-empty return-data conditions, lengths, memory contents, storage, and transient storage are equivalent for all inputs)"
         if self.verbose:
             print(f"    └─ {msg}")
         return True, msg

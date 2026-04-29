@@ -15,7 +15,7 @@ class _DummyEVMProgram:
             'length': BitVecVal(0, 64),
             'memory': state.evm_memory.Memory,
             'base_addr': None,
-            'has_return': BoolVal(False),
+            'has_return_data': BoolVal(False),
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
         }
@@ -28,7 +28,7 @@ class _DummyX86Program:
             'length': BitVecVal(0, 64),
             'memory': state.x86_memory.evm_mem,
             'base_addr': BitVecVal(0, 64),
-            'has_return': BoolVal(False),
+            'has_return_data': BoolVal(False),
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
         }

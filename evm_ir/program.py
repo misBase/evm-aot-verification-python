@@ -79,7 +79,7 @@ class EVMProgram:
         Returns:
             (final_state, result_dict)元组，其中：
             - final_state: 程序执行后的最终SMT状态（从所有路径合并）
-            - result_dict: 包含合并返回值的字典（offset, length, memory, has_return）
+            - result_dict: 包含合并返回值的字典（offset, length, memory, has_return_data）
         """
         # 创建符号执行引擎
         executor = SymbolicExecutor(
@@ -99,7 +99,7 @@ class EVMProgram:
                 'length': BitVecVal(0, 64),
                 'memory': state.evm_memory.Memory,
                 'base_addr': None,
-                'has_return': BoolVal(False),
+                'has_return_data': BoolVal(False),
                 'storage': state.evm_storage.Storage,
                 'transient_storage': state.evm_transient_storage.TransientStorage,
             }
@@ -110,14 +110,14 @@ class EVMProgram:
         merged_state = self._merge_global_states(final_global_states)
 
         # 提取结果
-        has_return = merged_state.return_length != BitVecVal(0, 64)
+        has_return_data = merged_state.return_length != BitVecVal(0, 64)
 
         result = {
             'offset': merged_state.return_offset,
             'length': merged_state.return_length,
             'memory': merged_state.evm_memory.Memory,
             'base_addr': None,
-            'has_return': has_return,
+            'has_return_data': has_return_data,
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
         }

@@ -162,7 +162,7 @@ class X86Program:
         Returns:
             (final_state, result_dict)元组，其中：
             - final_state: 程序执行后的最终SMT状态（从所有路径合并）
-            - result_dict: 包含合并返回值的字典（offset, length, memory, base_addr, has_return）
+            - result_dict: 包含合并返回值的字典（offset, length, memory, base_addr, has_return_data）
         """
         # 获取要执行的指令
         instructions_to_execute = self._get_instructions()
@@ -203,16 +203,18 @@ class X86Program:
 
         # 提取结果
         r15_value = merged_state.x86_registers.get_register(Register.R15)
-        has_return = merged_state.return_length != BitVecVal(0, 64)
+        has_return_data = merged_state.return_length != BitVecVal(0, 64)
 
         # 注意：result['memory'] 是 EVM 256-bit memory Array（R15 域）。
         # callEngine 与 stack 域只在内部合并；refinement_checker 比对 return data 时只读 evm_mem。
+        # 注意：这里的 has_return_data 是 length-derived（length != 0），
+        # 与 x86_64/semantics.py 中 status-derived 的 status_code_has_return_data 不同。
         result = {
             'offset': merged_state.return_offset,
             'length': merged_state.return_length,
             'memory': merged_state.x86_memory.evm_mem,
             'base_addr': r15_value,
-            'has_return': has_return,
+            'has_return_data': has_return_data,
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
         }
@@ -247,7 +249,7 @@ class X86Program:
             'length': BitVecVal(0, 64),
             'memory': state.x86_memory.evm_mem,
             'base_addr': r15_value,
-            'has_return': BoolVal(False),
+            'has_return_data': BoolVal(False),
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
         }
@@ -382,14 +384,14 @@ class X86Program:
         # 提取结果
         from z3 import BitVecVal
         r15_value = state.x86_registers.get_register(Register.R15)
-        has_return = state.return_length != BitVecVal(0, 64)
+        has_return_data = state.return_length != BitVecVal(0, 64)
         
         result = {
             'offset': state.return_offset,
             'length': state.return_length,
             'memory': state.x86_memory.evm_mem,
             'base_addr': r15_value,
-            'has_return': has_return,
+            'has_return_data': has_return_data,
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
         }

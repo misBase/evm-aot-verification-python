@@ -1106,7 +1106,7 @@ def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, 
     Returns:
         (merged_state, result_dict)元组，其中：
         - merged_state: 包含所有3条路径合并结果的状态
-        - result_dict: 包含合并返回值的字典（offset, length, memory, has_return）
+        - result_dict: 包含合并返回值的字典（offset, length, memory, has_return_data）
     """
     from z3 import IntVal
     
@@ -1128,13 +1128,13 @@ def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, 
     path3_condition = And(sp >= min_depth_int, sp <= max_depth_int)
     
     # 执行路径1：SP < min_depth -> 错误路径
-    # 错误路径返回错误状态码（无返回数据）
+    # 错误路径返回错误状态码（当前抽象下不暴露非空 return data）
     from z3 import BitVecVal
     path1_state = state.copy()
     path1_state.return_offset = BitVecVal(0, 64)
     path1_state.return_length = BitVecVal(0, 64)
-    # 注意：在实际实现中，我们可能会设置特定的错误状态码
-    # 目前，我们使用0表示无返回（错误）
+    # 注意：在实际实现中，我们可能会设置特定的错误状态码。
+    # 当前抽象只保留“是否暴露非空 return data”这一外部可观察效果。
     
     # 执行路径2：SP > max_depth -> 错误路径
     path2_state = state.copy()
@@ -1196,14 +1196,14 @@ def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, 
     
     # 构建结果字典
     from z3 import BitVecVal
-    has_return = merged_state.return_length != BitVecVal(0, 64)
+    has_return_data = merged_state.return_length != BitVecVal(0, 64)
     
     result = {
         'offset': merged_state.return_offset,
         'length': merged_state.return_length,
         'memory': merged_state.evm_memory.Memory,
         'base_addr': None,  # EVM内存使用直接偏移量
-        'has_return': has_return
+        'has_return_data': has_return_data
     }
     
     return merged_state, result

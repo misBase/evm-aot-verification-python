@@ -75,13 +75,13 @@ class SMTState:
         self.x86_memory = X86MemoryState()
         self.x86_registers = X86RegisterState()
 
-        # RETURN指令跟踪
+        # RETURN/REVERT 数据跟踪
         # 存储偏移量和长度而不是提取Array
         # 这允许直接内存比较，没有max_bytes限制
-        # 使用条件符号值：0表示无返回值
+        # 当前抽象下，0 长度表示“不暴露非空 return data”
         from z3 import BitVecVal
-        self.return_offset: BitVec = BitVecVal(0, 64)  # 返回偏移量（64位），0 = 无返回
-        self.return_length: BitVec = BitVecVal(0, 64)  # 返回长度（64位），0 = 无返回
+        self.return_offset: BitVec = BitVecVal(0, 64)  # 返回偏移量（64位）
+        self.return_length: BitVec = BitVecVal(0, 64)  # 返回长度（64位），0 表示当前抽象下不暴露非空 return data
 
         # callEngine 字段的显式 side-channel。
         # x86 指令执行器识别到 mov [r13+KNOWN_OFFSET], ... 时同步更新这些字段，
