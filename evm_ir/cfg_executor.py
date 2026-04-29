@@ -43,6 +43,9 @@ class SymbolicExecutor:
             max_depth: 最大执行深度
             use_reachability_check: 是否使用可达性检查
         """
+        # todo: max_depth > max_iteration * blocks in loop body
+        #       max_depth only used in test, will be deleted
+
         self.blocks = blocks
         self.blocks_by_pc: Dict[int, EVMBlock] = {block.pc: block for block in blocks}
         self.max_depth = max_depth
@@ -50,6 +53,9 @@ class SymbolicExecutor:
 
         # 创建动态 CFG
         self.cfg = DynamicCFG(blocks)
+
+        self.static_loop_headers = self._pre_analyze_static_loop_headers()
+        self.max_iteration = 500 
 
         # work_list：待执行的全局状态列表
         self.work_list: List[GlobalState] = []
@@ -165,13 +171,15 @@ class SymbolicExecutor:
             node=entry_node
         )
         initial_global_state.depth = 0
-
+        for headers in self.static_loop_headers:
+            initial_global_state.loop_time[headers] = 0
+        
         # 添加到 work_list
         self.work_list.append(initial_global_state)
 
         # 主执行循环
         for global_state in self.strategy:
-            # 【预留】循环检测调用点（TODO: 实现检测逻辑）
+            # 循环检测调用
             self._detect_and_handle_loops(global_state)
 
             # 执行单个状态
@@ -315,7 +323,7 @@ class SymbolicExecutor:
             _, ctrl_op = self._find_control_flow_op(ops)
         if ctrl_op is None:
             from utils.exceptions import LogicError
-            raise LogicError(f"Block at pc={block.pc} has no JUMP control flow operation")
+            raise LogicError("missing_ctrl_op", f"Block at pc={block.pc} has no JUMP control flow operation")
         last_op = ctrl_op
 
         # 首先检查是否有 immediate（静态跳转）
@@ -324,8 +332,8 @@ class SymbolicExecutor:
             target_block = self.blocks_by_pc.get(target_pc)
             if target_block is None:
                 raise LogicError(
-                    f"Static JUMP at pc={last_op.pc} targets pc={target_pc}, "
-                    f"but target block not found"
+                    "missing_jump_target",
+                    f"Static JUMP at pc={last_op.pc} targets pc={target_pc}, but target block not found"
                 )
             target_node = self.cfg.get_or_create_node(target_pc)
             new_state = GlobalState(
@@ -334,6 +342,8 @@ class SymbolicExecutor:
                 node=target_node
             )
             new_state.depth = global_state.depth + 1
+            new_state.loop_time = global_state.loop_time.copy()
+
             # 静态跳转是无条件的
             from .cfg_structures import EdgeType
             new_state.edge_type_hint = EdgeType.UNCONDITIONAL
@@ -371,8 +381,8 @@ class SymbolicExecutor:
             target_block = self.blocks_by_pc.get(target_pc)
             if target_block is None:
                 raise LogicError(
-                    f"Resolved JUMP at pc={last_op.pc} targets pc={target_pc}, "
-                    f"but target block not found"
+                    "missing_jump_target",
+                    f"Resolved JUMP at pc={last_op.pc} targets pc={target_pc}, but target block not found"
                 )
 
             target_node = self.cfg.get_or_create_node(target_pc)
@@ -390,7 +400,7 @@ class SymbolicExecutor:
                 node=target_node
             )
             jump_state.depth = global_state.depth + 1
-            
+            jump_state.loop_time = global_state.loop_time.copy()
             # 设置边类型提示
             if is_if_expression:
                 # 从 If 表达式解析：第一个目标是 then 分支，第二个是 else 分支
@@ -430,7 +440,7 @@ class SymbolicExecutor:
             _, ctrl_op = self._find_control_flow_op(ops)
         if ctrl_op is None:
             from utils.exceptions import LogicError
-            raise LogicError(f"Block at pc={block.pc} has no JUMPI control flow operation")
+            raise LogicError("missing_ctrl_op", f"Block at pc={block.pc} has no JUMPI control flow operation")
         last_op = ctrl_op
 
         # 确定跳转条件
@@ -448,74 +458,25 @@ class SymbolicExecutor:
 
         # 处理跳转分支
         from .cfg_structures import EdgeType
-        
-        if last_op.immediate is not None and last_op.is_static:
-            # 静态跳转：使用 immediate 作为目标
-            target_pc = last_op.immediate
-            target_block = self.blocks_by_pc.get(target_pc)
-
-            if target_block is None:
-                raise LogicError(
-                    f"Static JUMPI at pc={last_op.pc} targets pc={target_pc}, "
-                    f"but target block not found"
-                )
-
-            target_node = self.cfg.get_or_create_node(target_pc)
-
-            # 深拷贝状态（JUMPI 分支必须深拷贝，参考 Mythril）
-            jump_world_state = copy.deepcopy(global_state.world_state)
-            jump_world_state.constraints.add(jump_condition)
-
-            jump_state = GlobalState(
-                mstate=mstate.copy(),
-                world_state=jump_world_state,
-                node=target_node
-            )
-            jump_state.depth = global_state.depth + 1
-            # 静态跳转目标，使用 CONDITIONAL_TRUE
-            jump_state.edge_type_hint = EdgeType.CONDITIONAL_TRUE
-            new_states.append(jump_state)
-        else:
-            # 尝试解析目标值
-            if target_value is None:
-                raise UnsupportedJumpError(
-                    "dynamic_jumpi",
-                    f"Dynamic JUMPI at pc={last_op.pc} has no target value",
-                    "Dynamic conditional jumps are not supported"
-                )
-
-            analysis = analyze_jump_target(target_value)
-
-            if not analysis.is_static:
-                raise UnsupportedJumpError(
-                    "dynamic_jumpi",
-                    f"Dynamic JUMPI at pc={last_op.pc} in block pc={block.pc}",
-                    "Dynamic conditional jumps are not supported"
-                )
-
-            # 判断目标是否来自 If 表达式
-            is_if_target = len(analysis.targets) > 1 or (
-                len(analysis.targets) == 1 and analysis.targets[0][1] is not None
-            )
-            
-            # 为每个解析出的目标创建跳转分支
-            for i, (target_pc, target_condition) in enumerate(analysis.targets):
+        from z3 import simplify,is_false
+        jump = simplify(jump_condition)
+        if not is_false(jump):
+            if last_op.immediate is not None and last_op.is_static:
+                # 静态跳转：使用 immediate 作为目标
+                target_pc = last_op.immediate
                 target_block = self.blocks_by_pc.get(target_pc)
+
                 if target_block is None:
                     raise LogicError(
-                        f"Resolved JUMPI at pc={last_op.pc} targets pc={target_pc}, "
-                        f"but target block not found"
+                        "missing_jump_target",
+                        f"Static JUMPI at pc={last_op.pc} targets pc={target_pc}, but target block not found"
                     )
 
                 target_node = self.cfg.get_or_create_node(target_pc)
 
-                # 组合条件：jump_condition AND target_condition（如果有）
-                combined_jump_condition = jump_condition
-                if target_condition is not None:
-                    combined_jump_condition = And(jump_condition, target_condition)
-
+                # 深拷贝状态（JUMPI 分支必须深拷贝，参考 Mythril）
                 jump_world_state = copy.deepcopy(global_state.world_state)
-                jump_world_state.constraints.add(combined_jump_condition)
+                jump_world_state.constraints.add(jump_condition)
 
                 jump_state = GlobalState(
                     mstate=mstate.copy(),
@@ -523,16 +484,68 @@ class SymbolicExecutor:
                     node=target_node
                 )
                 jump_state.depth = global_state.depth + 1
-                
-                # 设置边类型提示
-                if is_if_target:
-                    # 目标是 If 表达式，使用 IF_THEN/IF_ELSE
-                    jump_state.edge_type_hint = EdgeType.IF_THEN if i == 0 else EdgeType.IF_ELSE
-                else:
-                    # 目标是常量，使用 CONDITIONAL_TRUE
-                    jump_state.edge_type_hint = EdgeType.CONDITIONAL_TRUE
-                
+                jump_state.loop_time = global_state.loop_time.copy()
+                # 静态跳转目标，使用 CONDITIONAL_TRUE
+                jump_state.edge_type_hint = EdgeType.CONDITIONAL_TRUE
                 new_states.append(jump_state)
+            else:
+                # 尝试解析目标值
+                if target_value is None:
+                    raise UnsupportedJumpError(
+                        "dynamic_jumpi",
+                        f"Dynamic JUMPI at pc={last_op.pc} has no target value",
+                        "Dynamic conditional jumps are not supported"
+                    )
+
+                analysis = analyze_jump_target(target_value)
+
+                if not analysis.is_static:
+                    raise UnsupportedJumpError(
+                        "dynamic_jumpi",
+                        f"Dynamic JUMPI at pc={last_op.pc} in block pc={block.pc}",
+                        "Dynamic conditional jumps are not supported"
+                    )
+
+                # 判断目标是否来自 If 表达式
+                is_if_target = len(analysis.targets) > 1 or (
+                    len(analysis.targets) == 1 and analysis.targets[0][1] is not None
+                )
+                
+                # 为每个解析出的目标创建跳转分支
+                for i, (target_pc, target_condition) in enumerate(analysis.targets):
+                    target_block = self.blocks_by_pc.get(target_pc)
+                    if target_block is None:
+                        raise LogicError(
+                            "missing_jump_target",
+                            f"Resolved JUMPI at pc={last_op.pc} targets pc={target_pc}, but target block not found"
+                        )
+
+                    target_node = self.cfg.get_or_create_node(target_pc)
+
+                    # 组合条件：jump_condition AND target_condition（如果有）
+                    combined_jump_condition = jump_condition
+                    if target_condition is not None:
+                        combined_jump_condition = And(jump_condition, target_condition)
+
+                    jump_world_state = copy.deepcopy(global_state.world_state)
+                    jump_world_state.constraints.add(combined_jump_condition)
+
+                    jump_state = GlobalState(
+                        mstate=mstate.copy(),
+                        world_state=jump_world_state,
+                        node=target_node
+                    )
+                    jump_state.depth = global_state.depth + 1
+                    jump_state.loop_time = global_state.loop_time.copy()
+                    # 设置边类型提示
+                    if is_if_target:
+                        # 目标是 If 表达式，使用 IF_THEN/IF_ELSE
+                        jump_state.edge_type_hint = EdgeType.IF_THEN if i == 0 else EdgeType.IF_ELSE
+                    else:
+                        # 目标是常量，使用 CONDITIONAL_TRUE
+                        jump_state.edge_type_hint = EdgeType.CONDITIONAL_TRUE
+                    
+                    new_states.append(jump_state)
 
         # 分支 2：顺序执行（fallthrough）
         current_idx = self.blocks.index(block) # TODO: make it more efficient
@@ -550,6 +563,7 @@ class SymbolicExecutor:
                 node=fallthrough_node
             )
             fallthrough_state.depth = global_state.depth + 1
+            fallthrough_state.loop_time = global_state.loop_time.copy()
             # Fallthrough 始终使用 CONDITIONAL_FALSE
             fallthrough_state.edge_type_hint = EdgeType.CONDITIONAL_FALSE
             new_states.append(fallthrough_state)
@@ -587,7 +601,7 @@ class SymbolicExecutor:
             node=next_node
         )
         new_state.depth = global_state.depth + 1
-
+        new_state.loop_time = global_state.loop_time.copy()
         return [new_state]
 
     def _find_control_flow_op(self, ops: List['EvmOperator']) -> Tuple[Optional[int], Optional['EvmOperator']]:
@@ -621,6 +635,45 @@ class SymbolicExecutor:
         _, ctrl_op = self._find_control_flow_op(ops)
         return ctrl_op
 
+    def _pre_analyze_static_loop_headers(self) -> set:
+        """全局拓扑预分析，通过静态 DFS 找出所有的循环头 (Back-edge 目标)。"""
+        adjacency_list = {}
+        for i, block in enumerate(self.blocks):
+            targets = []
+            ops = [op for op in block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
+            ctrl_idx, ctrl_op = self._find_control_flow_op(ops)
+
+            if ctrl_op is None:
+                if i + 1 < len(self.blocks):
+                    targets.append(self.blocks[i+1].pc)
+            else:
+                kind = ctrl_op.kind.upper()
+                if kind in ("JUMP", "JUMPI") and ctrl_op.is_static and ctrl_op.immediate is not None:
+                    targets.append(ctrl_op.immediate)
+                if kind == "JUMPI":
+                    if i + 1 < len(self.blocks):
+                        targets.append(self.blocks[i+1].pc)
+
+            adjacency_list[block.pc] = targets
+
+        loop_headers = set()
+        visited_state = {}
+
+        def dfs(pc):
+            visited_state[pc] = 1
+            for target_pc in adjacency_list.get(pc, []):
+                state = visited_state.get(target_pc, 0)
+                if state == 0:
+                    dfs(target_pc)
+                elif state == 1:
+                    loop_headers.add(target_pc)
+            visited_state[pc] = 2
+
+        if self.blocks:
+            dfs(self.blocks[0].pc)
+
+        return loop_headers
+
     def _is_terminal_state(self, global_state: GlobalState) -> bool:
         """检查是否是终止状态。
 
@@ -643,39 +696,22 @@ class SymbolicExecutor:
     def _detect_and_handle_loops(self, global_state: GlobalState) -> None:
         """检测当前状态是否形成循环，并根据类型分类处理。
 
-        TODO: 实现循环检测逻辑
-        - PC 重复检测
-        - 循环分类（静态/动态/无界）
-        - 静态有界循环展开
-        - 其他循环类型抛出 UnsupportedLoopError
-
         Args:
             global_state: 当前全局状态
 
         Raises:
             UnsupportedLoopError: 检测到不支持的循环类型时抛出
         """
-        # TODO: 实现循环检测
-        pass
-
-    def _classify_loop(self, loop_pc: int, path_context: Dict) -> str:
-        """判断循环类型。
-
-        TODO: 实现循环分类逻辑
-        - 静态有界：检查循环条件是否为常量比较
-        - 动态有界：条件与符号变量比较
-        - 无界：无法确定循环边界
-
-        Args:
-            loop_pc: 循环头的 PC
-            path_context: 执行路径上下文信息
-
-        Returns:
-            "static_bounded" | "dynamic_bounded" | "unbounded"
-        """
-        # TODO: 实现循环分类
-        return "dynamic_bounded"  # 默认返回
-
+        from utils.exceptions import UnsupportedLoopError
+        node = global_state.node
+        if node is None:
+            return
+        current_pc = node.pc
+        if current_pc in self.static_loop_headers:
+            global_state.loop_time[current_pc] = global_state.loop_time[current_pc] + 1
+            if global_state.loop_time[current_pc] > self.max_iteration:
+                raise UnsupportedLoopError("overflow", f"Loop at {current_pc}")
+        return
 
 def build_dynamic_cfg(blocks: List[EVMBlock],
                       initial_state: SMTState,

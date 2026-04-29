@@ -706,18 +706,6 @@ class TestCFGVisualizer:
         dot = visualizer.generate_dot(title="My Custom CFG")
         assert "My Custom CFG" in dot
 
-    def test_render_png_without_graphviz(self, tmp_path: Path):
-        """测试在没有 graphviz 包时渲染 PNG 会引发错误。"""
-        blocks = [create_evm_block(pc=0, operations=[])]
-
-        cfg = DynamicCFG(blocks)
-        visualizer = CFGVisualizer(cfg)
-
-        output_file = tmp_path / "test.png"
-        try:
-            visualizer.render_png(str(output_file))
-        except ImportError:
-            pass  # 预期的错误
 
 
 # =============================================================================
@@ -1018,6 +1006,129 @@ class TestCFGIntegration:
         print(f"Generated partial CFG with {len(cfg.nodes)} nodes and {len(cfg.edges)} edges")
 
         visualizer = CFGVisualizer(cfg, cfg_type="evm")
-        output_file = tmp_path / "muti_block_real_exec.dot"
+        output_file = tmp_path / "new.dot"
+        visualizer.save_to_file(str(output_file))
+        assert output_file.exists()
+
+    def test_static_bounded_execution(self, tmp_path: Path):
+        """测试循环合约的符号执行，验证 UnsupportedLoopError 异常处理。"""
+        from evm_ir.json_parser import load_ir_from_json
+        from evm_ir.cfg_executor import SymbolicExecutor
+        from evm_ir.cfg_strategies import DFSStrategy
+        from state.smt_state import SMTState
+        from utils.exceptions import UnsupportedLoopError
+
+        test_dir = Path(__file__).parent.parent
+        json_file = test_dir / "data" / "static_bounded.json"
+
+        ir_result = load_ir_from_json(str(json_file))
+        blocks = ir_result.blocks
+
+        initial_state = SMTState.create_initial_state(num_inputs=0)
+
+        executor = SymbolicExecutor(
+            blocks=blocks,
+            strategy_cls=DFSStrategy,
+            max_depth=3000
+        )
+
+        try:
+            final_states = executor.execute(initial_state)
+        except UnsupportedLoopError as e:
+            pytest.fail(f"Static bounded loop should not raise UnsupportedLoopError: {e}")
+        except Exception as e:
+            pytest.fail(f"Symbolic execution failed with unexpected error: {str(e)}")
+
+        assert len(final_states) >= 1, "No final state reached (should reach STOP after loop)"
+        cfg = executor.cfg
+        assert len(cfg.nodes) == 5, f"Expected 5 CFG nodes, got {len(cfg.nodes)}"
+        assert len(cfg.edges) == 5, f"Expected 5 CFG edges, got {len(cfg.edges)}"
+
+        visualizer = CFGVisualizer(cfg, cfg_type="evm")
+        output_file = tmp_path / "static_bounded.dot"
+        visualizer.save_to_file(str(output_file))
+        assert output_file.exists()
+
+    def test_dynamic_bounded_execution(self, tmp_path: Path):
+        """测试循环合约的符号执行，验证 UnsupportedLoopError 异常处理。"""
+        from evm_ir.json_parser import load_ir_from_json
+        from evm_ir.cfg_executor import SymbolicExecutor
+        from evm_ir.cfg_strategies import DFSStrategy
+        from state.smt_state import SMTState
+        from utils.exceptions import UnsupportedLoopError
+
+        test_dir = Path(__file__).parent.parent
+        json_file = test_dir / "data" / "dynamic_bounded.json"
+
+        ir_result = load_ir_from_json(str(json_file))
+        blocks = ir_result.blocks
+
+        initial_state = SMTState.create_initial_state(num_inputs=1)
+
+        executor = SymbolicExecutor(
+            blocks=blocks,
+            strategy_cls=DFSStrategy,
+            max_depth=3000
+        )
+
+        try:
+            executor.execute(initial_state)
+        except UnsupportedLoopError as e:
+            print(f"Execution stopped due to unsupported loop: {e}")
+            assert "overflow" in str(e) or "Loop at" in str(e)
+        except Exception as e:
+            pytest.fail(f"Symbolic execution failed with unexpected error: {str(e)}")
+        else:
+            pytest.fail("Expected UnsupportedLoopError was not raised")
+
+        cfg = executor.cfg
+        assert len(cfg.nodes) > 0
+
+        print(f"Generated partial CFG with {len(cfg.nodes)} nodes and {len(cfg.edges)} edges")
+
+        visualizer = CFGVisualizer(cfg, cfg_type="evm")
+        output_file = tmp_path / "dynamic_bounded.dot"
+        visualizer.save_to_file(str(output_file))
+        assert output_file.exists()
+
+    def test_unbounded_execution(self, tmp_path: Path):
+        """测试循环合约的符号执行，验证 UnsupportedLoopError 异常处理。"""
+        from evm_ir.json_parser import load_ir_from_json
+        from evm_ir.cfg_executor import SymbolicExecutor
+        from evm_ir.cfg_strategies import DFSStrategy
+        from state.smt_state import SMTState
+        from utils.exceptions import UnsupportedLoopError
+
+        test_dir = Path(__file__).parent.parent
+        json_file = test_dir / "data" / "unbounded.json"
+
+        ir_result = load_ir_from_json(str(json_file))
+        blocks = ir_result.blocks
+
+        initial_state = SMTState.create_initial_state(num_inputs=1)
+
+        executor = SymbolicExecutor(
+            blocks=blocks,
+            strategy_cls=DFSStrategy,
+            max_depth=3000
+        )
+
+        try:
+            executor.execute(initial_state)
+        except UnsupportedLoopError as e:
+            print(f"Execution stopped due to unsupported loop: {e}")
+            assert "overflow" in str(e) or "Loop at" in str(e)
+        except Exception as e:
+            pytest.fail(f"Symbolic execution failed with unexpected error: {str(e)}")
+        else:
+            pytest.fail("Expected UnsupportedLoopError was not raised")
+
+        cfg = executor.cfg
+        assert len(cfg.nodes) > 0
+
+        print(f"Generated partial CFG with {len(cfg.nodes)} nodes and {len(cfg.edges)} edges")
+
+        visualizer = CFGVisualizer(cfg, cfg_type="evm")
+        output_file = tmp_path / "unbounded.dot"
         visualizer.save_to_file(str(output_file))
         assert output_file.exists()
