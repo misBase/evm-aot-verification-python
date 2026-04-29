@@ -340,6 +340,105 @@ def test_verify_sstore_load_program_pair():
     )
 
 
+def test_verify_two_block_program_pair():
+    """验证 two_block.json 与 two_block.hex 的两块控制流 return 结果一致性。
+
+    EVM IR 程序先写入 memory[100]，再通过静态目标 JUMPI 跳到返回块，
+    返回 memory[100:132] 的 32 字节结果。
+    """
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "two_block.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "two_block.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=600000, verbose=True)
+    initial_state = SMTState.create_initial_state()
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+    )
+
+    assert verified, (
+        f"two_block program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent return results. Error: {msg}"
+    )
+
+
+def test_verify_three_block_program_pair():
+    """验证 three_block.json 与 three_block.hex 的三块控制流 return 结果一致性。
+
+    EVM IR 程序先写入 memory[0x40] 和 memory[0x41]，再通过静态目标 JUMPI
+    跳到第三个返回块，返回 memory[0x41:0x42] 的 1 字节结果。
+    """
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "three_block.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "three_block.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=600000, verbose=True)
+    initial_state = SMTState.create_initial_state()
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+    )
+
+    assert verified, (
+        f"three_block program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent return results. Error: {msg}"
+    )
+
+
+def test_jumpi_2block_block_program_pair():
+    """验证 jumpi_2block.json 与 jumpi_2block.hex 的 JUMPI return 结果一致性。
+
+    EVM IR 程序根据 calldata 首字节决定静态 JUMPI 是否跳转，
+    分别返回 memory[0x40:0x41] 或 memory[0x41:0x42] 的 1 字节结果。
+    """
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "jumpi_2block.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "jumpi_2block.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=600000, verbose=True)
+    initial_state = SMTState.create_initial_state()
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+    )
+
+    assert verified, (
+        f"jumpi_2block program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent return results. Error: {msg}"
+    )
+
+
 @pytest.mark.skip(reason="Not impl well")
 def test_verify_muti_block_program_pair_full():
     """使用 muti_block.json 与 muti_block.hex 进行全量程序等价验证。"""

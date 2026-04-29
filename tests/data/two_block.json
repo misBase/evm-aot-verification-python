@@ -1,7 +1,6 @@
 {
   "control_frames": [
     {
-      "is_inner_block": false,
       "is_jump_target": false,
       "is_stop": false,
       "max_depth": 1022,
@@ -61,7 +60,6 @@
       "static_gas": 31
     },
     {
-      "is_inner_block": false,
       "is_jump_target": true,
       "is_stop": true,
       "max_depth": 1022,
