@@ -7,7 +7,7 @@ GoFunctionSemantics 单元测试。
 import pytest
 from z3 import BitVecVal, Solver, sat, unsat, simplify
 
-from state.smt_state import SMTState, EVMStorageState
+from state.smt_state import SMTState, EVMStorageState, MemoryDomain, PointerTag
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 from x86_64.go_function_semantics import GoFunctionSemantics, GoFunctionSemanticsError, StackAlignmentError, LIMBS_PER_UINT256
 from x86_64.models import Register
@@ -52,7 +52,7 @@ def _make_state_with_stack(values, sp_start=0):
         stack_index = depth - 1 - push_index
         addr_offset = -((stack_index + 1) * STACK_ELEMENT_SIZE)
         base_offset = BitVecVal(R14_BASE + addr_offset, 64)
-        state.x86_memory = state.x86_memory.store_256bit(base_offset, BitVecVal(val, 256))
+        state.x86_memory = state.x86_memory.store_256bit(base_offset, BitVecVal(val, 256), domain=MemoryDomain.STACK)
 
     return state, sp_start
 
@@ -160,7 +160,7 @@ class TestSloadSstore:
         # Read the result from the top of x86 memory stack
         result_sp = sp - LIMBS_PER_UINT256
         result_addr = _compute_stack_addr(R14_BASE, result_sp)
-        result = state.x86_memory.load_256bit(BitVecVal(result_addr, 64))
+        result = state.x86_memory.load_256bit(BitVecVal(result_addr, 64), domain=MemoryDomain.STACK)
 
         solver = Solver()
         solver.add(result == BitVecVal(data_val, 256))
@@ -184,7 +184,7 @@ class TestSloadSstore:
         # SLOAD: push key to stack - use memory_mapping address formula
         key_addr = _compute_stack_addr(R14_BASE, new_sp)
         state.x86_memory = state.x86_memory.store_256bit(
-            BitVecVal(key_addr, 64), BitVecVal(key_val, 256)
+            BitVecVal(key_addr, 64), BitVecVal(key_val, 256), domain=MemoryDomain.STACK,
         )
         sload_sp = new_sp + LIMBS_PER_UINT256
 
@@ -193,7 +193,7 @@ class TestSloadSstore:
         # 按当前 block 的栈窗口地址规则读取 SLOAD 压回的结果
         result_sp = sload_sp - LIMBS_PER_UINT256
         result_addr = _compute_stack_addr(R14_BASE, result_sp)
-        result = state.x86_memory.load_256bit(BitVecVal(result_addr, 64))
+        result = state.x86_memory.load_256bit(BitVecVal(result_addr, 64), domain=MemoryDomain.STACK)
 
         solver = Solver()
         solver.add(result != BitVecVal(data_val, 256))
@@ -211,17 +211,18 @@ class TestCallFamilyEffects:
         # retSize, retOffset, argsSize, argsOffset, addr, gas
         state, sp = _make_state_with_stack([2, 0x40, 4, 0, 0x1234, 1000])
         state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
-        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
-        old_outside = state.x86_memory.load_byte(BitVecVal(0x3F, 64))
+        # staticCall 把返回数据写入 EVM 内存（R15+retOffset），所以读取也用 EVM 域
+        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64), domain=MemoryDomain.EVM)
+        old_outside = state.x86_memory.load_byte(BitVecVal(0x3F, 64), domain=MemoryDomain.EVM)
 
         state = sem.apply(4, 5, sp, state, evm_pc=0x20)
 
         solver_inside = Solver()
-        solver_inside.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
+        solver_inside.add(state.x86_memory.load_byte(BitVecVal(0x40, 64), domain=MemoryDomain.EVM) != old_inside)
         assert solver_inside.check() == sat
 
         solver_outside = Solver()
-        solver_outside.add(state.x86_memory.load_byte(BitVecVal(0x3F, 64)) != old_outside)
+        solver_outside.add(state.x86_memory.load_byte(BitVecVal(0x3F, 64), domain=MemoryDomain.EVM) != old_outside)
         assert solver_outside.check() == unsat
 
     def test_staticcall_same_args_different_pc_are_independent(self):
@@ -236,13 +237,62 @@ class TestCallFamilyEffects:
 
         result_sp1 = sp1 - 6 * LIMBS_PER_UINT256
         result_sp2 = sp2 - 6 * LIMBS_PER_UINT256
-        result1 = state1.x86_memory.load_256bit(BitVecVal(_compute_stack_addr(R14_BASE, result_sp1), 64))
-        result2 = state2.x86_memory.load_256bit(BitVecVal(_compute_stack_addr(R14_BASE, result_sp2), 64))
+        result1 = state1.x86_memory.load_256bit(
+            BitVecVal(_compute_stack_addr(R14_BASE, result_sp1), 64), domain=MemoryDomain.STACK,
+        )
+        result2 = state2.x86_memory.load_256bit(
+            BitVecVal(_compute_stack_addr(R14_BASE, result_sp2), 64), domain=MemoryDomain.STACK,
+        )
 
         solver = Solver()
         solver.add(result1 == BitVecVal(1, 256))
         solver.add(result2 == BitVecVal(0, 256))
         assert solver.check() == sat
+
+    def test_staticcall_updates_return_data_source_and_callengine_mirror(self):
+        profile = _make_profile_with_host({5: "staticCall"})
+        sem = GoFunctionSemantics(profile)
+
+        state, sp = _make_state_with_stack([2, 0x40, 4, 0, 0x1234, 1000])
+        state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+
+        state = sem.apply(4, 5, sp, state, evm_pc=0x21)
+
+        r13 = state.x86_registers.get_register(Register.R13)
+        ptr_from_mem = state.x86_memory.load_64bit(
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["return_data_pointer"], 64),
+            domain=MemoryDomain.CALLENGINE,
+        )
+        size_from_mem = state.x86_memory.load_64bit(
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["return_data_size"], 64),
+            domain=MemoryDomain.CALLENGINE,
+        )
+
+        solver = Solver()
+        solver.add(ptr_from_mem != state.callengine_return_data_pointer)
+        assert solver.check() == unsat
+
+        solver = Solver()
+        solver.add(size_from_mem != BitVecVal(2, 64))
+        assert solver.check() == unsat
+
+        first_byte = simplify(state.return_data[BitVecVal(0, 64)])
+        assert "evm_static_call_ret_byte_" in str(first_byte)
+
+    def test_apply_clears_caller_saved_pointer_tags(self):
+        profile = _make_profile_with_host({5: "staticCall"})
+        sem = GoFunctionSemantics(profile)
+
+        state, sp = _make_state_with_stack([2, 0x40, 4, 0, 0x1234, 1000])
+        state.x86_registers.set_pointer_tag(Register.RSI, PointerTag.CALLDATA_PTR)
+        state.x86_registers.set_pointer_tag(Register.RAX, PointerTag.CODE_PTR)
+        state.x86_registers.set_pointer_tag(Register.R12, PointerTag.RETURNDATA_PTR)
+
+        state = sem.apply(4, 5, sp, state, evm_pc=0x22)
+
+        assert state.x86_registers.get_pointer_tag(Register.RSI) == PointerTag.NONE
+        assert state.x86_registers.get_pointer_tag(Register.RAX) == PointerTag.NONE
+        assert state.x86_registers.get_pointer_tag(Register.R12) == PointerTag.RETURNDATA_PTR
 
 
 class TestExtCodeCopyEffects:
@@ -255,17 +305,18 @@ class TestExtCodeCopyEffects:
         # Stack bottom-to-top: size, offset, destOffset, addr
         state, sp = _make_state_with_stack([2, 0x10, 0x40, 0x1234])
         state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
-        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
-        old_outside = state.x86_memory.load_byte(BitVecVal(0x3F, 64))
+        # extCodeCopy 写入 EVM 内存（R15+destOffset）
+        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64), domain=MemoryDomain.EVM)
+        old_outside = state.x86_memory.load_byte(BitVecVal(0x3F, 64), domain=MemoryDomain.EVM)
 
         state = sem.apply(4, 14, sp, state, evm_pc=0x30)
 
         solver_inside = Solver()
-        solver_inside.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
+        solver_inside.add(state.x86_memory.load_byte(BitVecVal(0x40, 64), domain=MemoryDomain.EVM) != old_inside)
         assert solver_inside.check() == sat
 
         solver_outside = Solver()
-        solver_outside.add(state.x86_memory.load_byte(BitVecVal(0x3F, 64)) != old_outside)
+        solver_outside.add(state.x86_memory.load_byte(BitVecVal(0x3F, 64), domain=MemoryDomain.EVM) != old_outside)
         assert solver_outside.check() == unsat
 
     def test_extcodecopy_zero_size_leaves_x86_memory_unchanged(self):
@@ -274,12 +325,12 @@ class TestExtCodeCopyEffects:
 
         state, sp = _make_state_with_stack([0, 0x10, 0x40, 0x1234])
         state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
-        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64))
+        old_inside = state.x86_memory.load_byte(BitVecVal(0x40, 64), domain=MemoryDomain.EVM)
 
         state = sem.apply(4, 14, sp, state, evm_pc=0x30)
 
         solver = Solver()
-        solver.add(state.x86_memory.load_byte(BitVecVal(0x40, 64)) != old_inside)
+        solver.add(state.x86_memory.load_byte(BitVecVal(0x40, 64), domain=MemoryDomain.EVM) != old_inside)
         assert solver.check() == unsat
 
 
@@ -294,7 +345,7 @@ class TestBuiltinFunctions:
         """
         result_sp = original_sp - 2 * LIMBS_PER_UINT256
         result_addr = _compute_stack_addr(R14_BASE, result_sp)
-        return state.x86_memory.load_256bit(BitVecVal(result_addr, 64))
+        return state.x86_memory.load_256bit(BitVecVal(result_addr, 64), domain=MemoryDomain.STACK)
 
     def test_builtin_gas_cost(self):
         """GAS builtin: push remaining gas (uninterpreted function)."""
@@ -317,7 +368,7 @@ class TestBuiltinFunctions:
 
         # Verify result was pushed at correct position (at current sp)
         result_addr = _compute_stack_addr(R14_BASE, sp)
-        result = state.x86_memory.load_256bit(BitVecVal(result_addr, 64))
+        result = state.x86_memory.load_256bit(BitVecVal(result_addr, 64), domain=MemoryDomain.STACK)
 
         # Result should be a 256-bit BitVec (uninterpreted function result)
         assert result.size() == 256
@@ -592,16 +643,16 @@ class TestSha3Memory:
         profile = _make_profile_with_host({1: "sha3"})
         sem = GoFunctionSemantics(profile)
 
-        # Create state with x86_memory containing data at offset 0
+        # Create state with EVM memory containing data at offset 0
         state = SMTState()
         state.x86_registers.set_register(Register.R13, BitVecVal(R13_BASE, 64))
         state.x86_registers.set_register(Register.R14, BitVecVal(R14_BASE, 64))
+        state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
 
-        # Store data in x86_memory at offset 0 (32 bytes)
-        offset = BitVecVal(0, 256)
+        # SHA3 reads from EVM 256-bit memory (R15 域)
         data = BitVecVal(0xDEADBEEF, 256)
         state.x86_memory = state.x86_memory.store_256bit(
-            BitVecVal(R14_BASE, 64), data
+            BitVecVal(0, 64), data, domain=MemoryDomain.EVM,
         )
 
         # Push offset and length onto stack (length=32 bytes)
@@ -612,15 +663,14 @@ class TestSha3Memory:
         # Apply SHA3
         state = sem.apply(4, 1, sp, state)
 
-        # The sha3 function should be applied to x86_memory
-        # Verify by checking that sha3_func is called with x86_memory.Memory
-        sha3_func = Function('sha3', state.x86_memory.Memory.sort(),
+        # The sha3 function should be applied to evm_mem (R15 域)
+        sha3_func = Function('sha3', state.x86_memory.evm_mem.sort(),
                              BitVecSort(256), BitVecSort(256), BitVecSort(256))
-        expected_hash = sha3_func(state.x86_memory.Memory, BitVecVal(0, 256), BitVecVal(32, 256))
+        expected_hash = sha3_func(state.x86_memory.evm_mem, BitVecVal(0, 256), BitVecVal(32, 256))
 
-        # Result should be stored in x86_memory at sp position
+        # Result should be stored in stack memory (R14 域) at sp position
         result_addr = _compute_stack_addr(R14_BASE, sp - LIMBS_PER_UINT256)
-        result_bv = state.x86_memory.load_256bit(BitVecVal(result_addr, 64))
+        result_bv = state.x86_memory.load_256bit(BitVecVal(result_addr, 64), domain=MemoryDomain.STACK)
 
         solver = SolverFor("QF_AUFBV")
         solver.set("timeout", 5000)

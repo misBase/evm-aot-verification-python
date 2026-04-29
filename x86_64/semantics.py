@@ -5,13 +5,34 @@ x86-64指令语义建模。
 """
 
 import capstone
-from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem, Not, And, Or
+from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem, Not, And, Or, Select
 from typing import List, Dict, Optional, Any, Tuple
 from .models import X86Block, X86Instruction, Register
 from .aot_profile import GO_HPC_EVM_PROFILE
 from .disassembler import disassemble_hex, parse_operands
 from common.uint256 import Uint256
-from state.smt_state import SMTState
+from state.smt_state import SMTState, MemoryDomain, MemoryDomainError, PointerTag
+
+
+def _classify_domain(base_reg) -> Optional[MemoryDomain]:
+    """根据 base_reg 把内存访问路由到对应 Z3 Array。
+
+    Go AOT ABI 规定：
+    - R13 -> callEngine 结构体
+    - R14 -> EVM 栈窗口
+    - R15 -> EVM 256-bit memory
+
+    其它寄存器或 None（含 RIP-relative、绝对地址）返回 None；
+    `_load/_store_memory_by_size` 在 None 上会抛 MemoryDomainError。
+    """
+    if base_reg == Register.R13:
+        return MemoryDomain.CALLENGINE
+    if base_reg == Register.R14:
+        return MemoryDomain.STACK
+    if base_reg == Register.R15:
+        return MemoryDomain.EVM
+    return None
+
 
 # RETURN指令的常量
 EVM_NATIVE_CALL_STATUS_CODE_RETURNED = GO_HPC_EVM_PROFILE.status_codes["returned"]
@@ -35,11 +56,36 @@ _CALLENGINE_FIELD_MAP = {
     (CALLENGINE_STACK_POINTER_BYTE_OFFSET,                  8): "callengine_stack_byte_offset",
     (0x38,                                              8): "callengine_stack_base",
     (0x70,                                              8): "callengine_gas_remaining",
+    (GO_HPC_EVM_PROFILE.offsets["input_pointer"],           8): "callengine_input_pointer",
+    (GO_HPC_EVM_PROFILE.offsets["input_size"],              8): "callengine_input_size_bytes",
+    (GO_HPC_EVM_PROFILE.offsets["code_pointer"],            8): "callengine_code_pointer",
+    (GO_HPC_EVM_PROFILE.offsets["code_size"],               8): "callengine_code_size_bytes",
+    (GO_HPC_EVM_PROFILE.offsets["return_data_pointer"],     8): "callengine_return_data_pointer",
+    (GO_HPC_EVM_PROFILE.offsets["return_data_size"],        8): "callengine_return_data_size_bytes",
     (GO_HPC_EVM_PROFILE.offsets["status_code"],             1): "callengine_status_code",
     (GO_HPC_EVM_PROFILE.offsets["builtin_function_index"],  4): "callengine_builtin_func_index",
     (GO_HPC_EVM_PROFILE.offsets["go_function_index"],       4): "callengine_go_func_index",
     (GO_HPC_EVM_PROFILE.offsets["return_address"],      8): "callengine_return_address",
     (0x108,                                             8): "callengine_builtin_arg0",
+}
+
+_POINTER_TAG_BY_CALLENGINE_OFFSET = {
+    0x10: PointerTag.EVM_PTR,
+    0x38: PointerTag.STACK_PTR,
+    GO_HPC_EVM_PROFILE.offsets["input_pointer"]: PointerTag.CALLDATA_PTR,
+    GO_HPC_EVM_PROFILE.offsets["code_pointer"]: PointerTag.CODE_PTR,
+    GO_HPC_EVM_PROFILE.offsets["return_data_pointer"]: PointerTag.RETURNDATA_PTR,
+}
+
+_READONLY_SOURCE_ATTRS = {
+    PointerTag.CALLDATA_PTR: ("callengine_input_pointer", "calldata"),
+    PointerTag.CODE_PTR: ("callengine_code_pointer", "code"),
+    PointerTag.RETURNDATA_PTR: ("callengine_return_data_pointer", "return_data"),
+}
+
+_WRITABLE_DOMAIN_BY_POINTER_TAG = {
+    PointerTag.EVM_PTR: MemoryDomain.EVM,
+    PointerTag.STACK_PTR: MemoryDomain.STACK,
 }
 
 
@@ -119,11 +165,15 @@ class X86SemanticsModel:
         state.x86_registers.set_register(Register.R13, BitVecVal(0, 64))
         state.x86_registers.set_register(Register.R14, BitVecVal(0, 64))
         state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        # ALU 单测桩约定：未路由的访存（base_reg ∉ {R13,R14,R15}，例如 [rax]）
+        # 兜底到 stack 域，避免重写大量现有指令测试。
+        state.unrouted_memory_domain = MemoryDomain.STACK
 
         # 写入初始内存（Python int key 转为 BitVecVal(64) 以支持负偏移的补码地址）
+        # 测试桩约定：R13=R14=R15=0 时所有访存都按 STACK 域路由（被测指令必须用 [R14+offset] 形式）。
         for offset, val in initial_memory.items():
             addr = BitVecVal(offset, 64)
-            state.x86_memory = state.x86_memory.store_limb(addr, val)
+            state.x86_memory = state.x86_memory.store_limb(addr, val, domain=MemoryDomain.STACK)
 
         for insn in instructions:
             state = insn.to_z3(state)
@@ -307,7 +357,96 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     def _bool_to_bv1(cond):
         return If(cond, BitVecVal(1, 1), BitVecVal(0, 1))
 
-    def _effective_address() -> BitVec:
+    def _get_register_pointer_tag(reg) -> PointerTag:
+        if reg is None:
+            return PointerTag.NONE
+        return state.x86_registers.get_pointer_tag(reg)
+
+    def _set_register_pointer_tag(reg, size_bytes: Optional[int], tag: PointerTag) -> None:
+        if reg is None:
+            return
+        if size_bytes == 8 and tag != PointerTag.NONE:
+            state.x86_registers.set_pointer_tag(reg, tag)
+        else:
+            state.x86_registers.clear_pointer_tag(reg)
+
+    def _pointer_tag_for_callengine_pointer_load(size_bytes: Optional[int]) -> PointerTag:
+        if operands.get('base_reg') != Register.R13 or size_bytes != 8:
+            return PointerTag.NONE
+        if operands.get('index_reg') is not None:
+            return PointerTag.NONE
+        offset = operands.get('offset')
+        if not isinstance(offset, int):
+            return PointerTag.NONE
+        return _POINTER_TAG_BY_CALLENGINE_OFFSET.get(offset, PointerTag.NONE)
+
+    def _resolve_pointer_tag_from_regs(base_reg, index_reg) -> PointerTag:
+        base_tag = _get_register_pointer_tag(base_reg)
+        index_tag = _get_register_pointer_tag(index_reg)
+        tags = [tag for tag in (base_tag, index_tag) if tag != PointerTag.NONE]
+        if not tags:
+            return PointerTag.NONE
+        if all(tag == tags[0] for tag in tags):
+            return tags[0]
+        return PointerTag.NONE
+
+    def _resolve_mem_operand_pointer_tag() -> PointerTag:
+        return _resolve_pointer_tag_from_regs(operands.get('base_reg'), operands.get('index_reg'))
+
+    def _resolve_writable_domain_from_mem_operand() -> Optional[MemoryDomain]:
+        """为 domain=None 的内存操作解析可写域 provenance。
+
+        这里只接受显式白名单中的 writable tags；readonly tags 与未来新增 tags
+        默认都不参与 writable routing，因此 readonly/writable 输入集合天然互斥。
+
+        此 helper 依赖算术传播规则维护的一个不变式：有意义的 writable
+        provenance 在地址算术后至多单侧保留。若 base/index 同时带 writable
+        provenance，则视为歧义并拒绝路由。
+        """
+        writable_domains = []
+        for reg in (operands.get('base_reg'), operands.get('index_reg')):
+            tag = _get_register_pointer_tag(reg)
+            domain = _WRITABLE_DOMAIN_BY_POINTER_TAG.get(tag)
+            if domain is not None:
+                writable_domains.append(domain)
+        if len(writable_domains) == 1:
+            return writable_domains[0]
+        return None
+
+    def _load_bytes_from_array(byte_array, base_addr64, effective_addr64, size_bytes: int):
+        source_offset = effective_addr64 - base_addr64
+        # calldata/code/return_data 都按“低地址存低字节”的线性字节流建模；
+        # 这里按小端序把连续字节重新拼回 64-bit/32-bit/16-bit 读取结果。
+        bytes_list = [Select(byte_array, source_offset + BitVecVal(i, 64)) for i in range(size_bytes)]
+        if size_bytes == 1:
+            return ZeroExt(56, bytes_list[0])
+        if size_bytes == 2:
+            return ZeroExt(48, Concat(bytes_list[1], bytes_list[0]))
+        if size_bytes == 4:
+            return ZeroExt(32, Concat(bytes_list[3], bytes_list[2], bytes_list[1], bytes_list[0]))
+        return Concat(*reversed(bytes_list))
+
+    def _load_readonly_source_by_tag(tag: PointerTag, effective_addr64, size_bytes: Optional[int]):
+        if tag == PointerTag.NONE or size_bytes is None:
+            return None
+        source_attrs = _READONLY_SOURCE_ATTRS.get(tag)
+        if source_attrs is None:
+            return None
+        pointer_attr, array_attr = source_attrs
+        return _load_bytes_from_array(
+            getattr(state, array_attr),
+            getattr(state, pointer_attr),
+            effective_addr64,
+            size_bytes,
+        )
+
+    def _effective_address() -> Tuple[BitVec, Optional[MemoryDomain]]:
+        """计算 effective address 并按 base_reg 推导 domain。
+
+        domain=None 表示路由不出来（RIP-relative / 绝对地址 / 非 R13/R14/R15 base）。
+        LEA 路径忽略 domain；_load_memory_by_size / _store_memory_by_size 在 domain=None
+        时抛 MemoryDomainError。
+        """
         base_reg = operands.get('base_reg')
         offset = _to_bv64(operands.get('offset', 0))
         rip_relative = False
@@ -320,8 +459,13 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
         if rip_relative:
             addr = BitVecVal(insn.addr + insn.size, 64) + offset
+            domain: Optional[MemoryDomain] = None  # 仅 lea 用，此分支不会被 load/store 调用
+        elif base_reg is None:
+            addr = offset
+            domain = None
         else:
-            addr = offset if base_reg is None else state.x86_registers.get_register(base_reg) + offset
+            addr = state.x86_registers.get_register(base_reg) + offset
+            domain = _classify_domain(base_reg)
 
         index_reg = operands.get('index_reg')
         if index_reg is not None:
@@ -330,7 +474,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             if scale != 1:
                 index_val = index_val * BitVecVal(scale, 64)
             addr = addr + index_val
-        return addr
+        return addr, domain
 
     def _update_logic_flags(result64):
         state.x86_registers.set_flag('CF', BitVecVal(0, 1))
@@ -382,40 +526,81 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         state.x86_registers.set_flag('ZF', _bool_to_bv1(result64 == BitVecVal(0, 64)))
         state.x86_registers.set_flag('SF', Extract(63, 63, result64))
 
-    def _load_memory_by_size(addr64, size_bytes: Optional[int]):
+    def _require_domain(domain: Optional[MemoryDomain], size_bytes: Optional[int]) -> MemoryDomain:
+        if domain is not None:
+            return domain
+        # 测试桩 fallback：仅对显式声明 unrouted_memory_domain 的 SMTState 生效。
+        # 生产路径（create_initial_state 创建的 state）这一字段为 None，触发抛错。
+        fallback = getattr(state, "unrouted_memory_domain", None)
+        if fallback is not None:
+            return fallback
+        raise MemoryDomainError(
+            f"unrouted memory access (mnemonic={insn.mnemonic}, "
+            f"base_reg={operands.get('base_reg')}, size={size_bytes})",
+            base_reg=operands.get('base_reg'),
+            size_bytes=size_bytes,
+            disasm=str(insn),
+        )
+
+    def _load_memory_by_size(addr64, domain: Optional[MemoryDomain], size_bytes: Optional[int]):
+        # callEngine side-channel 优先（避开穿透 Array Store 链）
         callengine_value = _maybe_read_callengine_field(state, operands, size_bytes)
         if callengine_value is not None:
             return callengine_value
+        if domain is None:
+            readonly_tag = _resolve_mem_operand_pointer_tag()
+            readonly_value = _load_readonly_source_by_tag(readonly_tag, addr64, size_bytes)
+            if readonly_value is not None:
+                return readonly_value
+            # readonly tags 不在 writable whitelist 中，因此这里的顺序只是
+            # defense in depth，而不是 correctness dependency。
+            domain = _resolve_writable_domain_from_mem_operand()
+        d = _require_domain(domain, size_bytes)
         if size_bytes == 1:
-            return ZeroExt(56, state.x86_memory.load_byte(addr64))
+            return ZeroExt(56, state.x86_memory.load_byte(addr64, domain=d))
         if size_bytes == 2:
-            b0 = state.x86_memory.load_byte(addr64)
-            b1 = state.x86_memory.load_byte(addr64 + BitVecVal(1, 64))
+            b0 = state.x86_memory.load_byte(addr64, domain=d)
+            b1 = state.x86_memory.load_byte(addr64 + BitVecVal(1, 64), domain=d)
             return ZeroExt(48, Concat(b1, b0))
         if size_bytes == 4:
-            b0 = state.x86_memory.load_byte(addr64)
-            b1 = state.x86_memory.load_byte(addr64 + BitVecVal(1, 64))
-            b2 = state.x86_memory.load_byte(addr64 + BitVecVal(2, 64))
-            b3 = state.x86_memory.load_byte(addr64 + BitVecVal(3, 64))
+            b0 = state.x86_memory.load_byte(addr64, domain=d)
+            b1 = state.x86_memory.load_byte(addr64 + BitVecVal(1, 64), domain=d)
+            b2 = state.x86_memory.load_byte(addr64 + BitVecVal(2, 64), domain=d)
+            b3 = state.x86_memory.load_byte(addr64 + BitVecVal(3, 64), domain=d)
             return ZeroExt(32, Concat(b3, b2, b1, b0))
-        return state.x86_memory.load_limb(addr64)
+        return state.x86_memory.load_limb(addr64, domain=d)
 
-    def _store_memory_by_size(addr64, size_bytes: Optional[int], value64):
+    def _store_memory_by_size(addr64, domain: Optional[MemoryDomain],
+                              size_bytes: Optional[int], value64):
+        if domain is None:
+            readonly_tag = _resolve_mem_operand_pointer_tag()
+            if readonly_tag in _READONLY_SOURCE_ATTRS:
+                raise MemoryDomainError(
+                    f"cannot write through readonly source pointer (mnemonic={insn.mnemonic}, "
+                    f"tag={readonly_tag})",
+                    base_reg=operands.get('base_reg'),
+                    size_bytes=size_bytes,
+                    disasm=str(insn),
+                )
+            # readonly tags 不在 writable whitelist 中，因此这里的顺序只是
+            # defense in depth，而不是 correctness dependency。
+            domain = _resolve_writable_domain_from_mem_operand()
+        d = _require_domain(domain, size_bytes)
         if size_bytes == 1:
-            return state.x86_memory.store_byte(addr64, Extract(7, 0, value64))
+            return state.x86_memory.store_byte(addr64, Extract(7, 0, value64), domain=d)
         if size_bytes == 2:
             mem = state.x86_memory
-            mem = mem.store_byte(addr64, Extract(7, 0, value64))
-            mem = mem.store_byte(addr64 + BitVecVal(1, 64), Extract(15, 8, value64))
+            mem = mem.store_byte(addr64, Extract(7, 0, value64), domain=d)
+            mem = mem.store_byte(addr64 + BitVecVal(1, 64), Extract(15, 8, value64), domain=d)
             return mem
         if size_bytes == 4:
             mem = state.x86_memory
-            mem = mem.store_byte(addr64, Extract(7, 0, value64))
-            mem = mem.store_byte(addr64 + BitVecVal(1, 64), Extract(15, 8, value64))
-            mem = mem.store_byte(addr64 + BitVecVal(2, 64), Extract(23, 16, value64))
-            mem = mem.store_byte(addr64 + BitVecVal(3, 64), Extract(31, 24, value64))
+            mem = mem.store_byte(addr64, Extract(7, 0, value64), domain=d)
+            mem = mem.store_byte(addr64 + BitVecVal(1, 64), Extract(15, 8, value64), domain=d)
+            mem = mem.store_byte(addr64 + BitVecVal(2, 64), Extract(23, 16, value64), domain=d)
+            mem = mem.store_byte(addr64 + BitVecVal(3, 64), Extract(31, 24, value64), domain=d)
             return mem
-        return state.x86_memory.store_limb(addr64, value64)
+        return state.x86_memory.store_limb(addr64, value64, domain=d)
 
     def _read_register_by_size(reg, size_bytes: Optional[int]):
         value64 = state.x86_registers.get_register(reg)
@@ -551,6 +736,14 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         if cond is None:
             raise ValueError(f"Unsupported SETcc instruction: {setcc_mnemonic}")
         return cond
+
+    def _propagate_add_reg_reg_pointer_tag(dest_tag: PointerTag,
+                                           src_tag: PointerTag) -> PointerTag:
+        if dest_tag == PointerTag.NONE and src_tag != PointerTag.NONE:
+            return src_tag
+        if dest_tag != PointerTag.NONE and src_tag == PointerTag.NONE:
+            return dest_tag
+        return PointerTag.NONE
     
     if mnemonic == 'mov':
         # MOV：将值从源移动到目标
@@ -559,19 +752,24 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             dest_reg = operands['dest_reg']
             dest_size = operands.get('dest_size')
             memory_size = operands.get('memory_size')
-            memory_offset = _effective_address()
-            mem_val = _load_memory_by_size(memory_offset, memory_size)
+            memory_offset, memory_domain = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, memory_domain, memory_size)
             _write_register_by_size(dest_reg, mem_val, dest_size)
-        
+            _set_register_pointer_tag(
+                dest_reg,
+                dest_size,
+                _pointer_tag_for_callengine_pointer_load(memory_size),
+            )
+
         elif operands['is_memory'] and operands['src_reg']:
             # MOV [base+offset], reg
             src_reg = operands['src_reg']
             src_size = operands.get('src_size')
             memory_size = operands.get('memory_size')
-            memory_offset = _effective_address()
+            memory_offset, memory_domain = _effective_address()
 
             reg_val = _read_register_by_size(src_reg, src_size)
-            new_memory_state = _store_memory_by_size(memory_offset, memory_size, reg_val)
+            new_memory_state = _store_memory_by_size(memory_offset, memory_domain, memory_size, reg_val)
             state.x86_memory = new_memory_state
             _maybe_update_callengine_field(state, operands, memory_size, reg_val)
         
@@ -583,7 +781,13 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             src_size = operands.get('src_size')
             src_val = _read_register_by_size(src_reg, src_size)
             _write_register_by_size(dest_reg, src_val, dest_size)
-        
+            copied_tag = (
+                _get_register_pointer_tag(src_reg)
+                if dest_size == 8 and src_size == 8
+                else PointerTag.NONE
+            )
+            _set_register_pointer_tag(dest_reg, dest_size, copied_tag)
+
         elif operands['dest_reg'] and operands['immediate'] is not None:
             # MOV reg, immediate
             dest_reg = operands['dest_reg']
@@ -594,9 +798,9 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         elif operands['is_memory'] and operands['immediate'] is not None:
             # MOV [base+offset], immediate
             memory_size = operands.get('memory_size')
-            memory_offset = _effective_address()
+            memory_offset, memory_domain = _effective_address()
             imm_val = _imm_to_bv64(memory_size)
-            state.x86_memory = _store_memory_by_size(memory_offset, memory_size, imm_val)
+            state.x86_memory = _store_memory_by_size(memory_offset, memory_domain, memory_size, imm_val)
             _maybe_update_callengine_field(state, operands, memory_size, imm_val)
         
         return state
@@ -610,33 +814,37 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         dest_size = operands.get('dest_size')
 
         if operands['is_memory']:
-            src_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+            mem_addr, mem_domain = _effective_address()
+            src_val = _load_memory_by_size(mem_addr, mem_domain, operands.get('memory_size'))
         elif operands['src_reg']:
             src_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
         else:
             raise ValueError(f"Unsupported MOVZX operand combination: {operands}")
 
         _write_register_by_size(dest_reg, src_val, dest_size)
+        _set_register_pointer_tag(dest_reg, dest_size, PointerTag.NONE)
         return state
 
     elif mnemonic == 'lea':
         # LEA：只计算有效地址，不访问内存且不修改标志位
+        # LEA 不进 _load/_store_memory_by_size，因此忽略 domain（包括 RIP-relative 与非 R13/R14/R15 base）
         if not operands['dest_reg'] or not operands['is_memory']:
             raise ValueError(f"Unsupported LEA operand combination: {operands}")
 
         dest_reg = operands['dest_reg']
         dest_size = operands.get('dest_size')
-        effective_addr = _effective_address()
+        effective_addr, _domain = _effective_address()
         _write_register_by_size(dest_reg, effective_addr, dest_size)
+        _set_register_pointer_tag(dest_reg, dest_size, _resolve_mem_operand_pointer_tag())
         return state
     
     elif mnemonic == 'add':
         # ADD：将源加到目标，设置进位标志
         if operands['is_memory'] and not operands['dest_reg']:
             # ADD [base+offset], reg/imm
-            memory_offset = _effective_address()
+            memory_offset, memory_domain = _effective_address()
             memory_size = operands.get('memory_size')
-            lhs_val = _load_memory_by_size(memory_offset, memory_size)
+            lhs_val = _load_memory_by_size(memory_offset, memory_domain, memory_size)
 
             if operands['src_reg']:
                 rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
@@ -652,7 +860,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             result = Extract(63, 0, sum_ext)
             carry_out = Extract(64, 64, sum_ext)
 
-            state.x86_memory = _store_memory_by_size(memory_offset, memory_size, result)
+            state.x86_memory = _store_memory_by_size(memory_offset, memory_domain, memory_size, result)
             _update_add_like_flags(lhs_val, rhs_val, result, carry_out)
             _maybe_update_callengine_field(state, operands, memory_size, result)
             return state
@@ -663,11 +871,12 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         dest_reg = operands['dest_reg']
         dest_size = operands.get('dest_size')
         reg_val = _read_register_by_size(dest_reg, dest_size)
+        dest_tag = _get_register_pointer_tag(dest_reg)
         
         if operands['is_memory']:
             # ADD reg, [base+offset]
-            memory_offset = _effective_address()
-            mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
+            memory_offset, memory_domain = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, memory_domain, operands.get('memory_size'))
 
             # 执行加法（64位，带进位生成）
             reg_ext = Concat(BitVecVal(0, 1), reg_val)
@@ -680,6 +889,9 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
             # 更新寄存器和标志
             _write_register_by_size(dest_reg, result, dest_size)
+            # memory operand 的 tag 仅用于 routing，不表示读出来的值本身是指针；
+            # 这里保持现有行为，只保留 destination 自身的 provenance。
+            _set_register_pointer_tag(dest_reg, dest_size, dest_tag)
             _update_add_like_flags(reg_val, mem_val, result, carry_out)
         
         elif operands['src_reg']:
@@ -694,8 +906,11 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             
             result = Extract(63, 0, sum_ext)
             carry_out = Extract(64, 64, sum_ext)
-            
+
             _write_register_by_size(dest_reg, result, dest_size)
+            src_tag = _get_register_pointer_tag(src_reg)
+            result_tag = _propagate_add_reg_reg_pointer_tag(dest_tag, src_tag)
+            _set_register_pointer_tag(dest_reg, dest_size, result_tag)
             _update_add_like_flags(reg_val, src_val, result, carry_out)
 
         elif operands['immediate'] is not None:
@@ -709,6 +924,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             carry_out = Extract(64, 64, sum_ext)
 
             _write_register_by_size(dest_reg, result, dest_size)
+            _set_register_pointer_tag(dest_reg, dest_size, dest_tag)
             _update_add_like_flags(reg_val, imm_val, result, carry_out)
         
         return state
@@ -724,7 +940,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         carry_in = state.x86_registers.get_flag('CF')
 
         if operands['is_memory']:
-            rhs_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+            mem_addr, mem_domain = _effective_address()
+            rhs_val = _load_memory_by_size(mem_addr, mem_domain, operands.get('memory_size'))
         elif operands['src_reg']:
             rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
         elif operands['immediate'] is not None:
@@ -759,7 +976,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         carry_in = state.x86_registers.get_flag('CF')
 
         if operands['is_memory']:
-            rhs = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+            mem_addr, mem_domain = _effective_address()
+            rhs = _load_memory_by_size(mem_addr, mem_domain, operands.get('memory_size'))
         elif operands['src_reg']:
             rhs = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
         elif operands['immediate'] is not None:
@@ -780,9 +998,11 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         dest_reg = operands['dest_reg']
         dest_size = operands.get('dest_size')
         reg_val = _read_register_by_size(dest_reg, dest_size)
+        dest_tag = _get_register_pointer_tag(dest_reg)
 
         if operands['is_memory']:
-            rhs_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+            mem_addr, mem_domain = _effective_address()
+            rhs_val = _load_memory_by_size(mem_addr, mem_domain, operands.get('memory_size'))
         elif operands['src_reg']:
             rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
         elif operands['immediate'] is not None:
@@ -792,6 +1012,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
         result = reg_val - rhs_val
         _write_register_by_size(dest_reg, result, dest_size)
+        if operands['immediate'] is not None:
+            _set_register_pointer_tag(dest_reg, dest_size, dest_tag)
         _update_sub_like_flags(reg_val, rhs_val, result)
 
         return state
@@ -820,7 +1042,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         reg_val = _read_register_by_size(dest_reg, dest_size)
         
         if operands['is_memory']:
-            rhs_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+            mem_addr, mem_domain = _effective_address()
+            rhs_val = _load_memory_by_size(mem_addr, mem_domain, operands.get('memory_size'))
         elif operands['src_reg']:
             rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
         elif operands['immediate'] is not None:
@@ -844,7 +1067,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         elif operands['immediate'] is not None:
             rhs = _imm_to_bv64(operands.get('dest_size'))
         elif operands['is_memory']:
-            rhs = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+            mem_addr, mem_domain = _effective_address()
+            rhs = _load_memory_by_size(mem_addr, mem_domain, operands.get('memory_size'))
         else:
             raise ValueError(f"Unsupported TEST operand combination: {operands}")
 
@@ -887,8 +1111,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         stack1_base = r14_value + (sp_bv - BitVecVal(8, 64)) * limb_size
         # Go runtime 在这里消费的是 PopUint64()，只观察每个 256-bit 栈值的低 64-bit limb。
         # 直接读取 z0 可显著减轻 return 条件和 return data 公式的体积。
-        offset_bv = state.x86_memory.load_64bit(stack0_base)
-        length_bv = state.x86_memory.load_64bit(stack1_base)
+        offset_bv = state.x86_memory.load_64bit(stack0_base, domain=MemoryDomain.STACK)
+        length_bv = state.x86_memory.load_64bit(stack1_base, domain=MemoryDomain.STACK)
         
         # 对 return_offset / return_length 使用条件符号值：
         # - RETURNED / REVERTED：设置为栈中的 offset、size
@@ -912,7 +1136,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     elif mnemonic == 'mul':
         # MUL：无符号乘法（RDX:RAX = RAX * op）
         if operands['is_memory']:
-            op_val = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+            mem_addr, mem_domain = _effective_address()
+            op_val = _load_memory_by_size(mem_addr, mem_domain, operands.get('memory_size'))
         elif operands['dest_reg']:
             op_val = _read_register_by_size(operands['dest_reg'], operands.get('dest_size'))
         else:
@@ -936,7 +1161,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     elif mnemonic == 'div':
         # DIV：无符号除法（RDX:RAX / op -> quotient in RAX, remainder in RDX）
         if operands['is_memory']:
-            divisor = _load_memory_by_size(_effective_address(), operands.get('memory_size'))
+            mem_addr, mem_domain = _effective_address()
+            divisor = _load_memory_by_size(mem_addr, mem_domain, operands.get('memory_size'))
         elif operands['dest_reg']:
             divisor = _read_register_by_size(operands['dest_reg'], operands.get('dest_size'))
         else:
@@ -970,8 +1196,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
         if operands['is_memory']:
             # AND reg, [base+offset]
-            memory_offset = _effective_address()
-            mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
+            memory_offset, memory_domain = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, memory_domain, operands.get('memory_size'))
             result = reg_val & mem_val
             _write_register_by_size(dest_reg, result, dest_size)
 
@@ -1000,8 +1226,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
         if operands['is_memory']:
             # OR reg, [base+offset]
-            memory_offset = _effective_address()
-            mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
+            memory_offset, memory_domain = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, memory_domain, operands.get('memory_size'))
             result = reg_val | mem_val
             _write_register_by_size(dest_reg, result, dest_size)
 
@@ -1030,8 +1256,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
         if operands['is_memory']:
             # XOR reg, [base+offset]
-            memory_offset = _effective_address()
-            mem_val = _load_memory_by_size(memory_offset, operands.get('memory_size'))
+            memory_offset, memory_domain = _effective_address()
+            mem_val = _load_memory_by_size(memory_offset, memory_domain, operands.get('memory_size'))
             result = reg_val ^ mem_val
             _write_register_by_size(dest_reg, result, dest_size)
 
@@ -1053,11 +1279,11 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         # SHL：逻辑左移
         count64 = _shift_count_64()
         if operands['is_memory'] and not operands['dest_reg']:
-            addr = _effective_address()
+            addr, addr_domain = _effective_address()
             mem_size = operands.get('memory_size')
-            lhs = _load_memory_by_size(addr, mem_size)
+            lhs = _load_memory_by_size(addr, addr_domain, mem_size)
             result = lhs << count64
-            state.x86_memory = _store_memory_by_size(addr, mem_size, result)
+            state.x86_memory = _store_memory_by_size(addr, addr_domain, mem_size, result)
             _set_shift_flags(lhs, result, count64, is_left=True)
             _maybe_update_callengine_field(state, operands, mem_size, result)
             return state
@@ -1077,11 +1303,11 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         # SHR：逻辑右移
         count64 = _shift_count_64()
         if operands['is_memory'] and not operands['dest_reg']:
-            addr = _effective_address()
+            addr, addr_domain = _effective_address()
             mem_size = operands.get('memory_size')
-            lhs = _load_memory_by_size(addr, mem_size)
+            lhs = _load_memory_by_size(addr, addr_domain, mem_size)
             result = LShR(lhs, count64)
-            state.x86_memory = _store_memory_by_size(addr, mem_size, result)
+            state.x86_memory = _store_memory_by_size(addr, addr_domain, mem_size, result)
             _set_shift_flags(lhs, result, count64, is_left=False)
             _maybe_update_callengine_field(state, operands, mem_size, result)
             return state
@@ -1100,11 +1326,11 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     elif mnemonic == 'not':
         # NOT：按位取反，不影响标志位
         if operands['is_memory'] and not operands['dest_reg']:
-            addr = _effective_address()
+            addr, addr_domain = _effective_address()
             mem_size = operands.get('memory_size')
-            value = _load_memory_by_size(addr, mem_size)
+            value = _load_memory_by_size(addr, addr_domain, mem_size)
             result = ~value
-            state.x86_memory = _store_memory_by_size(addr, mem_size, result)
+            state.x86_memory = _store_memory_by_size(addr, addr_domain, mem_size, result)
             _maybe_update_callengine_field(state, operands, mem_size, result)
             return state
 
@@ -1133,9 +1359,9 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         value64 = ZeroExt(63, _bool_to_bv1(cond))
 
         if operands['is_memory'] and not operands['dest_reg']:
-            addr = _effective_address()
+            addr, addr_domain = _effective_address()
             mem_size = operands.get('memory_size') or 1
-            state.x86_memory = _store_memory_by_size(addr, mem_size, value64)
+            state.x86_memory = _store_memory_by_size(addr, addr_domain, mem_size, value64)
             _maybe_update_callengine_field(state, operands, mem_size, value64)
             return state
 

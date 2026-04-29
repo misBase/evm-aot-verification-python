@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 
 from z3 import BitVec, BitVecVal, Concat, Extract
 
-from state.x86_state import X86MemoryState
+from state.x86_state import MemoryDomain, X86MemoryState
 
 
 class StackMemoryMapper:
@@ -103,10 +103,10 @@ class StackMemoryMapper:
         base_bv = base if base is not None else BitVecVal(0, 64)
         base_offset = StackMemoryMapper.slot_index_to_base_offset(slot_index, total_slots)
         absolute_base = base_bv + BitVecVal(base_offset, 64)
-        z0 = memory.load_limb(absolute_base)
-        z1 = memory.load_limb(absolute_base + BitVecVal(8, 64))
-        z2 = memory.load_limb(absolute_base + BitVecVal(16, 64))
-        z3 = memory.load_limb(absolute_base + BitVecVal(24, 64))
+        z0 = memory.load_limb(absolute_base, domain=MemoryDomain.STACK)
+        z1 = memory.load_limb(absolute_base + BitVecVal(8, 64), domain=MemoryDomain.STACK)
+        z2 = memory.load_limb(absolute_base + BitVecVal(16, 64), domain=MemoryDomain.STACK)
+        z3 = memory.load_limb(absolute_base + BitVecVal(24, 64), domain=MemoryDomain.STACK)
         return Concat(z3, z2, z1, z0)
 
     @staticmethod
@@ -143,7 +143,7 @@ class StackMemoryMapper:
                 abs_base + BitVecVal(24, 64): z3,
             }
             for addr, limb in layout.items():
-                new_memory = new_memory.store_limb(addr, limb)
+                new_memory = new_memory.store_limb(addr, limb, domain=MemoryDomain.STACK)
 
         return new_memory
 

@@ -14,7 +14,7 @@ from x86_64.models import Register, X86Instruction
 from x86_64.cfg_structures import X86DynamicCFG, X86EdgeType
 from x86_64.cfg_state import X86GlobalState, X86WorldState
 from visualization.cfg_visualizer import CFGVisualizer
-from state.smt_state import SMTState
+from state.smt_state import SMTState, MemoryDomain, MemoryDomainError, PointerTag
 
 
 class TestX86SymbolicExecutor:
@@ -249,13 +249,16 @@ class TestRetGoBridge:
             stack_index = stack_depth - 1 - push_index
             addr = self.R14_BASE - (stack_index + 1) * self.STACK_ELEMENT_SIZE
             state.x86_memory = state.x86_memory.store_256bit(
-                BitVecVal(addr, 64), BitVecVal(value, 256)
+                BitVecVal(addr, 64), BitVecVal(value, 256), domain=MemoryDomain.STACK,
             )
 
+        sp_bv = BitVecVal(sp_in_memory % (1 << 64), 64)
         sp_addr = self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
         state.x86_memory = state.x86_memory.store_64bit(
-            BitVecVal(sp_addr, 64), BitVecVal(sp_in_memory % (1 << 64), 64)
+            BitVecVal(sp_addr, 64), sp_bv, domain=MemoryDomain.CALLENGINE,
         )
+        # 同步 callEngine side-channel —— cfg_executor 通过 BitVec 字段读 sp
+        state.callengine_stack_pointer_limbs = sp_bv
         return state
 
     def _make_profile_with_host(self, host_functions):
@@ -484,9 +487,12 @@ class TestRetGoBridge:
         assert len(resume_node.states) == 1
 
         resumed_mstate = resume_node.states[0].mstate
-        result = resumed_mstate.x86_memory.load_256bit(BitVecVal(self.R14_BASE - 0x40, 64))
+        result = resumed_mstate.x86_memory.load_256bit(
+            BitVecVal(self.R14_BASE - 0x40, 64), domain=MemoryDomain.STACK,
+        )
         sp_bv = resumed_mstate.x86_memory.load_64bit(
-            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64)
+            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64),
+            domain=MemoryDomain.CALLENGINE,
         )
 
         solver = Solver()
@@ -533,7 +539,8 @@ class TestRetGoBridge:
         resumed_mstate = resume_node.states[0].mstate
         loaded = resumed_mstate.evm_storage.sload(BitVecVal(0x42, 256))
         sp_bv = resumed_mstate.x86_memory.load_64bit(
-            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64)
+            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64),
+            domain=MemoryDomain.CALLENGINE,
         )
 
         solver = Solver()
@@ -571,7 +578,8 @@ class TestRetGoBridge:
 
         resumed_mstate = resume_node.states[0].mstate
         sp_bv = resumed_mstate.x86_memory.load_64bit(
-            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64)
+            BitVecVal(self.R13_BASE + GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64),
+            domain=MemoryDomain.CALLENGINE,
         )
 
         solver = Solver()
@@ -1666,3 +1674,35 @@ class TestMergePointsExcludeBackEdges:
         assert 0x1006 in executor.merge_points, (
             f"合流点 0x1006 应在 merge_points 中，当前={executor.merge_points}"
         )
+
+    def test_merge_with_conflicting_pointer_tags_fails_fast_on_followup_load(self):
+        """不同来源的 pointer tag 在 merge 后必须降为 NONE，并继续对后续访存抛错。"""
+        blocks = self.disasm_and_create_blocks("c3")
+        executor = X86SymbolicExecutor(blocks, max_depth=10, enable_merge=True)
+
+        state1 = SMTState.create_initial_state(num_inputs=0)
+        state1.x86_registers.set_register(Register.RSI, state1.callengine_input_pointer)
+        state1.x86_registers.set_pointer_tag(Register.RSI, PointerTag.CALLDATA_PTR)
+
+        state2 = SMTState.create_initial_state(num_inputs=0)
+        state2.x86_registers.set_register(Register.RSI, state2.callengine_code_pointer)
+        state2.x86_registers.set_pointer_tag(Register.RSI, PointerTag.CODE_PTR)
+
+        world1 = X86WorldState()
+        world1.constraints.add(Bool("path_a"))
+        world2 = X86WorldState()
+        world2.constraints.add(Bool("path_b"))
+
+        merged = executor._merge_at_confluence(
+            blocks[0].start_addr,
+            [
+                X86GlobalState(mstate=state1, world_state=world1, node=executor.cfg.get_or_create_node(blocks[0].start_addr)),
+                X86GlobalState(mstate=state2, world_state=world2, node=executor.cfg.get_or_create_node(blocks[0].start_addr)),
+            ],
+        )
+
+        assert merged.mstate.x86_registers.get_pointer_tag(Register.RSI) == PointerTag.NONE
+
+        load_insn = disassemble_hex("488b4e18", base_addr=0)[0]
+        with pytest.raises(MemoryDomainError):
+            load_insn.to_z3(merged.mstate)

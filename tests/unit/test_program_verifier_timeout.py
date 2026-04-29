@@ -26,7 +26,7 @@ class _DummyX86Program:
         return state, {
             'offset': BitVecVal(0, 64),
             'length': BitVecVal(0, 64),
-            'memory': state.x86_memory.Memory,
+            'memory': state.x86_memory.evm_mem,
             'base_addr': BitVecVal(0, 64),
             'has_return': BoolVal(False),
             'storage': state.evm_storage.Storage,

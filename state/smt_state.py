@@ -5,14 +5,22 @@
 将栈、内存和寄存器建模为符号变量。
 """
 
-from z3 import BitVec, Array, BitVecSort
+from typing import Optional
+
+from z3 import BitVec, Array, BitVecSort, Extract
 
 from state.evm_stack_state import EVMStackState
 from state.evm_memory_state import EVMMemoryState
 from state.evm_storage_state import EVMStorageState
 from state.evm_transient_storage_state import EVMTransientStorageState
 from state.evm_gas_state import EVMGasState
-from state.x86_state import X86MemoryState, X86RegisterState
+from state.x86_state import (
+    MemoryDomain,
+    MemoryDomainError,
+    PointerTag,
+    X86MemoryState,
+    X86RegisterState,
+)
 
 # 为了向后兼容，重新导出所有子类
 __all__ = [
@@ -24,6 +32,9 @@ __all__ = [
     'EVMGasState',
     'X86MemoryState',
     'X86RegisterState',
+    'MemoryDomain',
+    'MemoryDomainError',
+    'PointerTag',
 ]
 
 
@@ -41,6 +52,12 @@ class SMTState:
         "callengine_stack_byte_offset",
         "callengine_stack_base",
         "callengine_gas_remaining",
+        "callengine_input_pointer",
+        "callengine_input_size_bytes",
+        "callengine_code_pointer",
+        "callengine_code_size_bytes",
+        "callengine_return_data_pointer",
+        "callengine_return_data_size_bytes",
         "callengine_status_code",
         "callengine_builtin_func_index",
         "callengine_go_func_index",
@@ -78,6 +95,12 @@ class SMTState:
         self.callengine_stack_byte_offset:   BitVec = BitVecVal(0, 64)   # [R13+0x30]
         self.callengine_stack_base:          BitVec = BitVecVal(0, 64)   # [R13+0x38]
         self.callengine_gas_remaining:       BitVec = BitVecVal(0, 64)   # [R13+0x70]
+        self.callengine_input_pointer:       BitVec = BitVecVal(0, 64)   # [R13+0x90]
+        self.callengine_input_size_bytes:    BitVec = BitVecVal(0, 64)   # [R13+0x98]
+        self.callengine_code_pointer:        BitVec = BitVecVal(0, 64)   # [R13+0xA0]
+        self.callengine_code_size_bytes:     BitVec = BitVecVal(0, 64)   # [R13+0xA8]
+        self.callengine_return_data_pointer: BitVec = BitVecVal(0, 64)   # [R13+0xB0]
+        self.callengine_return_data_size_bytes: BitVec = BitVecVal(0, 64)  # [R13+0xB8]
         self.callengine_status_code:         BitVec = BitVecVal(0, 8)    # [R13+0xE0]
         self.callengine_builtin_func_index:  BitVec = BitVecVal(0, 32)   # [R13+0xE4]
         self.callengine_go_func_index:       BitVec = BitVecVal(0, 32)   # [R13+0xE8]
@@ -87,12 +110,21 @@ class SMTState:
         # PC（程序计数器）
         self.pc: int = 0
 
+        # 测试桩 unsafe fallback：仅供 instruction-level 单测使用。
+        # 当 base_reg ∉ {R13, R14, R15} 时（如 [rax]、[rbx]），生产代码会抛
+        # MemoryDomainError；测试桩可以把这一行设为 MemoryDomain.STACK，把这些
+        # 访存兜底到 stack 域，避免在低层指令机制单测里到处改 hex。
+        # 生产路径（create_initial_state、to_z3）不会修改这个字段。
+        self.unrouted_memory_domain: Optional[MemoryDomain] = None
+
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
         self.stack_base = None
         self.stack_num_inputs = 0
 
         # 环境信息
         self.calldata = Array('CallData', BitVecSort(64), BitVecSort(8))
+        self.code = Array('CodeData', BitVecSort(64), BitVecSort(8))
+        self.return_data = Array('ReturnData', BitVecSort(64), BitVecSort(8))
         self.calldatasize = BitVec('CallDataSize', 256)
         self.callvalue = BitVec('CallValue', 256)
         self.basefee = BitVec('BaseFee', 256)
@@ -127,11 +159,14 @@ class SMTState:
 
         # 复制环境信息
         new_state.calldata = self.calldata
+        new_state.code = self.code
+        new_state.return_data = self.return_data
         new_state.calldatasize = self.calldatasize
         new_state.callvalue = self.callvalue
         new_state.basefee = self.basefee
         new_state.stack_base = getattr(self, 'stack_base', None)
         new_state.stack_num_inputs = getattr(self, 'stack_num_inputs', 0)
+        new_state.unrouted_memory_domain = getattr(self, 'unrouted_memory_domain', None)
 
         return new_state
 
@@ -225,6 +260,10 @@ class SMTState:
         # 为 callEngine 中会被读取的字段创建符号值
         r14 = BitVec('R14_stack_base', 64)   # stackElement0Address
         r15 = BitVec('R15_mem_base', 64)     # memoryElement0Address
+        calldata_ptr = BitVec('CallDataPtr', 64)
+        code_ptr = BitVec('CodePtr', 64)
+        return_data_ptr = BitVec('ReturnDataPtr', 64)
+        code_size = BitVec('CodeSizeBytes', 64)
 
         # 写入 callEngine 字段（相对于 R13 的偏移）：
         # [R13+0x10] = memoryElement0Address -> R15
@@ -241,16 +280,53 @@ class SMTState:
         initial_state.callengine_stack_byte_offset = BitVecVal(0, 64)
         initial_state.callengine_stack_base = r14
         initial_state.callengine_gas_remaining = BitVecVal(1000000000, 64)
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x10, 64), r15)
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x18, 64), BitVecVal(0, 64))
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x20, 64), BitVecVal(0, 64))
+        initial_state.callengine_input_pointer = calldata_ptr
+        initial_state.callengine_code_pointer = code_ptr
+        initial_state.callengine_code_size_bytes = code_size
+        initial_state.callengine_return_data_pointer = return_data_ptr
+        initial_state.callengine_return_data_size_bytes = BitVecVal(0, 64)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(0x10, 64), r15, domain=MemoryDomain.CALLENGINE)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(0x18, 64), BitVecVal(0, 64), domain=MemoryDomain.CALLENGINE)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(0x20, 64), BitVecVal(0, 64), domain=MemoryDomain.CALLENGINE)
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
             r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64),
-            BitVecVal(0, 64)
+            BitVecVal(0, 64),
+            domain=MemoryDomain.CALLENGINE,
         )
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x30, 64), BitVecVal(0, 64))
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x38, 64), r14)
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(r13 + BitVecVal(0x70, 64), BitVecVal(1000000000, 64))
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(0x30, 64), BitVecVal(0, 64), domain=MemoryDomain.CALLENGINE)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(0x38, 64), r14, domain=MemoryDomain.CALLENGINE)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(0x70, 64), BitVecVal(1000000000, 64), domain=MemoryDomain.CALLENGINE)
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["input_pointer"], 64),
+            calldata_ptr,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["code_pointer"], 64),
+            code_ptr,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["code_size"], 64),
+            code_size,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["return_data_pointer"], 64),
+            return_data_ptr,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["return_data_size"], 64),
+            BitVecVal(0, 64),
+            domain=MemoryDomain.CALLENGINE,
+        )
 
         # 保存原始 stack_base 和输入数量，供栈一致性检查使用
         initial_state.stack_base = r14
@@ -258,6 +334,14 @@ class SMTState:
 
         # 使用SP = 0初始化EVM栈
         initial_state.evm_stack = EVMStackState(sp=IntVal(0))
+
+        calldata_size_64 = Extract(63, 0, initial_state.calldatasize)
+        initial_state.callengine_input_size_bytes = calldata_size_64
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["input_size"], 64),
+            calldata_size_64,
+            domain=MemoryDomain.CALLENGINE,
+        )
 
         # 如果没有输入，直接返回空状态
         if num_inputs == 0:

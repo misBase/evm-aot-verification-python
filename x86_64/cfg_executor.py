@@ -16,7 +16,7 @@ from .cfg_structures import X86DynamicCFG, X86EdgeType
 from .cfg_state import X86GlobalState, X86WorldState, X86Constraints
 from .cfg_strategies import X86DFSStrategy, X86TopologicalStrategy
 from .disassembler import parse_operands
-from state.smt_state import SMTState
+from state.smt_state import SMTState, PointerTag
 
 
 class X86SymbolicExecutor:
@@ -222,6 +222,7 @@ class X86SymbolicExecutor:
         all_regs: Set[str] = set()
         for s in states:
             all_regs.update(s.mstate.x86_registers._registers.keys())
+            all_regs.update(s.mstate.x86_registers._pointer_tags.keys())
 
         from state.smt_state import X86RegisterState
         merged_regs = X86RegisterState()
@@ -233,6 +234,10 @@ class X86SymbolicExecutor:
                 s_val = s.mstate.x86_registers._registers.get(reg, BitVecVal(0, 64))
                 expr = If(cond, s_val, expr)
             merged_regs._registers[reg] = expr
+            reg_tags = [s.mstate.x86_registers.get_pointer_tag(reg) for s in states]
+            merged_regs._pointer_tags[reg] = (
+                reg_tags[0] if all(tag == reg_tags[0] for tag in reg_tags) else PointerTag.NONE
+            )
         merged_mstate.x86_registers = merged_regs
 
         # 合并标志位
@@ -246,13 +251,21 @@ class X86SymbolicExecutor:
                 expr = If(cond, s.mstate.x86_registers.get_flag(flag), expr)
             merged_regs._flags[flag] = expr
 
-        # 合并 x86 内存（Array 级 If）
+        # 合并 x86 内存（按 domain 分别合并三个 Z3 Array）
         from state.smt_state import X86MemoryState
-        expr = states[-1].mstate.x86_memory.Memory
-        for s in reversed(states[:-1]):
-            cond = s.get_constraints().as_bool()
-            expr = If(cond, s.mstate.x86_memory.Memory, expr)
-        merged_mstate.x86_memory = X86MemoryState(memory_array=expr)
+
+        def _merge_array(get_array):
+            expr = get_array(states[-1])
+            for s in reversed(states[:-1]):
+                cond = s.get_constraints().as_bool()
+                expr = If(cond, get_array(s), expr)
+            return expr
+
+        merged_mstate.x86_memory = X86MemoryState.from_arrays(
+            _merge_array(lambda s: s.mstate.x86_memory.call_engine_mem),
+            _merge_array(lambda s: s.mstate.x86_memory.stack_mem),
+            _merge_array(lambda s: s.mstate.x86_memory.evm_mem),
+        )
 
         # 合并 return_offset, return_length
         offset_expr = states[-1].mstate.return_offset
@@ -297,11 +310,17 @@ class X86SymbolicExecutor:
 
         # 环境信息共享
         merged_mstate.calldata = states[0].mstate.calldata
+        merged_mstate.code = states[0].mstate.code
+        merged_mstate.return_data = _merge_array(lambda s: s.mstate.return_data)
         merged_mstate.calldatasize = states[0].mstate.calldatasize
         merged_mstate.callvalue = states[0].mstate.callvalue
         merged_mstate.basefee = states[0].mstate.basefee
         merged_mstate.stack_base = states[0].mstate.stack_base
         merged_mstate.stack_num_inputs = states[0].mstate.stack_num_inputs
+        # 保留所有路径共享的 unrouted_memory_domain（生产路径都是 None）
+        merged_mstate.unrouted_memory_domain = getattr(
+            states[0].mstate, 'unrouted_memory_domain', None
+        )
 
         # 合并约束 = Or(所有原路径条件)
         merged_world = X86WorldState()

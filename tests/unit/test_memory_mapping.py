@@ -3,7 +3,7 @@
 
 from z3 import BitVecVal, is_true, simplify
 
-from state.x86_state import X86MemoryState
+from state.x86_state import MemoryDomain, X86MemoryState
 from verification.memory_mapping import StackMemoryMapper
 
 
@@ -21,8 +21,11 @@ def test_x86_memory_default_zero_initialized():
     """新建 x86 内存时，未写入字节默认应为 0。"""
     memory = X86MemoryState()
 
-    _assert_bv_eq(memory.load_byte(BitVecVal(0, 64)), BitVecVal(0, 8))
-    _assert_bv_eq(memory.load_byte(BitVecVal(0x1234, 64)), BitVecVal(0, 8))
+    _assert_bv_eq(memory.load_byte(BitVecVal(0, 64), domain=MemoryDomain.STACK), BitVecVal(0, 8))
+    _assert_bv_eq(memory.load_byte(BitVecVal(0x1234, 64), domain=MemoryDomain.STACK), BitVecVal(0, 8))
+    # 三个 domain 默认都是零
+    _assert_bv_eq(memory.load_byte(BitVecVal(0, 64), domain=MemoryDomain.CALLENGINE), BitVecVal(0, 8))
+    _assert_bv_eq(memory.load_byte(BitVecVal(0, 64), domain=MemoryDomain.EVM), BitVecVal(0, 8))
 
 
 def test_slot_index_to_base_offset_single_slot():
@@ -54,11 +57,11 @@ def test_initialize_x86_memory_from_stack_places_bottom_and_top_slots():
     )
 
     _assert_bv_eq(
-        initialized.load_256bit(base + BitVecVal(-0x40, 64)),
+        initialized.load_256bit(base + BitVecVal(-0x40, 64), domain=MemoryDomain.STACK),
         bottom_value,
     )
     _assert_bv_eq(
-        initialized.load_256bit(base + BitVecVal(-0x20, 64)),
+        initialized.load_256bit(base + BitVecVal(-0x20, 64), domain=MemoryDomain.STACK),
         top_value,
     )
 

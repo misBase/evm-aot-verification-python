@@ -4,12 +4,16 @@
 import pytest
 from z3 import BitVecVal, simplify, is_true
 
-from state.smt_state import SMTState
+from state.smt_state import SMTState, MemoryDomain
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register
 
 
 def _exec_single(hex_code: str, state: SMTState) -> SMTState:
+    # 指令机制单测约定：未路由的访存（base_reg ∉ {R13,R14,R15}，例如 [rax]）
+    # 兜底到 stack 域。这只是单测桩，不影响生产路径的严格 domain 检查。
+    if state.unrouted_memory_domain is None:
+        state.unrouted_memory_domain = MemoryDomain.STACK
     insn = disassemble_hex(hex_code, base_addr=0x1000)[0]
     return insn.to_z3(state)
 
@@ -25,7 +29,7 @@ def _set_flags(state: SMTState, cf: int = 0, zf: int = 0, sf: int = 0, of: int =
 def test_movzx_byte_ptr():
     state = SMTState()
     state.x86_registers.set_register(Register.RAX, BitVecVal(0x100, 64))
-    state.x86_memory = state.x86_memory.store_byte(0x100, BitVecVal(0xAB, 8))
+    state.x86_memory = state.x86_memory.store_byte(0x100, BitVecVal(0xAB, 8), domain=MemoryDomain.STACK)
 
     # movzx rcx, byte ptr [rax]
     out = _exec_single("480fb608", state)
@@ -35,8 +39,8 @@ def test_movzx_byte_ptr():
 def test_movzx_word_ptr_and_reg_source():
     st_mem = SMTState()
     st_mem.x86_registers.set_register(Register.RAX, BitVecVal(0x180, 64))
-    st_mem.x86_memory = st_mem.x86_memory.store_byte(0x180, BitVecVal(0x34, 8))
-    st_mem.x86_memory = st_mem.x86_memory.store_byte(0x181, BitVecVal(0x12, 8))
+    st_mem.x86_memory = st_mem.x86_memory.store_byte(0x180, BitVecVal(0x34, 8), domain=MemoryDomain.STACK)
+    st_mem.x86_memory = st_mem.x86_memory.store_byte(0x181, BitVecVal(0x12, 8), domain=MemoryDomain.STACK)
     out_mem = _exec_single("0fb708", st_mem)  # movzx ecx, word ptr [rax]
     assert is_true(simplify(out_mem.x86_registers.get_register(Register.RCX) == BitVecVal(0x1234, 64)))
 
@@ -64,7 +68,7 @@ def test_div_memory_and_guard_paths():
     st_ok.x86_registers.set_register(Register.RAX, BitVecVal(10, 64))
     st_ok.x86_registers.set_register(Register.RDX, BitVecVal(0, 64))
     st_ok.x86_registers.set_register(Register.RBX, BitVecVal(0x400, 64))
-    st_ok.x86_memory = st_ok.x86_memory.store_limb(0x400, BitVecVal(3, 64))
+    st_ok.x86_memory = st_ok.x86_memory.store_limb(0x400, BitVecVal(3, 64), domain=MemoryDomain.STACK)
     out_ok = _exec_single("48f733", st_ok)  # div qword ptr [rbx]
     assert is_true(simplify(out_ok.x86_registers.get_register(Register.RAX) == BitVecVal(3, 64)))
     assert is_true(simplify(out_ok.x86_registers.get_register(Register.RDX) == BitVecVal(1, 64)))
@@ -73,7 +77,7 @@ def test_div_memory_and_guard_paths():
     st_div0.x86_registers.set_register(Register.RAX, BitVecVal(0x123, 64))
     st_div0.x86_registers.set_register(Register.RDX, BitVecVal(0x456, 64))
     st_div0.x86_registers.set_register(Register.RBX, BitVecVal(0x410, 64))
-    st_div0.x86_memory = st_div0.x86_memory.store_limb(0x410, BitVecVal(0, 64))
+    st_div0.x86_memory = st_div0.x86_memory.store_limb(0x410, BitVecVal(0, 64), domain=MemoryDomain.STACK)
     out_div0 = _exec_single("48f733", st_div0)
     assert is_true(simplify(out_div0.x86_registers.get_register(Register.RAX) == BitVecVal(0x123, 64)))
     assert is_true(simplify(out_div0.x86_registers.get_register(Register.RDX) == BitVecVal(0x456, 64)))
@@ -82,7 +86,7 @@ def test_div_memory_and_guard_paths():
     st_over.x86_registers.set_register(Register.RAX, BitVecVal(0, 64))
     st_over.x86_registers.set_register(Register.RDX, BitVecVal(1, 64))  # dividend = 2^64
     st_over.x86_registers.set_register(Register.RBX, BitVecVal(0x420, 64))
-    st_over.x86_memory = st_over.x86_memory.store_limb(0x420, BitVecVal(1, 64))
+    st_over.x86_memory = st_over.x86_memory.store_limb(0x420, BitVecVal(1, 64), domain=MemoryDomain.STACK)
     out_over = _exec_single("48f733", st_over)
     assert is_true(simplify(out_over.x86_registers.get_register(Register.RAX) == BitVecVal(0, 64)))
     assert is_true(simplify(out_over.x86_registers.get_register(Register.RDX) == BitVecVal(1, 64)))
@@ -104,7 +108,7 @@ def test_adc_sbb_variants_reg_mem_imm():
     st_adc_mem = SMTState()
     st_adc_mem.x86_registers.set_register(Register.RAX, BitVecVal(10, 64))
     st_adc_mem.x86_registers.set_register(Register.RBX, BitVecVal(0x230, 64))
-    st_adc_mem.x86_memory = st_adc_mem.x86_memory.store_limb(0x230, BitVecVal(4, 64))
+    st_adc_mem.x86_memory = st_adc_mem.x86_memory.store_limb(0x230, BitVecVal(4, 64), domain=MemoryDomain.STACK)
     _set_flags(st_adc_mem, cf=1)
     out_adc_mem = _exec_single("481303", st_adc_mem)  # adc rax, qword ptr [rbx]
     assert is_true(simplify(out_adc_mem.x86_registers.get_register(Register.RAX) == BitVecVal(15, 64)))
@@ -126,7 +130,7 @@ def test_adc_sbb_variants_reg_mem_imm():
     st_sbb_mem = SMTState()
     st_sbb_mem.x86_registers.set_register(Register.RAX, BitVecVal(10, 64))
     st_sbb_mem.x86_registers.set_register(Register.RBX, BitVecVal(0x240, 64))
-    st_sbb_mem.x86_memory = st_sbb_mem.x86_memory.store_limb(0x240, BitVecVal(4, 64))
+    st_sbb_mem.x86_memory = st_sbb_mem.x86_memory.store_limb(0x240, BitVecVal(4, 64), domain=MemoryDomain.STACK)
     _set_flags(st_sbb_mem, cf=1)
     out_sbb_mem = _exec_single("481b03", st_sbb_mem)  # sbb rax, qword ptr [rbx]
     assert is_true(simplify(out_sbb_mem.x86_registers.get_register(Register.RAX) == BitVecVal(5, 64)))
@@ -158,15 +162,15 @@ def test_shift_by_cl():
 def test_shift_memory_and_count_zero_flags_unchanged():
     st_mem_l = SMTState()
     st_mem_l.x86_registers.set_register(Register.RAX, BitVecVal(0x260, 64))
-    st_mem_l.x86_memory = st_mem_l.x86_memory.store_limb(0x260, BitVecVal(2, 64))
+    st_mem_l.x86_memory = st_mem_l.x86_memory.store_limb(0x260, BitVecVal(2, 64), domain=MemoryDomain.STACK)
     out_mem_l = _exec_single("48d120", st_mem_l)  # shl qword ptr [rax], 1
-    assert is_true(simplify(out_mem_l.x86_memory.load_limb(BitVecVal(0x260, 64)) == BitVecVal(4, 64)))
+    assert is_true(simplify(out_mem_l.x86_memory.load_limb(BitVecVal(0x260, 64), domain=MemoryDomain.STACK) == BitVecVal(4, 64)))
 
     st_mem_r = SMTState()
     st_mem_r.x86_registers.set_register(Register.RAX, BitVecVal(0x270, 64))
-    st_mem_r.x86_memory = st_mem_r.x86_memory.store_limb(0x270, BitVecVal(8, 64))
+    st_mem_r.x86_memory = st_mem_r.x86_memory.store_limb(0x270, BitVecVal(8, 64), domain=MemoryDomain.STACK)
     out_mem_r = _exec_single("48d128", st_mem_r)  # shr qword ptr [rax], 1
-    assert is_true(simplify(out_mem_r.x86_memory.load_limb(BitVecVal(0x270, 64)) == BitVecVal(4, 64)))
+    assert is_true(simplify(out_mem_r.x86_memory.load_limb(BitVecVal(0x270, 64), domain=MemoryDomain.STACK) == BitVecVal(4, 64)))
 
     st_zero = SMTState()
     st_zero.x86_registers.set_register(Register.RAX, BitVecVal(5, 64))
@@ -187,10 +191,10 @@ def test_not_register_and_memory():
 
     st_mem = SMTState()
     st_mem.x86_registers.set_register(Register.RAX, BitVecVal(0x200, 64))
-    st_mem.x86_memory = st_mem.x86_memory.store_limb(0x200, BitVecVal(0x0F0F0F0F0F0F0F0F, 64))
+    st_mem.x86_memory = st_mem.x86_memory.store_limb(0x200, BitVecVal(0x0F0F0F0F0F0F0F0F, 64), domain=MemoryDomain.STACK)
     out_mem = _exec_single("48f710", st_mem)  # not qword ptr [rax]
     assert is_true(
-        simplify(out_mem.x86_memory.load_limb(BitVecVal(0x200, 64)) == BitVecVal(0xF0F0F0F0F0F0F0F0, 64))
+        simplify(out_mem.x86_memory.load_limb(BitVecVal(0x200, 64), domain=MemoryDomain.STACK) == BitVecVal(0xF0F0F0F0F0F0F0F0, 64))
     )
 
 
@@ -207,7 +211,7 @@ def test_mul_memory_and_flags():
     st_small = SMTState()
     st_small.x86_registers.set_register(Register.RAX, BitVecVal(3, 64))
     st_small.x86_registers.set_register(Register.RBX, BitVecVal(0x280, 64))
-    st_small.x86_memory = st_small.x86_memory.store_limb(0x280, BitVecVal(5, 64))
+    st_small.x86_memory = st_small.x86_memory.store_limb(0x280, BitVecVal(5, 64), domain=MemoryDomain.STACK)
     out_small = _exec_single("48f723", st_small)  # mul qword ptr [rbx]
     assert is_true(simplify(out_small.x86_registers.get_register(Register.RAX) == BitVecVal(15, 64)))
     assert is_true(simplify(out_small.x86_registers.get_register(Register.RDX) == BitVecVal(0, 64)))
@@ -217,7 +221,7 @@ def test_mul_memory_and_flags():
     st_big = SMTState()
     st_big.x86_registers.set_register(Register.RAX, BitVecVal(1 << 63, 64))
     st_big.x86_registers.set_register(Register.RBX, BitVecVal(0x290, 64))
-    st_big.x86_memory = st_big.x86_memory.store_limb(0x290, BitVecVal(2, 64))
+    st_big.x86_memory = st_big.x86_memory.store_limb(0x290, BitVecVal(2, 64), domain=MemoryDomain.STACK)
     out_big = _exec_single("48f723", st_big)
     assert is_true(simplify(out_big.x86_registers.get_register(Register.RAX) == BitVecVal(0, 64)))
     assert is_true(simplify(out_big.x86_registers.get_register(Register.RDX) == BitVecVal(1, 64)))
@@ -256,7 +260,7 @@ def test_sub_cmp_or_xor_memory_and_immediate_variants():
     st_sub_mem = SMTState()
     st_sub_mem.x86_registers.set_register(Register.RAX, BitVecVal(9, 64))
     st_sub_mem.x86_registers.set_register(Register.RBX, BitVecVal(0x2A0, 64))
-    st_sub_mem.x86_memory = st_sub_mem.x86_memory.store_limb(0x2A0, BitVecVal(4, 64))
+    st_sub_mem.x86_memory = st_sub_mem.x86_memory.store_limb(0x2A0, BitVecVal(4, 64), domain=MemoryDomain.STACK)
     out_sub_mem = _exec_single("482b03", st_sub_mem)  # sub rax, qword ptr [rbx]
     assert is_true(simplify(out_sub_mem.x86_registers.get_register(Register.RAX) == BitVecVal(5, 64)))
 
@@ -268,7 +272,7 @@ def test_sub_cmp_or_xor_memory_and_immediate_variants():
     st_cmp_mem = SMTState()
     st_cmp_mem.x86_registers.set_register(Register.RAX, BitVecVal(5, 64))
     st_cmp_mem.x86_registers.set_register(Register.RBX, BitVecVal(0x2B0, 64))
-    st_cmp_mem.x86_memory = st_cmp_mem.x86_memory.store_limb(0x2B0, BitVecVal(5, 64))
+    st_cmp_mem.x86_memory = st_cmp_mem.x86_memory.store_limb(0x2B0, BitVecVal(5, 64), domain=MemoryDomain.STACK)
     out_cmp_mem = _exec_single("483b03", st_cmp_mem)  # cmp rax, qword ptr [rbx]
     assert is_true(simplify(out_cmp_mem.x86_registers.get_flag("ZF") == BitVecVal(1, 1)))
     assert is_true(simplify(out_cmp_mem.x86_registers.get_flag("CF") == BitVecVal(0, 1)))
@@ -309,7 +313,7 @@ def test_setcc_register_and_memory():
     st_mem.x86_registers.set_register(Register.RAX, BitVecVal(0x300, 64))
     st_mem.x86_registers.set_flag("ZF", BitVecVal(1, 1))
     out_mem = _exec_single("0f9400", st_mem)  # sete byte ptr [rax]
-    assert is_true(simplify(out_mem.x86_memory.load_byte(BitVecVal(0x300, 64)) == BitVecVal(1, 8)))
+    assert is_true(simplify(out_mem.x86_memory.load_byte(BitVecVal(0x300, 64), domain=MemoryDomain.STACK) == BitVecVal(1, 8)))
 
 
 @pytest.mark.parametrize(
@@ -348,9 +352,9 @@ def test_setcc_condition_matrix(hex_code: str, true_flags: dict, false_flags: di
 def test_setcc_memory_only_writes_one_byte():
     st = SMTState()
     st.x86_registers.set_register(Register.RAX, BitVecVal(0x350, 64))
-    st.x86_memory = st.x86_memory.store_byte(0x350, BitVecVal(0xAA, 8))
-    st.x86_memory = st.x86_memory.store_byte(0x351, BitVecVal(0xBB, 8))
+    st.x86_memory = st.x86_memory.store_byte(0x350, BitVecVal(0xAA, 8), domain=MemoryDomain.STACK)
+    st.x86_memory = st.x86_memory.store_byte(0x351, BitVecVal(0xBB, 8), domain=MemoryDomain.STACK)
     _set_flags(st, zf=1)
     out = _exec_single("0f9500", st)  # setne byte ptr [rax], ZF=1 => 0
-    assert is_true(simplify(out.x86_memory.load_byte(BitVecVal(0x350, 64)) == BitVecVal(0, 8)))
-    assert is_true(simplify(out.x86_memory.load_byte(BitVecVal(0x351, 64)) == BitVecVal(0xBB, 8)))
+    assert is_true(simplify(out.x86_memory.load_byte(BitVecVal(0x350, 64), domain=MemoryDomain.STACK) == BitVecVal(0, 8)))
+    assert is_true(simplify(out.x86_memory.load_byte(BitVecVal(0x351, 64), domain=MemoryDomain.STACK) == BitVecVal(0xBB, 8)))

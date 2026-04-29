@@ -41,6 +41,12 @@ GO_HPC_EVM_PROFILE = X86AOTProfile(
         "go_function_index": 0xE8,
         "return_address": 0xF0,
         "stack_pointer": 0x28,
+        "input_pointer": 0x90,
+        "input_size": 0x98,
+        "code_pointer": 0xA0,
+        "code_size": 0xA8,
+        "return_data_pointer": 0xB0,
+        "return_data_size": 0xB8,
     },
     status_codes={
         "returned": 0,

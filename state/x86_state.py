@@ -2,6 +2,7 @@
 x86-64 内存和寄存器状态建模。
 """
 
+from enum import Enum
 from typing import Dict, Optional, TYPE_CHECKING
 from z3 import BitVec, BitVecVal, Array, BitVecSort, K, Select, Store
 
@@ -9,219 +10,173 @@ if TYPE_CHECKING:
     from x86_64.models import Register
 
 
-class X86MemoryState:
-    """x86-64内存状态表示。
+class MemoryDomain(str, Enum):
+    """x86 内存访问 domain，按 Go AOT 的寄存器约定路由到独立 Z3 Array。
 
-    使用Z3 Array对x86-64内存建模：Memory : Array[BitVec[64], BitVec[8]]
-    支持符号索引（例如，[r14+rax]，其中偏移量是符号的）
-    使用字节级寻址进行精确的内存建模。
+    - CALLENGINE: 通过 R13 访问 callEngine 结构体（sp、status_code、gas、return_address ...）
+    - STACK:      通过 R14 访问 EVM 栈窗口（4 limb × 槽位）
+    - EVM:        通过 R15 访问 EVM 256-bit memory（MSTORE/MLOAD/SHA3/RETURN data）
+    """
+    CALLENGINE = "callengine"
+    STACK = "stack"
+    EVM = "evm"
+
+
+class PointerTag(str, Enum):
+    """通用寄存器中只读源指针的轻量 provenance 标签。"""
+
+    NONE = "none"
+    CALLDATA_PTR = "calldata_ptr"
+    CODE_PTR = "code_ptr"
+    RETURNDATA_PTR = "returndata_ptr"
+    EVM_PTR = "evm_ptr"
+    STACK_PTR = "stack_ptr"
+
+
+class MemoryDomainError(ValueError):
+    """无法把内存访问静态路由到 {callengine, stack, evm} 任一 domain 时抛出。
+
+    继承 ValueError 以兼容现有 except ValueError 块。
     """
 
-    def __init__(self, memory_array: Optional[Array] = None):
-        """初始化x86-64内存状态。
+    def __init__(self, message: str, *, base_reg=None, size_bytes: Optional[int] = None,
+                 disasm: Optional[str] = None):
+        super().__init__(message)
+        self.base_reg = base_reg
+        self.size_bytes = size_bytes
+        self.disasm = disasm
 
-        Args:
-            memory_array: 可选的现有Memory数组
-        """
-        # Memory : Array[BitVec[64], BitVec[8]] - 偏移量是64位，值是8位（字节）
-        # x86 内存在未写入前默认为 0。
-        if memory_array is None:
-            self.Memory = K(BitVecSort(64), BitVecVal(0, 8))
-        else:
-            self.Memory = memory_array
 
-    def load_byte(self, offset: BitVec) -> BitVec:
-        """从内存加载单个字节。
+class X86MemoryState:
+    """x86-64 内存状态：拆分为三个独立 Z3 Array，按 base_reg 路由。
 
-        支持符号偏移量（例如，base_offset + reg_value）
+    每个 Array 都是 Array[BitVec[64], BitVec[8]]，默认全零（K(BV64, 0)）。
+    所有 load_*/store_* 必须显式传入 keyword-only 的 `domain` 参数，
+    无默认值，无 fallback —— 写错 domain 会立刻在 Select/Store 上跑错 Array。
 
-        Args:
-            offset: 64位BitVec内存偏移量（可以是符号的）
+    构造方式：
+        X86MemoryState()                                 # 三个 Array 全零
+        X86MemoryState.from_arrays(ce, st, ev)           # 显式指定三个 Array
+        state._with_array(domain, new_array)             # 替换某一个 Array，返回新实例
+    """
 
-        Returns:
-            8位BitVec值
-        """
-        if isinstance(offset, int):
-            # 将int转换为BitVec以向后兼容
-            offset = BitVecVal(offset, 64)
-        elif offset.size() != 64:
-            raise ValueError(f"Memory offset must be 64 bits, got {offset.size()}")
+    __slots__ = ("call_engine_mem", "stack_mem", "evm_mem")
 
-        return Select(self.Memory, offset)
+    def __init__(self, *,
+                 call_engine_mem: Optional[Array] = None,
+                 stack_mem: Optional[Array] = None,
+                 evm_mem: Optional[Array] = None):
+        self.call_engine_mem = call_engine_mem if call_engine_mem is not None else _zero_byte_array()
+        self.stack_mem       = stack_mem       if stack_mem       is not None else _zero_byte_array()
+        self.evm_mem         = evm_mem         if evm_mem         is not None else _zero_byte_array()
 
-    def store_byte(self, offset: BitVec, value: BitVec) -> 'X86MemoryState':
-        """将单个字节存储到内存。
+    @classmethod
+    def from_arrays(cls, call_engine_mem: Array, stack_mem: Array, evm_mem: Array) -> 'X86MemoryState':
+        return cls(call_engine_mem=call_engine_mem, stack_mem=stack_mem, evm_mem=evm_mem)
 
-        支持符号偏移量（例如，base_offset + reg_value）
+    # ---- 内部 dispatch helpers ----
 
-        Args:
-            offset: 64位BitVec内存偏移量（可以是符号的）
-            value: 8位BitVec值
+    def _array_for_domain(self, domain: MemoryDomain) -> Array:
+        if not isinstance(domain, MemoryDomain):
+            raise MemoryDomainError(f"unrecognized memory domain: {domain!r}")
+        if domain == MemoryDomain.CALLENGINE:
+            return self.call_engine_mem
+        if domain == MemoryDomain.STACK:
+            return self.stack_mem
+        if domain == MemoryDomain.EVM:
+            return self.evm_mem
+        raise MemoryDomainError(f"unrecognized memory domain: {domain!r}")
 
-        Returns:
-            具有更新Memory的新X86MemoryState
-        """
-        if isinstance(offset, int):
-            # 将int转换为BitVec以向后兼容
-            offset = BitVecVal(offset, 64)
-        elif offset.size() != 64:
-            raise ValueError(f"Memory offset must be 64 bits, got {offset.size()}")
+    def _with_array(self, domain: MemoryDomain, new_array: Array) -> 'X86MemoryState':
+        if not isinstance(domain, MemoryDomain):
+            raise MemoryDomainError(f"unrecognized memory domain: {domain!r}")
+        if domain == MemoryDomain.CALLENGINE:
+            return X86MemoryState.from_arrays(new_array, self.stack_mem, self.evm_mem)
+        if domain == MemoryDomain.STACK:
+            return X86MemoryState.from_arrays(self.call_engine_mem, new_array, self.evm_mem)
+        if domain == MemoryDomain.EVM:
+            return X86MemoryState.from_arrays(self.call_engine_mem, self.stack_mem, new_array)
+        raise MemoryDomainError(f"unrecognized memory domain: {domain!r}")
 
+    # ---- 字节级访问 ----
+
+    def load_byte(self, offset: BitVec, *, domain: MemoryDomain) -> BitVec:
+        offset = _coerce_offset(offset)
+        return Select(self._array_for_domain(domain), offset)
+
+    def store_byte(self, offset: BitVec, value: BitVec, *, domain: MemoryDomain) -> 'X86MemoryState':
+        offset = _coerce_offset(offset)
         if value.size() != 8:
             raise ValueError(f"Memory byte must be 8 bits, got {value.size()}")
+        new_arr = Store(self._array_for_domain(domain), offset, value)
+        return self._with_array(domain, new_arr)
 
-        new_memory = Store(self.Memory, offset, value)
-        new_state = X86MemoryState(memory_array=new_memory)
-        return new_state
+    # ---- 64-bit 访问（小端序） ----
 
-    def load_64bit(self, offset: BitVec) -> BitVec:
-        """从内存加载64位值（小端序）。
-
-        Args:
-            offset: 64位BitVec内存偏移量
-
-        Returns:
-            64位BitVec值
-        """
+    def load_64bit(self, offset: BitVec, *, domain: MemoryDomain) -> BitVec:
         from z3 import Concat
-
-        if isinstance(offset, int):
-            offset = BitVecVal(offset, 64)
-        elif offset.size() != 64:
-            raise ValueError(f"Memory offset must be 64 bits, got {offset.size()}")
-
-        # 按小端序加载8字节：[byte0|byte1|...|byte7]
-        # 其中byte0在offset（LSB），byte7在offset+7（MSB）
-        bytes_list = []
-        for i in range(8):
-            byte_offset = offset + BitVecVal(i, 64)
-            byte_val = Select(self.Memory, byte_offset)
-            bytes_list.append(byte_val)
-
-        # 按小端序连接：[byte7|byte6|...|byte0]
+        offset = _coerce_offset(offset)
+        arr = self._array_for_domain(domain)
+        bytes_list = [Select(arr, offset + BitVecVal(i, 64)) for i in range(8)]
         return Concat(*reversed(bytes_list))
 
-    def store_64bit(self, offset: BitVec, value: BitVec) -> 'X86MemoryState':
-        """将64位值存储到内存（小端序）。
-
-        Args:
-            offset: 64位BitVec内存偏移量
-            value: 64位BitVec值
-
-        Returns:
-            具有更新Memory的新X86MemoryState
-        """
+    def store_64bit(self, offset: BitVec, value: BitVec, *, domain: MemoryDomain) -> 'X86MemoryState':
         from z3 import Extract
-
-        if isinstance(offset, int):
-            offset = BitVecVal(offset, 64)
-        elif offset.size() != 64:
-            raise ValueError(f"Memory offset must be 64 bits, got {offset.size()}")
-
+        offset = _coerce_offset(offset)
         if value.size() != 64:
             raise ValueError(f"Value must be 64 bits, got {value.size()}")
-
-        # 按小端序存储8字节
-        new_memory = self.Memory
+        arr = self._array_for_domain(domain)
         for i in range(8):
-            # 提取字节i：位[8*i+7 : 8*i]（byte0是LSB）
-            byte_val = Extract(8*i+7, 8*i, value)
-            byte_offset = offset + BitVecVal(i, 64)
-            new_memory = Store(new_memory, byte_offset, byte_val)
+            byte_val = Extract(8 * i + 7, 8 * i, value)
+            arr = Store(arr, offset + BitVecVal(i, 64), byte_val)
+        return self._with_array(domain, arr)
 
-        new_state = X86MemoryState(memory_array=new_memory)
-        return new_state
+    def load_limb(self, offset: BitVec, *, domain: MemoryDomain) -> BitVec:
+        return self.load_64bit(offset, domain=domain)
 
-    def load_limb(self, offset: BitVec) -> BitVec:
-        """从内存加载64位limb（向后兼容）。
+    def store_limb(self, offset: BitVec, value: BitVec, *, domain: MemoryDomain) -> 'X86MemoryState':
+        return self.store_64bit(offset, value, domain=domain)
 
-        这是load_64bit()的别名，以保持向后兼容性。
+    # ---- 256-bit 访问（4×64-bit limb，小端序） ----
 
-        Args:
-            offset: 64位BitVec内存偏移量（可以是符号的）
-
-        Returns:
-            64位BitVec值
-        """
-        return self.load_64bit(offset)
-
-    def store_limb(self, offset: BitVec, value: BitVec) -> 'X86MemoryState':
-        """将64位limb存储到内存（向后兼容）。
-
-        这是store_64bit()的别名，以保持向后兼容性。
-
-        Args:
-            offset: 64位BitVec内存偏移量（可以是符号的）
-            value: 64位BitVec值
-
-        Returns:
-            具有更新Memory的新X86MemoryState
-        """
-        return self.store_64bit(offset, value)
-
-    def load_256bit(self, base_offset: BitVec) -> BitVec:
-        """从内存加载256位值（4×64位limb，小端序）。
-
-        Args:
-            base_offset: 256位值的64位BitVec基址偏移量（LSB偏移量）
-
-        Returns:
-            256位BitVec
-        """
+    def load_256bit(self, base_offset: BitVec, *, domain: MemoryDomain) -> BitVec:
         from z3 import Concat
-
-        if isinstance(base_offset, int):
-            base_offset = BitVecVal(base_offset, 64)
-
-        # 加载4个limb：z0（LSB）在base_offset，z1在base_offset+8，等等
-        z0 = self.load_64bit(base_offset)
-        z1 = self.load_64bit(base_offset + BitVecVal(8, 64))
-        z2 = self.load_64bit(base_offset + BitVecVal(16, 64))
-        z3 = self.load_64bit(base_offset + BitVecVal(24, 64))
-
-        # 连接：[z3|z2|z1|z0]用于256位值
+        base_offset = _coerce_offset(base_offset)
+        z0 = self.load_64bit(base_offset, domain=domain)
+        z1 = self.load_64bit(base_offset + BitVecVal(8, 64), domain=domain)
+        z2 = self.load_64bit(base_offset + BitVecVal(16, 64), domain=domain)
+        z3 = self.load_64bit(base_offset + BitVecVal(24, 64), domain=domain)
         return Concat(z3, z2, z1, z0)
 
-    def store_256bit(self, base_offset: BitVec, value: BitVec) -> 'X86MemoryState':
-        """将256位值存储到内存（4×64位limb，小端序）。
-
-        Args:
-            base_offset: 256位值的64位BitVec基址偏移量（LSB偏移量）
-            value: 256位BitVec
-
-        Returns:
-            具有更新Memory的新X86MemoryState
-        """
+    def store_256bit(self, base_offset: BitVec, value: BitVec, *, domain: MemoryDomain) -> 'X86MemoryState':
         from z3 import Extract
-
-        if isinstance(base_offset, int):
-            base_offset = BitVecVal(base_offset, 64)
-
+        base_offset = _coerce_offset(base_offset)
         if value.size() != 256:
             raise ValueError(f"Value must be 256 bits, got {value.size()}")
-
-        # 提取4个limb：z0（LSB）、z1、z2、z3（MSB）
         z0 = Extract(63, 0, value)
         z1 = Extract(127, 64, value)
         z2 = Extract(191, 128, value)
         z3 = Extract(255, 192, value)
-
-        # 存储limb（每次存储返回新状态）
-        new_state = self.store_64bit(base_offset, z0)
-        new_state = new_state.store_64bit(base_offset + BitVecVal(8, 64), z1)
-        new_state = new_state.store_64bit(base_offset + BitVecVal(16, 64), z2)
-        new_state = new_state.store_64bit(base_offset + BitVecVal(24, 64), z3)
-
+        new_state = self.store_64bit(base_offset, z0, domain=domain)
+        new_state = new_state.store_64bit(base_offset + BitVecVal(8, 64), z1, domain=domain)
+        new_state = new_state.store_64bit(base_offset + BitVecVal(16, 64), z2, domain=domain)
+        new_state = new_state.store_64bit(base_offset + BitVecVal(24, 64), z3, domain=domain)
         return new_state
 
     def copy(self) -> 'X86MemoryState':
-        """创建内存状态的副本。
+        return X86MemoryState.from_arrays(self.call_engine_mem, self.stack_mem, self.evm_mem)
 
-        Returns:
-            具有相同Memory的新X86MemoryState实例
-        """
-        new_state = X86MemoryState(memory_array=self.Memory)
-        return new_state
+
+def _zero_byte_array() -> Array:
+    return K(BitVecSort(64), BitVecVal(0, 8))
+
+
+def _coerce_offset(offset) -> BitVec:
+    if isinstance(offset, int):
+        return BitVecVal(offset, 64)
+    if offset.size() != 64:
+        raise ValueError(f"Memory offset must be 64 bits, got {offset.size()}")
+    return offset
 
 
 class X86RegisterState:
@@ -235,6 +190,7 @@ class X86RegisterState:
         # 寄存器：reg[Register]是64位BitVec
         # 使用字符串键以避免循环导入
         self._registers: Dict[str, BitVec] = {}
+        self._pointer_tags: Dict[str, PointerTag] = {}
         # 标志：flags[name]是1位BitVec
         self._flags: Dict[str, BitVec] = {}
         # CF（进位标志）从0开始
@@ -267,6 +223,21 @@ class X86RegisterState:
         # 将Register枚举转换为字符串键
         reg_key = reg.value if hasattr(reg, 'value') else str(reg)
         self._registers[reg_key] = value
+        self._pointer_tags[reg_key] = PointerTag.NONE
+
+    def get_pointer_tag(self, reg) -> PointerTag:
+        """获取寄存器的只读源指针标签。"""
+        reg_key = reg.value if hasattr(reg, 'value') else str(reg)
+        return self._pointer_tags.get(reg_key, PointerTag.NONE)
+
+    def set_pointer_tag(self, reg, tag: PointerTag) -> None:
+        """设置寄存器的只读源指针标签。"""
+        reg_key = reg.value if hasattr(reg, 'value') else str(reg)
+        self._pointer_tags[reg_key] = tag
+
+    def clear_pointer_tag(self, reg) -> None:
+        """清空寄存器的只读源指针标签。"""
+        self.set_pointer_tag(reg, PointerTag.NONE)
 
     def get_flag(self, flag_name: str) -> BitVec:
         """获取标志值。
@@ -300,5 +271,6 @@ class X86RegisterState:
         """
         new_state = X86RegisterState()
         new_state._registers = self._registers.copy()
+        new_state._pointer_tags = self._pointer_tags.copy()
         new_state._flags = self._flags.copy()
         return new_state

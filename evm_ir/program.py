@@ -195,7 +195,8 @@ class EVMProgram:
         merged.evm_stack.SP = expr
 
         # 合并其他字段（x86、storage、gas 等）
-        merged.x86_memory = global_states[0].mstate.x86_memory
+        # 显式 .copy() 避免共享同一 X86MemoryState 实例
+        merged.x86_memory = global_states[0].mstate.x86_memory.copy()
         merged.x86_registers = global_states[0].mstate.x86_registers
         merged.evm_gas = global_states[0].mstate.evm_gas
         # 保留 create_initial_state() 注入的调试元数据。

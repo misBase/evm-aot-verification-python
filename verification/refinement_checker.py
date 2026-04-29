@@ -8,6 +8,8 @@ import time
 from z3 import BitVec, BitVecVal, SolverFor, Distinct, unsat, sat, set_option, Select, And, ForAll
 from typing import TYPE_CHECKING, Tuple, Optional
 
+from state.smt_state import MemoryDomain
+
 if TYPE_CHECKING:
     from state.smt_state import SMTState
 
@@ -332,17 +334,6 @@ class RefinementChecker:
         这些槽位可能是执行过程中写入的值，也可能仍然是空理论/未预填的符号内容。
         这是一个调试接口，允许调用方手工控制检查范围。
 
-        这里保留一个独立的 sanity lemma：
-            r14_after == initial_state.stack_base + callengine_stack_byte_offset
-
-        它只用于隔离/固化执行后的地址环境，避免求解器在符号基址上做无关扩散；
-        当前固定槽位比较本身不依赖 sp 来反推栈顶地址。
-
-        prologue 固定做 `mov r14, [r13+0x38]; add r14, [r13+0x30]`，即
-        `r14_after = stack_base + byte_offset`。byte_offset 在 side-channel 字段
-        callengine_stack_byte_offset 中显式跟踪，不必让 Z3 穿透字节级 Memory Array。
-        R15_mem_base 同样用执行后 R15 寄存器固化。
-
         Args:
             evm_state: EVM to_z3() 执行后的 SMTState
             x86_state: x86 to_z3() 执行后的 SMTState
@@ -352,29 +343,12 @@ class RefinementChecker:
         Returns:
             (verified, message)
         """
-        from x86_64.models import Register
         from z3 import simplify, is_int_value
 
         if deadline is None:
             deadline = time.time() + (self.timeout_ms / 1000.0)
 
         stack_base = initial_state.stack_base  # 原始 R14_stack_base 纯变量
-        r13       = x86_state.x86_registers.get_register(Register.R13)
-        r14_after = x86_state.x86_registers.get_register(Register.R14)
-        r15_after = x86_state.x86_registers.get_register(Register.R15)
-
-        # 独立 sanity lemma：执行后 R14 = 初始栈基 + byte_delta。
-        # 固定槽位比较本身不依赖该关系取地址，但加入后可帮助隔离地址环境。
-        byte_delta = x86_state.callengine_stack_byte_offset
-        logical_stack_base_after = stack_base + byte_delta
-
-        isolation_assumptions = [
-            r14_after == logical_stack_base_after,
-            r13        == BitVecVal(0x00100000, 64),
-            stack_base == BitVecVal(0x00300000, 64),
-            r15_after  == BitVecVal(0x00500000, 64),
-        ]
-
         evm_stack = evm_state.evm_stack.Stack
 
         # 固定槽位坐标系的起点由初始预置窗口底部决定：
@@ -390,15 +364,14 @@ class RefinementChecker:
                     print(f"    └─ {msg}")
                 return False, msg
 
-            # 加入 lemma / 基址固化假设（每次 reset 后需重新加入）
-            for assumption in isolation_assumptions:
-                self.solver.add(assumption)
-
             # 从固定槽位坐标系底部向上第 i 个 32-byte 槽位：
             #   x86: load_256bit(stack_base - initial_num_inputs*0x20 + i*0x20)
             #   EVM: Stack[i]
             rel_offset = bottom_offset + i * 0x20
-            x86_val = x86_state.x86_memory.load_256bit(stack_base + BitVecVal(rel_offset, 64))
+            x86_val = x86_state.x86_memory.load_256bit(
+                stack_base + BitVecVal(rel_offset, 64),
+                domain=MemoryDomain.STACK,
+            )
             evm_val = Select(evm_stack, i)
 
             if self.verbose:

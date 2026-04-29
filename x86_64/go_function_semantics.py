@@ -14,9 +14,10 @@ from typing import Optional, Tuple
 from z3 import And, BitVec, BitVecVal, If, Lambda, Select, UGE, ULT
 
 from .aot_profile import X86AOTProfile
-from state.smt_state import SMTState
+from state.smt_state import SMTState, MemoryDomain
 from common import uninterpreted
 from common import arithmetic
+from x86_64.models import Register
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ class GoFunctionSemantics:
         addr_offset = self._compute_stack_address(new_sp)
         r14 = mstate.x86_registers.get_register(Register.R14)
         base_offset = r14 + BitVecVal(addr_offset, 64)
-        value = mstate.x86_memory.load_256bit(base_offset)
+        value = mstate.x86_memory.load_256bit(base_offset, domain=MemoryDomain.STACK)
         return value, new_sp, mstate
 
     def _push_uint256(self, sp: int, value: BitVec, mstate: SMTState) -> Tuple[int, SMTState]:
@@ -141,7 +142,7 @@ class GoFunctionSemantics:
         addr_offset = self._compute_stack_address(sp)
         r14 = mstate.x86_registers.get_register(Register.R14)
         base_offset = r14 + BitVecVal(addr_offset, 64)
-        mstate.x86_memory = mstate.x86_memory.store_256bit(base_offset, value)
+        mstate.x86_memory = mstate.x86_memory.store_256bit(base_offset, value, domain=MemoryDomain.STACK)
         new_sp = sp + LIMBS_PER_UINT256
         return new_sp, mstate
 
@@ -162,9 +163,53 @@ class GoFunctionSemantics:
         r13 = mstate.x86_registers.get_register(Register.R13)
         sp_offset = BitVecVal(self.aot_profile.offsets["stack_pointer"], 64)
         sp_bv = BitVecVal(sp, 64)
-        mstate.x86_memory = mstate.x86_memory.store_64bit(r13 + sp_offset, sp_bv)
+        mstate.x86_memory = mstate.x86_memory.store_64bit(
+            r13 + sp_offset, sp_bv, domain=MemoryDomain.CALLENGINE)
         # 同步 callEngine side-channel（保持与 x86 mov [r13+0x28], ... 的路径一致）
         mstate.callengine_stack_pointer_limbs = sp_bv
+        return mstate
+
+    def _sync_callengine_u64_field(self, mstate: SMTState, offset_name: str,
+                                   side_channel_name: str, value: BitVec) -> None:
+        r13 = mstate.x86_registers.get_register(Register.R13)
+        offset = BitVecVal(self.aot_profile.offsets[offset_name], 64)
+        setattr(mstate, side_channel_name, value)
+        mstate.x86_memory = mstate.x86_memory.store_64bit(
+            r13 + offset,
+            value,
+            domain=MemoryDomain.CALLENGINE,
+        )
+
+    def _clear_caller_saved_pointer_tags(self, mstate: SMTState) -> None:
+        for reg in (
+            Register.RAX, Register.RCX, Register.RDX, Register.RSI, Register.RDI,
+            Register.R8, Register.R9, Register.R10, Register.R11,
+        ):
+            mstate.x86_registers.clear_pointer_tag(reg)
+
+    def _update_return_data_source(self, mstate: SMTState, ret_size: BitVec,
+                                   byte_fn, effect_tag: str) -> SMTState:
+        size_64 = self._truncate_to_64(ret_size)
+        idx = BitVec(f"{effect_tag}_returndata_idx", 64)
+        old_return_data = mstate.return_data
+        mstate.return_data = Lambda(
+            idx,
+            If(ULT(idx, size_64), byte_fn(idx), Select(old_return_data, idx)),
+        )
+
+        return_data_ptr = BitVec(f"{effect_tag}_returndata_ptr", 64)
+        self._sync_callengine_u64_field(
+            mstate,
+            "return_data_pointer",
+            "callengine_return_data_pointer",
+            return_data_ptr,
+        )
+        self._sync_callengine_u64_field(
+            mstate,
+            "return_data_size",
+            "callengine_return_data_size_bytes",
+            size_64,
+        )
         return mstate
 
     def apply(self, status_code: int, func_index: Optional[int],
@@ -192,9 +237,13 @@ class GoFunctionSemantics:
             )
 
         if status_code == self.aot_profile.status_codes["call_go_host_function"]:
-            return self._dispatch_host_function(func_index, sp, mstate, evm_pc=evm_pc)
+            result = self._dispatch_host_function(func_index, sp, mstate, evm_pc=evm_pc)
+            self._clear_caller_saved_pointer_tags(result)
+            return result
         elif status_code == self.aot_profile.status_codes["call_builtin_function"]:
-            return self._dispatch_builtin_function(func_index, sp, mstate)
+            result = self._dispatch_builtin_function(func_index, sp, mstate)
+            self._clear_caller_saved_pointer_tags(result)
+            return result
         else:
             logger.warning(
                 "GoFunctionSemantics: unknown status_code=%d, skipping",
@@ -291,8 +340,7 @@ class GoFunctionSemantics:
     def _write_symbolic_memory_slice(self, mstate: SMTState, dest_offset: BitVec, size: BitVec,
                                      byte_fn, effect_tag: str,
                                      should_copy=None) -> SMTState:
-        """将一个符号化字节切片写入 x86 内存。"""
-        from state.smt_state import X86MemoryState
+        """将一个符号化字节切片写入 x86 内存（EVM 256-bit memory，R15 域）。"""
         from x86_64.models import Register
 
         dest_offset_64 = self._truncate_to_64(dest_offset)
@@ -309,11 +357,11 @@ class GoFunctionSemantics:
             ULT(relative, size_64),
         )
         write_cond = in_range if should_copy is None else And(should_copy, in_range)
-        new_memory = Lambda(
+        new_evm_array = Lambda(
             idx,
-            If(write_cond, byte_fn(relative), Select(mstate.x86_memory.Memory, idx)),
+            If(write_cond, byte_fn(relative), Select(mstate.x86_memory.evm_mem, idx)),
         )
-        mstate.x86_memory = X86MemoryState(memory_array=new_memory)
+        mstate.x86_memory = mstate.x86_memory._with_array(MemoryDomain.EVM, new_evm_array)
         return mstate
 
     def _handle_sload(self, sp: int, mstate: SMTState) -> SMTState:
@@ -336,7 +384,7 @@ class GoFunctionSemantics:
         """SHA3: pop offset, pop length, push sha3(memory, offset, length)。"""
         offset_bv, sp, mstate = self._pop_uint256(sp, mstate)
         length_bv, sp, mstate = self._pop_uint256(sp, mstate)
-        hash_val = uninterpreted.sha3_semantics(mstate.x86_memory.Memory, offset_bv, length_bv)
+        hash_val = uninterpreted.sha3_semantics(mstate.x86_memory.evm_mem, offset_bv, length_bv)
         sp, mstate = self._push_uint256(sp, hash_val, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -450,7 +498,7 @@ class GoFunctionSemantics:
         value, sp, mstate = self._pop_uint256(sp, mstate)
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
-        result = uninterpreted.create_semantics(value, offset, size, mstate.x86_memory.Memory, effect_id=evm_pc)
+        result = uninterpreted.create_semantics(value, offset, size, mstate.x86_memory.evm_mem, effect_id=evm_pc)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -462,7 +510,7 @@ class GoFunctionSemantics:
         size, sp, mstate = self._pop_uint256(sp, mstate)
         salt, sp, mstate = self._pop_uint256(sp, mstate)
         result = uninterpreted.create2_semantics(
-            value, offset, size, salt, mstate.x86_memory.Memory, effect_id=evm_pc
+            value, offset, size, salt, mstate.x86_memory.evm_mem, effect_id=evm_pc
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
@@ -477,10 +525,20 @@ class GoFunctionSemantics:
         args_size, sp, mstate = self._pop_uint256(sp, mstate)
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.Memory
+        old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.call_semantics(
             gas, addr, value, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=evm_pc)
+        effect_suffix = evm_pc if evm_pc is not None else "global"
+        mstate = self._update_return_data_source(
+            mstate,
+            ret_size,
+            lambda byte_index: uninterpreted.call_return_byte(
+                gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+                old_memory, byte_index, effect_id=evm_pc,
+            ),
+            effect_tag=f"call_{effect_suffix}",
+        )
         if evm_pc is not None:
             should_copy = uninterpreted.call_should_copy_return_data(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
@@ -510,10 +568,20 @@ class GoFunctionSemantics:
         args_size, sp, mstate = self._pop_uint256(sp, mstate)
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.Memory
+        old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.callcode_semantics(
             gas, addr, value, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=evm_pc)
+        effect_suffix = evm_pc if evm_pc is not None else "global"
+        mstate = self._update_return_data_source(
+            mstate,
+            ret_size,
+            lambda byte_index: uninterpreted.callcode_return_byte(
+                gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+                old_memory, byte_index, effect_id=evm_pc,
+            ),
+            effect_tag=f"callcode_{effect_suffix}",
+        )
         if evm_pc is not None:
             should_copy = uninterpreted.callcode_should_copy_return_data(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
@@ -542,10 +610,20 @@ class GoFunctionSemantics:
         args_size, sp, mstate = self._pop_uint256(sp, mstate)
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.Memory
+        old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.delegate_call_semantics(
             gas, addr, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=evm_pc)
+        effect_suffix = evm_pc if evm_pc is not None else "global"
+        mstate = self._update_return_data_source(
+            mstate,
+            ret_size,
+            lambda byte_index: uninterpreted.delegate_call_return_byte(
+                gas, addr, args_offset, args_size, ret_offset, ret_size,
+                old_memory, byte_index, effect_id=evm_pc,
+            ),
+            effect_tag=f"delegatecall_{effect_suffix}",
+        )
         if evm_pc is not None:
             should_copy = uninterpreted.delegate_call_should_copy_return_data(
                 gas, addr, args_offset, args_size, ret_offset, ret_size,
@@ -574,10 +652,20 @@ class GoFunctionSemantics:
         args_size, sp, mstate = self._pop_uint256(sp, mstate)
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.Memory
+        old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.static_call_semantics(
             gas, addr, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=evm_pc)
+        effect_suffix = evm_pc if evm_pc is not None else "global"
+        mstate = self._update_return_data_source(
+            mstate,
+            ret_size,
+            lambda byte_index: uninterpreted.static_call_return_byte(
+                gas, addr, args_offset, args_size, ret_offset, ret_size,
+                old_memory, byte_index, effect_id=evm_pc,
+            ),
+            effect_tag=f"staticcall_{effect_suffix}",
+        )
         if evm_pc is not None:
             mstate = self._write_call_return_data(
                 mstate,
@@ -746,6 +834,7 @@ class GoFunctionSemantics:
         mstate.x86_memory = mstate.x86_memory.store_64bit(
             r13 + BitVecVal(0x18, 64),
             new_size_bytes,
+            domain=MemoryDomain.CALLENGINE,
         )
         return mstate
 

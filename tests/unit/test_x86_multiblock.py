@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from z3 import BitVecVal, is_true, simplify
 
-from state.smt_state import SMTState
+from state.smt_state import SMTState, MemoryDomain
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register
 
@@ -36,12 +36,16 @@ def test_add_memory_destination_with_register_updates_flags():
     state = SMTState()
     state.x86_registers.set_register(Register.R13, BitVecVal(0x1000, 64))
     state.x86_registers.set_register(Register.RAX, BitVecVal(2, 64))
-    state.x86_memory = state.x86_memory.store_64bit(BitVecVal(0x1030, 64), BitVecVal(1, 64))
+    state.x86_memory = state.x86_memory.store_64bit(BitVecVal(0x1030, 64), BitVecVal(1, 64), domain=MemoryDomain.CALLENGINE)
+    # 同步 side-channel：[R13+0x30] 命中 callengine_stack_byte_offset 字段
+    state.callengine_stack_byte_offset = BitVecVal(1, 64)
 
     # add qword ptr [r13 + 0x30], rax
     out = _exec_single("49014530", state, base_addr=0x2D8)
 
-    assert is_true(simplify(out.x86_memory.load_64bit(BitVecVal(0x1030, 64)) == BitVecVal(3, 64)))
+    # ADD 后两条路径都应保持等价：side-channel 字段（生产路径）和 Array（兜底）
+    assert is_true(simplify(out.callengine_stack_byte_offset == BitVecVal(3, 64)))
+    assert is_true(simplify(out.x86_memory.load_64bit(BitVecVal(0x1030, 64), domain=MemoryDomain.CALLENGINE) == BitVecVal(3, 64)))
     assert is_true(simplify(out.x86_registers.get_flag("CF") == BitVecVal(0, 1)))
     assert is_true(simplify(out.x86_registers.get_flag("OF") == BitVecVal(0, 1)))
     assert is_true(simplify(out.x86_registers.get_flag("ZF") == BitVecVal(0, 1)))
@@ -52,13 +56,15 @@ def test_add_memory_destination_with_immediate_updates_flags():
     state = SMTState()
     state.x86_registers.set_register(Register.R13, BitVecVal(0x1000, 64))
     state.x86_memory = state.x86_memory.store_64bit(
-        BitVecVal(0x1030, 64), BitVecVal((1 << 64) - 1, 64)
+        BitVecVal(0x1030, 64), BitVecVal((1 << 64) - 1, 64), domain=MemoryDomain.CALLENGINE,
     )
+    state.callengine_stack_byte_offset = BitVecVal((1 << 64) - 1, 64)
 
     # add qword ptr [r13 + 0x30], 1
     out = _exec_single("4983453001", state, base_addr=0x2D8)
 
-    assert is_true(simplify(out.x86_memory.load_64bit(BitVecVal(0x1030, 64)) == BitVecVal(0, 64)))
+    assert is_true(simplify(out.callengine_stack_byte_offset == BitVecVal(0, 64)))
+    assert is_true(simplify(out.x86_memory.load_64bit(BitVecVal(0x1030, 64), domain=MemoryDomain.CALLENGINE) == BitVecVal(0, 64)))
     assert is_true(simplify(out.x86_registers.get_flag("CF") == BitVecVal(1, 1)))
     assert is_true(simplify(out.x86_registers.get_flag("OF") == BitVecVal(0, 1)))
     assert is_true(simplify(out.x86_registers.get_flag("ZF") == BitVecVal(1, 1)))
@@ -69,7 +75,8 @@ def test_inst_executor_supports_movabs_lea_and_add_mem_dest():
     state = SMTState()
     state.x86_registers.set_register(Register.R13, BitVecVal(0x1000, 64))
     state.x86_registers.set_register(Register.RAX, BitVecVal(1, 64))
-    state.x86_memory = state.x86_memory.store_64bit(BitVecVal(0x1030, 64), BitVecVal(2, 64))
+    state.x86_memory = state.x86_memory.store_64bit(BitVecVal(0x1030, 64), BitVecVal(2, 64), domain=MemoryDomain.CALLENGINE)
+    state.callengine_stack_byte_offset = BitVecVal(2, 64)
 
     # movabs rbx, imm64; lea r8, [rip+0x18]; add qword ptr [r13+0x30], rax
     insns = disassemble_hex("48bb00000000000000084c8d051800000049014530", base_addr=0x10F)
@@ -78,7 +85,8 @@ def test_inst_executor_supports_movabs_lea_and_add_mem_dest():
 
     assert is_true(simplify(state.x86_registers.get_register(Register.RBX) == BitVecVal(0x0800000000000000, 64)))
     assert is_true(simplify(state.x86_registers.get_register(Register.R8) == BitVecVal(0x138, 64)))
-    assert is_true(simplify(state.x86_memory.load_64bit(BitVecVal(0x1030, 64)) == BitVecVal(3, 64)))
+    assert is_true(simplify(state.callengine_stack_byte_offset == BitVecVal(3, 64)))
+    assert is_true(simplify(state.x86_memory.load_64bit(BitVecVal(0x1030, 64), domain=MemoryDomain.CALLENGINE) == BitVecVal(3, 64)))
 
 
 @pytest.mark.parametrize(

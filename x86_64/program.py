@@ -17,7 +17,7 @@ from .cfg import identify_basic_blocks
 from .cfg_executor import X86SymbolicExecutor
 from .cfg_strategies import X86DFSStrategy
 from .cfg_state import X86GlobalState
-from state.smt_state import SMTState
+from state.smt_state import SMTState, PointerTag
 
 
 class X86Program:
@@ -205,10 +205,12 @@ class X86Program:
         r15_value = merged_state.x86_registers.get_register(Register.R15)
         has_return = merged_state.return_length != BitVecVal(0, 64)
 
+        # 注意：result['memory'] 是 EVM 256-bit memory Array（R15 域）。
+        # callEngine 与 stack 域只在内部合并；refinement_checker 比对 return data 时只读 evm_mem。
         result = {
             'offset': merged_state.return_offset,
             'length': merged_state.return_length,
-            'memory': merged_state.x86_memory.Memory,
+            'memory': merged_state.x86_memory.evm_mem,
             'base_addr': r15_value,
             'has_return': has_return,
             'storage': merged_state.evm_storage.Storage,
@@ -243,7 +245,7 @@ class X86Program:
         result = {
             'offset': BitVecVal(0, 64),
             'length': BitVecVal(0, 64),
-            'memory': state.x86_memory.Memory,
+            'memory': state.x86_memory.evm_mem,
             'base_addr': r15_value,
             'has_return': BoolVal(False),
             'storage': state.evm_storage.Storage,
@@ -297,30 +299,43 @@ class X86Program:
             callengine_conditions,
         )
 
-        # 合并 x86 内存
-        first_memory = global_states[0].mstate.x86_memory.Memory
-        expr = first_memory
-        for gstate in reversed(global_states):
-            condition = gstate.get_constraints().as_bool()
-            expr = If(condition, gstate.mstate.x86_memory.Memory, expr)
-        merged.x86_memory.Memory = expr
+        # 合并 x86 内存（按 domain 分别合并三个 Z3 Array）
+        from state.smt_state import X86MemoryState
 
-        # 合并寄存器 (RBX, RDX, RCX, RAX)
-        for reg in [Register.RBX, Register.RDX, Register.RCX, Register.RAX]:
+        def _merge_array(get_array):
+            first = get_array(global_states[0])
+            expr = first
+            for gstate in reversed(global_states):
+                condition = gstate.get_constraints().as_bool()
+                expr = If(condition, get_array(gstate), expr)
+            return expr
+
+        merged.x86_memory = X86MemoryState.from_arrays(
+            _merge_array(lambda g: g.mstate.x86_memory.call_engine_mem),
+            _merge_array(lambda g: g.mstate.x86_memory.stack_mem),
+            _merge_array(lambda g: g.mstate.x86_memory.evm_mem),
+        )
+        merged.return_data = _merge_array(lambda g: g.mstate.return_data)
+
+        # 合并寄存器
+        all_reg_keys = set()
+        for gstate in global_states:
+            all_reg_keys.update(gstate.mstate.x86_registers._registers.keys())
+            all_reg_keys.update(gstate.mstate.x86_registers._pointer_tags.keys())
+
+        for reg_key in all_reg_keys:
+            reg = next((candidate for candidate in Register if candidate.value == reg_key), reg_key)
             first_val = global_states[0].mstate.x86_registers.get_register(reg)
             expr = first_val
             for gstate in reversed(global_states):
                 condition = gstate.get_constraints().as_bool()
                 expr = If(condition, gstate.mstate.x86_registers.get_register(reg), expr)
             merged.x86_registers.set_register(reg, expr)
-
-        # 合并 R15（基址寄存器）
-        first_r15 = global_states[0].mstate.x86_registers.get_register(Register.R15)
-        expr = first_r15
-        for gstate in reversed(global_states):
-            condition = gstate.get_constraints().as_bool()
-            expr = If(condition, gstate.mstate.x86_registers.get_register(Register.R15), expr)
-        merged.x86_registers.set_register(Register.R15, expr)
+            reg_tags = [gstate.mstate.x86_registers.get_pointer_tag(reg) for gstate in global_states]
+            merged.x86_registers.set_pointer_tag(
+                reg,
+                reg_tags[0] if all(tag == reg_tags[0] for tag in reg_tags) else PointerTag.NONE,
+            )
 
         # 合并 EVM storage（Go函数调用可能修改storage）
         from state.smt_state import EVMStorageState, EVMTransientStorageState
@@ -340,6 +355,11 @@ class X86Program:
         merged.evm_transient_storage = EVMTransientStorageState(storage_array=expr)
 
         # 保留 create_initial_state() 注入的调试元数据。
+        merged.calldata = global_states[0].mstate.calldata
+        merged.code = global_states[0].mstate.code
+        merged.calldatasize = global_states[0].mstate.calldatasize
+        merged.callvalue = global_states[0].mstate.callvalue
+        merged.basefee = global_states[0].mstate.basefee
         merged.stack_base = global_states[0].mstate.stack_base
         merged.stack_num_inputs = global_states[0].mstate.stack_num_inputs
 
@@ -367,7 +387,7 @@ class X86Program:
         result = {
             'offset': state.return_offset,
             'length': state.return_length,
-            'memory': state.x86_memory.Memory,
+            'memory': state.x86_memory.evm_mem,
             'base_addr': r15_value,
             'has_return': has_return,
             'storage': state.evm_storage.Storage,
@@ -376,73 +396,6 @@ class X86Program:
 
         return state, result
 
-    def _merge_path_results(self, path_results: List[Tuple[Any, Dict[str, Any]]]) -> Dict[str, Any]:
-        """使用嵌套If表达式合并路径结果。
-        
-        Args:
-            path_results: (condition, result_dict)元组列表
-            
-        Returns:
-            合并的结果字典
-        """
-        if not path_results:
-            # 如果没有路径，返回默认结果
-            from z3 import BitVecVal
-            from .models import Register
-            r15_default = BitVecVal(0, 64)  # 默认R15值
-            return {
-                'offset': BitVecVal(0, 64),
-                'length': BitVecVal(0, 64),
-                'memory': None,  # 将由调用者设置
-                'base_addr': r15_default,
-                'has_return': BoolVal(False)
-            }
-        
-        if len(path_results) == 1:
-            # 单条路径：返回其结果
-            _, result = path_results[0]
-            return result
-        
-        # 为每个字段构建嵌套If表达式
-        def build_nested_if(field_name: str, default_value):
-            """为字段构建嵌套If表达式。"""
-            expr = default_value
-            # 从后往前构建（右结合）
-            for i in range(len(path_results) - 1, -1, -1):
-                condition, result = path_results[i]
-                field_value = result.get(field_name, default_value)
-                expr = If(condition, field_value, expr)
-            return expr
-        
-        from z3 import BitVecVal, Array
-        from state.smt_state import X86MemoryState
-        from .models import Register
-        
-        # 从第一条路径结果获取内存数组类型
-        first_memory = path_results[0][1]['memory']
-        if first_memory is None:
-            # 创建默认内存数组
-            mem_state = X86MemoryState()
-            first_memory = mem_state.Memory
-        
-        # 获取默认base_addr
-        first_base_addr = path_results[0][1].get('base_addr', BitVecVal(0, 64))
-        
-        # 合并每个字段
-        merged_offset = build_nested_if('offset', BitVecVal(0, 64))
-        merged_length = build_nested_if('length', BitVecVal(0, 64))
-        merged_memory = build_nested_if('memory', first_memory)
-        merged_base_addr = build_nested_if('base_addr', first_base_addr)
-        merged_has_return = build_nested_if('has_return', BoolVal(False))
-        
-        return {
-            'offset': merged_offset,
-            'length': merged_length,
-            'memory': merged_memory,
-            'base_addr': merged_base_addr,
-            'has_return': merged_has_return
-        }
-    
     def __repr__(self):
         info = f"instructions={len(self.instructions)}, base_addr=0x{self.base_addr:x}"
         if self.blocks:

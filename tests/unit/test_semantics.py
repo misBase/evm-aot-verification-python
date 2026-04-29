@@ -8,7 +8,7 @@ from x86_64.semantics import X86SemanticsModel
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
 from x86_64.models import Register, X86Instruction
 from verification.refinement_checker import RefinementChecker
-from state.smt_state import SMTState, EVMMemoryState
+from state.smt_state import SMTState, EVMMemoryState, MemoryDomain
 from z3 import And, BitVec, BitVecVal, Select, Store, simplify, is_true, Solver, sat, unsat
 
 # x86-64 ADD操作十六进制序列（来自AOT编译器输出）
@@ -396,18 +396,21 @@ def _make_x86_ret_state(status_code: int, stack_values, sp: int = 0,
     status_addr = r13_base + GO_HPC_EVM_PROFILE.offsets["status_code"]
     sp_addr = r13_base + GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
     state.x86_memory = state.x86_memory.store_byte(
-        BitVecVal(status_addr, 64), BitVecVal(status_code, 8)
+        BitVecVal(status_addr, 64), BitVecVal(status_code, 8), domain=MemoryDomain.CALLENGINE,
     )
     state.x86_memory = state.x86_memory.store_64bit(
-        BitVecVal(sp_addr, 64), BitVecVal(sp % (1 << 64), 64)
+        BitVecVal(sp_addr, 64), BitVecVal(sp % (1 << 64), 64), domain=MemoryDomain.CALLENGINE,
     )
+    # 同步 callEngine side-channel —— 生产 ret/_extract_stack_pointer 直接读 BitVec 字段
+    state.callengine_status_code = BitVecVal(status_code, 8)
+    state.callengine_stack_pointer_limbs = BitVecVal(sp % (1 << 64), 64)
 
     stack_depth = len(stack_values)
     for push_index, value in enumerate(stack_values):
         stack_index = stack_depth - 1 - push_index
         addr = r14_base - (stack_index + 1) * 0x20
         state.x86_memory = state.x86_memory.store_256bit(
-            BitVecVal(addr, 64), BitVecVal(value, 256)
+            BitVecVal(addr, 64), BitVecVal(value, 256), domain=MemoryDomain.STACK,
         )
 
     return state
