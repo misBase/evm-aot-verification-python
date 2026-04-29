@@ -67,13 +67,21 @@ class SMTState:
 
     def __init__(self):
         """初始化统一SMT状态。"""
+        # EVM IR 的逻辑执行状态：用于符号化 EVM IR 的栈/内存语义。
+        # x86 路径不直接操作这两个字段，而是使用 x86_memory 的 STACK/EVM 域。
         self.evm_stack = EVMStackState()
         self.evm_memory = EVMMemoryState()
+
+        # x86 执行视图：用于符号化编译后机器码的内存/寄存器状态投影。
+        # 这些字段服务于 x86 指令级执行，不等同于上面的逻辑 EVM 状态。
+        self.x86_memory = X86MemoryState()
+        self.x86_registers = X86RegisterState()
+
+        # 统一语义状态中的 contract storage；名称里的 evm 强调语义来源，
+        # 不是指“仅 EVM 侧私有”，x86 host 语义也会读写它。
         self.evm_storage = EVMStorageState()
         self.evm_transient_storage = EVMTransientStorageState()
         self.evm_gas = EVMGasState()
-        self.x86_memory = X86MemoryState()
-        self.x86_registers = X86RegisterState()
 
         # RETURN/REVERT 数据跟踪
         # 存储偏移量和长度而不是提取Array
