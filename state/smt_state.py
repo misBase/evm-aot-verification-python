@@ -65,6 +65,26 @@ class SMTState:
         "callengine_builtin_arg0",
     )
 
+    ENVIRONMENT_FIELDS = (
+        "calldata",
+        "code",
+        "return_data",
+        "calldatasize",
+        "callvalue",
+        "basefee",
+        "self_address",
+        "origin_address",
+        "caller_address",
+        "block_timestamp",
+        "block_number",
+        "gaslimit",
+        "blobbasefee",
+    )
+
+    OPTIONAL_ENVIRONMENT_FIELDS = (
+        "blobhash_count",
+    )
+
     def __init__(self):
         """初始化统一SMT状态。"""
         # EVM IR 的逻辑执行状态：用于符号化 EVM IR 的栈/内存语义。
@@ -136,6 +156,13 @@ class SMTState:
         self.calldatasize = BitVec('CallDataSize', 256)
         self.callvalue = BitVec('CallValue', 256)
         self.basefee = BitVec('BaseFee', 256)
+        self.self_address = BitVec('SelfAddress', 256)
+        self.origin_address = BitVec('OriginAddress', 256)
+        self.caller_address = BitVec('CallerAddress', 256)
+        self.block_timestamp = BitVec('BlockTimestamp', 64)
+        self.block_number = BitVec('BlockNumber', 64)
+        self.gaslimit = BitVec('GasLimit', 64)
+        self.blobbasefee = BitVec('BlobBaseFee', 64)
 
     @classmethod
     def _create_empty(cls) -> 'SMTState':
@@ -165,13 +192,7 @@ class SMTState:
         self.copy_callengine_side_channels_to(new_state)
         new_state.pc = self.pc
 
-        # 复制环境信息
-        new_state.calldata = self.calldata
-        new_state.code = self.code
-        new_state.return_data = self.return_data
-        new_state.calldatasize = self.calldatasize
-        new_state.callvalue = self.callvalue
-        new_state.basefee = self.basefee
+        self.copy_environment_to(new_state)
         new_state.stack_base = getattr(self, 'stack_base', None)
         new_state.stack_num_inputs = getattr(self, 'stack_num_inputs', 0)
         new_state.unrouted_memory_domain = getattr(self, 'unrouted_memory_domain', None)
@@ -182,6 +203,14 @@ class SMTState:
         """复制 callEngine side-channel 字段到另一个 SMTState。"""
         for field in self.CALLENGINE_SIDE_CHANNEL_FIELDS:
             setattr(other, field, getattr(self, field))
+
+    def copy_environment_to(self, other: 'SMTState') -> None:
+        """复制共享环境字段到另一个 SMTState。"""
+        for field in self.ENVIRONMENT_FIELDS:
+            setattr(other, field, getattr(self, field))
+        for field in self.OPTIONAL_ENVIRONMENT_FIELDS:
+            if hasattr(self, field):
+                setattr(other, field, getattr(self, field))
 
     @classmethod
     def merge_callengine_side_channels(cls, merged_state: 'SMTState',

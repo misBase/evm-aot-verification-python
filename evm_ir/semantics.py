@@ -328,6 +328,26 @@ class EVMOperationSemantics:
                 raise ValueError("ADD requires 2 inputs")
             return self.add_semantics(inputs[0], inputs[1])
 
+        elif kind == "SUB":
+            if len(inputs) < 2:
+                raise ValueError("SUB requires 2 inputs")
+            return self.sub_semantics(inputs[0], inputs[1])
+
+        elif kind == "MUL":
+            if len(inputs) < 2:
+                raise ValueError("MUL requires 2 inputs")
+            return self.mul_semantics(inputs[0], inputs[1])
+
+        elif kind == "DIV":
+            if len(inputs) < 2:
+                raise ValueError("DIV requires 2 inputs")
+            return self.div_semantics(inputs[0], inputs[1])
+
+        elif kind == "MOD":
+            if len(inputs) < 2:
+                raise ValueError("MOD requires 2 inputs")
+            return self.mod_semantics(inputs[0], inputs[1])
+
         elif kind == "SDIV":
             if len(inputs) < 2:
                 raise ValueError("SDIV requires 2 inputs")
@@ -338,6 +358,11 @@ class EVMOperationSemantics:
                 raise ValueError("SMOD requires 2 inputs")
             return self.smod_semantics(inputs[0], inputs[1])
 
+        elif kind == "EXP":
+            if len(inputs) < 2:
+                raise ValueError("EXP requires 2 inputs")
+            return self.exp_semantics(inputs[0], inputs[1])
+
         elif kind == "SLT":
             if len(inputs) < 2:
                 raise ValueError("SLT requires 2 inputs")
@@ -347,6 +372,46 @@ class EVMOperationSemantics:
             if len(inputs) < 2:
                 raise ValueError("SGT requires 2 inputs")
             return self.sgt_semantics(inputs[0], inputs[1])
+
+        elif kind == "LT":
+            if len(inputs) < 2:
+                raise ValueError("LT requires 2 inputs")
+            return self.lt_semantics(inputs[0], inputs[1])
+
+        elif kind == "GT":
+            if len(inputs) < 2:
+                raise ValueError("GT requires 2 inputs")
+            return self.gt_semantics(inputs[0], inputs[1])
+
+        elif kind == "EQ":
+            if len(inputs) < 2:
+                raise ValueError("EQ requires 2 inputs")
+            return self.eq_semantics(inputs[0], inputs[1])
+
+        elif kind == "ISZERO":
+            if len(inputs) < 1:
+                raise ValueError("ISZERO requires 1 input")
+            return self.iszero_semantics(inputs[0])
+
+        elif kind == "AND":
+            if len(inputs) < 2:
+                raise ValueError("AND requires 2 inputs")
+            return self.and_semantics(inputs[0], inputs[1])
+
+        elif kind == "OR":
+            if len(inputs) < 2:
+                raise ValueError("OR requires 2 inputs")
+            return self.or_semantics(inputs[0], inputs[1])
+
+        elif kind == "XOR":
+            if len(inputs) < 2:
+                raise ValueError("XOR requires 2 inputs")
+            return self.xor_semantics(inputs[0], inputs[1])
+
+        elif kind == "NOT":
+            if len(inputs) < 1:
+                raise ValueError("NOT requires 1 input")
+            return self.not_semantics(inputs[0])
 
         elif kind == "SIGNEXTEND":
             if len(inputs) < 2:
@@ -744,6 +809,62 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         state.evm_stack = stack_after_pop3
         return state
 
+    elif kind == "CODESIZE":
+        state.evm_stack = state.evm_stack.push(ZeroExt(192, state.callengine_code_size_bytes))
+        return state
+
+    elif kind == "CODECOPY":
+        # CODECOPY: memOffset = pop(), codeOffset = pop(), length = pop()
+        mem_offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        code_offset_bv, stack_after_pop2 = stack_after_pop1.pop()
+        length_bv, stack_after_pop3 = stack_after_pop2.pop()
+
+        code_offset_64 = _uint256_to_u64_with_overflow_max(code_offset_bv)
+        code_size_64 = state.callengine_code_size_bytes
+
+        def code_byte(relative_index):
+            code_index = code_offset_64 + relative_index
+            return If(
+                ULT(code_index, code_size_64),
+                Select(state.code, code_index),
+                BitVecVal(0, 8),
+            )
+
+        state.evm_memory = _write_symbolic_memory_slice(
+            state.evm_memory,
+            mem_offset_bv,
+            length_bv,
+            code_byte,
+            effect_tag=f"codecopy_idx_{op.pc}",
+        )
+        state.evm_stack = stack_after_pop3
+        return state
+
+    elif kind == "RETURNDATASIZE":
+        state.evm_stack = state.evm_stack.push(ZeroExt(192, state.callengine_return_data_size_bytes))
+        return state
+
+    elif kind == "RETURNDATACOPY":
+        # RETURNDATACOPY: memOffset = pop(), returnDataOffset = pop(), length = pop()
+        mem_offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        data_offset_bv, stack_after_pop2 = stack_after_pop1.pop()
+        length_bv, stack_after_pop3 = stack_after_pop2.pop()
+
+        data_offset_64 = _uint256_to_u64_with_overflow_max(data_offset_bv)
+
+        def return_data_byte(relative_index):
+            return Select(state.return_data, data_offset_64 + relative_index)
+
+        state.evm_memory = _write_symbolic_memory_slice(
+            state.evm_memory,
+            mem_offset_bv,
+            length_bv,
+            return_data_byte,
+            effect_tag=f"returndatacopy_idx_{op.pc}",
+        )
+        state.evm_stack = stack_after_pop3
+        return state
+
     elif kind == "CALLVALUE":
         # CALLVALUE: Push callvalue onto stack
         state.evm_stack = state.evm_stack.push(state.callvalue)
@@ -756,8 +877,66 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         state.evm_stack = stack_after_pop2.push(hash_val)
         return state
 
+    elif kind == "MCOPY":
+        # MCOPY: memOffset = pop(), srcOffset = pop(), length = pop()
+        dst_offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        src_offset_bv, stack_after_pop2 = stack_after_pop1.pop()
+        length_bv, stack_after_pop3 = stack_after_pop2.pop()
+
+        dst_offset_64 = _truncate_to_64(dst_offset_bv)
+        src_offset_64 = _truncate_to_64(src_offset_bv)
+        length_64 = _truncate_to_64(length_bv)
+        old_memory = state.evm_memory.Memory
+
+        state.evm_memory = _write_symbolic_memory_slice(
+            state.evm_memory,
+            dst_offset_bv,
+            length_bv,
+            lambda relative_index: Select(old_memory, src_offset_64 + relative_index),
+            effect_tag=f"mcopy_idx_{op.pc}",
+        )
+        copied_end = dst_offset_64 + length_64
+        state.evm_memory = EVMMemoryState(
+            memory_array=state.evm_memory.Memory,
+            msize=If(UGE(copied_end, state.evm_memory.MSize), copied_end, state.evm_memory.MSize),
+        )
+        state.evm_stack = stack_after_pop3
+        return state
+
+    elif kind == "GASPRICE":
+        state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))
+        return state
+
+    elif kind == "COINBASE":
+        state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))
+        return state
+
+    elif kind == "TIMESTAMP":
+        state.evm_stack = state.evm_stack.push(ZeroExt(192, state.block_timestamp))
+        return state
+
+    elif kind == "NUMBER":
+        state.evm_stack = state.evm_stack.push(ZeroExt(192, state.block_number))
+        return state
+
+    elif kind == "DIFFICULTY":
+        state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))
+        return state
+
+    elif kind == "GASLIMIT":
+        state.evm_stack = state.evm_stack.push(ZeroExt(192, state.gaslimit))
+        return state
+
+    elif kind == "CHAINID":
+        state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))
+        return state
+
     elif kind == "BASEFEE":
         state.evm_stack = state.evm_stack.push(state.basefee)
+        return state
+
+    elif kind == "BLOBBASEFEE":
+        state.evm_stack = state.evm_stack.push(ZeroExt(192, state.blobbasefee))
         return state
 
     elif kind == "GAS":
@@ -765,6 +944,26 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # Gas is 64-bit, zero-extend to 256-bit for stack
         gas_256 = ZeroExt(192, state.evm_gas.Gas)
         state.evm_stack = state.evm_stack.push(gas_256)
+        return state
+
+    elif kind == "PC":
+        state.evm_stack = state.evm_stack.push(BitVecVal(op.pc, 256))
+        return state
+
+    elif kind == "MSIZE":
+        state.evm_stack = state.evm_stack.push(ZeroExt(192, state.evm_memory.MSize))
+        return state
+
+    elif kind == "ADDRESS":
+        state.evm_stack = state.evm_stack.push(state.self_address)
+        return state
+
+    elif kind == "ORIGIN":
+        state.evm_stack = state.evm_stack.push(state.origin_address)
+        return state
+
+    elif kind == "CALLER":
+        state.evm_stack = state.evm_stack.push(state.caller_address)
         return state
 
     elif kind == "BALANCE":
@@ -810,6 +1009,17 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     elif kind == "BLOCKHASH":
         block_number_bv, stack1 = state.evm_stack.pop()
         result = uninterpreted.block_hash_semantics(block_number_bv)
+        state.evm_stack = stack1.push(result)
+        return state
+
+    elif kind == "BLOBHASH":
+        index_bv, stack1 = state.evm_stack.pop()
+        blobhash_count = getattr(state, "blobhash_count", BitVecVal(0, 64))
+        result = If(
+            ULT(index_bv, ZeroExt(192, blobhash_count)),
+            uninterpreted.blob_hash_semantics(index_bv),
+            BitVecVal(0, 256),
+        )
         state.evm_stack = stack1.push(result)
         return state
 

@@ -419,15 +419,15 @@ class GoFunctionSemantics:
         dest_offset, sp, mstate = self._pop_uint256(sp, mstate)
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
-        effect_suffix = evm_pc if evm_pc is not None else "global"
+        effect_id = evm_pc if evm_pc is not None else 0
         mstate = self._write_symbolic_memory_slice(
             mstate,
             dest_offset,
             size,
             lambda byte_index: uninterpreted.ext_code_copy_byte(
-                addr, offset, byte_index, effect_id=evm_pc,
+                addr, offset, byte_index, effect_id=effect_id,
             ),
-            effect_tag=f"extcodecopy_idx_{effect_suffix}",
+            effect_tag=f"extcodecopy_idx_{effect_id}",
         )
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
@@ -495,22 +495,24 @@ class GoFunctionSemantics:
 
     def _handle_create(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
         """CREATE: pop value, offset, size; push new_address。"""
+        effect_id = evm_pc if evm_pc is not None else 0
         value, sp, mstate = self._pop_uint256(sp, mstate)
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
-        result = uninterpreted.create_semantics(value, offset, size, mstate.x86_memory.evm_mem, effect_id=evm_pc)
+        result = uninterpreted.create_semantics(value, offset, size, mstate.x86_memory.evm_mem, effect_id=effect_id)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
     def _handle_create2(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
         """CREATE2: pop value, offset, size, salt; push new_address。"""
+        effect_id = evm_pc if evm_pc is not None else 0
         value, sp, mstate = self._pop_uint256(sp, mstate)
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
         salt, sp, mstate = self._pop_uint256(sp, mstate)
         result = uninterpreted.create2_semantics(
-            value, offset, size, salt, mstate.x86_memory.evm_mem, effect_id=evm_pc
+            value, offset, size, salt, mstate.x86_memory.evm_mem, effect_id=effect_id
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
@@ -518,6 +520,7 @@ class GoFunctionSemantics:
 
     def _handle_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
         """CALL: pop gas, addr, value, argsOffset, argsSize, retOffset, retSize; push success。"""
+        effect_id = evm_pc if evm_pc is not None else 0
         gas, sp, mstate = self._pop_uint256(sp, mstate)
         addr, sp, mstate = self._pop_uint256(sp, mstate)
         value, sp, mstate = self._pop_uint256(sp, mstate)
@@ -528,39 +531,39 @@ class GoFunctionSemantics:
         old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.call_semantics(
             gas, addr, value, args_offset, args_size, ret_offset, ret_size,
-            old_memory, effect_id=evm_pc)
-        effect_suffix = evm_pc if evm_pc is not None else "global"
+            old_memory, effect_id=effect_id)
+        effect_suffix = effect_id
         mstate = self._update_return_data_source(
             mstate,
             ret_size,
             lambda byte_index: uninterpreted.call_return_byte(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
-                old_memory, byte_index, effect_id=evm_pc,
+                old_memory, byte_index, effect_id=effect_id,
             ),
             effect_tag=f"call_{effect_suffix}",
         )
-        if evm_pc is not None:
-            should_copy = uninterpreted.call_should_copy_return_data(
+        should_copy = uninterpreted.call_should_copy_return_data(
+            gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+            old_memory, effect_id=effect_id,
+        )
+        mstate = self._write_call_return_data(
+            mstate,
+            ret_offset,
+            ret_size,
+            lambda byte_index: uninterpreted.call_return_byte(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
-                old_memory, effect_id=evm_pc,
-            )
-            mstate = self._write_call_return_data(
-                mstate,
-                ret_offset,
-                ret_size,
-                lambda byte_index: uninterpreted.call_return_byte(
-                    gas, addr, value, args_offset, args_size, ret_offset, ret_size,
-                    old_memory, byte_index, effect_id=evm_pc,
-                ),
-                effect_id=evm_pc,
-                should_copy=should_copy,
-            )
+                old_memory, byte_index, effect_id=effect_id,
+            ),
+            effect_id=effect_id,
+            should_copy=should_copy,
+        )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
     def _handle_call_code(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
         """CALLCODE: 与 CALL 的参数签名相同，压入 success。"""
+        effect_id = evm_pc if evm_pc is not None else 0
         gas, sp, mstate = self._pop_uint256(sp, mstate)
         addr, sp, mstate = self._pop_uint256(sp, mstate)
         value, sp, mstate = self._pop_uint256(sp, mstate)
@@ -571,39 +574,39 @@ class GoFunctionSemantics:
         old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.callcode_semantics(
             gas, addr, value, args_offset, args_size, ret_offset, ret_size,
-            old_memory, effect_id=evm_pc)
-        effect_suffix = evm_pc if evm_pc is not None else "global"
+            old_memory, effect_id=effect_id)
+        effect_suffix = effect_id
         mstate = self._update_return_data_source(
             mstate,
             ret_size,
             lambda byte_index: uninterpreted.callcode_return_byte(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
-                old_memory, byte_index, effect_id=evm_pc,
+                old_memory, byte_index, effect_id=effect_id,
             ),
             effect_tag=f"callcode_{effect_suffix}",
         )
-        if evm_pc is not None:
-            should_copy = uninterpreted.callcode_should_copy_return_data(
+        should_copy = uninterpreted.callcode_should_copy_return_data(
+            gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+            old_memory, effect_id=effect_id,
+        )
+        mstate = self._write_call_return_data(
+            mstate,
+            ret_offset,
+            ret_size,
+            lambda byte_index: uninterpreted.callcode_return_byte(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
-                old_memory, effect_id=evm_pc,
-            )
-            mstate = self._write_call_return_data(
-                mstate,
-                ret_offset,
-                ret_size,
-                lambda byte_index: uninterpreted.callcode_return_byte(
-                    gas, addr, value, args_offset, args_size, ret_offset, ret_size,
-                    old_memory, byte_index, effect_id=evm_pc,
-                ),
-                effect_id=evm_pc,
-                should_copy=should_copy,
-            )
+                old_memory, byte_index, effect_id=effect_id,
+            ),
+            effect_id=effect_id,
+            should_copy=should_copy,
+        )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
     def _handle_delegate_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
         """DELEGATECALL: 弹出 gas、addr、argsOffset、argsSize、retOffset、retSize，压入 success。"""
+        effect_id = evm_pc if evm_pc is not None else 0
         gas, sp, mstate = self._pop_uint256(sp, mstate)
         addr, sp, mstate = self._pop_uint256(sp, mstate)
         args_offset, sp, mstate = self._pop_uint256(sp, mstate)
@@ -613,39 +616,39 @@ class GoFunctionSemantics:
         old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.delegate_call_semantics(
             gas, addr, args_offset, args_size, ret_offset, ret_size,
-            old_memory, effect_id=evm_pc)
-        effect_suffix = evm_pc if evm_pc is not None else "global"
+            old_memory, effect_id=effect_id)
+        effect_suffix = effect_id
         mstate = self._update_return_data_source(
             mstate,
             ret_size,
             lambda byte_index: uninterpreted.delegate_call_return_byte(
                 gas, addr, args_offset, args_size, ret_offset, ret_size,
-                old_memory, byte_index, effect_id=evm_pc,
+                old_memory, byte_index, effect_id=effect_id,
             ),
             effect_tag=f"delegatecall_{effect_suffix}",
         )
-        if evm_pc is not None:
-            should_copy = uninterpreted.delegate_call_should_copy_return_data(
+        should_copy = uninterpreted.delegate_call_should_copy_return_data(
+            gas, addr, args_offset, args_size, ret_offset, ret_size,
+            old_memory, effect_id=effect_id,
+        )
+        mstate = self._write_call_return_data(
+            mstate,
+            ret_offset,
+            ret_size,
+            lambda byte_index: uninterpreted.delegate_call_return_byte(
                 gas, addr, args_offset, args_size, ret_offset, ret_size,
-                old_memory, effect_id=evm_pc,
-            )
-            mstate = self._write_call_return_data(
-                mstate,
-                ret_offset,
-                ret_size,
-                lambda byte_index: uninterpreted.delegate_call_return_byte(
-                    gas, addr, args_offset, args_size, ret_offset, ret_size,
-                    old_memory, byte_index, effect_id=evm_pc,
-                ),
-                effect_id=evm_pc,
-                should_copy=should_copy,
-            )
+                old_memory, byte_index, effect_id=effect_id,
+            ),
+            effect_id=effect_id,
+            should_copy=should_copy,
+        )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
     def _handle_static_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
         """STATICCALL: 弹出 gas、addr、argsOffset、argsSize、retOffset、retSize，压入 success。"""
+        effect_id = evm_pc if evm_pc is not None else 0
         gas, sp, mstate = self._pop_uint256(sp, mstate)
         addr, sp, mstate = self._pop_uint256(sp, mstate)
         args_offset, sp, mstate = self._pop_uint256(sp, mstate)
@@ -655,28 +658,27 @@ class GoFunctionSemantics:
         old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.static_call_semantics(
             gas, addr, args_offset, args_size, ret_offset, ret_size,
-            old_memory, effect_id=evm_pc)
-        effect_suffix = evm_pc if evm_pc is not None else "global"
+            old_memory, effect_id=effect_id)
+        effect_suffix = effect_id
         mstate = self._update_return_data_source(
             mstate,
             ret_size,
             lambda byte_index: uninterpreted.static_call_return_byte(
                 gas, addr, args_offset, args_size, ret_offset, ret_size,
-                old_memory, byte_index, effect_id=evm_pc,
+                old_memory, byte_index, effect_id=effect_id,
             ),
             effect_tag=f"staticcall_{effect_suffix}",
         )
-        if evm_pc is not None:
-            mstate = self._write_call_return_data(
-                mstate,
-                ret_offset,
-                ret_size,
-                lambda byte_index: uninterpreted.static_call_return_byte(
-                    gas, addr, args_offset, args_size, ret_offset, ret_size,
-                    old_memory, byte_index, effect_id=evm_pc,
-                ),
-                effect_id=evm_pc,
-            )
+        mstate = self._write_call_return_data(
+            mstate,
+            ret_offset,
+            ret_size,
+            lambda byte_index: uninterpreted.static_call_return_byte(
+                gas, addr, args_offset, args_size, ret_offset, ret_size,
+                old_memory, byte_index, effect_id=effect_id,
+            ),
+            effect_id=effect_id,
+        )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate

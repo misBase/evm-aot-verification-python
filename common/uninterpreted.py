@@ -53,6 +53,12 @@ def block_hash_semantics(block_number: BitVecRef) -> BitVecRef:
     return f(block_number)
 
 
+def blob_hash_semantics(index: BitVecRef) -> BitVecRef:
+    """BLOBHASH: uninterpreted blob versioned hash by index。"""
+    f = Function('evm_blob_hash', BitVecSort(256), BitVecSort(256))
+    return f(index)
+
+
 def _scoped_name(base_name: str, effect_id: Optional[int]) -> str:
     """为需要结构化 identity 的 host effect 构造作用域化名字。"""
     if effect_id is None:

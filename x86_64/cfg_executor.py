@@ -308,13 +308,9 @@ class X86SymbolicExecutor:
             ts_expr = If(cond, s.mstate.evm_transient_storage.TransientStorage, ts_expr)
         merged_mstate.evm_transient_storage = EVMTransientStorageState(storage_array=ts_expr)
 
-        # 环境信息共享
-        merged_mstate.calldata = states[0].mstate.calldata
-        merged_mstate.code = states[0].mstate.code
+        # 环境信息在 x86 CFG 分支间共享；return_data 可能被 host-call 路径更新，单独合并。
+        states[0].mstate.copy_environment_to(merged_mstate)
         merged_mstate.return_data = _merge_array(lambda s: s.mstate.return_data)
-        merged_mstate.calldatasize = states[0].mstate.calldatasize
-        merged_mstate.callvalue = states[0].mstate.callvalue
-        merged_mstate.basefee = states[0].mstate.basefee
         merged_mstate.stack_base = states[0].mstate.stack_base
         merged_mstate.stack_num_inputs = states[0].mstate.stack_num_inputs
         # 保留所有路径共享的 unrouted_memory_domain（生产路径都是 None）
