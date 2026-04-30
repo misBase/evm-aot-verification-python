@@ -7,7 +7,7 @@
 
 from typing import Optional
 
-from z3 import BitVec, Array, BitVecSort, Extract
+from z3 import BitVec, Array, BitVecSort
 
 from state.evm_stack_state import EVMStackState
 from state.evm_memory_state import EVMMemoryState
@@ -153,7 +153,10 @@ class SMTState:
         self.calldata = Array('CallData', BitVecSort(64), BitVecSort(8))
         self.code = Array('CodeData', BitVecSort(64), BitVecSort(8))
         self.return_data = Array('ReturnData', BitVecSort(64), BitVecSort(8))
-        self.calldatasize = BitVec('CallDataSize', 256)
+        # Go evmLedgerContext.inputSliceLen / len(scope.Contract.Input).
+        # CALLDATASIZE opcode semantics zero-extend this 64-bit context value
+        # before pushing it onto the 256-bit EVM stack.
+        self.calldatasize = BitVec('CallDataSize', 64)
         self.callvalue = BitVec('CallValue', 256)
         self.basefee = BitVec('BaseFee', 256)
         self.self_address = BitVec('SelfAddress', 256)
@@ -255,21 +258,26 @@ class SMTState:
             setattr(merged_state, field, value)
 
     @staticmethod
-    def create_initial_state(num_inputs: int = 0) -> 'SMTState':
+    def create_initial_state(
+        num_inputs: int = 0,
+        calldata_size_bytes: Optional[int] = None,
+    ) -> 'SMTState':
         """创建具有符号输入的初始SMT状态。
 
         创建一个新状态，包含：
         - EVM栈上的指定数量的符号256位值
         - 映射到x86内存布局的EVM栈
+        - EVM calldatasize context 与 x86 callEngine 64-bit input_size 的一致映射
 
         Args:
             num_inputs: 要创建的符号输入数量（默认0）
+            calldata_size_bytes: 固定 calldata 字节长度；None 表示使用 64-bit 符号长度。
 
         Returns:
             具有符号输入的已初始化SMTState
 
         Raises:
-            ValueError: 如果num_inputs为负数或过大（>1024）
+            ValueError: 如果num_inputs为负数或过大（>1024），或 calldata_size_bytes 超出 uint64
         """
         # Lazy imports to avoid circular dependencies
         from common.uint256 import Uint256
@@ -283,6 +291,15 @@ class SMTState:
             raise ValueError(f"num_inputs must be non-negative, got {num_inputs}")
         if num_inputs > 1024:
             raise ValueError(f"num_inputs must be <= 1024 (EVM stack limit), got {num_inputs}")
+        if calldata_size_bytes is not None:
+            if calldata_size_bytes < 0:
+                raise ValueError(
+                    f"calldata_size_bytes must be non-negative, got {calldata_size_bytes}"
+                )
+            if calldata_size_bytes > (1 << 64) - 1:
+                raise ValueError(
+                    f"calldata_size_bytes must fit in uint64, got {calldata_size_bytes}"
+                )
 
         # 创建基础状态
         initial_state = SMTState()
@@ -372,7 +389,11 @@ class SMTState:
         # 使用SP = 0初始化EVM栈
         initial_state.evm_stack = EVMStackState(sp=IntVal(0))
 
-        calldata_size_64 = Extract(63, 0, initial_state.calldatasize)
+        if calldata_size_bytes is None:
+            calldata_size_64 = initial_state.calldatasize
+        else:
+            calldata_size_64 = BitVecVal(calldata_size_bytes, 64)
+            initial_state.calldatasize = calldata_size_64
         initial_state.callengine_input_size_bytes = calldata_size_64
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
             r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["input_size"], 64),

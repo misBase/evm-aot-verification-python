@@ -304,15 +304,15 @@ def test_verify_three_block_program_pair():
     )
 
 @pytest.mark.skip(reason="里面包含栈溢出的问题，TAG指令当前未建模好，导致两边结果不一致，待错误码建模完善后再启用")
-def test_jumpi_2block_block_program_pair():
-    """验证 jumpi_2block.json 与 jumpi_2block.hex 的 JUMPI return 结果一致性。
+def test_jumpi_2block_err_program_pair():
+    """验证 jumpi_2block_err.json 与 jumpi_2block_err.hex 的 JUMPI return 结果一致性。
 
     EVM IR 程序根据 calldata 首字节决定静态 JUMPI 是否跳转，
     分别返回 memory[0x40:0x41] 或 memory[0x41:0x42] 的 1 字节结果。
     """
     test_dir = os.path.dirname(__file__)
-    ir_path = os.path.join(test_dir, "..", "data", "jumpi_2block.json")
-    x86_hex_path = os.path.join(test_dir, "..", "data", "jumpi_2block.hex")
+    ir_path = os.path.join(test_dir, "..", "data", "jumpi_2block_err.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "jumpi_2block_err.hex")
 
     compiler_result = load_ir_from_json(ir_path)
     evm_program = EVMProgram(compiler_result)
@@ -331,7 +331,43 @@ def test_jumpi_2block_block_program_pair():
     )
 
     assert verified, (
-        f"jumpi_2block program pair verification failed. "
+        f"jumpi_2block_err program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent return results. Error: {msg}"
+    )
+
+
+def test_jumpi_2block_ok_program_pair():
+    """验证修正后的 jumpi_2block_ok.json 与 jumpi_2block_ok.hex。
+
+    EVM IR 程序根据 calldata 第 0 字节静态 JUMPI：
+    条件非零返回 memory[0x41:0x42]，条件为零返回 memory[0x40:0x41]。
+    该 fixture 由 Go 侧从同一段修正后的 EVM bytecode 生成 IR 和 x64 机器码。
+    """
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "jumpi_2block_ok.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "jumpi_2block_ok.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=600000, verbose=True)
+    # The branch condition still depends on symbolic CallData[0], while this
+    # fixture fixes the runtime calldata length to the single byte it inspects.
+    initial_state = SMTState.create_initial_state(calldata_size_bytes=1)
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+    )
+
+    assert verified, (
+        f"jumpi_2block_ok program pair verification failed. "
         f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
         f"should produce equivalent return results. Error: {msg}"
     )

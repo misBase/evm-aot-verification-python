@@ -483,7 +483,7 @@ def test_calldatacopy_zero_padding_and_stack_order():
 
     state = SMTState()
     state.evm_memory = EVMMemoryState(msize=BitVecVal(0, 64))
-    state.calldatasize = BitVecVal(1, 256)
+    state.calldatasize = BitVecVal(1, 64)
     state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
 
     # Go / EVM 语义：top=memOffset, second=dataOffset, third=length
@@ -505,7 +505,7 @@ def test_calldataload_zero_padding():
     op = EvmOperator(kind="CALLDATALOAD", pc=0)
 
     state = SMTState()
-    state.calldatasize = BitVecVal(2, 256)
+    state.calldatasize = BitVecVal(2, 64)
     state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
     state.calldata = Store(state.calldata, BitVecVal(1, 64), BitVecVal(0xBB, 8))
     state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))
@@ -519,12 +519,27 @@ def test_calldataload_zero_padding():
     assert solver.check() == sat
 
 
+def test_calldatasize_zero_extends_context_size():
+    """测试 CALLDATASIZE 对齐 Go 的 uint256.SetUint64(len(input))。"""
+    op = EvmOperator(kind="CALLDATASIZE", pc=0)
+
+    state = SMTState()
+    state.calldatasize = BitVecVal(5, 64)
+
+    result_state = evm_operator_to_z3(op, state)
+    loaded, _ = result_state.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(loaded != BitVecVal(5, 256))
+    assert solver.check() == unsat
+
+
 def test_calldataload_offset_overflow_returns_zero():
     """测试 CALLDATALOAD 的 offset 超过 uint64 时返回 0。"""
     op = EvmOperator(kind="CALLDATALOAD", pc=1)
 
     state = SMTState()
-    state.calldatasize = BitVecVal(32, 256)
+    state.calldatasize = BitVecVal(32, 64)
     state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
     state.evm_stack = state.evm_stack.push(BitVecVal((1 << 64), 256))
 
@@ -541,7 +556,7 @@ def test_calldatacopy_symbolic_length_writes_memory():
     op = EvmOperator(kind="CALLDATACOPY", pc=1)
 
     state = SMTState()
-    state.calldatasize = BitVecVal(1, 256)
+    state.calldatasize = BitVecVal(1, 64)
     state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAB, 8))
 
     symbolic_length = BitVec("calldatacopy_len", 256)

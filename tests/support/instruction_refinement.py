@@ -311,7 +311,7 @@ def _initialize_evm_readonly_sources(
         readonly_words["return_data"],
     )
     if case.calldata_size_bytes is not None:
-        state.calldatasize = BitVecVal(case.calldata_size_bytes, 256)
+        state.calldatasize = BitVecVal(case.calldata_size_bytes, 64)
         state.callengine_input_size_bytes = BitVecVal(case.calldata_size_bytes, 64)
     if case.code_size_bytes is not None:
         state.callengine_code_size_bytes = BitVecVal(case.code_size_bytes, 64)

@@ -1,0 +1,174 @@
+{
+  "control_frames": [
+    {
+      "is_jump_target": false,
+      "is_stop": false,
+      "max_depth": 1022,
+      "min_depth": 0,
+      "operations": [
+        {
+          "kind": "TAG",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "128",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "64",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 2
+        },
+        {
+          "kind": "MSTORE",
+          "pc": 4
+        },
+        {
+          "immediate": "1",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 5
+        },
+        {
+          "immediate": "65",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 7
+        },
+        {
+          "kind": "MSTORE",
+          "pc": 9
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 10
+        },
+        {
+          "kind": "CALLDATALOAD",
+          "pc": 12
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 13
+        },
+        {
+          "kind": "BYTE",
+          "pc": 15
+        },
+        {
+          "kind": "BLOCKEND",
+          "pc": 18
+        },
+        {
+          "immediate": "27",
+          "is_static": true,
+          "kind": "JUMPI",
+          "param": 1,
+          "pc": 18
+        }
+      ],
+      "pc": 0,
+      "stack_depth": 0,
+      "static_gas": 43
+    },
+    {
+      "is_jump_target": false,
+      "is_stop": true,
+      "max_depth": 1021,
+      "min_depth": 0,
+      "operations": [
+        {
+          "kind": "TAG",
+          "pc": 18
+        },
+        {
+          "immediate": "1",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 19
+        },
+        {
+          "immediate": "39",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 21
+        },
+        {
+          "immediate": "1",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 23
+        },
+        {
+          "kind": "ADD",
+          "pc": 25
+        },
+        {
+          "kind": "RETURN",
+          "pc": 26
+        },
+        {
+          "kind": "BLOCKEND",
+          "pc": 27
+        },
+        {
+          "immediate": "27",
+          "is_static": true,
+          "kind": "JUMP",
+          "pc": 27
+        }
+      ],
+      "pc": 19,
+      "stack_depth": 0,
+      "static_gas": 12
+    },
+    {
+      "is_jump_target": true,
+      "is_stop": true,
+      "max_depth": 1022,
+      "min_depth": 0,
+      "operations": [
+        {
+          "kind": "TAG",
+          "param": 3,
+          "pc": 27
+        },
+        {
+          "immediate": "1",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 28
+        },
+        {
+          "immediate": "65",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 30
+        },
+        {
+          "kind": "RETURN",
+          "pc": 32
+        },
+        {
+          "kind": "BLOCKEND",
+          "pc": 32
+        },
+        {
+          "kind": "STOP",
+          "pc": 34
+        }
+      ],
+      "pc": 27,
+      "stack_depth": 0,
+      "static_gas": 7
+    }
+  ]
+}

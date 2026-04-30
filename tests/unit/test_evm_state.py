@@ -5,7 +5,7 @@ EVM状态模型的单元测试。
 """
 
 import pytest
-from z3 import BitVec, BitVecVal, IntVal, Solver, sat
+from z3 import BitVec, BitVecVal, IntVal, Solver, sat, unsat
 from state.smt_state import EVMStackState, EVMStorageState, EVMGasState, SMTState
 
 
@@ -122,6 +122,38 @@ class TestEVMStackState:
         solver = Solver()
         solver.add(new_stack.SP == stack.SP)
         assert solver.check() == sat
+
+
+class TestSMTState:
+    """测试统一 SMT 初态的跨 EVM/x86 元数据契约。"""
+
+    def test_initial_calldata_size_is_shared_symbolic_u64(self):
+        state = SMTState.create_initial_state()
+
+        assert state.calldatasize.size() == 64
+        assert state.callengine_input_size_bytes.size() == 64
+
+        solver = Solver()
+        solver.add(state.calldatasize != state.callengine_input_size_bytes)
+        assert solver.check() == unsat
+
+    def test_initial_calldata_size_can_be_fixed(self):
+        state = SMTState.create_initial_state(calldata_size_bytes=1)
+
+        solver = Solver()
+        solver.add(state.calldatasize != BitVecVal(1, 64))
+        assert solver.check() == unsat
+
+        solver = Solver()
+        solver.add(state.callengine_input_size_bytes != BitVecVal(1, 64))
+        assert solver.check() == unsat
+
+    def test_initial_calldata_size_must_fit_uint64(self):
+        with pytest.raises(ValueError, match="calldata_size_bytes must be non-negative"):
+            SMTState.create_initial_state(calldata_size_bytes=-1)
+
+        with pytest.raises(ValueError, match="calldata_size_bytes must fit in uint64"):
+            SMTState.create_initial_state(calldata_size_bytes=1 << 64)
 
 
 class TestEVMStorageState:

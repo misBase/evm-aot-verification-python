@@ -733,8 +733,10 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
 
     elif kind == "CALLDATASIZE":
-        # CALLDATASIZE: Push calldatasize onto stack
-        state.evm_stack = state.evm_stack.push(state.calldatasize)
+        # Go: scope.Stack.push(uint256.SetUint64(uint64(len(input)))).
+        if state.calldatasize.size() != 64:
+            raise ValueError(f"calldatasize context must be 64 bits, got {state.calldatasize.size()}")
+        state.evm_stack = state.evm_stack.push(ZeroExt(192, state.calldatasize))
         return state
 
     elif kind == "CALLDATALOAD":
@@ -750,7 +752,9 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         else:
             raise ValueError(f"Offset must be 64 or 256 bits, got {offset_bv.size()}")
 
-        calldatasize_64 = _uint256_to_u64_with_overflow_max(state.calldatasize)
+        if state.calldatasize.size() != 64:
+            raise ValueError(f"calldatasize context must be 64 bits, got {state.calldatasize.size()}")
+        calldatasize_64 = state.calldatasize
 
         # 对齐 go-hpc-evm/opCallDataLoad + getData:
         # - offset Uint64WithOverflow 失败时直接返回 0
@@ -781,7 +785,9 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         length_64 = _truncate_to_64(length_bv)
         # Go 解释器对 dataOffset 使用 Uint64WithOverflow，溢出时钳到 MaxUint64
         calldata_offset_64 = _uint256_to_u64_with_overflow_max(data_offset_bv)
-        calldatasize_64 = _uint256_to_u64_with_overflow_max(state.calldatasize)
+        if state.calldatasize.size() != 64:
+            raise ValueError(f"calldatasize context must be 64 bits, got {state.calldatasize.size()}")
+        calldatasize_64 = state.calldatasize
 
         copy_index = BitVec(f"calldatacopy_idx_{op.pc}", 64)
         relative_index = copy_index - mem_offset_64
