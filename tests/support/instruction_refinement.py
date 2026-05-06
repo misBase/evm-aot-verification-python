@@ -5,7 +5,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from z3 import BitVecVal, Concat, Extract, IntVal, Or, Select, Solver, Store, unsat
+from z3 import (
+    BitVecVal,
+    Concat,
+    Extract,
+    If,
+    IntVal,
+    Or,
+    Select,
+    Solver,
+    Store,
+    Z3_OP_CONCAT,
+    Z3_OP_EXTRACT,
+    Z3_OP_ITE,
+    is_bv_value,
+    simplify,
+    unsat,
+)
 
 from common.uint256 import Uint256
 from evm_ir.models import EvmOperator
@@ -83,8 +99,10 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
     memory_words = _symbolic_memory_words(case)
     readonly_words = _symbolic_readonly_words(case)
     if case.expected_stack_height is None and not case.memory_check_offsets:
-        evm_result = _build_evm_result(case, operands)
-        x86_result = _build_x86_result(case, operands, memory_words, readonly_words)
+        evm_result = _normalize_refinement_bv(_build_evm_result(case, operands))
+        x86_result = _normalize_refinement_bv(
+            _build_x86_result(case, operands, memory_words, readonly_words)
+        )
         mismatches = [evm_result != x86_result]
     else:
         evm_state = _build_evm_final_state(case, operands, memory_words, readonly_words)
@@ -109,6 +127,82 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
         f"execution_mode={case.x86_execution_mode}, "
         f"x86_core_hex={case.x86_core_hex}, solver_result={result}"
     )
+
+
+def _normalize_refinement_bv(expr):
+    """Fold byte-wise memory round trips back into one word-sized expression."""
+    # x86 侧的 256-bit 值经 byte-array memory store/load 后，常会变成
+    # Concat(If(c, 0, Extract(byte, x)), ...)。这里仅把这种严格连续、
+    # 同条件、同来源的形状折回 If(c, 0, Extract(word, x))，避免让 Z3
+    # 为纯粹的 byte 重组噪音做昂贵 bit-blast。
+    return _fold_bytewise_ite_concat(simplify(expr))
+
+
+def _fold_bytewise_ite_concat(expr):
+    parts = _flatten_concat(expr)
+    if len(parts) <= 1:
+        return expr
+
+    folded = _try_fold_bytewise_zero_ite_concat(parts)
+    if folded is not None:
+        return folded
+
+    return expr
+
+
+def _flatten_concat(expr):
+    if expr.decl().kind() != Z3_OP_CONCAT:
+        return [expr]
+
+    parts = []
+    for index in range(expr.num_args()):
+        parts.extend(_flatten_concat(expr.arg(index)))
+    return parts
+
+
+def _try_fold_bytewise_zero_ite_concat(parts):
+    # 只接受 If(cond, 0, Extract(..., source)) 且 Extract 范围从高到低连续
+    # 的 concat；任何条件、来源、顺序或分支形状不一致都会放弃折叠。
+    condition = None
+    source = None
+    high = None
+    next_low = None
+    total_size = 0
+
+    for part in parts:
+        if part.decl().kind() != Z3_OP_ITE or part.num_args() != 3:
+            return None
+
+        part_condition = part.arg(0)
+        zero_branch = part.arg(1)
+        value_branch = part.arg(2)
+        if not is_bv_value(zero_branch) or zero_branch.as_long() != 0:
+            return None
+        if value_branch.decl().kind() != Z3_OP_EXTRACT:
+            return None
+
+        extract_high, extract_low = value_branch.decl().params()
+        if extract_high - extract_low + 1 != zero_branch.size():
+            return None
+
+        value_source = value_branch.arg(0)
+        if condition is None:
+            condition = part_condition
+            source = value_source
+            high = extract_high
+        elif not condition.eq(part_condition) or not source.eq(value_source):
+            return None
+
+        if next_low is not None and extract_high != next_low - 1:
+            return None
+
+        next_low = extract_low
+        total_size += zero_branch.size()
+
+    if condition is None or source is None or high is None or next_low is None:
+        return None
+
+    return If(condition, BitVecVal(0, total_size), Extract(high, next_low, source))
 
 
 def _operands(case: InstructionRefinementCase) -> list[Uint256]:

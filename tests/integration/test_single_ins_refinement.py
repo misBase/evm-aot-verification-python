@@ -102,11 +102,10 @@ X86_DELEGATECALL_CORE_HEX_SEQUENCE = "41c785e800000004000000488d0518000000498985
 X86_STATICCALL_CORE_HEX_SEQUENCE = "41c785e800000005000000488d0518000000498985f000000041c685e00000000449c7452800000000c34d8b75384d0375304d8b7d10498b45704883e8004989457041c685e00000000249c74528ecffffffc3"
 X86_SELFDESTRUCT_CORE_HEX_SEQUENCE = "41c785e800000008000000488d0518000000498985f000000041c685e00000000449c7452800000000c34d8b75384d0375304d8b7d1041c685e00000000249c7452800000000c341c685e00000000249c74528fcffffffc3"
 
-BUILTIN_XFAIL_REASON = "builtin/host-call path is not modeled by the current micro-refinement helper."
+BUILTIN_XFAIL_REASON = "full symbolic proof through builtin fast/fallback paths is too expensive for the current micro-refinement helper."
 BRANCHY_CFG_XFAIL_REASON = "Z3 returns unknown for this branchy stack-op CFG formula within the current timeout."
 DATA_COPY_LOOP_XFAIL_REASON = "current x86 CFG semantics does not yet prove the CALLDATA/CODE copy loop byte-0 path."
 MCOPY_LOOP_XFAIL_REASON = "current x86 CFG semantics does not yet prove this memory-to-memory copy loop."
-PC_XFAIL_REASON = "go-hpc-evm amd64 compileEVMPC currently panics with 'implement me', so no x86 core exists yet."
 
 SELF_ADDRESS = 0x111122223333444455556666777788889999AAAA
 ORIGIN_ADDRESS = 0x22223333444455556666777788889999AAAABBBB
@@ -157,18 +156,16 @@ ARITHMETIC_0X00_CASES = [
         ),
     ),
     # IR: DIV, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="DIV",
-            evm_kind="DIV",
-            arity=2,
-            x86_core_hex=X86_DIV_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(reason=BUILTIN_XFAIL_REASON, strict=True),
+    InstructionRefinementCase(
+        name="DIV",
+        evm_kind="DIV",
+        arity=2,
+        x86_core_hex=X86_DIV_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        x86_enable_go_bridge=True,
+        solver_timeout_ms=5_000,
     ),
     # IR: MOD, STOP
     pytest.param(
@@ -180,6 +177,7 @@ ARITHMETIC_0X00_CASES = [
             base_addr=X86_CORE_BASE_ADDR,
             evm_operand_indices=(1, 0),
             x86_execution_mode="cfg",
+            x86_enable_go_bridge=True,
             solver_timeout_ms=1_000,
         ),
         marks=pytest.mark.xfail(reason=BUILTIN_XFAIL_REASON, strict=True),
@@ -194,6 +192,7 @@ ARITHMETIC_0X00_CASES = [
             base_addr=X86_CORE_BASE_ADDR,
             evm_operand_indices=(1, 0),
             x86_execution_mode="cfg",
+            x86_enable_go_bridge=True,
             solver_timeout_ms=1_000,
         ),
         marks=pytest.mark.xfail(reason=BUILTIN_XFAIL_REASON, strict=True),
@@ -208,6 +207,7 @@ ARITHMETIC_0X00_CASES = [
             base_addr=X86_CORE_BASE_ADDR,
             evm_operand_indices=(1, 0),
             x86_execution_mode="cfg",
+            x86_enable_go_bridge=True,
             solver_timeout_ms=1_000,
         ),
         marks=pytest.mark.xfail(reason=BUILTIN_XFAIL_REASON, strict=True),
@@ -220,36 +220,36 @@ ARITHMETIC_0X00_CASES = [
             arity=3,
             x86_core_hex=X86_ADDMOD_CORE_HEX_SEQUENCE,
             base_addr=X86_CORE_BASE_ADDR,
+            evm_operand_indices=(2, 1, 0),
             x86_execution_mode="cfg",
+            x86_enable_go_bridge=True,
             solver_timeout_ms=1_000,
         ),
         marks=pytest.mark.xfail(reason=BUILTIN_XFAIL_REASON, strict=True),
     ),
     # IR: MULMOD, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="MULMOD",
-            evm_kind="MULMOD",
-            arity=3,
-            x86_core_hex=X86_MULMOD_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(reason=BUILTIN_XFAIL_REASON, strict=True),
+    InstructionRefinementCase(
+        name="MULMOD",
+        evm_kind="MULMOD",
+        arity=3,
+        x86_core_hex=X86_MULMOD_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(2, 1, 0),
+        x86_execution_mode="cfg",
+        x86_enable_go_bridge=True,
+        solver_timeout_ms=15_000,
     ),
     # IR: EXP, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="EXP",
-            evm_kind="EXP",
-            arity=2,
-            x86_core_hex=X86_EXP_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(reason=BUILTIN_XFAIL_REASON, strict=True),
+    InstructionRefinementCase(
+        name="EXP",
+        evm_kind="EXP",
+        arity=2,
+        x86_core_hex=X86_EXP_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        x86_enable_go_bridge=True,
+        solver_timeout_ms=1_000,
     ),
     # IR: SIGNEXTEND, STOP
     pytest.param(
@@ -623,22 +623,8 @@ STORAGE_EXECUTION_0X50_CASES = [
         x86_execution_mode="cfg",
         x86_enable_go_bridge=True,
     ),
-    # IR: PC, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="PC",
-            evm_kind="PC",
-            arity=0,
-            x86_core_hex="",
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_pc=1,
-            expected_stack_height=1,
-        ),
-        marks=pytest.mark.xfail(
-            reason=PC_XFAIL_REASON,
-            strict=True,
-        ),
-    ),
+    # PC is intentionally not covered here: go-hpc-evm amd64 does not emit an
+    # AOT core for EVM PC; it is handled by the interpreter path instead.
     # IR: MSIZE, STOP
     InstructionRefinementCase(
         name="MSIZE",

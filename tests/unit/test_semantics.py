@@ -274,6 +274,32 @@ def test_mod_opcode_stack_order():
     assert is_true(simplify(top2 == BitVecVal(3, 256))), f"MOD: 3%10 should be 3, got {simplify(top2)}"
 
 
+def test_addmod_opcode_stack_order():
+    """测试ADDMOD从栈的弹出顺序：result = (top + second) % third"""
+    op = EvmOperator(kind="ADDMOD", pc=0)
+    # bottom-to-top: modulus=6, b=4, a=5 -> (5+4)%6 = 3
+    state = _make_state_with_stack(6, 4, 5)
+    result_state = evm_operator_to_z3(op, state)
+    top, _ = result_state.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(top != BitVecVal(3, 256))
+    assert solver.check() == unsat, f"ADDMOD: (5+4)%6 should be 3, got {simplify(top)}"
+
+
+def test_mulmod_opcode_stack_order():
+    """测试MULMOD从栈的弹出顺序：result = (top * second) % third"""
+    op = EvmOperator(kind="MULMOD", pc=0)
+    # bottom-to-top: modulus=7, b=4, a=5 -> (5*4)%7 = 6
+    state = _make_state_with_stack(7, 4, 5)
+    result_state = evm_operator_to_z3(op, state)
+    top, _ = result_state.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(top != BitVecVal(6, 256))
+    assert solver.check() == unsat, f"MULMOD: (5*4)%7 should be 6, got {simplify(top)}"
+
+
 def test_lt_opcode_stack_order():
     """测试LT从栈的弹出顺序：result = (top < second) ? 1 : 0"""
     op = EvmOperator(kind="LT", pc=0)

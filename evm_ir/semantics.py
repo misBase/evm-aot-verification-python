@@ -538,9 +538,9 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
 
     elif kind == "EXP":
-        a, stack_after_pop1 = state.evm_stack.pop()
-        b, stack_after_pop2 = stack_after_pop1.pop()
-        result = op_semantics.exp_semantics(a, b)
+        base, stack_after_pop1 = state.evm_stack.pop()
+        exponent, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.exp_semantics(base, exponent)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
@@ -613,53 +613,53 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
 
     elif kind == "SIGNEXTEND":
-        a, stack_after_pop1 = state.evm_stack.pop()
-        b, stack_after_pop2 = stack_after_pop1.pop()
-        result = op_semantics.signextend_semantics(a, b)
+        index, stack_after_pop1 = state.evm_stack.pop()
+        value, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.signextend_semantics(index, value)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "BYTE":
-        a, stack_after_pop1 = state.evm_stack.pop()
-        b, stack_after_pop2 = stack_after_pop1.pop()
-        result = op_semantics.byte_semantics(a, b)
+        index, stack_after_pop1 = state.evm_stack.pop()
+        value, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.byte_semantics(index, value)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "ADDMOD":
-        c, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
         b, stack_after_pop2 = stack_after_pop1.pop()
-        a, stack_after_pop3 = stack_after_pop2.pop()
-        result = op_semantics.addmod_semantics(a, b, c)
+        mod, stack_after_pop3 = stack_after_pop2.pop()
+        result = op_semantics.addmod_semantics(a, b, mod)
         state.evm_stack = stack_after_pop3.push(result)
         return state
 
     elif kind == "MULMOD":
-        c, stack_after_pop1 = state.evm_stack.pop()
+        a, stack_after_pop1 = state.evm_stack.pop()
         b, stack_after_pop2 = stack_after_pop1.pop()
-        a, stack_after_pop3 = stack_after_pop2.pop()
-        result = op_semantics.mulmod_semantics(a, b, c)
+        mod, stack_after_pop3 = stack_after_pop2.pop()
+        result = op_semantics.mulmod_semantics(a, b, mod)
         state.evm_stack = stack_after_pop3.push(result)
         return state
 
     elif kind == "SHL":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
-        result = op_semantics.shl_semantics(a, b)
+        shift, stack_after_pop1 = state.evm_stack.pop()
+        value, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.shl_semantics(value, shift)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "SHR":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
-        result = op_semantics.shr_semantics(a, b)
+        shift, stack_after_pop1 = state.evm_stack.pop()
+        value, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.shr_semantics(value, shift)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
     elif kind == "SAR":
-        b, stack_after_pop1 = state.evm_stack.pop()
-        a, stack_after_pop2 = stack_after_pop1.pop()
-        result = op_semantics.sar_semantics(a, b)
+        shift, stack_after_pop1 = state.evm_stack.pop()
+        value, stack_after_pop2 = stack_after_pop1.pop()
+        result = op_semantics.sar_semantics(value, shift)
         state.evm_stack = stack_after_pop2.push(result)
         return state
 
