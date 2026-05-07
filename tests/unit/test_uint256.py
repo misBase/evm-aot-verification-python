@@ -11,6 +11,18 @@ from z3 import BitVecVal, simplify
 from common.uint256 import Uint256
 
 
+UINT64_MASK = (1 << 64) - 1
+UINT256_MASK = (1 << 256) - 1
+
+
+def assert_uint256_equals_int(actual: Uint256, expected: int):
+    expected &= UINT256_MASK
+    assert simplify(actual.z0 == BitVecVal(expected & UINT64_MASK, 64))
+    assert simplify(actual.z1 == BitVecVal((expected >> 64) & UINT64_MASK, 64))
+    assert simplify(actual.z2 == BitVecVal((expected >> 128) & UINT64_MASK, 64))
+    assert simplify(actual.z3 == BitVecVal((expected >> 192) & UINT64_MASK, 64))
+
+
 class TestUint256AddSemantics:
     """测试 add_semantics() 方法。"""
 
@@ -221,6 +233,26 @@ class TestUint256MulSemantics:
         assert simplify(result.z1 == 0)
         assert simplify(result.z2 == 0)
         assert simplify(result.z3 == 0)
+
+    @pytest.mark.parametrize(
+        "left,right",
+        [
+            ((1 << 64) - 1, (1 << 64) - 1),
+            ((1 << 256) - 1, (1 << 256) - 1),
+            (
+                0x0123456789ABCDEF_FEDCBA9876543210_1111222233334444_5555666677778888,
+                0xFFEEDDCCBBAA9988_7766554433221100_0123456789ABCDEF_F0E1D2C3B4A59687,
+            ),
+            (
+                (1 << 192) + (3 << 128) + (5 << 64) + 7,
+                (11 << 192) + (13 << 128) + (17 << 64) + 19,
+            ),
+        ],
+    )
+    def test_mul_matches_modulo_256_product_across_limbs(self, left, right):
+        """多 limb 乘法应等价于 Python 整数乘积截断到 256 位。"""
+        result = Uint256.from_int(left).mul_semantics(Uint256.from_int(right))
+        assert_uint256_equals_int(result, left * right)
 
 
 class TestUint256BitwiseSemantics:

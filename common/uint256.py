@@ -4,7 +4,7 @@ Uint256：将256位无符号整数表示为4x64位limb。
 本模块提供在验证系统中处理256位值的实用工具。
 """
 
-from z3 import BitVec, BitVecVal, Concat, Extract
+from z3 import BitVec, BitVecVal, Concat, Extract, ZeroExt
 
 
 class Uint256:
@@ -176,7 +176,7 @@ class Uint256:
         """将两个Uint256值相乘（语义建模）。
 
         计算 (a * b) mod 2^256。
-        简化实现：使用256位直接相乘然后截断。
+        按 holiman/uint256.Int.Mul 的 4x64 limb 算法建模。
 
         Args:
             other: 要相乘的另一个Uint256值
@@ -184,17 +184,58 @@ class Uint256:
         Returns:
             表示积(a * b) mod 2^256的新Uint256实例
         """
-        from z3 import BitVecVal
+        zero_64 = BitVecVal(0, 64)
+        zero_carry = BitVecVal(0, 1)
 
-        # 直接使用256位乘法然后截断
-        a_256 = self.to_bv256()
-        b_256 = other.to_bv256()
+        def mul64(x, y):
+            product = ZeroExt(64, x) * ZeroExt(64, y)
+            return Extract(127, 64, product), Extract(63, 0, product)
 
-        # 256位乘法会溢出，这正是我们想要的（模2^256）
-        product_256 = a_256 * b_256
+        def add64(x, y, carry=zero_carry):
+            total = (
+                Concat(BitVecVal(0, 1), x) +
+                Concat(BitVecVal(0, 1), y) +
+                Concat(BitVecVal(0, 64), carry)
+            )
+            return Extract(63, 0, total), Extract(64, 64, total)
 
-        # 将结果转换回Uint256
-        return Uint256.from_bv256(product_256)
+        def umul_hop(z, x, y):
+            hi, lo = mul64(x, y)
+            lo, carry = add64(lo, z)
+            hi, _ = add64(hi, zero_64, carry)
+            return hi, lo
+
+        def umul_step(z, x, y, carry):
+            hi, lo = mul64(x, y)
+            lo, carry_bit = add64(lo, carry)
+            hi, _ = add64(hi, zero_64, carry_bit)
+            lo, carry_bit = add64(lo, z)
+            hi, _ = add64(hi, zero_64, carry_bit)
+            return hi, lo
+
+        x0, x1, x2, x3 = self.z0, self.z1, self.z2, self.z3
+        y0, y1, y2, y3 = other.z0, other.z1, other.z2, other.z3
+
+        carry0, z0 = mul64(x0, y0)
+        carry0, res1 = umul_hop(carry0, x1, y0)
+        carry0, res2 = umul_hop(carry0, x2, y0)
+
+        carry1, z1 = umul_hop(res1, x0, y1)
+        carry1, res2 = umul_step(res2, x1, y1, carry1)
+
+        carry2, z2 = umul_hop(res2, x0, y2)
+
+        z3 = (
+            x3 * y0 +
+            x2 * y1 +
+            x0 * y3 +
+            x1 * y2 +
+            carry0 +
+            carry1 +
+            carry2
+        )
+
+        return Uint256(z0, z1, z2, z3)
 
     def and_semantics(self, other: 'Uint256') -> 'Uint256':
         """按位与操作（语义建模）。
@@ -334,4 +375,3 @@ class Uint256:
 
     def __repr__(self):
         return f"Uint256(z0={self.z0}, z1={self.z1}, z2={self.z2}, z3={self.z3})"
-
