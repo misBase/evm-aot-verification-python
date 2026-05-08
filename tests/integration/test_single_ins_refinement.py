@@ -273,72 +273,48 @@ ARITHMETIC_0X00_CASES = [
 
 COMPARISON_AND_BITWISE_0X10_CASES = [
     # IR: LT, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="LT",
-            evm_kind="LT",
-            arity=2,
-            x86_core_hex=X86_LT_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(
-            reason="Z3 returns unknown for the unsigned comparison carry-chain CFG formula within the current timeout.",
-            strict=True,
-        ),
+    InstructionRefinementCase(
+        name="LT",
+        evm_kind="LT",
+        arity=2,
+        x86_core_hex=X86_LT_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        solver_timeout_ms=1_000,
     ),
     # IR: GT, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="GT",
-            evm_kind="GT",
-            arity=2,
-            x86_core_hex=X86_GT_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(
-            reason="Z3 returns unknown for the unsigned comparison carry-chain CFG formula within the current timeout.",
-            strict=True,
-        ),
+    InstructionRefinementCase(
+        name="GT",
+        evm_kind="GT",
+        arity=2,
+        x86_core_hex=X86_GT_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        solver_timeout_ms=1_000,
     ),
     # IR: SLT, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="SLT",
-            evm_kind="SLT",
-            arity=2,
-            x86_core_hex=X86_SLT_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(
-            reason=BRANCHY_CFG_XFAIL_REASON,
-            strict=True,
-        ),
+    InstructionRefinementCase(
+        name="SLT",
+        evm_kind="SLT",
+        arity=2,
+        x86_core_hex=X86_SLT_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        solver_timeout_ms=1_000,
     ),
     # IR: SGT, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="SGT",
-            evm_kind="SGT",
-            arity=2,
-            x86_core_hex=X86_SGT_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(
-            reason=BRANCHY_CFG_XFAIL_REASON,
-            strict=True,
-        ),
+    InstructionRefinementCase(
+        name="SGT",
+        evm_kind="SGT",
+        arity=2,
+        x86_core_hex=X86_SGT_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        solver_timeout_ms=1_000,
     ),
     # IR: EQ, STOP
     InstructionRefinementCase(

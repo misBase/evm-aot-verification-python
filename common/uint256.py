@@ -302,34 +302,32 @@ class Uint256:
     def lt_semantics(self, other: 'Uint256'):
         """无符号小于比较（语义建模）。
 
+        对齐 github.com/holiman/uint256 v1.3.2 的 Int.Lt：
+        从最低 limb 开始做 z - x 的 Sub64 借位链，最终借位非零
+        当且仅当 self < other。
+        即 z < x <=> z - x < 0，也就是 subtraction overflows。
+
         Args:
             other: 另一个Uint256值
 
         Returns:
             BoolRef：如果 a < b 则为True
         """
-        from z3 import Or, And, ULT
+        borrow = BitVecVal(0, 1)
+        for z_limb, x_limb in (
+            (self.z0, other.z0),
+            (self.z1, other.z1),
+            (self.z2, other.z2),
+            (self.z3, other.z3),
+        ):
+            diff_ext = (
+                Concat(BitVecVal(0, 1), z_limb)
+                - Concat(BitVecVal(0, 1), x_limb)
+                - Concat(BitVecVal(0, 64), borrow)
+            )
+            borrow = Extract(64, 64, diff_ext)
 
-        # 比较从最高位limb开始
-        high_lt = ULT(self.z3, other.z3)
-        high_eq = self.z3 == other.z3
-
-        mid2_lt = ULT(self.z2, other.z2)
-        mid2_eq = self.z2 == other.z2
-
-        mid1_lt = ULT(self.z1, other.z1)
-        mid1_eq = self.z1 == other.z1
-
-        low_lt = ULT(self.z0, other.z0)
-
-        result = Or(
-            high_lt,
-            And(high_eq, mid2_lt),
-            And(high_eq, mid2_eq, mid1_lt),
-            And(high_eq, mid2_eq, mid1_eq, low_lt)
-        )
-
-        return result
+        return borrow != BitVecVal(0, 1)
 
     def gt_semantics(self, other: 'Uint256'):
         """无符号大于比较（语义建模）。
@@ -341,6 +339,52 @@ class Uint256:
             BoolRef：如果 a > b 则为True
         """
         return other.lt_semantics(self)
+
+    def slt_semantics(self, other: 'Uint256'):
+        """有符号小于比较（语义建模）。
+
+        对齐 github.com/holiman/uint256 v1.3.2 的 Int.Slt：
+        符号不同则负数更小，符号相同则复用 Int.Lt。
+
+        Args:
+            other: 另一个Uint256值
+
+        Returns:
+            BoolRef：如果 a < b（按二补码有符号解释）则为True
+        """
+        from z3 import And, Not, Or
+
+        self_negative = Extract(63, 63, self.z3) == BitVecVal(1, 1)
+        other_negative = Extract(63, 63, other.z3) == BitVecVal(1, 1)
+        same_sign = self_negative == other_negative
+
+        return Or(
+            And(self_negative, Not(other_negative)),
+            And(same_sign, self.lt_semantics(other)),
+        )
+
+    def sgt_semantics(self, other: 'Uint256'):
+        """有符号大于比较（语义建模）。
+
+        对齐 github.com/holiman/uint256 v1.3.2 的 Int.Sgt：
+        符号不同则非负数更大，符号相同则复用 Int.Gt。
+
+        Args:
+            other: 另一个Uint256值
+
+        Returns:
+            BoolRef：如果 a > b（按二补码有符号解释）则为True
+        """
+        from z3 import And, Not, Or
+
+        self_negative = Extract(63, 63, self.z3) == BitVecVal(1, 1)
+        other_negative = Extract(63, 63, other.z3) == BitVecVal(1, 1)
+        same_sign = self_negative == other_negative
+
+        return Or(
+            And(Not(self_negative), other_negative),
+            And(same_sign, self.gt_semantics(other)),
+        )
 
     def eq_semantics(self, other: 'Uint256'):
         """等于比较（语义建模）。

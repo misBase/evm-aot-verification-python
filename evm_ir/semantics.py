@@ -172,15 +172,15 @@ class EVMOperationSemantics:
 
     def slt_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM SLT操作的逻辑公式 (a < b, signed)。"""
-        a_bv = self._to_bv256(a)
-        b_bv = self._to_bv256(b)
-        return If(a_bv < b_bv, BitVecVal(1, 256), BitVecVal(0, 256))
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        return If(a_uint.slt_semantics(b_uint), BitVecVal(1, 256), BitVecVal(0, 256))
 
     def sgt_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM SGT操作的逻辑公式 (a > b, signed)。"""
-        a_bv = self._to_bv256(a)
-        b_bv = self._to_bv256(b)
-        return If(a_bv > b_bv, BitVecVal(1, 256), BitVecVal(0, 256))
+        a_uint = self._to_uint256(a)
+        b_uint = self._to_uint256(b)
+        return If(a_uint.sgt_semantics(b_uint), BitVecVal(1, 256), BitVecVal(0, 256))
 
     def eq_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM EQ操作的逻辑公式 (a == b)。"""

@@ -366,6 +366,11 @@ class TestUint256ComparisonSemantics:
         result = val1.lt_semantics(val2)
         assert not simplify(result)
 
+    def test_lt_cross_limb_borrow_order(self):
+        """LT 跨 limb：低 limb 局部比较不能覆盖高 limb。"""
+        assert simplify(Uint256.from_int((1 << 64) - 1).lt_semantics(Uint256.from_int(1 << 64)))
+        assert not simplify(Uint256.from_int(1 << 64).lt_semantics(Uint256.from_int((1 << 64) - 1)))
+
     def test_gt_less_than(self):
         """GT 小于：1 > 5 为 False"""
         val1 = Uint256.from_int(1)
@@ -386,6 +391,32 @@ class TestUint256ComparisonSemantics:
         val2 = Uint256.from_int(1)
         result = val1.gt_semantics(val2)
         assert simplify(result)
+
+    def test_slt_cross_sign(self):
+        """SLT 跨符号：-1 < 1 为 True，1 < -1 为 False。"""
+        neg_one = Uint256.from_int(UINT256_MASK)
+        pos_one = Uint256.from_int(1)
+
+        assert simplify(neg_one.slt_semantics(pos_one))
+        assert not simplify(pos_one.slt_semantics(neg_one))
+
+    def test_slt_same_negative_uses_unsigned_order(self):
+        """SLT 同为负数：-2 < -1 为 True。"""
+        neg_two = Uint256.from_int(UINT256_MASK - 1)
+        neg_one = Uint256.from_int(UINT256_MASK)
+
+        assert simplify(neg_two.slt_semantics(neg_one))
+        assert not simplify(neg_one.slt_semantics(neg_two))
+
+    def test_sgt_cross_sign_and_same_negative(self):
+        """SGT 跨符号和同负数：1 > -1，-1 > -2。"""
+        pos_one = Uint256.from_int(1)
+        neg_one = Uint256.from_int(UINT256_MASK)
+        neg_two = Uint256.from_int(UINT256_MASK - 1)
+
+        assert simplify(pos_one.sgt_semantics(neg_one))
+        assert simplify(neg_one.sgt_semantics(neg_two))
+        assert not simplify(neg_two.sgt_semantics(neg_one))
 
     def test_eq_equal(self):
         """EQ 相等：5 == 5 为 True"""
