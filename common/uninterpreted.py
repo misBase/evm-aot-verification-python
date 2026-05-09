@@ -1,26 +1,93 @@
 """EVM host function 的 Z3 未解释函数（uninterpreted function）语义。
 
 相同的函数名确保 EVM IR 侧和 x86 侧生成相同的 Z3 符号，从而允许 Z3 证明等价性。
-涉及 memory 的函数（sha3、call 系列、create 系列）接受 memory array 参数，
-两侧传入同一个 SMTState 里的 memory array（共享 Z3 Array）。
+SHA3 只把规范化的 byte slice 作为 UF 参数，避免无关 memory store 污染 hash identity；
+CALL / CREATE 系列仍接受 memory array 参数。
 """
 from typing import Optional
 
 from z3 import (
+    BitVec,
     BitVecRef,
     BitVecSort,
     BitVecVal,
     BoolRef,
     BoolSort,
+    Concat,
+    Extract,
     Function,
     If,
+    Lambda,
+    Select,
+    ULT,
+    ZeroExt,
+    is_bv_value,
+    simplify,
 )
 
 
-def sha3_semantics(memory, offset: BitVecRef, length: BitVecRef) -> BitVecRef:
-    """SHA3: uninterpreted hash of memory[offset..offset+length)。"""
-    f = Function('sha3', memory.sort(), offset.sort(), length.sort(), BitVecSort(256))
-    return f(memory, offset, length)
+SHA3_FAST_PATH_MAX_BYTES = 256
+
+
+def _to_bv64(value: BitVecRef) -> BitVecRef:
+    if value.size() == 64:
+        return value
+    if value.size() == 256:
+        return Extract(63, 0, value)
+    raise ValueError(f"Expected 64-bit or 256-bit BitVec, got {value.size()} bits")
+
+
+def _to_bv256(value: BitVecRef) -> BitVecRef:
+    if value.size() == 256:
+        return value
+    if value.size() == 64:
+        return ZeroExt(192, value)
+    raise ValueError(f"Expected 64-bit or 256-bit BitVec, got {value.size()} bits")
+
+
+def sha3_semantics(memory, base: BitVecRef, offset: BitVecRef,
+                   length: BitVecRef) -> BitVecRef:
+    """SHA3: uninterpreted hash of memory[base+offset : +length).
+
+    The hash identity depends on the selected byte slice and the original
+    256-bit length.  The whole memory Array is intentionally not an argument.
+    """
+    base_64 = _to_bv64(base)
+    offset_64 = _to_bv64(offset)
+    length_256 = _to_bv256(length)
+    length_id = simplify(length_256)
+    start = simplify(base_64 + offset_64)
+
+    if is_bv_value(length_id):
+        concrete_length = length_id.as_long()
+        if 0 <= concrete_length <= SHA3_FAST_PATH_MAX_BYTES:
+            bytes_list = []
+            for i in range(SHA3_FAST_PATH_MAX_BYTES):
+                if i < concrete_length:
+                    bytes_list.append(Select(memory, start + BitVecVal(i, 64)))
+                else:
+                    bytes_list.append(BitVecVal(0, 8))
+            data_2048 = Concat(*bytes_list)
+            f = Function('sha3_bytes',
+                         BitVecSort(SHA3_FAST_PATH_MAX_BYTES * 8),
+                         BitVecSort(256),
+                         BitVecSort(256))
+            return f(data_2048, BitVecVal(concrete_length, 256))
+
+    # BV64 length only bounds memory indexing in this model; length_id keeps the
+    # original BV256 value in the hash identity.
+    length_64 = simplify(_to_bv64(length_id))
+    idx = BitVec('sha3_slice_idx', 64)
+    slice_array = Lambda(
+        [idx],
+        If(
+            ULT(idx, length_64),
+            Select(memory, start + idx),
+            BitVecVal(0, 8),
+        ),
+    )
+    f = Function('sha3_slice', slice_array.sort(), BitVecSort(256), BitVecSort(256))
+    return f(slice_array, length_id)
 
 
 def balance_semantics(addr: BitVecRef) -> BitVecRef:

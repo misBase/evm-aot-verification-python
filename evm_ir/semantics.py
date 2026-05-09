@@ -879,7 +879,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     elif kind == "SHA3":
         offset_bv, stack_after_pop1 = state.evm_stack.pop()
         length_bv, stack_after_pop2 = stack_after_pop1.pop()
-        hash_val = uninterpreted.sha3_semantics(state.evm_memory.Memory, offset_bv, length_bv)
+        hash_val = uninterpreted.sha3_semantics(
+            state.evm_memory.Memory,
+            BitVecVal(0, 64),
+            offset_bv,
+            length_bv,
+        )
         state.evm_stack = stack_after_pop2.push(hash_val)
         return state
 

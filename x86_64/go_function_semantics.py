@@ -381,10 +381,16 @@ class GoFunctionSemantics:
         return mstate
 
     def _handle_sha3(self, sp: int, mstate: SMTState) -> SMTState:
-        """SHA3: pop offset, pop length, push sha3(memory, offset, length)。"""
+        """SHA3: pop offset, pop length, push sha3(memory, R15+offset, length)。"""
         offset_bv, sp, mstate = self._pop_uint256(sp, mstate)
         length_bv, sp, mstate = self._pop_uint256(sp, mstate)
-        hash_val = uninterpreted.sha3_semantics(mstate.x86_memory.evm_mem, offset_bv, length_bv)
+        r15 = mstate.x86_registers.get_register(Register.R15)
+        hash_val = uninterpreted.sha3_semantics(
+            mstate.x86_memory.evm_mem,
+            r15,
+            offset_bv,
+            length_bv,
+        )
         sp, mstate = self._push_uint256(sp, hash_val, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate

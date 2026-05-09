@@ -633,12 +633,13 @@ class TestSha3Memory:
     """Test SHA3 uses x86_memory (not evm_memory)."""
 
     def test_sha3_uses_x86_memory(self):
-        """SHA3 should use x86_memory.Memory for hash input.
+        """SHA3 should use x86 EVM-domain memory at R15+offset for hash input.
 
         This verifies that when x86 instructions modify memory (via x86_memory),
         SHA3 reads from the same memory.
         """
-        from z3 import Function, BitVecSort, SolverFor
+        from z3 import SolverFor
+        from common import uninterpreted
 
         profile = _make_profile_with_host({1: "sha3"})
         sem = GoFunctionSemantics(profile)
@@ -647,12 +648,13 @@ class TestSha3Memory:
         state = SMTState()
         state.x86_registers.set_register(Register.R13, BitVecVal(R13_BASE, 64))
         state.x86_registers.set_register(Register.R14, BitVecVal(R14_BASE, 64))
-        state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        r15_base = 0x30000
+        state.x86_registers.set_register(Register.R15, BitVecVal(r15_base, 64))
 
         # SHA3 reads from EVM 256-bit memory (R15 域)
         data = BitVecVal(0xDEADBEEF, 256)
         state.x86_memory = state.x86_memory.store_256bit(
-            BitVecVal(0, 64), data, domain=MemoryDomain.EVM,
+            BitVecVal(r15_base, 64), data, domain=MemoryDomain.EVM,
         )
 
         # Push offset and length onto stack (length=32 bytes)
@@ -663,19 +665,115 @@ class TestSha3Memory:
         # Apply SHA3
         state = sem.apply(4, 1, sp, state)
 
-        # The sha3 function should be applied to evm_mem (R15 域)
-        sha3_func = Function('sha3', state.x86_memory.evm_mem.sort(),
-                             BitVecSort(256), BitVecSort(256), BitVecSort(256))
-        expected_hash = sha3_func(state.x86_memory.evm_mem, BitVecVal(0, 256), BitVecVal(32, 256))
+        # The sha3 helper should hash the R15-relative EVM memory slice.
+        expected_hash = uninterpreted.sha3_semantics(
+            state.x86_memory.evm_mem,
+            BitVecVal(r15_base, 64),
+            BitVecVal(0, 256),
+            BitVecVal(32, 256),
+        )
 
         # Result should be stored in stack memory (R14 域) at sp position
-        result_addr = _compute_stack_addr(R14_BASE, sp - LIMBS_PER_UINT256)
+        result_addr = _compute_stack_addr(R14_BASE, sp - 2 * LIMBS_PER_UINT256)
         result_bv = state.x86_memory.load_256bit(BitVecVal(result_addr, 64), domain=MemoryDomain.STACK)
 
         solver = SolverFor("QF_AUFBV")
         solver.set("timeout", 5000)
-        # The result should equal sha3(x86_memory, 0, 32)
-        # We can't easily verify the exact hash without parsing the formula,
-        # but we can verify the function application is correct by checking
-        # that evm_memory and x86_memory are separate and sha3 uses x86_memory
-        assert result_bv.eq(expected_hash) or solver.check() == sat
+        solver.add(result_bv != expected_hash)
+        assert solver.check() == unsat
+
+    def test_sha3_fast_path_ignores_slice_external_writes(self):
+        from z3 import BitVecSort, K, SolverFor, Store
+        from common import uninterpreted
+
+        zero_mem = K(BitVecSort(64), BitVecVal(0, 8))
+        noisy_mem = Store(zero_mem, BitVecVal(100, 64), BitVecVal(0xAB, 8))
+
+        clean_hash = uninterpreted.sha3_semantics(
+            zero_mem, BitVecVal(0, 64), BitVecVal(0, 256), BitVecVal(32, 256)
+        )
+        noisy_hash = uninterpreted.sha3_semantics(
+            noisy_mem, BitVecVal(0, 64), BitVecVal(0, 256), BitVecVal(32, 256)
+        )
+
+        solver = SolverFor("QF_AUFBV")
+        solver.set("timeout", 5000)
+        solver.add(clean_hash != noisy_hash)
+        assert solver.check() == unsat
+
+    def test_sha3_fast_path_equates_different_write_order(self):
+        from z3 import BitVec, BitVecSort, K, SolverFor, Store
+        from common import uninterpreted
+
+        mem_forward = K(BitVecSort(64), BitVecVal(0, 8))
+        mem_reverse = K(BitVecSort(64), BitVecVal(0, 8))
+        symbolic_bytes = [BitVec(f"sha3_byte_{i}", 8) for i in range(32)]
+
+        for i, byte in enumerate(symbolic_bytes):
+            mem_forward = Store(mem_forward, BitVecVal(i, 64), byte)
+        for i in reversed(range(32)):
+            mem_reverse = Store(mem_reverse, BitVecVal(i, 64), symbolic_bytes[i])
+
+        forward_hash = uninterpreted.sha3_semantics(
+            mem_forward, BitVecVal(0, 64), BitVecVal(0, 256), BitVecVal(32, 256)
+        )
+        reverse_hash = uninterpreted.sha3_semantics(
+            mem_reverse, BitVecVal(0, 64), BitVecVal(0, 256), BitVecVal(32, 256)
+        )
+
+        solver = SolverFor("QF_AUFBV")
+        solver.set("timeout", 5000)
+        solver.add(forward_hash != reverse_hash)
+        assert solver.check() == unsat
+
+    def test_sha3_fast_path_uses_fixed_bv2048_data(self):
+        from z3 import BitVecSort, K
+        from common import uninterpreted
+
+        zero_mem = K(BitVecSort(64), BitVecVal(0, 8))
+        hash_5 = uninterpreted.sha3_semantics(
+            zero_mem, BitVecVal(0, 64), BitVecVal(0, 256), BitVecVal(5, 256)
+        )
+        hash_6 = uninterpreted.sha3_semantics(
+            zero_mem, BitVecVal(0, 64), BitVecVal(0, 256), BitVecVal(6, 256)
+        )
+
+        assert hash_5.decl().name() == "sha3_bytes"
+        assert hash_6.decl().name() == "sha3_bytes"
+        assert hash_5.arg(0).size() == 2048
+        assert hash_6.arg(0).size() == 2048
+        assert simplify(hash_5.arg(0) == hash_6.arg(0))
+
+    def test_sha3_length_identity_keeps_same_padding_unconstrained(self):
+        from z3 import BitVecSort, K, SolverFor
+        from common import uninterpreted
+
+        zero_mem = K(BitVecSort(64), BitVecVal(0, 8))
+        hash_5 = uninterpreted.sha3_semantics(
+            zero_mem, BitVecVal(0, 64), BitVecVal(0, 256), BitVecVal(5, 256)
+        )
+        hash_6 = uninterpreted.sha3_semantics(
+            zero_mem, BitVecVal(0, 64), BitVecVal(0, 256), BitVecVal(6, 256)
+        )
+
+        equal_solver = SolverFor("QF_AUFBV")
+        equal_solver.set("timeout", 5000)
+        equal_solver.add(hash_5 == hash_6)
+        assert equal_solver.check() == sat
+
+        distinct_solver = SolverFor("QF_AUFBV")
+        distinct_solver.set("timeout", 5000)
+        distinct_solver.add(hash_5 != hash_6)
+        assert distinct_solver.check() == sat
+
+    def test_sha3_symbolic_length_uses_slice_fallback(self):
+        from z3 import BitVec, BitVecSort, K
+        from common import uninterpreted
+
+        zero_mem = K(BitVecSort(64), BitVecVal(0, 8))
+        symbolic_length = BitVec("sha3_symbolic_length", 256)
+        hash_value = uninterpreted.sha3_semantics(
+            zero_mem, BitVecVal(0, 64), BitVecVal(0, 256), symbolic_length
+        )
+
+        assert hash_value.decl().name() == "sha3_slice"
