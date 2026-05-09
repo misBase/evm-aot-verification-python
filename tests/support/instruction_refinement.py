@@ -63,9 +63,12 @@ class InstructionRefinementCase:
     evm_pc: int = 0
     evm_param: int | None = None
     evm_immediate: int | None = None
+    evm_is_static: bool = False
     operand_values: tuple[int | None, ...] | None = None
     evm_operand_indices: tuple[int, ...] | None = None
     expected_stack_height: int | None = None
+    expected_status_code: int | None = None
+    compare_return_metadata: bool = False
     initial_memory_word_offsets: tuple[int, ...] = ()
     initial_calldata_word_offsets: tuple[int, ...] = ()
     initial_code_word_offsets: tuple[int, ...] = ()
@@ -98,7 +101,15 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
     operands = _operands(case)
     memory_words = _symbolic_memory_words(case)
     readonly_words = _symbolic_readonly_words(case)
-    if case.expected_stack_height is None and not case.memory_check_offsets:
+    requires_state_comparison = (
+        case.expected_stack_height is not None
+        or bool(case.memory_check_offsets)
+        or bool(case.storage_check_keys)
+        or bool(case.transient_storage_check_keys)
+        or case.expected_status_code is not None
+        or case.compare_return_metadata
+    )
+    if not requires_state_comparison:
         evm_result = _normalize_refinement_bv(_build_evm_result(case, operands))
         x86_result = _normalize_refinement_bv(
             _build_x86_result(case, operands, memory_words, readonly_words)
@@ -109,12 +120,27 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
         x86_state = _build_x86_final_state(case, operands, memory_words, readonly_words)
         mismatches = []
         if case.expected_stack_height is not None:
+            mismatches.append(evm_state.evm_stack.SP != IntVal(case.expected_stack_height))
             evm_stack = _extract_evm_stack_outputs(evm_state, case.expected_stack_height)
             x86_stack = _extract_x86_stack_outputs(x86_state, case.arity, case.expected_stack_height)
             mismatches.extend(evm != x86 for evm, x86 in zip(evm_stack, x86_stack, strict=True))
+        if case.expected_status_code is not None:
+            mismatches.append(
+                x86_state.callengine_status_code != BitVecVal(case.expected_status_code, 8)
+            )
+        if case.compare_return_metadata:
+            mismatches.extend(
+                (
+                    evm_state.return_offset != x86_state.return_offset,
+                    evm_state.return_length != x86_state.return_length,
+                )
+            )
         mismatches.extend(_memory_mismatches(case, evm_state, x86_state))
         mismatches.extend(_storage_mismatches(case, evm_state, x86_state))
         mismatches.extend(_transient_storage_mismatches(case, evm_state, x86_state))
+
+    if not mismatches:
+        raise AssertionError(f"{case.name} micro-refinement has no observable checks")
 
     solver = Solver()
     solver.set(timeout=case.solver_timeout_ms)
@@ -557,6 +583,7 @@ def _evm_operator(case: InstructionRefinementCase) -> EvmOperator:
         pc=case.evm_pc,
         immediate=case.evm_immediate,
         param=case.evm_param,
+        is_static=case.evm_is_static,
     )
 
 

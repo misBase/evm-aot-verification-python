@@ -137,7 +137,7 @@ class X86Program:
     
     def to_z3(self, state: SMTState,
              strategy_cls: type = X86DFSStrategy,
-             max_depth: int = 100,
+             max_depth: int = 1000,
              use_reachability_check: bool = True,
              enable_go_bridge: bool = True,
              enable_merge: bool = False,

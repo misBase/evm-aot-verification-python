@@ -36,7 +36,7 @@ class X86SymbolicExecutor:
     def __init__(self,
                  blocks: List[X86Block],
                  strategy_cls: type = X86DFSStrategy,
-                 max_depth: int = 100,
+                 max_depth: int = 1000,
                  use_reachability_check: bool = True,
                  enable_go_bridge: bool = True,
                  enable_merge: bool = True,
