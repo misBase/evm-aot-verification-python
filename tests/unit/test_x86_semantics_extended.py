@@ -104,6 +104,48 @@ def test_sbb_with_carry_flag():
     assert is_true(simplify(out.x86_registers.get_flag("CF") == BitVecVal(0, 1)))
 
 
+def test_adc_of_at_signed_max():
+    state = SMTState()
+    state.x86_registers.set_register(Register.RAX, BitVecVal(4, 64))
+    state.x86_registers.set_register(Register.RCX, BitVecVal(0x7FFFFFFFFFFFFFFF, 64))
+    _set_flags(state, cf=1)
+
+    out = _exec_single("4811c8", state)  # adc rax, rcx
+    assert is_true(simplify(out.x86_registers.get_register(Register.RAX) == BitVecVal(0x8000000000000004, 64)))
+    assert is_true(simplify(out.x86_registers.get_flag("OF") == BitVecVal(1, 1)))
+    assert is_true(simplify(out.x86_registers.get_flag("CF") == BitVecVal(0, 1)))
+
+
+def test_sbb_of_with_borrow_through_signed_max():
+    state = SMTState()
+    state.x86_registers.set_register(Register.RAX, BitVecVal(0x803D4617FFFFFFFF, 64))
+    state.x86_registers.set_register(Register.RCX, BitVecVal(0x7FFFFFFFFFFFFFFF, 64))
+    _set_flags(state, cf=1)
+
+    out = _exec_single("4819c8", state)  # sbb rax, rcx
+    assert is_true(simplify(out.x86_registers.get_register(Register.RAX) == BitVecVal(0x003D4617FFFFFFFF, 64)))
+    assert is_true(simplify(out.x86_registers.get_flag("OF") == BitVecVal(1, 1)))
+    assert is_true(simplify(out.x86_registers.get_flag("CF") == BitVecVal(0, 1)))
+
+
+def test_narrow_alu_shift_and_mul_fail_fast():
+    st_add = SMTState()
+    st_add.x86_registers.set_register(Register.RAX, BitVecVal(1, 64))
+    st_add.x86_registers.set_register(Register.RCX, BitVecVal(1, 64))
+    with pytest.raises(NotImplementedError, match="ADD.*dest_size=4"):
+        _exec_single("01c8", st_add)  # add eax, ecx
+
+    st_shift = SMTState()
+    with pytest.raises(NotImplementedError, match="SHL.*memory_size=4"):
+        _exec_single("d120", st_shift)  # shl dword ptr [rax], 1
+
+    st_mul = SMTState()
+    st_mul.x86_registers.set_register(Register.RAX, BitVecVal(2, 64))
+    st_mul.x86_registers.set_register(Register.RCX, BitVecVal(3, 64))
+    with pytest.raises(NotImplementedError, match="MUL.*dest_size=4"):
+        _exec_single("f7e1", st_mul)  # mul ecx
+
+
 def test_adc_sbb_variants_reg_mem_imm():
     st_adc_mem = SMTState()
     st_adc_mem.x86_registers.set_register(Register.RAX, BitVecVal(10, 64))

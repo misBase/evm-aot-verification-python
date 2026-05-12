@@ -1282,7 +1282,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # LOG指令：从栈中弹出参数并记录事件
         # immediate 字段表示主题数量 (0-4)
         # LOG[n] 弹出 (2+n) 个值: offset, size, topic1...topicn
-        # 占位实现：只弹出值，不实际记录事件日志
+        # TODO: 占位实现：只弹出值，不实际记录事件日志
 
         # 获取主题数量
         num_topics = op.immediate if op.immediate is not None else 0
