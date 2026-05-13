@@ -29,6 +29,9 @@ class PointerTag(str, Enum):
     CALLDATA_PTR = "calldata_ptr"
     CODE_PTR = "code_ptr"
     RETURNDATA_PTR = "returndata_ptr"
+    SELF_ADDRESS_PTR = "self_address_ptr"
+    ORIGIN_ADDRESS_PTR = "origin_address_ptr"
+    CALLER_ADDRESS_PTR = "caller_address_ptr"
     EVM_PTR = "evm_ptr"
     STACK_PTR = "stack_ptr"
 

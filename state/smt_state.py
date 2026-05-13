@@ -51,7 +51,11 @@ class SMTState:
         "callengine_stack_pointer_limbs",
         "callengine_stack_byte_offset",
         "callengine_stack_base",
+        "callengine_callvalue",
         "callengine_gas_remaining",
+        "callengine_self_address_pointer",
+        "callengine_origin_address_pointer",
+        "callengine_caller_address_pointer",
         "callengine_input_pointer",
         "callengine_input_size_bytes",
         "callengine_code_pointer",
@@ -122,7 +126,11 @@ class SMTState:
         self.callengine_stack_pointer_limbs: BitVec = BitVecVal(0, 64)   # [R13+0x28]
         self.callengine_stack_byte_offset:   BitVec = BitVecVal(0, 64)   # [R13+0x30]
         self.callengine_stack_base:          BitVec = BitVecVal(0, 64)   # [R13+0x38]
+        self.callengine_callvalue:           BitVec = BitVecVal(0, 64)   # [R13+0x68]
         self.callengine_gas_remaining:       BitVec = BitVecVal(0, 64)   # [R13+0x70]
+        self.callengine_self_address_pointer: BitVec = BitVecVal(0, 64)  # [R13+0x78]
+        self.callengine_origin_address_pointer: BitVec = BitVecVal(0, 64)  # [R13+0x80]
+        self.callengine_caller_address_pointer: BitVec = BitVecVal(0, 64)  # [R13+0x88]
         self.callengine_input_pointer:       BitVec = BitVecVal(0, 64)   # [R13+0x90]
         self.callengine_input_size_bytes:    BitVec = BitVecVal(0, 64)   # [R13+0x98]
         self.callengine_code_pointer:        BitVec = BitVecVal(0, 64)   # [R13+0xA0]
@@ -282,9 +290,11 @@ class SMTState:
         # Lazy imports to avoid circular dependencies
         from common.uint256 import Uint256
         from verification.memory_mapping import StackMemoryMapper
-        from z3 import IntVal, BitVecVal
+        from z3 import IntVal, BitVecVal, ZeroExt
         from x86_64.models import Register
         from x86_64.aot_profile import GO_HPC_EVM_PROFILE
+
+        callengine_offsets = GO_HPC_EVM_PROFILE.offsets
 
         # 验证输入数量
         if num_inputs < 0:
@@ -317,7 +327,16 @@ class SMTState:
         calldata_ptr = BitVec('CallDataPtr', 64)
         code_ptr = BitVec('CodePtr', 64)
         return_data_ptr = BitVec('ReturnDataPtr', 64)
+        self_address_ptr = BitVec('SelfAddressPtr', 64)
+        origin_address_ptr = BitVec('OriginAddressPtr', 64)
+        caller_address_ptr = BitVec('CallerAddressPtr', 64)
         code_size = BitVec('CodeSizeBytes', 64)
+        callvalue64 = BitVec('CallValue64', 64)
+
+        initial_state.callvalue = ZeroExt(192, callvalue64)
+        initial_state.self_address = ZeroExt(96, BitVec('SelfAddress160', 160))
+        initial_state.origin_address = ZeroExt(96, BitVec('OriginAddress160', 160))
+        initial_state.caller_address = ZeroExt(96, BitVec('CallerAddress160', 160))
 
         # 写入 callEngine 字段（相对于 R13 的偏移）：
         # [R13+0x10] = memoryElement0Address -> R15
@@ -326,58 +345,102 @@ class SMTState:
         # [R13+0x28] = stackPointer（limb 数 delta，初始为 0）
         # [R13+0x30] = stackPointer 字节偏移（add r14, [r13+0x30]，初始为 0）
         # [R13+0x38] = stackElement0Address -> R14 基址
+        # [R13+0x68] = callvalue low 64 bits（AOT 当前写入 uint256 低 limb，高 limb 清零）
         # [R13+0x70] = gas，固定为足够大的具体值，确保 gas 检查走 success path
+        # [R13+0x78/0x80/0x88] = self/origin/caller 20-byte address buffers
         initial_state.callengine_memory_base = r15
         initial_state.callengine_memory_size_bytes = BitVecVal(0, 64)
         initial_state.callengine_memory_gas_used = BitVecVal(0, 64)
         initial_state.callengine_stack_pointer_limbs = BitVecVal(0, 64)
         initial_state.callengine_stack_byte_offset = BitVecVal(0, 64)
         initial_state.callengine_stack_base = r14
+        initial_state.callengine_callvalue = callvalue64
         initial_state.callengine_gas_remaining = BitVecVal(1000000000, 64)
+        initial_state.callengine_self_address_pointer = self_address_ptr
+        initial_state.callengine_origin_address_pointer = origin_address_ptr
+        initial_state.callengine_caller_address_pointer = caller_address_ptr
         initial_state.callengine_input_pointer = calldata_ptr
         initial_state.callengine_code_pointer = code_ptr
         initial_state.callengine_code_size_bytes = code_size
         initial_state.callengine_return_data_pointer = return_data_ptr
         initial_state.callengine_return_data_size_bytes = BitVecVal(0, 64)
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(0x10, 64), r15, domain=MemoryDomain.CALLENGINE)
+            r13 + BitVecVal(callengine_offsets["memory_base"], 64),
+            r15,
+            domain=MemoryDomain.CALLENGINE,
+        )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(0x18, 64), BitVecVal(0, 64), domain=MemoryDomain.CALLENGINE)
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(0x20, 64), BitVecVal(0, 64), domain=MemoryDomain.CALLENGINE)
-        initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["stack_pointer"], 64),
+            r13 + BitVecVal(callengine_offsets["memory_size"], 64),
             BitVecVal(0, 64),
             domain=MemoryDomain.CALLENGINE,
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(0x30, 64), BitVecVal(0, 64), domain=MemoryDomain.CALLENGINE)
+            r13 + BitVecVal(callengine_offsets["last_gas_cost"], 64),
+            BitVecVal(0, 64),
+            domain=MemoryDomain.CALLENGINE,
+        )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(0x38, 64), r14, domain=MemoryDomain.CALLENGINE)
+            r13 + BitVecVal(callengine_offsets["stack_pointer"], 64),
+            BitVecVal(0, 64),
+            domain=MemoryDomain.CALLENGINE,
+        )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(0x70, 64), BitVecVal(1000000000, 64), domain=MemoryDomain.CALLENGINE)
+            r13 + BitVecVal(callengine_offsets["stack_byte_offset"], 64),
+            BitVecVal(0, 64),
+            domain=MemoryDomain.CALLENGINE,
+        )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["input_pointer"], 64),
+            r13 + BitVecVal(callengine_offsets["stack_base"], 64),
+            r14,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(callengine_offsets["callvalue"], 64),
+            callvalue64,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(callengine_offsets["gas_remaining"], 64),
+            BitVecVal(1000000000, 64),
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(callengine_offsets["self_address_pointer"], 64),
+            self_address_ptr,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(callengine_offsets["origin_address_pointer"], 64),
+            origin_address_ptr,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(callengine_offsets["caller_address_pointer"], 64),
+            caller_address_ptr,
+            domain=MemoryDomain.CALLENGINE,
+        )
+        initial_state.x86_memory = initial_state.x86_memory.store_limb(
+            r13 + BitVecVal(callengine_offsets["input_pointer"], 64),
             calldata_ptr,
             domain=MemoryDomain.CALLENGINE,
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["code_pointer"], 64),
+            r13 + BitVecVal(callengine_offsets["code_pointer"], 64),
             code_ptr,
             domain=MemoryDomain.CALLENGINE,
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["code_size"], 64),
+            r13 + BitVecVal(callengine_offsets["code_size"], 64),
             code_size,
             domain=MemoryDomain.CALLENGINE,
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["return_data_pointer"], 64),
+            r13 + BitVecVal(callengine_offsets["return_data_pointer"], 64),
             return_data_ptr,
             domain=MemoryDomain.CALLENGINE,
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["return_data_size"], 64),
+            r13 + BitVecVal(callengine_offsets["return_data_size"], 64),
             BitVecVal(0, 64),
             domain=MemoryDomain.CALLENGINE,
         )
@@ -396,7 +459,7 @@ class SMTState:
             initial_state.calldatasize = calldata_size_64
         initial_state.callengine_input_size_bytes = calldata_size_64
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
-            r13 + BitVecVal(GO_HPC_EVM_PROFILE.offsets["input_size"], 64),
+            r13 + BitVecVal(callengine_offsets["input_size"], 64),
             calldata_size_64,
             domain=MemoryDomain.CALLENGINE,
         )

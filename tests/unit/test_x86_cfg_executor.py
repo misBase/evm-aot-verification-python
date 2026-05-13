@@ -713,7 +713,7 @@ class TestHandleJcc:
         hex_code = "7401c39048ffc3"
         blocks, _ = self.disasm_and_create_blocks(hex_code)
 
-        executor = X86SymbolicExecutor(blocks)
+        executor = X86SymbolicExecutor(blocks, use_reachability_check=False)
         global_state = self.create_global_state(block_addr=0x1000)
         block = blocks[0]  # 包含 je 的块
         insn = block.instructions[-1]  # je 指令
@@ -752,7 +752,7 @@ class TestHandleJcc:
         hex_code = "7401c390"
         blocks, _ = self.disasm_and_create_blocks(hex_code)
 
-        executor = X86SymbolicExecutor(blocks)
+        executor = X86SymbolicExecutor(blocks, use_reachability_check=False)
         global_state = self.create_global_state(block_addr=0x1000)
         block = blocks[0]
         insn = block.instructions[-1]
@@ -790,7 +790,7 @@ class TestHandleJcc:
                 continue
 
             blocks, _ = self.disasm_and_create_blocks(hex_code)
-            executor = X86SymbolicExecutor(blocks)
+            executor = X86SymbolicExecutor(blocks, use_reachability_check=False)
             global_state = self.create_global_state(block_addr=0x1000)
             block = blocks[0]
             insn = block.instructions[-1]
@@ -1084,7 +1084,7 @@ class TestBuildJumpCondition:
 
     def test_build_jump_condition_all_mnemonics(self):
         """测试所有条件跳转助记符。"""
-        mnemonics = ['jb', 'jae', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']
+        mnemonics = ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']
 
         hex_code = "7401c3"
         executor = self.disasm_and_create_executor(hex_code)
@@ -1093,6 +1093,15 @@ class TestBuildJumpCondition:
         for mnemonic in mnemonics:
             condition = executor._build_jump_condition(mnemonic, mstate)
             assert condition is not None, f"Failed for {mnemonic}"
+
+    def test_build_jump_condition_rejects_unsupported_mnemonic(self):
+        """测试未知条件跳转不会静默按 JE 处理。"""
+        hex_code = "7401c3"
+        executor = self.disasm_and_create_executor(hex_code)
+        mstate = SMTState()
+
+        with pytest.raises(ValueError, match="Unsupported Jcc mnemonic: js"):
+            executor._build_jump_condition("js", mstate)
 
 
 class TestIsTerminalState:

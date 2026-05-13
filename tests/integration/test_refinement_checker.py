@@ -373,6 +373,40 @@ def test_jumpi_2block_ok_program_pair():
     )
 
 
+def test_verify_perf_erc20_lite_program_pair():
+    """验证 perf_erc20_lite.json 与 perf_erc20_lite.hex 的 ERC20 风格中型样本。
+
+    该 fixture 覆盖 dispatcher、selector 分支、SHA3 mapping key、SLOAD/SSTORE、
+    RETURN/REVERT 等真实合约常见路径。固定 calldata 长度为 68 字节，覆盖
+    transfer/approve 的两个 ABI 参数，同时保持 selector 和参数内容符号化。
+    """
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "perf_erc20_lite.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "perf_erc20_lite.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=180000, verbose=False)
+    initial_state = SMTState.create_initial_state(calldata_size_bytes=68)
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+    )
+
+    assert verified, (
+        f"perf_erc20_lite program pair verification failed. "
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent observable results. Error: {msg}"
+    )
+
+
 @pytest.mark.skip(reason="Not impl well")
 def test_verify_muti_block_program_pair_full():
     """使用 muti_block.json 与 muti_block.hex 进行全量程序等价验证。"""

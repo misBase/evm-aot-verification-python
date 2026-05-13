@@ -8,7 +8,7 @@
 from pathlib import Path
 
 import pytest
-from z3 import BitVec, BitVecVal, Solver, sat, unsat, simplify, Store
+from z3 import BitVec, BitVecVal, Solver, sat, unsat, simplify, Store, ZeroExt
 
 from state.smt_state import (
     MemoryDomain,
@@ -126,6 +126,21 @@ def test_mov_loads_writable_base_pointer_tags_from_callengine():
         assert solver.check() == unsat
 
 
+def test_create_initial_state_maps_callvalue_to_callengine_context():
+    state = SMTState.create_initial_state(num_inputs=0)
+    insn = disassemble_hex("498b4568", base_addr=0)[0]  # mov rax, qword ptr [r13 + 0x68]
+
+    state = insn.to_z3(state)
+
+    solver = Solver()
+    solver.add(state.x86_registers.get_register(Register.RAX) != state.callengine_callvalue)
+    assert solver.check() == unsat
+
+    solver = Solver()
+    solver.add(state.callvalue != ZeroExt(192, state.callengine_callvalue))
+    assert solver.check() == unsat
+
+
 def test_tagged_calldata_pointer_derived_access_reads_readonly_source_and_clears_loaded_tag():
     state = SMTState.create_initial_state(num_inputs=0)
     state.x86_registers.set_register(Register.RBX, BitVecVal(0, 64))
@@ -195,6 +210,34 @@ def test_code_and_returndata_pointer_tags_route_readonly_sources():
         solver = Solver()
         solver.add(state.x86_registers.get_register(Register.RCX) != BitVecVal(int.from_bytes(bytes(payload), "little"), 64))
         assert solver.check() == unsat
+
+
+def test_tagged_caller_address_pointer_reads_address_buffer_from_environment():
+    address = 0x3333444455556666777788889999AAAABBBBCCCC
+    state = SMTState.create_initial_state(num_inputs=0)
+    state.caller_address = BitVecVal(address, 256)
+    state.x86_registers.set_register(Register.R14, BitVecVal(0, 64))
+
+    caller_core_hex = (
+        "498b8588000000"
+        "488b480c41884e0748c1e90841884e0648c1e90841884e0548c1e90841884e04"
+        "48c1e90841884e0348c1e90841884e0248c1e90841884e0148c1e90841880e"
+        "48c1e908"
+        "488b480441884e0f48c1e90841884e0e48c1e90841884e0d48c1e90841884e0c"
+        "48c1e90841884e0b48c1e90841884e0a48c1e90841884e0948c1e90841884e08"
+        "48c1e908"
+        "488b0841884e1348c1e90841884e1248c1e90841884e1148c1e90841884e10"
+        "48c1e908"
+        "41c646140041c646150041c646160041c646170049c7461800000000"
+    )
+    for insn in disassemble_hex(caller_core_hex, base_addr=0):
+        state = insn.to_z3(state)
+
+    assert state.x86_registers.get_pointer_tag(Register.RAX) == PointerTag.CALLER_ADDRESS_PTR
+    stack_value = state.x86_memory.load_256bit(BitVecVal(0, 64), domain=MemoryDomain.STACK)
+    solver = Solver()
+    solver.add(stack_value != state.caller_address)
+    assert solver.check() == unsat
 
 
 def test_store_through_tagged_readonly_pointer_raises():

@@ -6,14 +6,14 @@ x86-64 符号执行引擎（参考 evm_ir）。
 
 import logging
 from typing import Any, List, Dict, Optional, Tuple, Set
-from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat
+from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat, is_false
 
 logger = logging.getLogger(__name__)
 
 from .aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 from .models import Register, X86Block, X86Instruction
 from .cfg_structures import X86DynamicCFG, X86EdgeType
-from .cfg_state import X86GlobalState, X86WorldState, X86Constraints
+from .cfg_state import X86GlobalState, X86WorldState
 from .cfg_strategies import X86DFSStrategy, X86TopologicalStrategy
 from .disassembler import parse_operands
 from state.smt_state import SMTState, PointerTag
@@ -40,6 +40,7 @@ class X86SymbolicExecutor:
                  use_reachability_check: bool = True,
                  enable_go_bridge: bool = True,
                  enable_merge: bool = True,
+                 reachability_timeout_ms: Optional[int] = 50,
                  call_site_mapping: Optional[Any] = None,
                  aot_profile: Optional[X86AOTProfile] = None):
         """初始化符号执行引擎。
@@ -51,6 +52,7 @@ class X86SymbolicExecutor:
             use_reachability_check: 是否使用可达性检查
             enable_go_bridge: 是否启用 ret -> GO_HOST -> returnAddress 建模
             enable_merge: 是否启用合流点合并优化
+            reachability_timeout_ms: 单次可达性 SMT 检查预算；超时按可能可达处理
         """
         self.blocks = blocks
         self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
@@ -59,6 +61,7 @@ class X86SymbolicExecutor:
         self.use_reachability_check = use_reachability_check
         self.enable_go_bridge = enable_go_bridge
         self.enable_merge = enable_merge
+        self.reachability_timeout_ms = reachability_timeout_ms
         self.call_site_mapping = call_site_mapping
         self.aot_profile = aot_profile or GO_HPC_EVM_PROFILE
 
@@ -89,6 +92,12 @@ class X86SymbolicExecutor:
 
         # 每个 CallGoFunction-ret 站点对应一个独立 GO_HOST 外部节点
         self._go_host_addr_by_ret_block: Dict[int, int] = {}
+
+    def _is_state_reachable(self, state: X86GlobalState) -> bool:
+        """Check path feasibility."""
+        return state.get_constraints().is_possible(
+            solver_timeout=self.reachability_timeout_ms
+        )
 
     def _get_static_successors(self, block_idx: int, block: X86Block) -> List[int]:
         """解析 block 末尾指令，返回后继 block 地址列表（静态分析）。
@@ -441,7 +450,7 @@ class X86SymbolicExecutor:
                     old_count = len(new_states)
                     new_states = [
                         state for state in new_states
-                        if state.get_constraints().is_possible()
+                        if self._is_state_reachable(state)
                     ]
                     pruned = old_count - len(new_states)
                     self.pruned_states += pruned
@@ -482,7 +491,7 @@ class X86SymbolicExecutor:
                     if self.use_reachability_check and len(new_states) > 1:
                         new_states = [
                             state for state in new_states
-                            if state.get_constraints().is_possible()
+                            if self._is_state_reachable(state)
                         ]
                     if merged.node and merged.node.block.instructions:
                         last_insn = merged.node.block.instructions[-1]
@@ -524,7 +533,7 @@ class X86SymbolicExecutor:
             if self.use_reachability_check and len(new_states) > 1:
                 new_states = [
                     ns for ns in new_states
-                    if ns.get_constraints().is_possible()
+                    if self._is_state_reachable(ns)
                 ]
             if state.node and state.node.block.instructions:
                 last_insn = state.node.block.instructions[-1]
@@ -695,16 +704,17 @@ class X86SymbolicExecutor:
 
         mnemonic = insn.mnemonic.lower()
 
-        # 构建跳转条件
-        # 注意：当前实现使用符号变量作为占位符
-        # 完整实现需要从 CPU 标志寄存器（CF, ZF, SF, OF）中提取条件
-        jump_condition = self._build_jump_condition(mnemonic, mstate)
-        fallthrough_condition = Not(jump_condition)
+        # 根据 CPU 标志寄存器（CF, ZF, SF, OF）构建跳转条件
+        jump_condition = simplify(self._build_jump_condition(mnemonic, mstate))
+        fallthrough_condition = simplify(Not(jump_condition))
+
+        def _keep_branch(cond) -> bool:
+            return (not self.use_reachability_check) or not is_false(cond)
 
         new_states = []
 
         # 分支 1：跳转到目标（条件为真）
-        if target_block is not None:
+        if target_block is not None and _keep_branch(jump_condition):
             target_node = self.cfg.get_or_create_node(target_addr)
 
             # 浅拷贝状态（X86WorldState.__copy__ 已正确实现）
@@ -727,7 +737,7 @@ class X86SymbolicExecutor:
 
         # 分支 2：顺序执行（条件为假）
         current_idx = self.block_index[block.start_addr]
-        if current_idx + 1 < len(self.blocks):
+        if current_idx + 1 < len(self.blocks) and _keep_branch(fallthrough_condition):
             fallthrough_addr = self.blocks[current_idx + 1].start_addr
             fallthrough_node = self.cfg.get_or_create_node(fallthrough_addr)
 
@@ -1071,7 +1081,10 @@ class X86SymbolicExecutor:
             'jge': sf_eq_of,         # SF == OF (有符号大于等于)
         }
 
-        return conditions.get(mnemonic, zf_true)
+        condition = conditions.get(mnemonic)
+        if condition is None:
+            raise ValueError(f"Unsupported Jcc mnemonic: {mnemonic}")
+        return condition
 
     def _extract_jcc_condition(self, state: X86GlobalState):
         """从状态中提取 Jcc 条件（用于 CFG 边）。
@@ -1166,7 +1179,7 @@ class X86SymbolicExecutor:
             if marked_terminal is not None:
                 if not self.use_reachability_check:
                     return bool(marked_terminal)
-                return bool(marked_terminal) and global_state.get_constraints().is_possible()
+                return bool(marked_terminal) and self._is_state_reachable(global_state)
 
             # 兜底：若未经过 execute_state，ret 默认按终止处理。
             return True
@@ -1221,7 +1234,8 @@ def build_x86_dynamic_cfg(blocks: List[X86Block],
                           max_depth: int = 100,
                           use_reachability_check: bool = True,
                           enable_go_bridge: bool = True,
-                          enable_merge: bool = False) -> Tuple[List[X86GlobalState], X86DynamicCFG]:
+                          enable_merge: bool = False,
+                          reachability_timeout_ms: Optional[int] = 50) -> Tuple[List[X86GlobalState], X86DynamicCFG]:
     """构建动态 CFG 并执行符号执行。
 
     Args:
@@ -1232,6 +1246,7 @@ def build_x86_dynamic_cfg(blocks: List[X86Block],
         use_reachability_check: 是否启用可达性检查
         enable_go_bridge: 是否启用 ret->GO_HOST->returnAddress 建模
         enable_merge: 是否启用合流点合并优化
+        reachability_timeout_ms: 单次可达性 SMT 检查预算；None 表示使用默认全局预算
 
     Returns:
         (final_states, cfg) 元组
@@ -1243,6 +1258,7 @@ def build_x86_dynamic_cfg(blocks: List[X86Block],
         use_reachability_check=use_reachability_check,
         enable_go_bridge=enable_go_bridge,
         enable_merge=enable_merge,
+        reachability_timeout_ms=reachability_timeout_ms,
     )
     final_states = executor.execute(initial_state)
     return final_states, executor.cfg

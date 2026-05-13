@@ -38,7 +38,11 @@ _UINT256_SLOT_BYTES = 4 * _LIMB_STRIDE_BYTES
 _MAX_SUPPORTED_ARITY = 17
 _CALLENGINE_LIMB_ATTRS = {
     0x18: "callengine_memory_size_bytes",
+    0x68: "callengine_callvalue",
     0x70: "callengine_gas_remaining",
+    0x78: "callengine_self_address_pointer",
+    0x80: "callengine_origin_address_pointer",
+    0x88: "callengine_caller_address_pointer",
     0x98: "callengine_input_size_bytes",
     0xA8: "callengine_code_size_bytes",
     0xB8: "callengine_return_data_size_bytes",
@@ -383,6 +387,7 @@ def _execute_x86_core(
     state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
     state.x86_registers.set_pointer_tag(Register.R15, PointerTag.EVM_PTR)
     state.unrouted_memory_domain = MemoryDomain.STACK
+    _initialize_evm_context_values(state, case)
 
     for offset, value in initial_memory.items():
         state.x86_memory = state.x86_memory.store_limb(

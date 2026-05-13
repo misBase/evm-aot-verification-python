@@ -35,46 +35,54 @@ def _classify_domain(base_reg) -> Optional[MemoryDomain]:
 
 
 # RETURN指令的常量
+_CALLENGINE_OFFSETS = GO_HPC_EVM_PROFILE.offsets
+
 EVM_NATIVE_CALL_STATUS_CODE_RETURNED = GO_HPC_EVM_PROFILE.status_codes["returned"]
 EVM_NATIVE_CALL_STATUS_CODE_REVERTED = GO_HPC_EVM_PROFILE.status_codes["reverted"]
 EVM_NATIVE_CALL_STATUS_CODE_INVALID = GO_HPC_EVM_PROFILE.status_codes["invalid"]
-EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = GO_HPC_EVM_PROFILE.offsets["status_code"]
-EVM_CALL_ENGINE_STACK_CONTEXT_STACK_POINTER_OFFSET = GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
+EVM_CALL_ENGINE_EXIT_CONTEXT_NATIVE_CALL_STATUS_CODE_OFFSET = _CALLENGINE_OFFSETS["status_code"]
+EVM_CALL_ENGINE_STACK_CONTEXT_STACK_POINTER_OFFSET = _CALLENGINE_OFFSETS["stack_pointer"]
 AMD64_RESERVED_REGISTER_FOR_CALL_ENGINE = Register.R13  # 指向callEngine实例的指针
 
-# callEngine 的 stack_pointer byte offset（profile 里没单独列出，这里显式定义）。
 # 由 Go prologue `add r14, [r13+0x30]` 使用。
-CALLENGINE_STACK_POINTER_BYTE_OFFSET = 0x30
+CALLENGINE_STACK_POINTER_BYTE_OFFSET = _CALLENGINE_OFFSETS["stack_byte_offset"]
 
 # callEngine 字段 side-channel：识别到 mov [r13+offset], imm/reg 时同步到 SMTState 的显式字段。
 # (offset, expected_size_bytes) -> side-channel attribute name
 _CALLENGINE_FIELD_MAP = {
-    (0x10,                                              8): "callengine_memory_base",
-    (0x18,                                              8): "callengine_memory_size_bytes",
-    (0x20,                                              8): "callengine_memory_gas_used",
-    (GO_HPC_EVM_PROFILE.offsets["stack_pointer"],           8): "callengine_stack_pointer_limbs",
+    (_CALLENGINE_OFFSETS["memory_base"],                    8): "callengine_memory_base",
+    (_CALLENGINE_OFFSETS["memory_size"],                    8): "callengine_memory_size_bytes",
+    (_CALLENGINE_OFFSETS["last_gas_cost"],                  8): "callengine_memory_gas_used",
+    (_CALLENGINE_OFFSETS["stack_pointer"],                  8): "callengine_stack_pointer_limbs",
     (CALLENGINE_STACK_POINTER_BYTE_OFFSET,                  8): "callengine_stack_byte_offset",
-    (0x38,                                              8): "callengine_stack_base",
-    (0x70,                                              8): "callengine_gas_remaining",
-    (GO_HPC_EVM_PROFILE.offsets["input_pointer"],           8): "callengine_input_pointer",
-    (GO_HPC_EVM_PROFILE.offsets["input_size"],              8): "callengine_input_size_bytes",
-    (GO_HPC_EVM_PROFILE.offsets["code_pointer"],            8): "callengine_code_pointer",
-    (GO_HPC_EVM_PROFILE.offsets["code_size"],               8): "callengine_code_size_bytes",
-    (GO_HPC_EVM_PROFILE.offsets["return_data_pointer"],     8): "callengine_return_data_pointer",
-    (GO_HPC_EVM_PROFILE.offsets["return_data_size"],        8): "callengine_return_data_size_bytes",
-    (GO_HPC_EVM_PROFILE.offsets["status_code"],             1): "callengine_status_code",
-    (GO_HPC_EVM_PROFILE.offsets["builtin_function_index"],  4): "callengine_builtin_func_index",
-    (GO_HPC_EVM_PROFILE.offsets["go_function_index"],       4): "callengine_go_func_index",
-    (GO_HPC_EVM_PROFILE.offsets["return_address"],      8): "callengine_return_address",
-    (0x108,                                             8): "callengine_builtin_arg0",
+    (_CALLENGINE_OFFSETS["stack_base"],                     8): "callengine_stack_base",
+    (_CALLENGINE_OFFSETS["callvalue"],                      8): "callengine_callvalue",
+    (_CALLENGINE_OFFSETS["gas_remaining"],                  8): "callengine_gas_remaining",
+    (_CALLENGINE_OFFSETS["self_address_pointer"],           8): "callengine_self_address_pointer",
+    (_CALLENGINE_OFFSETS["origin_address_pointer"],         8): "callengine_origin_address_pointer",
+    (_CALLENGINE_OFFSETS["caller_address_pointer"],         8): "callengine_caller_address_pointer",
+    (_CALLENGINE_OFFSETS["input_pointer"],                  8): "callengine_input_pointer",
+    (_CALLENGINE_OFFSETS["input_size"],                     8): "callengine_input_size_bytes",
+    (_CALLENGINE_OFFSETS["code_pointer"],                   8): "callengine_code_pointer",
+    (_CALLENGINE_OFFSETS["code_size"],                      8): "callengine_code_size_bytes",
+    (_CALLENGINE_OFFSETS["return_data_pointer"],            8): "callengine_return_data_pointer",
+    (_CALLENGINE_OFFSETS["return_data_size"],               8): "callengine_return_data_size_bytes",
+    (_CALLENGINE_OFFSETS["status_code"],                    1): "callengine_status_code",
+    (_CALLENGINE_OFFSETS["builtin_function_index"],         4): "callengine_builtin_func_index",
+    (_CALLENGINE_OFFSETS["go_function_index"],              4): "callengine_go_func_index",
+    (_CALLENGINE_OFFSETS["return_address"],                 8): "callengine_return_address",
+    (_CALLENGINE_OFFSETS["arch_grow_number"],               8): "callengine_builtin_arg0",
 }
 
 _POINTER_TAG_BY_CALLENGINE_OFFSET = {
-    0x10: PointerTag.EVM_PTR,
-    0x38: PointerTag.STACK_PTR,
-    GO_HPC_EVM_PROFILE.offsets["input_pointer"]: PointerTag.CALLDATA_PTR,
-    GO_HPC_EVM_PROFILE.offsets["code_pointer"]: PointerTag.CODE_PTR,
-    GO_HPC_EVM_PROFILE.offsets["return_data_pointer"]: PointerTag.RETURNDATA_PTR,
+    _CALLENGINE_OFFSETS["memory_base"]: PointerTag.EVM_PTR,
+    _CALLENGINE_OFFSETS["stack_base"]: PointerTag.STACK_PTR,
+    _CALLENGINE_OFFSETS["self_address_pointer"]: PointerTag.SELF_ADDRESS_PTR,
+    _CALLENGINE_OFFSETS["origin_address_pointer"]: PointerTag.ORIGIN_ADDRESS_PTR,
+    _CALLENGINE_OFFSETS["caller_address_pointer"]: PointerTag.CALLER_ADDRESS_PTR,
+    _CALLENGINE_OFFSETS["input_pointer"]: PointerTag.CALLDATA_PTR,
+    _CALLENGINE_OFFSETS["code_pointer"]: PointerTag.CODE_PTR,
+    _CALLENGINE_OFFSETS["return_data_pointer"]: PointerTag.RETURNDATA_PTR,
 }
 
 _READONLY_SOURCE_ATTRS = {
@@ -82,6 +90,14 @@ _READONLY_SOURCE_ATTRS = {
     PointerTag.CODE_PTR: ("callengine_code_pointer", "code"),
     PointerTag.RETURNDATA_PTR: ("callengine_return_data_pointer", "return_data"),
 }
+
+_ADDRESS_SOURCE_ATTRS = {
+    PointerTag.SELF_ADDRESS_PTR: ("callengine_self_address_pointer", "self_address"),
+    PointerTag.ORIGIN_ADDRESS_PTR: ("callengine_origin_address_pointer", "origin_address"),
+    PointerTag.CALLER_ADDRESS_PTR: ("callengine_caller_address_pointer", "caller_address"),
+}
+
+_READONLY_POINTER_TAGS = frozenset(_READONLY_SOURCE_ATTRS) | frozenset(_ADDRESS_SOURCE_ATTRS)
 
 _WRITABLE_DOMAIN_BY_POINTER_TAG = {
     PointerTag.EVM_PTR: MemoryDomain.EVM,
@@ -420,11 +436,8 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             return writable_domains[0]
         return None
 
-    def _load_bytes_from_array(byte_array, base_addr64, effective_addr64, size_bytes: int):
-        source_offset = effective_addr64 - base_addr64
-        # calldata/code/return_data 都按“低地址存低字节”的线性字节流建模；
-        # 这里按小端序把连续字节重新拼回 64-bit/32-bit/16-bit 读取结果。
-        bytes_list = [Select(byte_array, source_offset + BitVecVal(i, 64)) for i in range(size_bytes)]
+    def _load_bytes_little_endian(bytes_list):
+        size_bytes = len(bytes_list)
         if size_bytes == 1:
             return ZeroExt(56, bytes_list[0])
         if size_bytes == 2:
@@ -433,19 +446,65 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
             return ZeroExt(32, Concat(bytes_list[3], bytes_list[2], bytes_list[1], bytes_list[0]))
         return Concat(*reversed(bytes_list))
 
+    def _load_bytes_from_array(byte_array, base_addr64, effective_addr64, size_bytes: int):
+        source_offset = effective_addr64 - base_addr64
+        # calldata/code/return_data 都按“低地址存低字节”的线性字节流建模；
+        # 这里按小端序把连续字节重新拼回 64-bit/32-bit/16-bit 读取结果。
+        bytes_list = [Select(byte_array, source_offset + BitVecVal(i, 64)) for i in range(size_bytes)]
+        return _load_bytes_little_endian(bytes_list)
+
+    def _select_address_byte(address_value, byte_index64):
+        # Go common.Address 是 20-byte big-endian buffer；EVM stack value 是
+        # zero-extended uint160，地址字节对应 value 的低 160 bits。
+        #
+        # AOT amd64 makeMem20ToStack maps the 20-byte buffer into uint256 limbs:
+        #   mem:        -----> bigger address
+        #          | 0-3 | 4-11 | 12-19 |
+        #             |     |       |
+        #   stack:  v3[4:8] v2      v1       (v4 = 0)
+        #   loc: bigger address <-----
+        selected = BitVecVal(0, 8)
+        for byte_index in reversed(range(20)):
+            high = 159 - 8 * byte_index
+            low = high - 7
+            selected = If(
+                byte_index64 == BitVecVal(byte_index, 64),
+                Extract(high, low, address_value),
+                selected,
+            )
+        return selected
+
+    def _load_bytes_from_address_value(address_value, base_addr64, effective_addr64, size_bytes: int):
+        source_offset = effective_addr64 - base_addr64
+        bytes_list = [
+            _select_address_byte(address_value, source_offset + BitVecVal(i, 64))
+            for i in range(size_bytes)
+        ]
+        return _load_bytes_little_endian(bytes_list)
+
     def _load_readonly_source_by_tag(tag: PointerTag, effective_addr64, size_bytes: Optional[int]):
         if tag == PointerTag.NONE or size_bytes is None:
             return None
         source_attrs = _READONLY_SOURCE_ATTRS.get(tag)
-        if source_attrs is None:
-            return None
-        pointer_attr, array_attr = source_attrs
-        return _load_bytes_from_array(
-            getattr(state, array_attr),
-            getattr(state, pointer_attr),
-            effective_addr64,
-            size_bytes,
-        )
+        if source_attrs is not None:
+            pointer_attr, array_attr = source_attrs
+            return _load_bytes_from_array(
+                getattr(state, array_attr),
+                getattr(state, pointer_attr),
+                effective_addr64,
+                size_bytes,
+            )
+        address_attrs = _ADDRESS_SOURCE_ATTRS.get(tag)
+        if address_attrs is not None:
+            pointer_attr, address_attr = address_attrs
+            return _load_bytes_from_address_value(
+                getattr(state, address_attr),
+                getattr(state, pointer_attr),
+                effective_addr64,
+                size_bytes,
+            )
+        return None
+
 
     def _effective_address() -> Tuple[BitVec, Optional[MemoryDomain]]:
         """计算 effective address 并按 base_reg 推导 domain。
@@ -588,7 +647,7 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
                               size_bytes: Optional[int], value64):
         if domain is None:
             readonly_tag = _resolve_mem_operand_pointer_tag()
-            if readonly_tag in _READONLY_SOURCE_ATTRS:
+            if readonly_tag in _READONLY_POINTER_TAGS:
                 raise MemoryDomainError(
                     f"cannot write through readonly source pointer (mnemonic={insn.mnemonic}, "
                     f"tag={readonly_tag})",

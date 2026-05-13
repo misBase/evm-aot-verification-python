@@ -141,6 +141,7 @@ class X86Program:
              use_reachability_check: bool = True,
              enable_go_bridge: bool = True,
              enable_merge: bool = False,
+             reachability_timeout_ms: Optional[int] = 50,
              call_site_mapping=None) -> Tuple[SMTState, Dict[str, Any]]:
         """使用 worklist 驱动的符号执行为整个程序构建Z3公式。
 
@@ -158,6 +159,7 @@ class X86Program:
             use_reachability_check: 是否使用可达性检查
             enable_go_bridge: 是否启用 ret -> GO_HOST -> returnAddress 建模
             enable_merge: 是否启用合流点合并优化（大规模 CFG 推荐开启）
+            reachability_timeout_ms: 单次可达性 SMT 检查预算；None 表示使用默认全局预算
 
         Returns:
             (final_state, result_dict)元组，其中：
@@ -186,6 +188,7 @@ class X86Program:
             use_reachability_check=use_reachability_check,
             enable_go_bridge=enable_go_bridge,
             enable_merge=enable_merge,
+            reachability_timeout_ms=reachability_timeout_ms,
             call_site_mapping=call_site_mapping,
             aot_profile=self.aot_profile,
         )
