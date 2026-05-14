@@ -46,7 +46,6 @@ htmlcov/
 # Z3
 *.smt2
 
-CLAUDE.md
 .claude/
 
 # Visualization dot files
