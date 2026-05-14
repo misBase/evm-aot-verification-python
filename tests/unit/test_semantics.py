@@ -577,6 +577,40 @@ def test_calldataload_offset_overflow_returns_zero():
     assert solver.check() == sat
 
 
+def test_calldataload_max_uint64_offset_uses_go_getdata_clamp():
+    """测试 uint64 内的大 offset 会按 Go getData clamp 到末尾而不是回绕读取。"""
+    op = EvmOperator(kind="CALLDATALOAD", pc=2)
+
+    state = SMTState()
+    state.calldatasize = BitVecVal(1, 64)
+    state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
+    state.evm_stack = state.evm_stack.push(BitVecVal((1 << 64) - 1, 256))
+
+    result_state = evm_operator_to_z3(op, state)
+    loaded, _ = result_state.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(loaded != BitVecVal(0, 256))
+    assert solver.check() == unsat
+
+
+def test_calldataload_near_max_uint64_offset_does_not_wrap_to_calldata_start():
+    """测试 offset+31 回绕时仍不会误读 calldata 低地址。"""
+    op = EvmOperator(kind="CALLDATALOAD", pc=3)
+
+    state = SMTState()
+    state.calldatasize = BitVecVal(1, 64)
+    state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
+    state.evm_stack = state.evm_stack.push(BitVecVal((1 << 64) - 31, 256))
+
+    result_state = evm_operator_to_z3(op, state)
+    loaded, _ = result_state.evm_stack.pop()
+
+    solver = Solver()
+    solver.add(loaded != BitVecVal(0, 256))
+    assert solver.check() == unsat
+
+
 def test_calldatacopy_symbolic_length_writes_memory():
     """测试 CALLDATACOPY 在符号长度下不会错误地保持内存不变。"""
     op = EvmOperator(kind="CALLDATACOPY", pc=1)
@@ -598,6 +632,72 @@ def test_calldatacopy_symbolic_length_writes_memory():
     solver.add(old_mem != BitVecVal(0xAB, 8))
     solver.add(Select(result_state.evm_memory.Memory, BitVecVal(5, 64)) == old_mem)
     assert solver.check() == unsat
+
+
+def test_calldatacopy_overflow_offset_uses_go_getdata_clamp():
+    """测试 CALLDATACOPY dataOffset 溢出钳到 MaxUint64 后不会回绕读取。"""
+    op = EvmOperator(kind="CALLDATACOPY", pc=4)
+
+    state = SMTState()
+    state.calldatasize = BitVecVal(1, 64)
+    state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
+    state.evm_memory = state.evm_memory.set_byte(BitVecVal(10, 64), BitVecVal(0x11, 8))
+    state.evm_memory = state.evm_memory.set_byte(BitVecVal(11, 64), BitVecVal(0x22, 8))
+
+    state.evm_stack = state.evm_stack.push(BitVecVal(2, 256))       # length
+    state.evm_stack = state.evm_stack.push(BitVecVal(1 << 64, 256)) # dataOffset -> MaxUint64
+    state.evm_stack = state.evm_stack.push(BitVecVal(10, 256))      # memOffset
+    result_state = evm_operator_to_z3(op, state)
+
+    for addr in (10, 11):
+        solver = Solver()
+        solver.add(Select(result_state.evm_memory.Memory, BitVecVal(addr, 64)) != BitVecVal(0, 8))
+        assert solver.check() == unsat
+
+
+def test_calldatacopy_zero_length_does_not_grow_memory():
+    """测试 CALLDATACOPY length=0 时不写内存也不增长 MSize。"""
+    op = EvmOperator(kind="CALLDATACOPY", pc=5)
+
+    state = SMTState()
+    state.evm_memory = EVMMemoryState(msize=BitVecVal(3, 64))
+    state.calldatasize = BitVecVal(1, 64)
+    state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
+    old_dest = Select(state.evm_memory.Memory, BitVecVal(10, 64))
+
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))   # length
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))   # dataOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(10, 256))  # memOffset
+    result_state = evm_operator_to_z3(op, state)
+
+    solver_mem = Solver()
+    solver_mem.add(Select(result_state.evm_memory.Memory, BitVecVal(10, 64)) != old_dest)
+    assert solver_mem.check() == unsat
+
+    solver_msize = Solver()
+    solver_msize.add(result_state.evm_memory.MSize != BitVecVal(3, 64))
+    assert solver_msize.check() == unsat
+
+
+def test_codecopy_max_uint64_offset_uses_go_getdata_clamp():
+    """测试 CODECOPY codeOffset 接近 uint64 上界时不会回绕读取 code[0]。"""
+    op = EvmOperator(kind="CODECOPY", pc=6)
+
+    state = SMTState()
+    state.callengine_code_size_bytes = BitVecVal(1, 64)
+    state.code = Store(state.code, BitVecVal(0, 64), BitVecVal(0xAA, 8))
+    state.evm_memory = state.evm_memory.set_byte(BitVecVal(10, 64), BitVecVal(0x11, 8))
+    state.evm_memory = state.evm_memory.set_byte(BitVecVal(11, 64), BitVecVal(0x22, 8))
+
+    state.evm_stack = state.evm_stack.push(BitVecVal(2, 256))              # length
+    state.evm_stack = state.evm_stack.push(BitVecVal((1 << 64) - 1, 256))  # codeOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(10, 256))             # memOffset
+    result_state = evm_operator_to_z3(op, state)
+
+    for addr in (10, 11):
+        solver = Solver()
+        solver.add(Select(result_state.evm_memory.Memory, BitVecVal(addr, 64)) != BitVecVal(0, 8))
+        assert solver.check() == unsat
 
 
 def test_extcodecopy_symbolically_writes_memory():

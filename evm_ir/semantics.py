@@ -40,6 +40,27 @@ def _uint256_to_u64_with_overflow_max(value: BitVecRef) -> BitVecRef:
     )
 
 
+def _go_getdata_byte(byte_array,
+                     start_64: BitVecRef,
+                     source_size_64: BitVecRef,
+                     relative_64: BitVecRef) -> BitVecRef:
+    """Model one byte of Go getData(data, start, size)'s padded result."""
+    if start_64.size() != 64:
+        raise ValueError(f"getData start must be 64 bits, got {start_64.size()}")
+    if source_size_64.size() != 64:
+        raise ValueError(f"getData source size must be 64 bits, got {source_size_64.size()}")
+    if relative_64.size() != 64:
+        raise ValueError(f"getData relative index must be 64 bits, got {relative_64.size()}")
+
+    effective_start = If(ULT(source_size_64, start_64), source_size_64, start_64)
+    remaining = source_size_64 - effective_start
+    return If(
+        ULT(relative_64, remaining),
+        Select(byte_array, effective_start + relative_64),
+        BitVecVal(0, 8),
+    )
+
+
 def _write_call_return_data(memory_state: EVMMemoryState,
                             ret_offset_bv: BitVecRef,
                             ret_size_bv: BitVecRef,
@@ -761,11 +782,11 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # - 超出 calldatasize 的字节补 0
         bytes_list = []
         for i in range(32):
-            byte_offset = offset_64 + BitVecVal(i, 64)
-            byte_val = If(
-                ULT(byte_offset, calldatasize_64),
-                Select(state.calldata, byte_offset),
-                BitVecVal(0, 8),
+            byte_val = _go_getdata_byte(
+                state.calldata,
+                offset_64,
+                calldatasize_64,
+                BitVecVal(i, 64),
             )
             bytes_list.append(byte_val)
 
@@ -781,37 +802,24 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         data_offset_bv, stack_after_pop2 = stack_after_pop1.pop()
         length_bv, stack_after_pop3 = stack_after_pop2.pop()
 
-        mem_offset_64 = _truncate_to_64(mem_offset_bv)
-        length_64 = _truncate_to_64(length_bv)
         # Go 解释器对 dataOffset 使用 Uint64WithOverflow，溢出时钳到 MaxUint64
         calldata_offset_64 = _uint256_to_u64_with_overflow_max(data_offset_bv)
         if state.calldatasize.size() != 64:
             raise ValueError(f"calldatasize context must be 64 bits, got {state.calldatasize.size()}")
         calldatasize_64 = state.calldatasize
 
-        copy_index = BitVec(f"calldatacopy_idx_{op.pc}", 64)
-        relative_index = copy_index - mem_offset_64
-        calldata_index = calldata_offset_64 + relative_index
-        in_copy_range = And(
-            UGE(copy_index, mem_offset_64),
-            ULT(relative_index, length_64),
+        state.evm_memory = _write_symbolic_memory_slice(
+            state.evm_memory,
+            mem_offset_bv,
+            length_bv,
+            lambda relative_index: _go_getdata_byte(
+                state.calldata,
+                calldata_offset_64,
+                calldatasize_64,
+                relative_index,
+            ),
+            effect_tag=f"calldatacopy_idx_{op.pc}",
         )
-        copied_byte = If(
-            ULT(calldata_index, calldatasize_64),
-            Select(state.calldata, calldata_index),
-            BitVecVal(0, 8),
-        )
-        new_memory = Lambda(
-            copy_index,
-            If(in_copy_range, copied_byte, Select(state.evm_memory.Memory, copy_index)),
-        )
-        new_msize = If(
-            UGE(mem_offset_64 + length_64, state.evm_memory.MSize),
-            mem_offset_64 + length_64,
-            state.evm_memory.MSize,
-        )
-
-        state.evm_memory = EVMMemoryState(memory_array=new_memory, msize=new_msize)
         state.evm_stack = stack_after_pop3
         return state
 
@@ -826,15 +834,14 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         length_bv, stack_after_pop3 = stack_after_pop2.pop()
 
         code_offset_64 = _uint256_to_u64_with_overflow_max(code_offset_bv)
+        if state.callengine_code_size_bytes.size() != 64:
+            raise ValueError(
+                f"code size context must be 64 bits, got {state.callengine_code_size_bytes.size()}"
+            )
         code_size_64 = state.callengine_code_size_bytes
 
         def code_byte(relative_index):
-            code_index = code_offset_64 + relative_index
-            return If(
-                ULT(code_index, code_size_64),
-                Select(state.code, code_index),
-                BitVecVal(0, 8),
-            )
+            return _go_getdata_byte(state.code, code_offset_64, code_size_64, relative_index)
 
         state.evm_memory = _write_symbolic_memory_slice(
             state.evm_memory,
