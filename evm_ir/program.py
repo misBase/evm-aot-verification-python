@@ -12,6 +12,7 @@ from .models import EVMBlock
 from .semantics import EVMIRSemantics
 from .json_parser import CompilerEVMResult
 from .cfg import SymbolicExecutor, DFSStrategy, BFSStrategy, GlobalState
+from common.path_observation import PathObservation, PathSemantics
 from state.smt_state import SMTState
 
 
@@ -57,6 +58,22 @@ class EVMProgram:
         """
         return self.blocks_by_pc.get(pc)
 
+    def _execute_paths(
+        self,
+        state: SMTState,
+        strategy_cls: type = DFSStrategy,
+        max_depth: int = 100,
+        use_reachability_check: bool = True,
+    ) -> List[GlobalState]:
+        """Execute the EVM CFG and return terminal global states."""
+        executor = SymbolicExecutor(
+            blocks=self.blocks,
+            strategy_cls=strategy_cls,
+            max_depth=max_depth,
+            use_reachability_check=use_reachability_check,
+        )
+        return executor.execute(state)
+
     def to_z3(self, state: SMTState,
              strategy_cls: type = DFSStrategy,
              max_depth: int = 100,
@@ -81,16 +98,12 @@ class EVMProgram:
             - final_state: 程序执行后的最终SMT状态（从所有路径合并）
             - result_dict: 包含合并返回值的字典（offset, length, memory, has_return_data）
         """
-        # 创建符号执行引擎
-        executor = SymbolicExecutor(
-            blocks=self.blocks,
+        final_global_states = self._execute_paths(
+            state,
             strategy_cls=strategy_cls,
             max_depth=max_depth,
-            use_reachability_check=use_reachability_check
+            use_reachability_check=use_reachability_check,
         )
-
-        # 执行符号执行
-        final_global_states = executor.execute(state)
 
         if not final_global_states:
             # 没有终止状态，返回默认结果
@@ -123,6 +136,54 @@ class EVMProgram:
         }
 
         return merged_state, result
+
+    def to_z3_paths(
+        self,
+        state: SMTState,
+        strategy_cls: type = DFSStrategy,
+        max_depth: int = 100,
+        use_reachability_check: bool = True,
+        merge_state: bool = False,
+    ) -> PathSemantics:
+        """Build terminal path observations for the EVM program.
+
+        Unlike ``to_z3()``, this keeps terminal paths separate and only builds a
+        merged state when explicitly requested for debug-only stack checks.
+        """
+        final_global_states = self._execute_paths(
+            state,
+            strategy_cls=strategy_cls,
+            max_depth=max_depth,
+            use_reachability_check=use_reachability_check,
+        )
+        observations = [
+            self._path_observation(gstate)
+            for gstate in final_global_states
+        ]
+        merged_state = (
+            self._merge_global_states(final_global_states)
+            if merge_state and final_global_states
+            else None
+        )
+        return PathSemantics(
+            global_states=final_global_states,
+            observations=observations,
+            merged_state=merged_state,
+        )
+
+    def _path_observation(self, gstate: GlobalState) -> PathObservation:
+        """Extract the observable result of one terminal EVM path."""
+        state = gstate.mstate
+        return PathObservation(
+            condition=gstate.get_constraints().as_bool(),
+            offset=state.return_offset,
+            length=state.return_length,
+            memory=state.evm_memory.Memory,
+            base_addr=None,
+            has_return_data=state.return_length != BitVecVal(0, 64),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        )
 
     def _merge_global_states(self, global_states: List[GlobalState]) -> SMTState:
         """合并所有全局状态的机器状态。

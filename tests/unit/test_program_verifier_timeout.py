@@ -3,6 +3,7 @@
 
 from z3 import BitVecVal, BoolVal
 
+from common.path_observation import PathObservation, PathSemantics
 import verification.program_verifier as program_verifier_module
 from state.smt_state import SMTState
 from verification.program_verifier import ProgramEquivalenceChecker
@@ -20,6 +21,24 @@ class _DummyEVMProgram:
             'transient_storage': state.evm_transient_storage.TransientStorage,
         }
 
+    def to_z3_paths(self, state, merge_state=False):
+        return PathSemantics(
+            global_states=[],
+            observations=[
+                PathObservation(
+                    condition=BoolVal(True),
+                    offset=BitVecVal(0, 64),
+                    length=BitVecVal(0, 64),
+                    memory=state.evm_memory.Memory,
+                    base_addr=None,
+                    has_return_data=BoolVal(False),
+                    storage=state.evm_storage.Storage,
+                    transient_storage=state.evm_transient_storage.TransientStorage,
+                )
+            ],
+            merged_state=state if merge_state else None,
+        )
+
 
 class _DummyX86Program:
     def to_z3(self, state, call_site_mapping=None):
@@ -32,6 +51,24 @@ class _DummyX86Program:
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
         }
+
+    def to_z3_paths(self, state, call_site_mapping=None, merge_state=False):
+        return PathSemantics(
+            global_states=[],
+            observations=[
+                PathObservation(
+                    condition=BoolVal(True),
+                    offset=BitVecVal(0, 64),
+                    length=BitVecVal(0, 64),
+                    memory=state.x86_memory.evm_mem,
+                    base_addr=BitVecVal(0, 64),
+                    has_return_data=BoolVal(False),
+                    storage=state.evm_storage.Storage,
+                    transient_storage=state.evm_transient_storage.TransientStorage,
+                )
+            ],
+            merged_state=state if merge_state else None,
+        )
 
 
 def test_verify_program_pair_uses_independent_stack_check_budget(monkeypatch):
@@ -83,7 +120,38 @@ def test_verify_program_pair_rewrites_refinement_timeout_message(monkeypatch):
         lambda _evm_result, _x86_result: (False, checker.refinement_checker._timeout_message()),
     )
 
-    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+    )
+
+    assert not verified
+    assert msg == "? TIMEOUT: refinement check exceeded overall timeout (123 ms)"
+
+
+def test_verify_program_pair_rewrites_path_refinement_timeout_message(monkeypatch):
+    checker = ProgramEquivalenceChecker(timeout_ms=123, verbose=False)
+    initial_state = SMTState.create_initial_state()
+    evm_program = _DummyEVMProgram()
+    x86_program = _DummyX86Program()
+
+    monkeypatch.setattr(program_verifier_module, "build_call_site_mapping", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        checker.refinement_checker,
+        "check_refinement_paths",
+        lambda _evm_results, _x86_results: (
+            False,
+            checker.refinement_checker._timeout_message(),
+        ),
+    )
+
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        path_observations=True,
+    )
 
     assert not verified
     assert msg == "? TIMEOUT: refinement check exceeded overall timeout (123 ms)"

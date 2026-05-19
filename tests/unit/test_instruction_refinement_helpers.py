@@ -1,8 +1,30 @@
 """Tests for single-instruction refinement helper rewrites."""
 
-from z3 import BitVec, BitVecVal, Concat, Extract, If, Solver, simplify, unsat
+from z3 import BitVec, BitVecVal, BoolVal, Concat, Extract, If, Solver, simplify, unsat
 
-from tests.support.instruction_refinement import _normalize_refinement_bv
+from state.smt_state import MemoryDomain, SMTState
+from tests.support import instruction_refinement as refinement
+from tests.support.instruction_refinement import (
+    InstructionRefinementCase,
+    _initialize_evm_readonly_sources,
+    _initialize_x86_readonly_sources,
+    _normalize_refinement_bv,
+)
+
+
+def _empty_readonly_words():
+    return {"calldata": [], "code": [], "return_data": []}
+
+
+def _minimal_case(**kwargs):
+    return InstructionRefinementCase(
+        name="TEST",
+        evm_kind="CALLDATALOAD",
+        arity=1,
+        x86_core_hex="",
+        base_addr=0,
+        **kwargs,
+    )
 
 
 def _bytewise_zero_ite_concat(condition, source, high=255, low=0):
@@ -59,3 +81,97 @@ def test_normalize_refinement_bv_rejects_non_contiguous_extracts():
     )
 
     assert _normalize_refinement_bv(expr).eq(simplify(expr))
+
+
+def test_instruction_refinement_evm_uses_symbolic_calldata_size_when_unfixed():
+    state = SMTState()
+    case = _minimal_case(calldata_size_bytes=None)
+
+    _initialize_evm_readonly_sources(state, case, _empty_readonly_words())
+
+    solver = Solver()
+    solver.add(state.callengine_input_size_bytes != state.calldatasize)
+    assert solver.check() == unsat
+
+
+def test_instruction_refinement_x86_stores_symbolic_calldata_size_when_unfixed():
+    state = SMTState()
+    case = _minimal_case(calldata_size_bytes=None)
+
+    _initialize_x86_readonly_sources(state, case, _empty_readonly_words())
+
+    input_size_field = state.x86_memory.load_limb(
+        BitVecVal(0x98, 64),
+        domain=MemoryDomain.CALLENGINE,
+    )
+
+    solver = Solver()
+    solver.add(state.callengine_input_size_bytes != state.calldatasize)
+    assert solver.check() == unsat
+
+    solver = Solver()
+    solver.add(input_size_field != state.calldatasize)
+    assert solver.check() == unsat
+
+
+def test_instruction_refinement_cfg_uses_merged_state_by_default(monkeypatch):
+    case = _minimal_case(
+        expected_stack_height=0,
+        x86_execution_mode="cfg",
+    )
+    calls = []
+
+    monkeypatch.setattr(refinement, "_build_evm_final_state", lambda *_args: object())
+    monkeypatch.setattr(refinement, "_build_x86_final_state", lambda *_args: object())
+    monkeypatch.setattr(
+        refinement,
+        "_build_x86_final_global_states",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("unexpected terminal-path branch")),
+    )
+
+    def _merged_mismatches(*_args):
+        calls.append("merged")
+        return [BoolVal(False)]
+
+    monkeypatch.setattr(refinement, "_state_observation_mismatches", _merged_mismatches)
+    monkeypatch.setattr(
+        refinement,
+        "_path_observation_mismatches",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("unexpected path mismatches")),
+    )
+
+    refinement.assert_instruction_refines(case)
+
+    assert calls == ["merged"]
+
+
+def test_instruction_refinement_cfg_can_compare_terminal_paths(monkeypatch):
+    case = _minimal_case(
+        expected_stack_height=0,
+        x86_execution_mode="cfg",
+        x86_compare_terminal_paths=True,
+    )
+    calls = []
+
+    monkeypatch.setattr(refinement, "_build_evm_final_state", lambda *_args: object())
+    monkeypatch.setattr(
+        refinement,
+        "_build_x86_final_state",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("unexpected merged-state branch")),
+    )
+    monkeypatch.setattr(refinement, "_build_x86_final_global_states", lambda *_args: ["path"])
+
+    def _path_mismatches(*_args):
+        calls.append("paths")
+        return [BoolVal(False)]
+
+    monkeypatch.setattr(refinement, "_path_observation_mismatches", _path_mismatches)
+    monkeypatch.setattr(
+        refinement,
+        "_state_observation_mismatches",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("unexpected merged mismatches")),
+    )
+
+    refinement.assert_instruction_refines(case)
+
+    assert calls == ["paths"]

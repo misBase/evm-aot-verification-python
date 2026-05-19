@@ -6,11 +6,14 @@ from dataclasses import dataclass
 from typing import Literal
 
 from z3 import (
+    And,
     BitVecVal,
+    BoolVal,
     Concat,
     Extract,
     If,
     IntVal,
+    Not,
     Or,
     Select,
     Solver,
@@ -87,6 +90,7 @@ class InstructionRefinementCase:
     storage_check_keys: tuple[int, ...] = ()
     transient_storage_check_keys: tuple[int, ...] = ()
     x86_execution_mode: Literal["linear", "cfg"] = "linear"
+    x86_compare_terminal_paths: bool = False
     x86_enable_go_bridge: bool = False
     x86_max_depth: int = 50
     solver_timeout_ms: int = 10_000
@@ -121,27 +125,17 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
         mismatches = [evm_result != x86_result]
     else:
         evm_state = _build_evm_final_state(case, operands, memory_words, readonly_words)
-        x86_state = _build_x86_final_state(case, operands, memory_words, readonly_words)
-        mismatches = []
-        if case.expected_stack_height is not None:
-            mismatches.append(evm_state.evm_stack.SP != IntVal(case.expected_stack_height))
-            evm_stack = _extract_evm_stack_outputs(evm_state, case.expected_stack_height)
-            x86_stack = _extract_x86_stack_outputs(x86_state, case.arity, case.expected_stack_height)
-            mismatches.extend(evm != x86 for evm, x86 in zip(evm_stack, x86_stack, strict=True))
-        if case.expected_status_code is not None:
-            mismatches.append(
-                x86_state.callengine_status_code != BitVecVal(case.expected_status_code, 8)
+        if case.x86_execution_mode == "cfg" and case.x86_compare_terminal_paths:
+            x86_global_states = _build_x86_final_global_states(
+                case,
+                operands,
+                memory_words,
+                readonly_words,
             )
-        if case.compare_return_metadata:
-            mismatches.extend(
-                (
-                    evm_state.return_offset != x86_state.return_offset,
-                    evm_state.return_length != x86_state.return_length,
-                )
-            )
-        mismatches.extend(_memory_mismatches(case, evm_state, x86_state))
-        mismatches.extend(_storage_mismatches(case, evm_state, x86_state))
-        mismatches.extend(_transient_storage_mismatches(case, evm_state, x86_state))
+            mismatches = _path_observation_mismatches(case, evm_state, x86_global_states)
+        else:
+            x86_state = _build_x86_final_state(case, operands, memory_words, readonly_words)
+            mismatches = _state_observation_mismatches(case, evm_state, x86_state)
 
     if not mismatches:
         raise AssertionError(f"{case.name} micro-refinement has no observable checks")
@@ -155,6 +149,7 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
         f"{case.name} micro-refinement failed: "
         f"opcode={case.evm_kind}, base_addr=0x{case.base_addr:x}, "
         f"execution_mode={case.x86_execution_mode}, "
+        f"compare_terminal_paths={case.x86_compare_terminal_paths}, "
         f"x86_core_hex={case.x86_core_hex}, solver_result={result}"
     )
 
@@ -343,6 +338,18 @@ def _build_x86_final_state(
     return _execute_x86_core(case, initial_memory, initial_evm_memory, readonly_words)
 
 
+def _build_x86_final_global_states(
+    case: InstructionRefinementCase,
+    operands: list[Uint256],
+    memory_words: list[Uint256],
+    readonly_words: dict[str, list[Uint256]],
+):
+    initial_memory = _build_aot_stack_memory(operands)
+    initial_evm_memory = _build_aot_evm_memory(case, memory_words)
+    state = _build_x86_initial_state(case, initial_memory, initial_evm_memory, readonly_words)
+    return _execute_x86_core_cfg_global_states(case, state)
+
+
 def _extract_x86_stack_outputs(state: SMTState, arity: int, expected_stack_height: int):
     return tuple(
         _load_stack_slot(state, arity, slot_index)
@@ -381,6 +388,24 @@ def _execute_x86_core(
     initial_evm_memory,
     readonly_words: dict[str, list[Uint256]],
 ):
+    state = _build_x86_initial_state(case, initial_memory, initial_evm_memory, readonly_words)
+
+    if case.x86_execution_mode == "cfg":
+        return _execute_x86_core_cfg(case, state)
+    if case.x86_execution_mode != "linear":
+        raise ValueError(
+            f"{case.name}: x86_execution_mode must be 'linear' or 'cfg', "
+            f"got {case.x86_execution_mode!r}"
+        )
+    return _execute_x86_core_linear(case, state)
+
+
+def _build_x86_initial_state(
+    case: InstructionRefinementCase,
+    initial_memory,
+    initial_evm_memory,
+    readonly_words: dict[str, list[Uint256]],
+):
     state = SMTState()
     state.x86_registers.set_register(Register.R13, BitVecVal(0, 64))
     state.x86_registers.set_register(Register.R14, BitVecVal(0, 64))
@@ -405,14 +430,7 @@ def _execute_x86_core(
     _initialize_x86_callengine_limb_values(state, case)
     _initialize_x86_stack_byte_values(state, case)
 
-    if case.x86_execution_mode == "cfg":
-        return _execute_x86_core_cfg(case, state)
-    if case.x86_execution_mode != "linear":
-        raise ValueError(
-            f"{case.name}: x86_execution_mode must be 'linear' or 'cfg', "
-            f"got {case.x86_execution_mode!r}"
-        )
-    return _execute_x86_core_linear(case, state)
+    return state
 
 
 def _initialize_evm_readonly_sources(
@@ -435,9 +453,8 @@ def _initialize_evm_readonly_sources(
         case.initial_return_data_word_offsets,
         readonly_words["return_data"],
     )
-    if case.calldata_size_bytes is not None:
-        state.calldatasize = BitVecVal(case.calldata_size_bytes, 64)
-        state.callengine_input_size_bytes = BitVecVal(case.calldata_size_bytes, 64)
+    calldata_size = _initialize_calldata_size(state, case)
+    state.callengine_input_size_bytes = calldata_size
     if case.code_size_bytes is not None:
         state.callengine_code_size_bytes = BitVecVal(case.code_size_bytes, 64)
     if case.return_data_size_bytes is not None:
@@ -478,10 +495,9 @@ def _initialize_x86_readonly_sources(
     _store_callengine_limb(state, 0x90, BitVecVal(0, 64))
     _store_callengine_limb(state, 0xA0, BitVecVal(0, 64))
     _store_callengine_limb(state, 0xB0, BitVecVal(0, 64))
-    if case.calldata_size_bytes is not None:
-        size = BitVecVal(case.calldata_size_bytes, 64)
-        state.callengine_input_size_bytes = size
-        _store_callengine_limb(state, 0x98, size)
+    calldata_size = _initialize_calldata_size(state, case)
+    state.callengine_input_size_bytes = calldata_size
+    _store_callengine_limb(state, 0x98, calldata_size)
     if case.code_size_bytes is not None:
         size = BitVecVal(case.code_size_bytes, 64)
         state.callengine_code_size_bytes = size
@@ -514,6 +530,16 @@ def _initialize_x86_stack_byte_values(
             BitVecVal(value, 8),
             domain=MemoryDomain.STACK,
         )
+
+
+def _initialize_calldata_size(state: SMTState, case: InstructionRefinementCase):
+    """Return the shared calldata-size value for EVM and x86 callEngine views."""
+    if case.calldata_size_bytes is None:
+        return state.calldatasize
+
+    size = BitVecVal(case.calldata_size_bytes, 64)
+    state.calldatasize = size
+    return size
 
 
 def _store_words_in_byte_array(array, offsets: tuple[int, ...], words: list[Uint256]):
@@ -552,6 +578,98 @@ def _execute_x86_core_cfg(case: InstructionRefinementCase, state: SMTState) -> S
         enable_merge=False,
     )
     return final_state
+
+
+def _execute_x86_core_cfg_global_states(case: InstructionRefinementCase, state: SMTState):
+    program = X86Program.from_hex(case.x86_core_hex, base_addr=case.base_addr)
+    paths = program.to_z3_paths(
+        state,
+        max_depth=case.x86_max_depth,
+        enable_go_bridge=case.x86_enable_go_bridge,
+        enable_merge=False,
+        merge_state=False,
+    )
+    if not paths.global_states:
+        raise ValueError(f"{case.name}: cfg execution produced no terminal paths")
+    return paths.global_states
+
+
+def _state_observation_mismatches(
+    case: InstructionRefinementCase,
+    evm_state: SMTState,
+    x86_state: SMTState,
+):
+    mismatches = []
+    if case.expected_stack_height is not None:
+        mismatches.append(evm_state.evm_stack.SP != IntVal(case.expected_stack_height))
+        evm_stack = _extract_evm_stack_outputs(evm_state, case.expected_stack_height)
+        x86_stack = _extract_x86_stack_outputs(x86_state, case.arity, case.expected_stack_height)
+        mismatches.extend(evm != x86 for evm, x86 in zip(evm_stack, x86_stack, strict=True))
+    if case.expected_status_code is not None:
+        mismatches.append(
+            x86_state.callengine_status_code != BitVecVal(case.expected_status_code, 8)
+        )
+    if case.compare_return_metadata:
+        mismatches.extend(
+            (
+                evm_state.return_offset != x86_state.return_offset,
+                evm_state.return_length != x86_state.return_length,
+            )
+        )
+    mismatches.extend(_memory_mismatches(case, evm_state, x86_state))
+    mismatches.extend(_storage_mismatches(case, evm_state, x86_state))
+    mismatches.extend(_transient_storage_mismatches(case, evm_state, x86_state))
+    return mismatches
+
+
+def _path_observation_mismatches(
+    case: InstructionRefinementCase,
+    evm_state: SMTState,
+    x86_global_states,
+):
+    if not x86_global_states:
+        return [BoolVal(True)]
+
+    mismatches = []
+    if case.expected_stack_height is not None:
+        mismatches.append(evm_state.evm_stack.SP != IntVal(case.expected_stack_height))
+        evm_stack = _extract_evm_stack_outputs(evm_state, case.expected_stack_height)
+    else:
+        evm_stack = ()
+
+    path_conditions = [gstate.get_constraints().as_bool() for gstate in x86_global_states]
+    mismatches.append(Not(Or(*path_conditions)))
+
+    for condition, gstate in zip(path_conditions, x86_global_states, strict=True):
+        path_mismatches = []
+        if case.expected_stack_height is not None:
+            x86_stack = _extract_x86_stack_outputs(
+                gstate.mstate,
+                case.arity,
+                case.expected_stack_height,
+            )
+            path_mismatches.extend(
+                evm != x86 for evm, x86 in zip(evm_stack, x86_stack, strict=True)
+            )
+        if case.expected_status_code is not None:
+            path_mismatches.append(
+                gstate.mstate.callengine_status_code != BitVecVal(case.expected_status_code, 8)
+            )
+        if case.compare_return_metadata:
+            path_mismatches.extend(
+                (
+                    evm_state.return_offset != gstate.mstate.return_offset,
+                    evm_state.return_length != gstate.mstate.return_length,
+                )
+            )
+        path_mismatches.extend(_memory_mismatches(case, evm_state, gstate.mstate))
+        path_mismatches.extend(_storage_mismatches(case, evm_state, gstate.mstate))
+        path_mismatches.extend(_transient_storage_mismatches(case, evm_state, gstate.mstate))
+
+        if path_mismatches:
+            mismatches.append(And(condition, Or(*path_mismatches)))
+
+    return mismatches
 
 
 def _memory_mismatches(case: InstructionRefinementCase, evm_state: SMTState, x86_state: SMTState):

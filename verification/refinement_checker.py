@@ -5,7 +5,7 @@
 """
 
 import time
-from z3 import BitVecVal, Select, SolverFor, sat, set_option, unsat
+from z3 import And, BitVecVal, BoolVal, Not, Or, Select, SolverFor, sat, set_option, unsat
 from typing import TYPE_CHECKING, Tuple, Optional
 
 from state.smt_state import MemoryDomain
@@ -83,9 +83,133 @@ class RefinementChecker:
         deadline = time.time() + (self.timeout_ms / 1000.0)
 
         return self._check_refinement_direct_memory(evm_result, x86_result, deadline)
+
+    def check_refinement_paths(
+        self,
+        evm_results: list[dict],
+        x86_results: list[dict],
+    ) -> Tuple[bool, Optional[str]]:
+        """Check refinement directly over terminal path observations.
+
+        This avoids first merging whole terminal memory/storage arrays.  For each
+        feasible EVM/x86 terminal-path intersection, it proves the same
+        observable properties as ``check_refinement``.
+        """
+        deadline = time.time() + (self.timeout_ms / 1000.0)
+
+        if not evm_results:
+            return False, "✗ NO TERMINAL PATHS: EVM program produced no terminal state"
+        if not x86_results:
+            return False, "✗ NO TERMINAL PATHS: x86 program produced no terminal state"
+
+        verified, msg = self._check_path_coverage(evm_results, "EVM", deadline)
+        if not verified:
+            return False, msg
+        verified, msg = self._check_path_coverage(x86_results, "x86", deadline)
+        if not verified:
+            return False, msg
+
+        pair_count = 0
+        checked_pair_count = 0
+        for evm_index, evm_result in enumerate(evm_results):
+            evm_condition = evm_result.get("condition", BoolVal(True))
+            for x86_index, x86_result in enumerate(x86_results):
+                x86_condition = x86_result.get("condition", BoolVal(True))
+                path_condition = And(evm_condition, x86_condition)
+                pair_count += 1
+                may_be_feasible, msg = self._check_path_pair_may_be_feasible(
+                    path_condition,
+                    deadline,
+                    f"evm[{evm_index}], x86[{x86_index}]",
+                )
+                if msg is not None:
+                    return False, msg
+                if not may_be_feasible:
+                    continue
+                checked_pair_count += 1
+                verified, msg = self._check_refinement_direct_memory(
+                    evm_result,
+                    x86_result,
+                    deadline,
+                    path_condition=path_condition,
+                    context=f"path pair evm[{evm_index}], x86[{x86_index}]",
+                )
+                if not verified:
+                    return False, msg
+
+        msg = (
+            "✓ VERIFIED: x86 refines EVM over terminal path observations "
+            f"({len(evm_results)} EVM path(s), {len(x86_results)} x86 path(s), "
+            f"{checked_pair_count}/{pair_count} feasible pair(s))"
+        )
+        if self.verbose:
+            print(f"    └─ {msg}")
+        return True, msg
+
+    def _check_path_coverage(
+        self,
+        path_results: list[dict],
+        label: str,
+        deadline: Optional[float],
+    ) -> Tuple[bool, Optional[str]]:
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return False, msg
+
+        conditions = [result.get("condition", BoolVal(True)) for result in path_results]
+        self.solver.add(Not(Or(*conditions)))
+
+        start_time = time.time()
+        result = self.solver.check()
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ {label} terminal path coverage check: {solve_time:.3f}s, result={result}")
+
+        if result == unsat:
+            return True, None
+        if result == sat:
+            return False, f"✗ COUNTEREXAMPLE: {label} terminal paths do not cover all inputs"
+        return False, self._unknown_message()
+
+    def _check_path_pair_may_be_feasible(
+        self,
+        path_condition,
+        deadline: Optional[float],
+        label: str,
+    ) -> tuple[bool, Optional[str]]:
+        if not self._reset_solver_with_budget(deadline):
+            msg = self._timeout_message()
+            if self.verbose:
+                print(f"    └─ {msg}")
+            return True, msg
+
+        self.solver.add(path_condition)
+
+        start_time = time.time()
+        result = self.solver.check()
+        solve_time = time.time() - start_time
+
+        if self.verbose:
+            print(f"    ├─ Path pair feasibility {label}: {solve_time:.3f}s, result={result}")
+
+        if result == unsat:
+            return False, None
+        if result == sat:
+            return True, None
+        # UNKNOWN is handled conservatively: do not prune the pair.
+        return True, None
     
-    def _check_refinement_direct_memory(self, evm_result: dict, x86_result: dict,
-                                        deadline: Optional[float] = None) -> Tuple[bool, Optional[str]]:
+    def _check_refinement_direct_memory(
+        self,
+        evm_result: dict,
+        x86_result: dict,
+        deadline: Optional[float] = None,
+        path_condition=None,
+        context: str = "",
+    ) -> Tuple[bool, Optional[str]]:
         """通过直接比较 return data 内容检查精化关系。
 
         当前抽象只比较“是否暴露非空 return data”以及对应的字节内容，
@@ -128,6 +252,7 @@ class RefinementChecker:
         x86_memory = x86_result['memory']
         x86_base_addr = x86_result['base_addr']
         x86_has_return_data = x86_result.get('has_return_data', x86_length != BitVecVal(0, 64))
+        path_condition = path_condition if path_condition is not None else BoolVal(True)
 
         # 第一次检查：非空 return data 条件必须等价
         if not self._reset_solver_with_budget(deadline):
@@ -135,6 +260,7 @@ class RefinementChecker:
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
+        self.solver.add(path_condition)
         self.solver.add(evm_has_return_data != x86_has_return_data)
 
         start_time = time.time()
@@ -142,10 +268,13 @@ class RefinementChecker:
         solve_time = time.time() - start_time
 
         if self.verbose:
-            print(f"    ├─ Non-empty return-data condition check: {solve_time:.3f}s, result={result}")
+            prefix = f"{context}: " if context else ""
+            print(f"    ├─ {prefix}Non-empty return-data condition check: {solve_time:.3f}s, result={result}")
 
         if result == sat:
             msg = "✗ COUNTEREXAMPLE: Non-empty return-data conditions differ"
+            if context:
+                msg = f"{msg} ({context})"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
@@ -161,6 +290,7 @@ class RefinementChecker:
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
+        self.solver.add(path_condition)
         self.solver.add(evm_has_return_data)  # 假设两者都有非空 return data
         self.solver.add(x86_has_return_data)
         self.solver.add(evm_length != x86_length)
@@ -170,10 +300,13 @@ class RefinementChecker:
         solve_time = time.time() - start_time
 
         if self.verbose:
-            print(f"    ├─ Length equality check: {solve_time:.3f}s, result={result}")
+            prefix = f"{context}: " if context else ""
+            print(f"    ├─ {prefix}Length equality check: {solve_time:.3f}s, result={result}")
 
         if result == sat:
             msg = "✗ COUNTEREXAMPLE: Non-empty return-data lengths differ"
+            if context:
+                msg = f"{msg} ({context})"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
@@ -196,6 +329,7 @@ class RefinementChecker:
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
+        self.solver.add(path_condition)
         self.solver.add(evm_has_return_data)  # 两者都有非空 return data
         self.solver.add(x86_has_return_data)
         self.solver.add(evm_length == x86_length)  # 长度相等
@@ -224,13 +358,16 @@ class RefinementChecker:
         solve_time = time.time() - start_time
 
         if self.verbose:
-            print(f"    ├─ Memory content check: {solve_time:.3f}s, result={result}")
+            prefix = f"{context}: " if context else ""
+            print(f"    ├─ {prefix}Memory content check: {solve_time:.3f}s, result={result}")
 
         if result == unsat:
             pass  # Memory contents equivalent, continue to storage check
         elif result == sat:
             model = self.solver.model()
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (memory contents differ)"
+            if context:
+                msg = f"{msg} ({context})"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
@@ -246,7 +383,7 @@ class RefinementChecker:
 
         if evm_storage is not None and x86_storage is not None:
             verified, msg = self._check_storage_equivalence(
-                evm_storage, x86_storage, deadline
+                evm_storage, x86_storage, deadline, path_condition, context
             )
             if not verified:
                 return False, msg
@@ -257,18 +394,24 @@ class RefinementChecker:
 
         if evm_ts is not None and x86_ts is not None:
             verified, msg = self._check_transient_storage_equivalence(
-                evm_ts, x86_ts, deadline
+                evm_ts, x86_ts, deadline, path_condition, context
             )
             if not verified:
                 return False, msg
 
         msg = "✓ VERIFIED: x86 refines EVM (non-empty return-data conditions, lengths, memory contents, storage, and transient storage are equivalent for all inputs)"
-        if self.verbose:
+        if self.verbose and not context:
             print(f"    └─ {msg}")
         return True, msg
 
-    def _check_storage_equivalence(self, evm_storage, x86_storage,
-                                   deadline=None):
+    def _check_storage_equivalence(
+        self,
+        evm_storage,
+        x86_storage,
+        deadline=None,
+        path_condition=None,
+        context: str = "",
+    ):
         """检查EVM和x86的Storage是否等价。
 
         反证法：是否存在key使得 Select(evm_storage, key) != Select(x86_storage, key)
@@ -291,6 +434,8 @@ class RefinementChecker:
             return False, msg
 
         key = BitVec('storage_check_key', 256)
+        if path_condition is not None:
+            self.solver.add(path_condition)
         self.solver.add(Select(evm_storage, key) != Select(x86_storage, key))
 
         import time
@@ -299,12 +444,15 @@ class RefinementChecker:
         solve_time = time.time() - start_time
 
         if self.verbose:
-            print(f"    ├─ Storage equivalence check: {solve_time:.3f}s, result={result}")
+            prefix = f"{context}: " if context else ""
+            print(f"    ├─ {prefix}Storage equivalence check: {solve_time:.3f}s, result={result}")
 
         if result == unsat:
             return True, "Storage equivalent"
         elif result == sat:
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (storage differs)"
+            if context:
+                msg = f"{msg} ({context})"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg
@@ -408,8 +556,14 @@ class RefinementChecker:
             print(f"    └─ {msg}")
         return True, msg
 
-    def _check_transient_storage_equivalence(self, evm_ts, x86_ts,
-                                              deadline=None):
+    def _check_transient_storage_equivalence(
+        self,
+        evm_ts,
+        x86_ts,
+        deadline=None,
+        path_condition=None,
+        context: str = "",
+    ):
         """检查EVM和x86的Transient Storage是否等价。
 
         反证法：是否存在key使得 Select(evm_ts, key) != Select(x86_ts, key)
@@ -432,6 +586,8 @@ class RefinementChecker:
             return False, msg
 
         key = BitVec('transient_storage_check_key', 256)
+        if path_condition is not None:
+            self.solver.add(path_condition)
         self.solver.add(Select(evm_ts, key) != Select(x86_ts, key))
 
         import time
@@ -440,12 +596,15 @@ class RefinementChecker:
         solve_time = time.time() - start_time
 
         if self.verbose:
-            print(f"    ├─ Transient storage equivalence check: {solve_time:.3f}s, result={result}")
+            prefix = f"{context}: " if context else ""
+            print(f"    ├─ {prefix}Transient storage equivalence check: {solve_time:.3f}s, result={result}")
 
         if result == unsat:
             return True, "Transient storage equivalent"
         elif result == sat:
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (transient storage differs)"
+            if context:
+                msg = f"{msg} ({context})"
             if self.verbose:
                 print(f"    └─ {msg}")
             return False, msg

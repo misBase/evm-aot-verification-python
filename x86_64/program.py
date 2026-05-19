@@ -17,6 +17,7 @@ from .cfg import identify_basic_blocks
 from .cfg_executor import X86SymbolicExecutor
 from .cfg_strategies import X86DFSStrategy
 from .cfg_state import X86GlobalState
+from common.path_observation import PathObservation, PathSemantics
 from state.smt_state import SMTState, PointerTag
 
 
@@ -223,6 +224,94 @@ class X86Program:
         }
 
         return merged_state, result
+
+    def to_z3_paths(
+        self,
+        state: SMTState,
+        strategy_cls: type = X86DFSStrategy,
+        max_depth: int = 1000,
+        use_reachability_check: bool = True,
+        enable_go_bridge: bool = True,
+        enable_merge: bool = False,
+        reachability_timeout_ms: Optional[int] = 50,
+        call_site_mapping=None,
+        merge_state: bool = False,
+    ) -> PathSemantics:
+        """Build terminal path observations for the x86 program.
+
+        This mirrors ``to_z3()`` execution choices, but keeps terminal paths
+        separate and avoids merging whole memory arrays unless ``merge_state``
+        is requested by a debug stack check.
+        """
+        instructions_to_execute = self._get_instructions()
+
+        if not instructions_to_execute:
+            observation = self._path_observation_from_state(state, BoolVal(True))
+            return PathSemantics(
+                global_states=[],
+                observations=[observation],
+                merged_state=state if merge_state else None,
+            )
+
+        blocks = identify_basic_blocks(instructions_to_execute)
+
+        if not blocks:
+            final_state, _ = self._to_z3_sequential(state, instructions_to_execute)
+            global_state = X86GlobalState(mstate=final_state)
+            observation = self._path_observation_from_state(final_state, BoolVal(True))
+            return PathSemantics(
+                global_states=[global_state],
+                observations=[observation],
+                merged_state=final_state if merge_state else None,
+            )
+
+        executor = X86SymbolicExecutor(
+            blocks=blocks,
+            strategy_cls=strategy_cls,
+            max_depth=max_depth,
+            use_reachability_check=use_reachability_check,
+            enable_go_bridge=enable_go_bridge,
+            enable_merge=enable_merge,
+            reachability_timeout_ms=reachability_timeout_ms,
+            call_site_mapping=call_site_mapping,
+            aot_profile=self.aot_profile,
+        )
+
+        final_global_states = executor.execute(state)
+        observations = [
+            self._path_observation(gstate)
+            for gstate in final_global_states
+        ]
+        merged_state = (
+            self._merge_global_states(final_global_states)
+            if merge_state and final_global_states
+            else None
+        )
+        return PathSemantics(
+            global_states=final_global_states,
+            observations=observations,
+            merged_state=merged_state,
+        )
+
+    def _path_observation(self, gstate: X86GlobalState) -> PathObservation:
+        """Extract the observable result of one terminal x86 path."""
+        return self._path_observation_from_state(
+            gstate.mstate,
+            gstate.get_constraints().as_bool(),
+        )
+
+    def _path_observation_from_state(self, state: SMTState, condition) -> PathObservation:
+        r15_value = state.x86_registers.get_register(Register.R15)
+        return PathObservation(
+            condition=condition,
+            offset=state.return_offset,
+            length=state.return_length,
+            memory=state.x86_memory.evm_mem,
+            base_addr=r15_value,
+            has_return_data=state.return_length != BitVecVal(0, 64),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        )
 
     def _get_instructions(self) -> List[X86Instruction]:
         """获取要执行的指令列表。
