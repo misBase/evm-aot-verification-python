@@ -4,14 +4,54 @@
 验证x86精化EVM：对所有输入，x86_output = EVM_output。
 """
 
+import threading
 import time
-from z3 import And, BitVecVal, BoolVal, Not, Or, Select, SolverFor, sat, set_option, unsat
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+
+from z3 import (
+    And,
+    BitVec,
+    BitVecVal,
+    BoolVal,
+    Context,
+    Not,
+    Or,
+    Select,
+    SolverFor,
+    UGE,
+    ULT,
+    sat,
+    set_option,
+    unsat,
+)
 from typing import TYPE_CHECKING, Tuple, Optional
 
 from state.smt_state import MemoryDomain
 
 if TYPE_CHECKING:
     from state.smt_state import SMTState
+
+
+_Z3_TRANSLATE_LOCK = threading.Lock()
+_PATH_RESULT_KEYS = (
+    "condition",
+    "offset",
+    "length",
+    "memory",
+    "base_addr",
+    "has_return_data",
+    "storage",
+    "transient_storage",
+)
+
+
+@dataclass
+class _PathPairChunkCheckResult:
+    checked_pair_count: int
+    verified: bool
+    message: Optional[str]
+    logs: list[str] = field(default_factory=list)
 
 
 class RefinementChecker:
@@ -40,31 +80,51 @@ class RefinementChecker:
         self.solver = SolverFor("QF_AUFBV")
         self.solver.set("timeout", timeout_ms)
 
-    def _timeout_message(self) -> str:
-        return f"? TIMEOUT: Solver exceeded overall timeout ({self.timeout_ms} ms)"
+    @staticmethod
+    def _timeout_message_for(timeout_ms: int) -> str:
+        return f"? TIMEOUT: Solver exceeded overall timeout ({timeout_ms} ms)"
 
-    def _unknown_message(self) -> str:
-        reason = self.solver.reason_unknown()
+    def _timeout_message(self) -> str:
+        return self._timeout_message_for(self.timeout_ms)
+
+    @staticmethod
+    def _unknown_message_for_solver(solver, timeout_ms: int) -> str:
+        reason = solver.reason_unknown()
         if reason == "timeout":
-            return self._timeout_message()
+            return RefinementChecker._timeout_message_for(timeout_ms)
         if reason:
             return f"? UNKNOWN: Solver could not determine refinement (reason: {reason})"
         return "? UNKNOWN: Solver could not determine refinement"
 
-    def _reset_solver_with_budget(self, deadline: Optional[float]) -> bool:
-        """重置求解器并为本次 check 设置剩余预算。"""
+    def _unknown_message(self) -> str:
+        return self._unknown_message_for_solver(self.solver, self.timeout_ms)
+
+    @staticmethod
+    def _reset_solver_with_budget_for(solver, timeout_ms: int, deadline: Optional[float]) -> bool:
         now = time.time()
         if deadline is not None and now >= deadline:
             return False
 
-        self.solver.reset()
+        solver.reset()
         if deadline is None:
-            timeout_ms = self.timeout_ms
+            solver_timeout_ms = timeout_ms
         else:
-            timeout_ms = int((deadline - now) * 1000)
-            timeout_ms = max(timeout_ms, 1)
-        self.solver.set("timeout", timeout_ms)
+            solver_timeout_ms = int((deadline - now) * 1000)
+            solver_timeout_ms = max(solver_timeout_ms, 1)
+        solver.set("timeout", solver_timeout_ms)
         return True
+
+    def _reset_solver_with_budget(self, deadline: Optional[float]) -> bool:
+        """重置求解器并为本次 check 设置剩余预算。"""
+        return self._reset_solver_with_budget_for(self.solver, self.timeout_ms, deadline)
+
+    def _emit_solver_log(self, logs: Optional[list[str]], line: str) -> None:
+        if not self.verbose:
+            return
+        if logs is None:
+            print(line)
+        else:
+            logs.append(line)
     
     def check_refinement(self, evm_result: dict, x86_result: dict) -> Tuple[bool, Optional[str]]:
         """检查x86是否精化EVM（对所有输入，x86_result = evm_result）。
@@ -88,6 +148,7 @@ class RefinementChecker:
         self,
         evm_results: list[dict],
         x86_results: list[dict],
+        path_pair_workers: int = 1,
     ) -> Tuple[bool, Optional[str]]:
         """Check refinement directly over terminal path observations.
 
@@ -95,6 +156,9 @@ class RefinementChecker:
         feasible EVM/x86 terminal-path intersection, it proves the same
         observable properties as ``check_refinement``.
         """
+        if path_pair_workers <= 0:
+            raise ValueError("path_pair_workers must be a positive integer")
+
         deadline = time.time() + (self.timeout_ms / 1000.0)
 
         if not evm_results:
@@ -109,6 +173,37 @@ class RefinementChecker:
         if not verified:
             return False, msg
 
+        if path_pair_workers == 1:
+            checked_pair_count, pair_count, failure = self._check_path_pairs_sequential(
+                evm_results,
+                x86_results,
+                deadline,
+            )
+        else:
+            checked_pair_count, pair_count, failure = self._check_path_pairs_parallel(
+                evm_results,
+                x86_results,
+                deadline,
+                path_pair_workers,
+            )
+        if failure is not None:
+            return False, failure
+
+        msg = (
+            "✓ VERIFIED: x86 refines EVM over terminal path observations "
+            f"({len(evm_results)} EVM path(s), {len(x86_results)} x86 path(s), "
+            f"{checked_pair_count}/{pair_count} feasible pair(s))"
+        )
+        if self.verbose:
+            print(f"    └─ {msg}")
+        return True, msg
+
+    def _check_path_pairs_sequential(
+        self,
+        evm_results: list[dict],
+        x86_results: list[dict],
+        deadline: Optional[float],
+    ) -> tuple[int, int, Optional[str]]:
         pair_count = 0
         checked_pair_count = 0
         for evm_index, evm_result in enumerate(evm_results):
@@ -123,7 +218,7 @@ class RefinementChecker:
                     f"evm[{evm_index}], x86[{x86_index}]",
                 )
                 if msg is not None:
-                    return False, msg
+                    return checked_pair_count, pair_count, msg
                 if not may_be_feasible:
                     continue
                 checked_pair_count += 1
@@ -135,16 +230,144 @@ class RefinementChecker:
                     context=f"path pair evm[{evm_index}], x86[{x86_index}]",
                 )
                 if not verified:
-                    return False, msg
+                    return checked_pair_count, pair_count, msg
+        return checked_pair_count, pair_count, None
 
-        msg = (
-            "✓ VERIFIED: x86 refines EVM over terminal path observations "
-            f"({len(evm_results)} EVM path(s), {len(x86_results)} x86 path(s), "
-            f"{checked_pair_count}/{pair_count} feasible pair(s))"
-        )
+    def _check_path_pairs_parallel(
+        self,
+        evm_results: list[dict],
+        x86_results: list[dict],
+        deadline: Optional[float],
+        path_pair_workers: int,
+    ) -> tuple[int, int, Optional[str]]:
+        pair_specs = [
+            (evm_index, x86_index)
+            for evm_index, evm_result in enumerate(evm_results)
+            for x86_index, x86_result in enumerate(x86_results)
+        ]
+        pair_count = len(pair_specs)
+        checked_pair_count = 0
+        max_workers = min(path_pair_workers, pair_count)
+        chunks = [
+            pair_specs[worker_index::max_workers]
+            for worker_index in range(max_workers)
+        ]
+
         if self.verbose:
-            print(f"    └─ {msg}")
-        return True, msg
+            print(
+                f"    ├─ Checking {pair_count} path pair(s) with "
+                f"{max_workers} worker thread(s)"
+            )
+
+        failure_message = None
+        cancel_event = threading.Event()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(
+                    self._check_path_pair_chunk,
+                    chunk,
+                    evm_results,
+                    x86_results,
+                    deadline,
+                    cancel_event,
+                )
+                for chunk in chunks
+            ]
+            for future in as_completed(futures):
+                result = future.result()
+                if self.verbose:
+                    for line in result.logs:
+                        print(line)
+                checked_pair_count += result.checked_pair_count
+                if not result.verified:
+                    if failure_message is None:
+                        failure_message = result.message
+                        cancel_event.set()
+                    continue
+
+        return checked_pair_count, pair_count, failure_message
+
+    def _check_path_pair_chunk(
+        self,
+        pair_specs: list[tuple[int, int]],
+        evm_results: list[dict],
+        x86_results: list[dict],
+        deadline: Optional[float],
+        cancel_event: threading.Event,
+    ) -> _PathPairChunkCheckResult:
+        ctx = Context()
+        solver = SolverFor("QF_AUFBV", ctx=ctx)
+        evm_cache = {}
+        x86_cache = {}
+        checked_pair_count = 0
+        logs: list[str] = []
+
+        for evm_index, x86_index in pair_specs:
+            if cancel_event.is_set():
+                return _PathPairChunkCheckResult(checked_pair_count, True, None, logs)
+
+            evm_result = evm_cache.get(evm_index)
+            if evm_result is None:
+                evm_result = self._translate_path_result(evm_results[evm_index], ctx)
+                evm_cache[evm_index] = evm_result
+            x86_result = x86_cache.get(x86_index)
+            if x86_result is None:
+                x86_result = self._translate_path_result(x86_results[x86_index], ctx)
+                x86_cache[x86_index] = x86_result
+
+            label = f"evm[{evm_index}], x86[{x86_index}]"
+            path_condition = And(BoolVal(True, ctx=ctx), evm_result["condition"], x86_result["condition"])
+
+            may_be_feasible, msg = self._check_path_pair_may_be_feasible_with_solver(
+                solver,
+                path_condition,
+                deadline,
+                label,
+                logs,
+            )
+            if msg is not None:
+                return _PathPairChunkCheckResult(checked_pair_count, False, msg, logs)
+            if not may_be_feasible:
+                continue
+
+            checked_pair_count += 1
+            verified, msg = self._check_refinement_direct_memory_with_solver(
+                solver,
+                evm_result,
+                x86_result,
+                deadline,
+                path_condition=path_condition,
+                context=f"path pair {label}",
+                logs=logs,
+                ctx=ctx,
+            )
+            if not verified:
+                return _PathPairChunkCheckResult(checked_pair_count, False, msg, logs)
+
+        return _PathPairChunkCheckResult(checked_pair_count, True, None, logs)
+
+    @classmethod
+    def _translate_path_result(cls, result, ctx):
+        translated = {}
+        with _Z3_TRANSLATE_LOCK:
+            for key in _PATH_RESULT_KEYS:
+                try:
+                    value = result[key]
+                except KeyError:
+                    continue
+                translated[key] = cls._translate_z3_value(value, ctx)
+        if "condition" not in translated:
+            translated["condition"] = BoolVal(True, ctx=ctx)
+        return translated
+
+    @staticmethod
+    def _translate_z3_value(value, ctx):
+        if value is None:
+            return None
+        translate = getattr(value, "translate", None)
+        if translate is None:
+            return value
+        return translate(ctx)
 
     def _check_path_coverage(
         self,
@@ -180,20 +403,37 @@ class RefinementChecker:
         deadline: Optional[float],
         label: str,
     ) -> tuple[bool, Optional[str]]:
-        if not self._reset_solver_with_budget(deadline):
+        return self._check_path_pair_may_be_feasible_with_solver(
+            self.solver,
+            path_condition,
+            deadline,
+            label,
+            logs=None,
+        )
+
+    def _check_path_pair_may_be_feasible_with_solver(
+        self,
+        solver,
+        path_condition,
+        deadline: Optional[float],
+        label: str,
+        logs: Optional[list[str]],
+    ) -> tuple[bool, Optional[str]]:
+        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
             msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
+            self._emit_solver_log(logs, f"    └─ {msg}")
             return True, msg
 
-        self.solver.add(path_condition)
+        solver.add(path_condition)
 
         start_time = time.time()
-        result = self.solver.check()
+        result = solver.check()
         solve_time = time.time() - start_time
 
-        if self.verbose:
-            print(f"    ├─ Path pair feasibility {label}: {solve_time:.3f}s, result={result}")
+        self._emit_solver_log(
+            logs,
+            f"    ├─ Path pair feasibility {label}: {solve_time:.3f}s, result={result}",
+        )
 
         if result == unsat:
             return False, None
@@ -201,7 +441,177 @@ class RefinementChecker:
             return True, None
         # UNKNOWN is handled conservatively: do not prune the pair.
         return True, None
-    
+
+    def _check_refinement_direct_memory_with_solver(
+        self,
+        solver,
+        evm_result: dict,
+        x86_result: dict,
+        deadline: Optional[float] = None,
+        path_condition=None,
+        context: str = "",
+        logs: Optional[list[str]] = None,
+        ctx=None,
+    ) -> Tuple[bool, Optional[str]]:
+        """``_check_refinement_direct_memory`` variant for worker-local solvers."""
+        evm_offset = evm_result['offset']
+        evm_length = evm_result['length']
+        evm_memory = evm_result['memory']
+        evm_has_return_data = evm_result.get(
+            'has_return_data',
+            evm_length != BitVecVal(0, 64, ctx=ctx),
+        )
+
+        x86_offset = x86_result['offset']
+        x86_length = x86_result['length']
+        x86_memory = x86_result['memory']
+        x86_base_addr = x86_result['base_addr']
+        x86_has_return_data = x86_result.get(
+            'has_return_data',
+            x86_length != BitVecVal(0, 64, ctx=ctx),
+        )
+        path_condition = path_condition if path_condition is not None else BoolVal(True, ctx=ctx)
+
+        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
+            msg = self._timeout_message()
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        solver.add(path_condition)
+        solver.add(evm_has_return_data != x86_has_return_data)
+
+        start_time = time.time()
+        result = solver.check()
+        solve_time = time.time() - start_time
+
+        prefix = f"{context}: " if context else ""
+        self._emit_solver_log(
+            logs,
+            f"    ├─ {prefix}Non-empty return-data condition check: "
+            f"{solve_time:.3f}s, result={result}",
+        )
+
+        if result == sat:
+            msg = "✗ COUNTEREXAMPLE: Non-empty return-data conditions differ"
+            if context:
+                msg = f"{msg} ({context})"
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        if result != unsat:
+            msg = self._unknown_message_for_solver(solver, self.timeout_ms)
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+
+        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
+            msg = self._timeout_message()
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        solver.add(path_condition)
+        solver.add(evm_has_return_data)
+        solver.add(x86_has_return_data)
+        solver.add(evm_length != x86_length)
+
+        start_time = time.time()
+        result = solver.check()
+        solve_time = time.time() - start_time
+
+        prefix = f"{context}: " if context else ""
+        self._emit_solver_log(
+            logs,
+            f"    ├─ {prefix}Length equality check: {solve_time:.3f}s, result={result}",
+        )
+
+        if result == sat:
+            msg = "✗ COUNTEREXAMPLE: Non-empty return-data lengths differ"
+            if context:
+                msg = f"{msg} ({context})"
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        if result != unsat:
+            msg = self._unknown_message_for_solver(solver, self.timeout_ms)
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+
+        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
+            msg = self._timeout_message()
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        solver.add(path_condition)
+        solver.add(evm_has_return_data)
+        solver.add(x86_has_return_data)
+        solver.add(evm_length == x86_length)
+
+        i = BitVec('return_data_index', 64, ctx=ctx)
+        index_in_range = And(BoolVal(True, ctx=ctx), UGE(i, BitVecVal(0, 64, ctx=ctx)), ULT(i, evm_length))
+        evm_addr = evm_offset + i
+        x86_addr = x86_base_addr + x86_offset + i
+        evm_byte = Select(evm_memory, evm_addr)
+        x86_byte = Select(x86_memory, x86_addr)
+        solver.add(index_in_range)
+        solver.add(evm_byte != x86_byte)
+
+        start_time = time.time()
+        result = solver.check()
+        solve_time = time.time() - start_time
+
+        prefix = f"{context}: " if context else ""
+        self._emit_solver_log(
+            logs,
+            f"    ├─ {prefix}Memory content check: {solve_time:.3f}s, result={result}",
+        )
+
+        if result == unsat:
+            pass
+        elif result == sat:
+            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (memory contents differ)"
+            if context:
+                msg = f"{msg} ({context})"
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        else:
+            msg = self._unknown_message_for_solver(solver, self.timeout_ms)
+            self._emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+
+        evm_storage = evm_result.get('storage')
+        x86_storage = x86_result.get('storage')
+        if evm_storage is not None and x86_storage is not None:
+            verified, msg = self._check_storage_equivalence_with_solver(
+                solver,
+                evm_storage,
+                x86_storage,
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
+
+        evm_ts = evm_result.get('transient_storage')
+        x86_ts = x86_result.get('transient_storage')
+        if evm_ts is not None and x86_ts is not None:
+            verified, msg = self._check_transient_storage_equivalence_with_solver(
+                solver,
+                evm_ts,
+                x86_ts,
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
+
+        msg = (
+            "✓ VERIFIED: x86 refines EVM (non-empty return-data conditions, lengths, "
+            "memory contents, storage, and transient storage are equivalent for all inputs)"
+        )
+        if not context:
+            self._emit_solver_log(logs, f"    └─ {msg}")
+        return True, msg
+
     def _check_refinement_direct_memory(
         self,
         evm_result: dict,
@@ -240,169 +650,16 @@ class RefinementChecker:
         Returns:
             (verified, message)，如果精化关系成立则verified为True
         """
-        from z3 import And, ULT, UGE, BitVec, Select, BitVecVal, sat, unsat
-
-        evm_offset = evm_result['offset']
-        evm_length = evm_result['length']
-        evm_memory = evm_result['memory']
-        evm_has_return_data = evm_result.get('has_return_data', evm_length != BitVecVal(0, 64))
-
-        x86_offset = x86_result['offset']
-        x86_length = x86_result['length']
-        x86_memory = x86_result['memory']
-        x86_base_addr = x86_result['base_addr']
-        x86_has_return_data = x86_result.get('has_return_data', x86_length != BitVecVal(0, 64))
-        path_condition = path_condition if path_condition is not None else BoolVal(True)
-
-        # 第一次检查：非空 return data 条件必须等价
-        if not self._reset_solver_with_budget(deadline):
-            msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        self.solver.add(path_condition)
-        self.solver.add(evm_has_return_data != x86_has_return_data)
-
-        start_time = time.time()
-        result = self.solver.check()
-        solve_time = time.time() - start_time
-
-        if self.verbose:
-            prefix = f"{context}: " if context else ""
-            print(f"    ├─ {prefix}Non-empty return-data condition check: {solve_time:.3f}s, result={result}")
-
-        if result == sat:
-            msg = "✗ COUNTEREXAMPLE: Non-empty return-data conditions differ"
-            if context:
-                msg = f"{msg} ({context})"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        elif result != unsat:
-            msg = self._unknown_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-
-        # 第二次检查：如果两者都有非空 return data，长度必须相等
-        if not self._reset_solver_with_budget(deadline):
-            msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        self.solver.add(path_condition)
-        self.solver.add(evm_has_return_data)  # 假设两者都有非空 return data
-        self.solver.add(x86_has_return_data)
-        self.solver.add(evm_length != x86_length)
-
-        start_time = time.time()
-        result = self.solver.check()
-        solve_time = time.time() - start_time
-
-        if self.verbose:
-            prefix = f"{context}: " if context else ""
-            print(f"    ├─ {prefix}Length equality check: {solve_time:.3f}s, result={result}")
-
-        if result == sat:
-            msg = "✗ COUNTEREXAMPLE: Non-empty return-data lengths differ"
-            if context:
-                msg = f"{msg} ({context})"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        elif result != unsat:
-            msg = self._unknown_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-
-        # 第三次检查：如果长度相等且两者都有非空 return data，内容必须相等
-        # 我们想等价地验证：ForAll i. (0 <= i < length) =>
-        #   EVM_memory[evm_offset + i] == x86_memory[x86_base_addr + x86_offset + i]
-        #
-        # 我们检查否定：Exists i. (0 <= i < length) AND
-        #   EVM_memory[evm_offset + i] != x86_memory[x86_base_addr + x86_offset + i]
-        # 如果这是UNSAT，则ForAll成立。
-
-        if not self._reset_solver_with_budget(deadline):
-            msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        self.solver.add(path_condition)
-        self.solver.add(evm_has_return_data)  # 两者都有非空 return data
-        self.solver.add(x86_has_return_data)
-        self.solver.add(evm_length == x86_length)  # 长度相等
-
-        # 创建符号索引变量
-        i = BitVec('return_data_index', 64)
-
-        # 约束：0 <= i < length
-        index_in_range = And(UGE(i, BitVecVal(0, 64)), ULT(i, evm_length))
-
-        # 计算内存地址
-        evm_addr = evm_offset + i
-        x86_addr = x86_base_addr + x86_offset + i
-
-        # 从内存读取字节
-        evm_byte = Select(evm_memory, evm_addr)
-        x86_byte = Select(x86_memory, x86_addr)
-
-        # 添加约束：i在范围内 AND evm_byte != x86_byte
-        # 如果这是可满足的，我们找到了反例
-        self.solver.add(index_in_range)
-        self.solver.add(evm_byte != x86_byte)
-
-        start_time = time.time()
-        result = self.solver.check()
-        solve_time = time.time() - start_time
-
-        if self.verbose:
-            prefix = f"{context}: " if context else ""
-            print(f"    ├─ {prefix}Memory content check: {solve_time:.3f}s, result={result}")
-
-        if result == unsat:
-            pass  # Memory contents equivalent, continue to storage check
-        elif result == sat:
-            model = self.solver.model()
-            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (memory contents differ)"
-            if context:
-                msg = f"{msg} ({context})"
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-        else:
-            msg = self._unknown_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
-
-        # 第四次检查：Storage等价性（如果结果中包含storage）
-        evm_storage = evm_result.get('storage')
-        x86_storage = x86_result.get('storage')
-
-        if evm_storage is not None and x86_storage is not None:
-            verified, msg = self._check_storage_equivalence(
-                evm_storage, x86_storage, deadline, path_condition, context
-            )
-            if not verified:
-                return False, msg
-
-        # 第五次检查：Transient Storage等价性（如果结果中包含transient_storage）
-        evm_ts = evm_result.get('transient_storage')
-        x86_ts = x86_result.get('transient_storage')
-
-        if evm_ts is not None and x86_ts is not None:
-            verified, msg = self._check_transient_storage_equivalence(
-                evm_ts, x86_ts, deadline, path_condition, context
-            )
-            if not verified:
-                return False, msg
-
-        msg = "✓ VERIFIED: x86 refines EVM (non-empty return-data conditions, lengths, memory contents, storage, and transient storage are equivalent for all inputs)"
-        if self.verbose and not context:
-            print(f"    └─ {msg}")
-        return True, msg
+        return self._check_refinement_direct_memory_with_solver(
+            self.solver,
+            evm_result,
+            x86_result,
+            deadline,
+            path_condition=path_condition,
+            context=context,
+            logs=None,
+            ctx=None,
+        )
 
     def _check_storage_equivalence(
         self,
@@ -425,42 +682,60 @@ class RefinementChecker:
         Returns:
             (verified, message)
         """
-        from z3 import BitVec, Select, sat, unsat
+        return self._check_storage_equivalence_with_solver(
+            self.solver,
+            evm_storage,
+            x86_storage,
+            deadline,
+            path_condition,
+            context,
+            logs=None,
+            ctx=None,
+        )
 
-        if not self._reset_solver_with_budget(deadline):
+    def _check_storage_equivalence_with_solver(
+        self,
+        solver,
+        evm_storage,
+        x86_storage,
+        deadline=None,
+        path_condition=None,
+        context: str = "",
+        logs: Optional[list[str]] = None,
+        ctx=None,
+    ):
+        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
             msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
+            self._emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        key = BitVec('storage_check_key', 256)
+        key = BitVec('storage_check_key', 256, ctx=ctx)
         if path_condition is not None:
-            self.solver.add(path_condition)
-        self.solver.add(Select(evm_storage, key) != Select(x86_storage, key))
+            solver.add(path_condition)
+        solver.add(Select(evm_storage, key) != Select(x86_storage, key))
 
-        import time
         start_time = time.time()
-        result = self.solver.check()
+        result = solver.check()
         solve_time = time.time() - start_time
 
-        if self.verbose:
-            prefix = f"{context}: " if context else ""
-            print(f"    ├─ {prefix}Storage equivalence check: {solve_time:.3f}s, result={result}")
+        prefix = f"{context}: " if context else ""
+        self._emit_solver_log(
+            logs,
+            f"    ├─ {prefix}Storage equivalence check: {solve_time:.3f}s, result={result}",
+        )
 
         if result == unsat:
             return True, "Storage equivalent"
-        elif result == sat:
+        if result == sat:
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (storage differs)"
             if context:
                 msg = f"{msg} ({context})"
-            if self.verbose:
-                print(f"    └─ {msg}")
+            self._emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
-        else:
-            msg = self._unknown_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
+
+        msg = self._unknown_message_for_solver(solver, self.timeout_ms)
+        self._emit_solver_log(logs, f"    └─ {msg}")
+        return False, msg
 
     def check_stack_equivalence(
         self,
@@ -577,39 +852,58 @@ class RefinementChecker:
         Returns:
             (verified, message)
         """
-        from z3 import BitVec, Select, sat, unsat
+        return self._check_transient_storage_equivalence_with_solver(
+            self.solver,
+            evm_ts,
+            x86_ts,
+            deadline,
+            path_condition,
+            context,
+            logs=None,
+            ctx=None,
+        )
 
-        if not self._reset_solver_with_budget(deadline):
+    def _check_transient_storage_equivalence_with_solver(
+        self,
+        solver,
+        evm_ts,
+        x86_ts,
+        deadline=None,
+        path_condition=None,
+        context: str = "",
+        logs: Optional[list[str]] = None,
+        ctx=None,
+    ):
+        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
             msg = self._timeout_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
+            self._emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        key = BitVec('transient_storage_check_key', 256)
+        key = BitVec('transient_storage_check_key', 256, ctx=ctx)
         if path_condition is not None:
-            self.solver.add(path_condition)
-        self.solver.add(Select(evm_ts, key) != Select(x86_ts, key))
+            solver.add(path_condition)
+        solver.add(Select(evm_ts, key) != Select(x86_ts, key))
 
-        import time
         start_time = time.time()
-        result = self.solver.check()
+        result = solver.check()
         solve_time = time.time() - start_time
 
-        if self.verbose:
-            prefix = f"{context}: " if context else ""
-            print(f"    ├─ {prefix}Transient storage equivalence check: {solve_time:.3f}s, result={result}")
+        prefix = f"{context}: " if context else ""
+        self._emit_solver_log(
+            logs,
+            f"    ├─ {prefix}Transient storage equivalence check: "
+            f"{solve_time:.3f}s, result={result}",
+        )
 
         if result == unsat:
             return True, "Transient storage equivalent"
-        elif result == sat:
+        if result == sat:
             msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (transient storage differs)"
             if context:
                 msg = f"{msg} ({context})"
-            if self.verbose:
-                print(f"    └─ {msg}")
+            self._emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
-        else:
-            msg = self._unknown_message()
-            if self.verbose:
-                print(f"    └─ {msg}")
-            return False, msg
+
+        msg = self._unknown_message_for_solver(solver, self.timeout_ms)
+        self._emit_solver_log(logs, f"    └─ {msg}")
+        return False, msg

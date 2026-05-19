@@ -33,7 +33,8 @@ class ProgramEquivalenceChecker:
                            initial_state: SMTState,
                            stack_check: Optional[int] = None,
                            stack_check_timeout_ms: int = 300000,
-                           path_observations: bool = False) -> Tuple[bool, Optional[str]]:
+                           path_observations: bool = False,
+                           path_pair_workers: int = 1) -> Tuple[bool, Optional[str]]:
         """验证EVM程序和x86程序在语义上等价。
 
         默认使用旧的 merged-result 检查路径，保持原有 Alive2 风格的
@@ -54,6 +55,8 @@ class ProgramEquivalenceChecker:
             stack_check_timeout_ms: 步骤5（debug 栈检查）的独立超时预算（毫秒）
             path_observations: 使用终止路径 observation 直接检查，避免完整 Array 终态合并；
                 默认 False，保持旧 merged-result 行为
+            path_pair_workers: path_observations=True 时用于 EVM/x86 terminal path
+                pair 检查的 worker 数；默认 1，保持串行行为
 
         Returns:
             (verified, message)，如果程序等价则verified为True
@@ -62,6 +65,8 @@ class ProgramEquivalenceChecker:
             raise ValueError("stack_check must be a positive integer or None")
         if stack_check_timeout_ms <= 0:
             raise ValueError("stack_check_timeout_ms must be a positive integer")
+        if path_pair_workers <= 0:
+            raise ValueError("path_pair_workers must be a positive integer")
 
         if self.verbose:
             print(f"\n=== Program-Level Verification (Alive2-style) ===")
@@ -75,6 +80,7 @@ class ProgramEquivalenceChecker:
                 initial_state,
                 stack_check,
                 stack_check_timeout_ms,
+                path_pair_workers,
             )
 
         # 步骤1：公式构建 - EVM（两级路径感知）
@@ -193,6 +199,7 @@ class ProgramEquivalenceChecker:
         initial_state: SMTState,
         stack_check: Optional[int],
         stack_check_timeout_ms: int,
+        path_pair_workers: int,
     ) -> Tuple[bool, Optional[str]]:
         if self.verbose:
             print("\n[1] Building EVM terminal path observations...")
@@ -239,13 +246,21 @@ class ProgramEquivalenceChecker:
         if self.verbose:
             print("\n[4] Checking program equivalence with Z3...")
             print("    ├─ Comparing terminal path observations without Array-level state merge")
-            print(f"    └─ Budget: {self.refinement_checker.timeout_ms} ms")
+            print(f"    ├─ Budget: {self.refinement_checker.timeout_ms} ms")
+            print(f"    └─ Path pair workers: {path_pair_workers}")
 
         check_start = time.time()
-        verified, message = self.refinement_checker.check_refinement_paths(
-            evm_paths.observations,
-            x86_paths.observations,
-        )
+        if path_pair_workers == 1:
+            verified, message = self.refinement_checker.check_refinement_paths(
+                evm_paths.observations,
+                x86_paths.observations,
+            )
+        else:
+            verified, message = self.refinement_checker.check_refinement_paths(
+                evm_paths.observations,
+                x86_paths.observations,
+                path_pair_workers=path_pair_workers,
+            )
         check_time = time.time() - check_start
 
         if self.verbose:

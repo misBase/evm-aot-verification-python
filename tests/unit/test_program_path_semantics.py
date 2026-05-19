@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Program-level terminal path observation API tests."""
 
+import threading
+
 import x86_64.program as x86_program_module
+from common.path_observation import PathObservation
 from evm_ir.json_parser import CompilerEVMResult
 from evm_ir.models import EVMBlock, EvmOperator
 from evm_ir.program import EVMProgram
 from state.smt_state import SMTState
-from verification.refinement_checker import RefinementChecker
+from verification.refinement_checker import RefinementChecker, _PathPairChunkCheckResult
 from x86_64.models import X86Block, X86Instruction
 from x86_64.program import X86Program
+from z3 import BitVec, BitVecVal, BoolVal
 
 
 OBSERVATION_KEYS = {
@@ -103,3 +107,92 @@ def test_to_z3_paths_merge_state_can_feed_stack_check():
     )
 
     assert verified, message
+
+
+def test_refinement_checker_can_check_path_pairs_in_parallel():
+    state = SMTState.create_initial_state()
+    selector = BitVec("parallel_path_selector", 1)
+    evm_observations = [
+        PathObservation(
+            condition=selector == BitVecVal(0, 1),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.evm_memory.Memory,
+            base_addr=None,
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        ),
+        PathObservation(
+            condition=selector == BitVecVal(1, 1),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.evm_memory.Memory,
+            base_addr=None,
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        ),
+    ]
+    x86_observations = [
+        PathObservation(
+            condition=BoolVal(True),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.x86_memory.evm_mem,
+            base_addr=BitVecVal(0, 64),
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        )
+    ]
+
+    checker = RefinementChecker(timeout_ms=1000)
+    verified, message = checker.check_refinement_paths(
+        evm_observations,
+        x86_observations,
+        path_pair_workers=2,
+    )
+
+    assert verified, message
+    assert "2/2 feasible pair(s)" in message
+
+
+def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monkeypatch):
+    checker = RefinementChecker(timeout_ms=1000)
+    cancelled_worker_started = threading.Event()
+    cancelled_worker_saw_cancel = threading.Event()
+
+    def fake_check_chunk(pair_specs, _evm_results, _x86_results, _deadline, cancel_event):
+        if pair_specs[0] == (0, 0):
+            return _PathPairChunkCheckResult(
+                checked_pair_count=1,
+                verified=False,
+                message="boom",
+                logs=["failure worker log"],
+            )
+
+        cancelled_worker_started.set()
+        assert cancel_event.wait(timeout=1.0)
+        cancelled_worker_saw_cancel.set()
+        return _PathPairChunkCheckResult(
+            checked_pair_count=1,
+            verified=True,
+            message=None,
+            logs=["cancelled worker log"],
+        )
+
+    monkeypatch.setattr(checker, "_check_path_pair_chunk", fake_check_chunk)
+
+    checked_pair_count, pair_count, failure = checker._check_path_pairs_parallel(
+        evm_results=[object(), object()],
+        x86_results=[object(), object()],
+        deadline=None,
+        path_pair_workers=2,
+    )
+
+    assert cancelled_worker_started.is_set()
+    assert cancelled_worker_saw_cancel.is_set()
+    assert failure == "boom"
+    assert pair_count == 4
+    assert checked_pair_count == 2
