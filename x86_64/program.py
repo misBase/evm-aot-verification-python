@@ -205,6 +205,16 @@ class X86Program:
         # 使用 If 表达式按路径条件合并
         merged_state = self._merge_global_states(final_global_states)
 
+        # 收集各终止路径在执行中累积的 SMTState.assumptions（如 CALLDATALOAD
+        # 处的 hi-192==0 假设），合并到 merged_state.assumptions 供
+        # program_verifier 注入 refinement solver。
+        from evm_ir.program import _dedup_z3_exprs
+        collected = list(getattr(state, 'assumptions', None) or [])
+        for gstate in final_global_states:
+            for a in (getattr(gstate.mstate, 'assumptions', None) or []):
+                collected.append(a)
+        merged_state.assumptions = _dedup_z3_exprs(collected) if collected else None
+
         # 提取结果
         r15_value = merged_state.x86_registers.get_register(Register.R15)
         has_return_data = merged_state.return_length != BitVecVal(0, 64)
@@ -294,10 +304,21 @@ class X86Program:
         )
 
     def _path_observation(self, gstate: X86GlobalState) -> PathObservation:
-        """Extract the observable result of one terminal x86 path."""
+        """Extract the observable result of one terminal x86 path.
+
+        把 mstate.assumptions（CALLDATALOAD 处累积的 hi-192==0 等无损先验）
+        And 进 path condition，保持与 EVM 侧 _path_observation 一致——否则
+        path_observations 模式 + 默认 assume_calldata_offset_no_overflow=True
+        会出现 hi-192!=0 区域上的伪反例。
+        """
+        from z3 import And
+        condition = gstate.get_constraints().as_bool()
+        path_assumptions = getattr(gstate.mstate, 'assumptions', None)
+        if path_assumptions:
+            condition = And(condition, *path_assumptions)
         return self._path_observation_from_state(
             gstate.mstate,
-            gstate.get_constraints().as_bool(),
+            condition,
         )
 
     def _path_observation_from_state(self, state: SMTState, condition) -> PathObservation:

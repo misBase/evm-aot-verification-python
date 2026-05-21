@@ -153,6 +153,22 @@ class SMTState:
         # 生产路径（create_initial_state、to_z3）不会修改这个字段。
         self.unrouted_memory_domain: Optional[MemoryDomain] = None
 
+        # 全局前置假设（precondition assumptions）。
+        # 这是一个 Z3 BoolRef 列表，由 caller 在创建初始 state 时塞入（例如
+        # "calldatasize ≤ 2^32-1" 这类无损先验），也可以由语义建模函数在执行
+        # 过程中追加（例如 CALLDATALOAD 处的 "offset hi-192 == 0"）。
+        # 后续 x86/EVM cfg_executor 在每条路径上把它们注入 world_state.constraints，
+        # refinement_checker 在 final solve 前也会把它们 add 到 solver。
+        # 默认 None；不影响既有路径。
+        self.assumptions: Optional[list] = None
+
+        # 默认开启 CALLDATALOAD/CALLDATACOPY 的 offset 高 192-bit == 0 假设。
+        # 这条假设在 EVM/x86 两侧都对应 vacuous 同行为分支（两侧 overflow 都返
+        # 回 0），所以对 refinement 无损；但能让 z3 跳过 256-bit carry chain，
+        # 大幅压缩 bit-blast 后的搜索空间。需要建模 overflow 行为差异的单测可
+        # 以显式把这个字段置 False。
+        self.assume_calldata_offset_no_overflow: bool = True
+
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
         self.stack_base = None
         self.stack_num_inputs = 0
@@ -174,6 +190,17 @@ class SMTState:
         self.block_number = BitVec('BlockNumber', 64)
         self.gaslimit = BitVec('GasLimit', 64)
         self.blobbasefee = BitVec('BlobBaseFee', 64)
+
+    def add_assumption(self, assumption) -> None:
+        """追加一个全局假设到 self.assumptions（若需要会自动初始化为空 list）。
+
+        语义建模函数（如 CALLDATALOAD）用它注入 "offset 高 192-bit == 0"
+        这类 vacuous-同行为分支假设；cfg_executor 在每条路径出发时会把
+        最新的列表一并加进 path constraints。
+        """
+        if self.assumptions is None:
+            self.assumptions = []
+        self.assumptions.append(assumption)
 
     @classmethod
     def _create_empty(cls) -> 'SMTState':
@@ -207,6 +234,13 @@ class SMTState:
         new_state.stack_base = getattr(self, 'stack_base', None)
         new_state.stack_num_inputs = getattr(self, 'stack_num_inputs', 0)
         new_state.unrouted_memory_domain = getattr(self, 'unrouted_memory_domain', None)
+        # 深拷贝 assumptions list，避免 sibling state 之间 mutate 互相污染。
+        # 后续 add_assumption() 只影响当前路径，不会回流到父/兄弟路径。
+        src_assumptions = getattr(self, 'assumptions', None)
+        new_state.assumptions = list(src_assumptions) if src_assumptions else None
+        new_state.assume_calldata_offset_no_overflow = getattr(
+            self, 'assume_calldata_offset_no_overflow', True,
+        )
 
         return new_state
 

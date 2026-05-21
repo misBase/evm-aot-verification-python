@@ -163,7 +163,7 @@ def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monke
     cancelled_worker_started = threading.Event()
     cancelled_worker_saw_cancel = threading.Event()
 
-    def fake_check_chunk(pair_specs, _evm_results, _x86_results, _deadline, cancel_event):
+    def fake_check_chunk(pair_specs, _evm_results, _x86_results, _deadline, cancel_event, skip_feasibility=False):
         if pair_specs[0] == (0, 0):
             return _PathPairChunkCheckResult(
                 checked_pair_count=1,

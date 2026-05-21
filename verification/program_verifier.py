@@ -14,6 +14,22 @@ from .call_site_mapping import build_call_site_mapping
 from state.smt_state import SMTState
 
 
+def _collect_assumptions(*states):
+    """Collect dedup'd SMTState.assumptions from a list of states (skip None)."""
+    seen = set()
+    out = []
+    for s in states:
+        if s is None:
+            continue
+        for a in getattr(s, 'assumptions', None) or []:
+            key = a.hash()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(a)
+    return out
+
+
 class ProgramEquivalenceChecker:
     """验证EVM和x86程序之间的等价性。"""
 
@@ -34,7 +50,9 @@ class ProgramEquivalenceChecker:
                            stack_check: Optional[int] = None,
                            stack_check_timeout_ms: int = 300000,
                            path_observations: bool = False,
-                           path_pair_workers: int = 1) -> Tuple[bool, Optional[str]]:
+                           path_pair_workers: int = 1,
+                           enable_merge: bool = True,
+                           skip_feasibility: bool = False) -> Tuple[bool, Optional[str]]:
         """验证EVM程序和x86程序在语义上等价。
 
         默认使用旧的 merged-result 检查路径，保持原有 Alive2 风格的
@@ -81,6 +99,8 @@ class ProgramEquivalenceChecker:
                 stack_check,
                 stack_check_timeout_ms,
                 path_pair_workers,
+                enable_merge=enable_merge,
+                skip_feasibility=skip_feasibility,
             )
 
         # 步骤1：公式构建 - EVM（两级路径感知）
@@ -109,7 +129,11 @@ class ProgramEquivalenceChecker:
 
         x86_start = time.time()
         call_site_mapping = build_call_site_mapping(evm_program, x86_program)
-        x86_state, x86_result = x86_program.to_z3(initial_state, call_site_mapping=call_site_mapping)
+        x86_state, x86_result = x86_program.to_z3(
+            initial_state,
+            call_site_mapping=call_site_mapping,
+            enable_merge=enable_merge,
+        )
         x86_build_time = time.time() - x86_start
 
         if self.verbose:
@@ -136,7 +160,20 @@ class ProgramEquivalenceChecker:
             print(f"    └─ Budget: {self.refinement_checker.timeout_ms} ms")
 
         check_start = time.time()
-        verified, message = self.refinement_checker.check_refinement(evm_result, x86_result)
+        # 把 initial_state、evm_state、x86_state 上累积的 assumptions（包括
+        # CALLDATALOAD 处的 hi-192==0 等无损先验，以及 caller 设定的 calldatasize
+        # 上界）作为顶层 precondition 传给 refinement check 的 solver。
+        # merged-result 路径没有 path_condition 字段，但 solver 也会以
+        # path_condition 形式接收。
+        assumptions = _collect_assumptions(initial_state, evm_state, x86_state)
+        if assumptions:
+            from z3 import And, BoolVal
+            extra_condition = And(BoolVal(True), *assumptions)
+        else:
+            extra_condition = None
+        verified, message = self.refinement_checker.check_refinement(
+            evm_result, x86_result, assumptions=extra_condition,
+        )
         check_time = time.time() - check_start
 
         if self.verbose:
@@ -200,6 +237,8 @@ class ProgramEquivalenceChecker:
         stack_check: Optional[int],
         stack_check_timeout_ms: int,
         path_pair_workers: int,
+        enable_merge: bool = True,
+        skip_feasibility: bool = False,
     ) -> Tuple[bool, Optional[str]]:
         if self.verbose:
             print("\n[1] Building EVM terminal path observations...")
@@ -225,6 +264,7 @@ class ProgramEquivalenceChecker:
             initial_state,
             call_site_mapping=call_site_mapping,
             merge_state=stack_check is not None,
+            enable_merge=enable_merge,
         )
         x86_build_time = time.time() - x86_start
         x86_state = x86_paths.merged_state
@@ -250,16 +290,36 @@ class ProgramEquivalenceChecker:
             print(f"    └─ Path pair workers: {path_pair_workers}")
 
         check_start = time.time()
+        # 同样把累积 assumptions 通过 evm/x86 各路径 observation 注入：path_observations
+        # 模式下，每个 observation 自带 condition；将顶层 assumptions And 到其上即可。
+        # PathObservation 是 frozen dataclass，使用 dataclasses.replace 构造新对象。
+        path_assumptions = _collect_assumptions(initial_state, evm_state, x86_state)
+        if path_assumptions:
+            from dataclasses import replace
+            from z3 import And
+            evm_paths_obs = [
+                replace(obs, condition=And(obs.condition, *path_assumptions))
+                for obs in evm_paths.observations
+            ]
+            x86_paths_obs = [
+                replace(obs, condition=And(obs.condition, *path_assumptions))
+                for obs in x86_paths.observations
+            ]
+        else:
+            evm_paths_obs = evm_paths.observations
+            x86_paths_obs = x86_paths.observations
         if path_pair_workers == 1:
             verified, message = self.refinement_checker.check_refinement_paths(
-                evm_paths.observations,
-                x86_paths.observations,
+                evm_paths_obs,
+                x86_paths_obs,
+                skip_feasibility=skip_feasibility,
             )
         else:
             verified, message = self.refinement_checker.check_refinement_paths(
-                evm_paths.observations,
-                x86_paths.observations,
+                evm_paths_obs,
+                x86_paths_obs,
                 path_pair_workers=path_pair_workers,
+                skip_feasibility=skip_feasibility,
             )
         check_time = time.time() - check_start
 

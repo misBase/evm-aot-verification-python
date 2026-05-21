@@ -561,10 +561,15 @@ def test_calldatasize_zero_extends_context_size():
 
 
 def test_calldataload_offset_overflow_returns_zero():
-    """测试 CALLDATALOAD 的 offset 超过 uint64 时返回 0。"""
+    """测试 CALLDATALOAD 的 offset 超过 uint64 时返回 0。
+
+    默认的 ``assume_calldata_offset_no_overflow=True`` 会 drop overflow
+    分支（程序级 perf 优化），这个单测显式关闭该 hint，保留完整建模。
+    """
     op = EvmOperator(kind="CALLDATALOAD", pc=1)
 
     state = SMTState()
+    state.assume_calldata_offset_no_overflow = False
     state.calldatasize = BitVecVal(32, 64)
     state.calldata = Store(state.calldata, BitVecVal(0, 64), BitVecVal(0xAA, 8))
     state.evm_stack = state.evm_stack.push(BitVecVal((1 << 64), 256))

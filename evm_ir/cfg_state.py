@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from typing import List, Optional, TYPE_CHECKING
-from z3 import BoolRef, BoolVal, Solver, unsat
+from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat
 
 from state.smt_state import SMTState
 
@@ -126,7 +126,9 @@ class Constraints:
         Returns:
             如果约束可满足则返回 True
         """
-        solver = Solver()
+        # 用 QF_AUFBV 与 x86 侧 reachability check 保持一致：约束含 calldata /
+        # storage Array Select，QF_AUFBV 比默认 Solver() 的通用 tactic 快很多。
+        solver = SolverFor("QF_AUFBV")
         for constraint in self._constraints:
             solver.add(constraint)
 

@@ -86,6 +86,10 @@ class X86SymbolicExecutor:
         # 统计信息
         self.total_states = 0
         self.pruned_states = 0
+        # 可达性检查的累计耗时与调用次数，便于 perf 实验诊断 build 慢的来源。
+        self.reachability_call_count = 0
+        self.reachability_total_wall = 0.0
+        self.reachability_pruned_count = 0
 
         # 终止状态列表
         self.final_states: List[X86GlobalState] = []
@@ -95,9 +99,18 @@ class X86SymbolicExecutor:
 
     def _is_state_reachable(self, state: X86GlobalState) -> bool:
         """Check path feasibility."""
-        return state.get_constraints().is_possible(
-            solver_timeout=self.reachability_timeout_ms
-        )
+        import time as _t
+        self.reachability_call_count += 1
+        t0 = _t.time()
+        try:
+            result = state.get_constraints().is_possible(
+                solver_timeout=self.reachability_timeout_ms
+            )
+        finally:
+            self.reachability_total_wall += _t.time() - t0
+        if not result:
+            self.reachability_pruned_count += 1
+        return result
 
     def _get_static_successors(self, block_idx: int, block: X86Block) -> List[int]:
         """解析 block 末尾指令，返回后继 block 地址列表（静态分析）。
@@ -420,6 +433,13 @@ class X86SymbolicExecutor:
             node=entry_node
         )
         initial_global_state.depth = 0
+
+        # 注入 caller 设定的全局先验（precondition assumptions）。
+        # 这些约束在每条路径的 X86Constraints 中作为初始合取项出现，
+        # 既让 reachability check 在分支处可以快速剪枝，也保证最终
+        # path_condition 中 carry 这些先验，无需 refinement_checker 重复加。
+        for assumption in getattr(initial_state, 'assumptions', None) or []:
+            initial_global_state.world_state.constraints.add(assumption)
 
         # 添加到 work_list
         self.work_list.append(initial_global_state)

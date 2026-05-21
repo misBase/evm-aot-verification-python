@@ -16,6 +16,19 @@ from common.path_observation import PathObservation, PathSemantics
 from state.smt_state import SMTState
 
 
+def _dedup_z3_exprs(exprs):
+    """按 Z3 AST hash 去重，避免同一 hi-192==0 假设在多路径上重复入栈。"""
+    seen = set()
+    out = []
+    for e in exprs:
+        key = e.hash()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+    return out
+
+
 class EVMProgram:
     """表示包含多个块的完整EVM程序。
 
@@ -122,6 +135,16 @@ class EVMProgram:
         # 使用 If 表达式按路径条件合并
         merged_state = self._merge_global_states(final_global_states)
 
+        # 收集各终止路径在执行中累积的 SMTState.assumptions（CALLDATALOAD 等
+        # 处追加的 hi-192==0 之类无损先验），合并到 merged_state.assumptions
+        # 供 program_verifier 取出后注入 refinement solver。
+        collected = list(getattr(state, 'assumptions', None) or [])
+        for gstate in final_global_states:
+            for a in (getattr(gstate.mstate, 'assumptions', None) or []):
+                collected.append(a)
+        # 去重（同一个 hi-192==0 表达式可能在多条路径上同时产生）。
+        merged_state.assumptions = _dedup_z3_exprs(collected) if collected else None
+
         # 提取结果
         has_return_data = merged_state.return_length != BitVecVal(0, 64)
 
@@ -172,10 +195,22 @@ class EVMProgram:
         )
 
     def _path_observation(self, gstate: GlobalState) -> PathObservation:
-        """Extract the observable result of one terminal EVM path."""
+        """Extract the observable result of one terminal EVM path.
+
+        把 mstate.assumptions（CALLDATALOAD 处累积的 hi-192==0 等无损先验）
+        And 进 path condition，保证 path_observations 模式下的 refinement
+        check 也看到这些 precondition——否则 drop 掉的 If(offset_overflow,...)
+        守卫会让 refinement 在 hi-192!=0 分支下 unsound（EVM 返 0，x86 返
+        byte-wrap 值，必定 SAT 反例）。
+        """
+        from z3 import And
         state = gstate.mstate
+        condition = gstate.get_constraints().as_bool()
+        path_assumptions = getattr(state, 'assumptions', None)
+        if path_assumptions:
+            condition = And(condition, *path_assumptions)
         return PathObservation(
-            condition=gstate.get_constraints().as_bool(),
+            condition=condition,
             offset=state.return_offset,
             length=state.return_length,
             memory=state.evm_memory.Memory,

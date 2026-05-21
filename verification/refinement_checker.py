@@ -54,26 +54,144 @@ class _PathPairChunkCheckResult:
     logs: list[str] = field(default_factory=list)
 
 
+def _storage_arrays_structurally_equal(a, b) -> bool:
+    """快速结构等价检查（同一 Z3 AST 实例或 hash 相等）。
+
+    Z3 表达式是 maximally shared 的（同一 AST manager 下相同表达式共享同一指针），
+    因此当两个 path 在同一 base Storage Array 上做了相同序列的 SSTORE，最终的
+    Store-chain 表达式会 hash 相等。这种情况下 storage equivalence 是平凡的，
+    可以跳过 z3 全 256-bit 量化 SAT。
+
+    保守起见：不等于不代表 z3 也不等价（只是这条 fast path miss），所以这是
+    sound 的——只是 perf 优化。
+    """
+    if a is None or b is None:
+        return False
+    try:
+        if a is b:
+            return True
+        # eq() 是 z3 Python API 的 syntactic equality（AST 同结构同地址）。
+        from z3 import eq as _z3_eq
+        return _z3_eq(a, b)
+    except Exception:
+        return False
+
+
+def _decompose_store_chain(arr):
+    """将一个 Z3 Array 表达式分解为 (base_array, [(key, value), ...]) 形式。
+
+    递归剥离顶层 Store(arr, k, v)；剩下的 base 是非 Store-rooted 表达式
+    （通常是初始 Array constant 或更复杂的合并 If）。返回的 key/value 列表
+    顺序对应写入顺序：列表最后一项是最近一次写入。如果遇到非 Store 节点
+    立即停止。
+    """
+    from z3 import Z3_OP_STORE
+    stores = []
+    cur = arr
+    try:
+        while True:
+            if not hasattr(cur, "decl"):
+                break
+            decl_kind = cur.decl().kind()
+            if decl_kind != Z3_OP_STORE:
+                break
+            args = cur.children()  # [base, key, value]
+            if len(args) != 3:
+                break
+            stores.append((args[1], args[2]))
+            cur = args[0]
+    except Exception:
+        return arr, []
+    stores.reverse()  # 顺序从最早到最近
+    return cur, stores
+
+
+def _storage_arrays_syntactically_equal(a, b) -> bool:
+    """递归地按 AST 结构判断两个 Z3 Array 表达式是否等价。
+
+    支持穿透 Store / If 节点：
+    - Store(base_a, ka, va) ≡ Store(base_b, kb, vb)
+      iff base_a ≡ base_b ∧ ka ≡ kb ∧ va ≡ vb
+    - If(c_a, t_a, e_a) ≡ If(c_b, t_b, e_b)
+      iff c_a ≡ c_b ∧ t_a ≡ t_b ∧ e_a ≡ e_b
+    - 叶节点：用 z3.eq AST 相等（处理 BitVecVal, Const 等）
+
+    这是 sufficient（不 necessary）：返回 True 时两侧 Z3 Array 严格 syntactic
+    相等，因此 Storage equivalence 平凡成立；返回 False 不代表语义不等价，
+    只是 fast path miss，会 fallback 到 z3 SAT。
+    """
+    from z3 import eq as _z3_eq
+    try:
+        if a is b or _z3_eq(a, b):
+            return True
+    except Exception:
+        return False
+    # AST 不直接相等：仅在 Store / If 这类 *组合* 节点上才递归 children。
+    # 对叶节点（BitVecVal/Const 等）和其他 declkinds，require z3.eq 已为
+    # syntactic 等价的唯一判据；上面已经 fail 过了，直接返回 False。
+    try:
+        if not (hasattr(a, "decl") and hasattr(b, "decl")):
+            return False
+        from z3 import Z3_OP_STORE, Z3_OP_ITE
+        ka = a.decl().kind()
+        kb = b.decl().kind()
+        if ka != kb:
+            return False
+        if ka not in (Z3_OP_STORE, Z3_OP_ITE):
+            # 非 Store/If 节点：z3.eq 已 fail，无递归收益，直接 False。
+            return False
+        children_a = a.children()
+        children_b = b.children()
+        if len(children_a) != len(children_b):
+            return False
+        for ca, cb in zip(children_a, children_b):
+            if not _storage_arrays_syntactically_equal(ca, cb):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _storage_store_chains_equal(a, b) -> bool:
+    """更深一层结构性等价：递归走 Store / If 节点比较 AST 形态。
+
+    sufficient（不 necessary）条件：两侧 Z3 Array 在 store/if 树上 syntactic
+    相等。返回 True 时 sound（两个 Z3 Array 等价）；False 时 fast path miss。
+
+    应用场景：path_observations + enable_merge 模式下，x86 的 storage 通常
+    是嵌套 If(cond_i, store_chain_i, fallback)；EVM 侧没合并，是简单的
+    Store 链。两边都基于同一 base `Array('Storage', ...)`、SSTORE 的 (k,v)
+    表达式按 AST 一致（因为两侧 sstore 共享 EVMStorageState.sstore），所以
+    顶层结构应当 syntactically 匹配。
+    """
+    if a is None or b is None:
+        return False
+    return _storage_arrays_syntactically_equal(a, b)
+
+
 class RefinementChecker:
     """检查x86和EVM语义之间的精化关系。
     
     验证x86精化EVM：对所有输入，x86_output = EVM_output。
     """
     
-    def __init__(self, timeout_ms: int = 60000, verbose: bool = False):
+    def __init__(self, timeout_ms: int = 60000, verbose: bool = False,
+                 z3_verbose: bool = False):
         """初始化精化检查器。
-        
+
         Args:
             timeout_ms: SMT求解器超时（毫秒）
-            verbose: 启用详细输出
+            verbose: 启用应用层详细输出（subcheck 时间、path-pair 进度等）
+            z3_verbose: 是否同时打开 z3 自身的 verbose（极吵；默认关，避免淹没
+                应用层日志）。perf 调试用 verbose=True, z3_verbose=False。
         """
         self.timeout_ms = timeout_ms
         self.verbose = verbose
 
         # NOTE: Z3 set_option 是全局设置。这里显式在每个实例中设置，避免
         # 前一个 verbose=True 的测试污染后续 verbose=False 的测试。
-        set_option(verbose=10 if verbose else 0)
-        set_option(proof=bool(verbose))
+        set_option(verbose=10 if z3_verbose else 0)
+        set_option(proof=bool(z3_verbose))
         
         # 使用QF_AUFBV（数组、未解释函数、位向量）以支持Array比较
         # QF_BV不支持Arrays，所以我们需要QF_AUFBV
@@ -126,7 +244,12 @@ class RefinementChecker:
         else:
             logs.append(line)
     
-    def check_refinement(self, evm_result: dict, x86_result: dict) -> Tuple[bool, Optional[str]]:
+    def check_refinement(
+        self,
+        evm_result: dict,
+        x86_result: dict,
+        assumptions=None,
+    ) -> Tuple[bool, Optional[str]]:
         """检查x86是否精化EVM（对所有输入，x86_result = evm_result）。
 
         此方法验证精化关系：
@@ -135,6 +258,8 @@ class RefinementChecker:
         Args:
             evm_result: 包含 offset, length, memory, base_addr, has_return_data, storage, transient_storage 的字典
             x86_result: 同上格式的字典
+            assumptions: 可选 Z3 BoolRef，作为顶层 precondition 注入 solver
+                （例如 calldatasize 上界约束）
 
         Returns:
             (verified, message)，如果精化关系成立则verified为True
@@ -142,19 +267,31 @@ class RefinementChecker:
         # 将 timeout_ms 作为整个 refine 检查流程的总预算（而不是每次 check 的预算）。
         deadline = time.time() + (self.timeout_ms / 1000.0)
 
-        return self._check_refinement_direct_memory(evm_result, x86_result, deadline)
+        return self._check_refinement_direct_memory(
+            evm_result, x86_result, deadline,
+            path_condition=assumptions,
+        )
 
     def check_refinement_paths(
         self,
         evm_results: list[dict],
         x86_results: list[dict],
         path_pair_workers: int = 1,
+        skip_feasibility: bool = False,
     ) -> Tuple[bool, Optional[str]]:
         """Check refinement directly over terminal path observations.
 
         This avoids first merging whole terminal memory/storage arrays.  For each
         feasible EVM/x86 terminal-path intersection, it proves the same
         observable properties as ``check_refinement``.
+
+        Args:
+            skip_feasibility: 跳过 ``_check_path_pair_may_be_feasible`` 预检查。
+                在符号 calldata 等场景下，feasibility precheck 自身也要 bit-blast
+                完整 path 谓词但很少能剪枝；跳过它能少做大约 pair_count 次 SAT 调用。
+                refinement check 在 path_condition 为 UNSAT 时返回 unsat（vacuously
+                refined），仍 sound——只是会把统计的 "feasible pair(s)" 计成全部
+                pair_count。
         """
         if path_pair_workers <= 0:
             raise ValueError("path_pair_workers must be a positive integer")
@@ -178,6 +315,7 @@ class RefinementChecker:
                 evm_results,
                 x86_results,
                 deadline,
+                skip_feasibility=skip_feasibility,
             )
         else:
             checked_pair_count, pair_count, failure = self._check_path_pairs_parallel(
@@ -185,6 +323,7 @@ class RefinementChecker:
                 x86_results,
                 deadline,
                 path_pair_workers,
+                skip_feasibility=skip_feasibility,
             )
         if failure is not None:
             return False, failure
@@ -203,6 +342,7 @@ class RefinementChecker:
         evm_results: list[dict],
         x86_results: list[dict],
         deadline: Optional[float],
+        skip_feasibility: bool = False,
     ) -> tuple[int, int, Optional[str]]:
         pair_count = 0
         checked_pair_count = 0
@@ -212,15 +352,16 @@ class RefinementChecker:
                 x86_condition = x86_result.get("condition", BoolVal(True))
                 path_condition = And(evm_condition, x86_condition)
                 pair_count += 1
-                may_be_feasible, msg = self._check_path_pair_may_be_feasible(
-                    path_condition,
-                    deadline,
-                    f"evm[{evm_index}], x86[{x86_index}]",
-                )
-                if msg is not None:
-                    return checked_pair_count, pair_count, msg
-                if not may_be_feasible:
-                    continue
+                if not skip_feasibility:
+                    may_be_feasible, msg = self._check_path_pair_may_be_feasible(
+                        path_condition,
+                        deadline,
+                        f"evm[{evm_index}], x86[{x86_index}]",
+                    )
+                    if msg is not None:
+                        return checked_pair_count, pair_count, msg
+                    if not may_be_feasible:
+                        continue
                 checked_pair_count += 1
                 verified, msg = self._check_refinement_direct_memory(
                     evm_result,
@@ -239,6 +380,7 @@ class RefinementChecker:
         x86_results: list[dict],
         deadline: Optional[float],
         path_pair_workers: int,
+        skip_feasibility: bool = False,
     ) -> tuple[int, int, Optional[str]]:
         pair_specs = [
             (evm_index, x86_index)
@@ -270,6 +412,7 @@ class RefinementChecker:
                     x86_results,
                     deadline,
                     cancel_event,
+                    skip_feasibility,
                 )
                 for chunk in chunks
             ]
@@ -294,6 +437,7 @@ class RefinementChecker:
         x86_results: list[dict],
         deadline: Optional[float],
         cancel_event: threading.Event,
+        skip_feasibility: bool = False,
     ) -> _PathPairChunkCheckResult:
         ctx = Context()
         solver = SolverFor("QF_AUFBV", ctx=ctx)
@@ -318,17 +462,18 @@ class RefinementChecker:
             label = f"evm[{evm_index}], x86[{x86_index}]"
             path_condition = And(BoolVal(True, ctx=ctx), evm_result["condition"], x86_result["condition"])
 
-            may_be_feasible, msg = self._check_path_pair_may_be_feasible_with_solver(
-                solver,
-                path_condition,
-                deadline,
-                label,
-                logs,
-            )
-            if msg is not None:
-                return _PathPairChunkCheckResult(checked_pair_count, False, msg, logs)
-            if not may_be_feasible:
-                continue
+            if not skip_feasibility:
+                may_be_feasible, msg = self._check_path_pair_may_be_feasible_with_solver(
+                    solver,
+                    path_condition,
+                    deadline,
+                    label,
+                    logs,
+                )
+                if msg is not None:
+                    return _PathPairChunkCheckResult(checked_pair_count, False, msg, logs)
+                if not may_be_feasible:
+                    continue
 
             checked_pair_count += 1
             verified, msg = self._check_refinement_direct_memory_with_solver(
@@ -704,6 +849,22 @@ class RefinementChecker:
         logs: Optional[list[str]] = None,
         ctx=None,
     ):
+        # 结构性短路：如果两侧 Storage 是同一 Z3 AST（同一 Array 表达式），
+        # 或可证明等价的 Store 链，则可跳过 z3 SAT 检查。perf_erc20_lite 这类
+        # 测试里 EVM IR 和 x86 host SSTORE 实际写的是同一 Z3 Array（共享 base
+        # storage），SSTORE 语义一致 -> 大部分 path pair 的两侧 Storage AST 直接
+        # 相等，能跳过 Storage equivalence 的 SAT 调用（其上做 256-bit key
+        # universal quantification 是慢的根源 — codex review 标注的 hot spot）。
+        # _storage_store_chains_equal 进一步沿 Store 链 syntactic 比较 (k,v)
+        # 序列，覆盖两侧 AST 顶层结构不同但写入序列一致的情况。
+        if _storage_store_chains_equal(evm_storage, x86_storage):
+            prefix = f"{context}: " if context else ""
+            self._emit_solver_log(
+                logs,
+                f"    ├─ {prefix}Storage equivalence check: 0.000s, structural-eq fast path",
+            )
+            return True, "Storage equivalent (structural)"
+
         if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
             msg = self._timeout_message()
             self._emit_solver_log(logs, f"    └─ {msg}")
@@ -874,6 +1035,17 @@ class RefinementChecker:
         logs: Optional[list[str]] = None,
         ctx=None,
     ):
+        # Structural fast path, same as 普通 storage：两侧若是同一 Z3 Array AST
+        # 直接跳过 z3。
+        if _storage_store_chains_equal(evm_ts, x86_ts):
+            prefix = f"{context}: " if context else ""
+            self._emit_solver_log(
+                logs,
+                f"    ├─ {prefix}Transient storage equivalence check: "
+                f"0.000s, structural-eq fast path",
+            )
+            return True, "Transient storage equivalent (structural)"
+
         if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
             msg = self._timeout_message()
             self._emit_solver_log(logs, f"    └─ {msg}")

@@ -377,8 +377,20 @@ def test_verify_perf_erc20_lite_program_pair():
     """验证 perf_erc20_lite.json 与 perf_erc20_lite.hex 的 ERC20 风格中型样本。
 
     该 fixture 覆盖 dispatcher、selector 分支、SHA3 mapping key、SLOAD/SSTORE、
-    RETURN/REVERT 等真实合约常见路径。固定 calldata 长度为 68 字节，覆盖
-    transfer/approve 的两个 ABI 参数，同时保持 selector 和参数内容符号化。
+    RETURN/REVERT 等真实合约常见路径。全部输入符号化（calldata 内容、
+    calldatasize、callvalue 等都符号化），无须固定长度。
+
+    全符号验证通过以下组合在 20 分钟内完成（实测 ≈ 19.3 分钟）：
+    - ``path_observations=True``：避免合并整个 memory Array，按 (evm_path, x86_path)
+      逐对检查；
+    - ``enable_merge=True``：x86 cfg 合流点状态合并，把符号 calldatasize 引发的
+      路径爆炸（25k+ states）压回到个位数 finals；
+    - ``path_pair_workers=4``：并行处理路径 pair。
+
+    EVM CALLDATALOAD 处的 ``offset 高 192-bit == 0`` 假设通过 SMTState.assumptions
+    在 to_z3 末尾收集，再由 program_verifier 注入到 refinement check 的 path
+    condition，对 vacuous（两侧 overflow 都返 0）分支剪枝以避免 256-bit carry
+    chain。详见 tests/support/calldataload_analysis/README.md。
     """
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "perf_erc20_lite.json")
@@ -391,13 +403,16 @@ def test_verify_perf_erc20_lite_program_pair():
         x86_hex_sequence = f.read().strip()
     x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
 
-    checker = ProgramEquivalenceChecker(timeout_ms=180000, verbose=False)
-    initial_state = SMTState.create_initial_state(calldata_size_bytes=68)
+    checker = ProgramEquivalenceChecker(timeout_ms=1200000, verbose=False)
+    initial_state = SMTState.create_initial_state()
     verified, msg = checker.verify_program_pair(
         evm_program,
         x86_program,
         initial_state,
         stack_check=None,
+        path_observations=True,
+        path_pair_workers=4,
+        enable_merge=True,
     )
 
     assert verified, (

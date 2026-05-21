@@ -173,7 +173,12 @@ class SymbolicExecutor:
         initial_global_state.depth = 0
         for headers in self.static_loop_headers:
             initial_global_state.loop_time[headers] = 0
-        
+
+        # 注入 caller 设定的全局先验（precondition assumptions）。详见
+        # SMTState.assumptions 注释。
+        for assumption in getattr(initial_state, 'assumptions', None) or []:
+            initial_global_state.world_state.constraints.add(assumption)
+
         # 添加到 work_list
         self.work_list.append(initial_global_state)
 

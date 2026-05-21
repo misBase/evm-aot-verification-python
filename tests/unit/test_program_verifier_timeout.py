@@ -41,7 +41,7 @@ class _DummyEVMProgram:
 
 
 class _DummyX86Program:
-    def to_z3(self, state, call_site_mapping=None):
+    def to_z3(self, state, call_site_mapping=None, **_kwargs):
         return state, {
             'offset': BitVecVal(0, 64),
             'length': BitVecVal(0, 64),
@@ -52,7 +52,7 @@ class _DummyX86Program:
             'transient_storage': state.evm_transient_storage.TransientStorage,
         }
 
-    def to_z3_paths(self, state, call_site_mapping=None, merge_state=False):
+    def to_z3_paths(self, state, call_site_mapping=None, merge_state=False, **_kwargs):
         return PathSemantics(
             global_states=[],
             observations=[
@@ -83,7 +83,7 @@ def test_verify_program_pair_uses_independent_stack_check_budget(monkeypatch):
     monkeypatch.setattr(
         checker.refinement_checker,
         "check_refinement",
-        lambda _evm_result, _x86_result: (True, "ok"),
+        lambda _evm_result, _x86_result, **_kwargs: (True, "ok"),
     )
 
     def _fake_stack_check(_evm_state, _x86_state, _initial_state, n_elements, deadline=None):
@@ -117,7 +117,9 @@ def test_verify_program_pair_rewrites_refinement_timeout_message(monkeypatch):
     monkeypatch.setattr(
         checker.refinement_checker,
         "check_refinement",
-        lambda _evm_result, _x86_result: (False, checker.refinement_checker._timeout_message()),
+        lambda _evm_result, _x86_result, **_kwargs: (
+            False, checker.refinement_checker._timeout_message(),
+        ),
     )
 
     verified, msg = checker.verify_program_pair(
@@ -140,7 +142,7 @@ def test_verify_program_pair_rewrites_path_refinement_timeout_message(monkeypatc
     monkeypatch.setattr(
         checker.refinement_checker,
         "check_refinement_paths",
-        lambda _evm_results, _x86_results: (
+        lambda _evm_results, _x86_results, **_kwargs: (
             False,
             checker.refinement_checker._timeout_message(),
         ),

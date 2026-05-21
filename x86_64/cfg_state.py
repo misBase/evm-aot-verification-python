@@ -7,7 +7,7 @@ x86-64 全局状态管理（参考 evm_ir）。
 from __future__ import annotations
 
 from typing import List, Optional, Dict, TYPE_CHECKING
-from z3 import BoolRef, BoolVal, Solver, unsat, And
+from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, And
 
 from state.smt_state import SMTState
 
@@ -92,7 +92,10 @@ class X86Constraints:
         Returns:
             如果约束可满足则返回 True
         """
-        solver = Solver()
+        # 全符号场景下，calldata/storage 是 Z3 Array，约束含 Array Select。默认的
+        # 通用 Solver() 会尝试组合多种理论，bit-blast 慢；QF_AUFBV 直接走 array
+        # + bit-vector + uninterpreted-function tactic，对我们用到的形式更快。
+        solver = SolverFor("QF_AUFBV")
         for constraint in self._constraints:
             solver.add(constraint)
         for flag_cond in self.flag_constraints.values():
