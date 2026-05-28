@@ -44,6 +44,11 @@ _PATH_RESULT_KEYS = (
     "storage",
     "transient_storage",
 )
+_PATH_PAIR_FEASIBILITY_TIMEOUT_CAP_MS = 250
+_STORAGE_QUICK_TIMEOUT_CAP_MS = 750
+_STORAGE_CALLDATASIZE_EXACT_PARTITION_LIMIT = 68
+_STORAGE_CALLDATASIZE_TAIL_TIMEOUT_CAP_MS = 30000
+_PATH_STRUCTURAL_ORACLE_TIMEOUT_CAP_MS = 200
 
 
 @dataclass
@@ -52,6 +57,44 @@ class _PathPairChunkCheckResult:
     verified: bool
     message: Optional[str]
     logs: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class _RefinementCheckTuning:
+    """Small timeout and partition knobs used by refinement sub-checks."""
+
+    path_pair_feasibility_timeout_ms: int
+    storage_quick_timeout_ms: int
+    storage_calldatasize_exact_partition_limit: int
+    storage_calldatasize_exact_partition_timeout_ms: int
+    storage_calldatasize_tail_partition_timeout_ms: int
+    path_structural_oracle_timeout_ms: int
+
+    @classmethod
+    def for_timeout(cls, timeout_ms: int) -> "_RefinementCheckTuning":
+        storage_quick_timeout_ms = min(timeout_ms, _STORAGE_QUICK_TIMEOUT_CAP_MS)
+        return cls(
+            path_pair_feasibility_timeout_ms=min(
+                timeout_ms,
+                _PATH_PAIR_FEASIBILITY_TIMEOUT_CAP_MS,
+            ),
+            storage_quick_timeout_ms=storage_quick_timeout_ms,
+            storage_calldatasize_exact_partition_limit=(
+                _STORAGE_CALLDATASIZE_EXACT_PARTITION_LIMIT
+            ),
+            storage_calldatasize_exact_partition_timeout_ms=min(
+                timeout_ms,
+                max(storage_quick_timeout_ms, 1000),
+            ),
+            storage_calldatasize_tail_partition_timeout_ms=min(
+                timeout_ms,
+                _STORAGE_CALLDATASIZE_TAIL_TIMEOUT_CAP_MS,
+            ),
+            path_structural_oracle_timeout_ms=min(
+                timeout_ms,
+                _PATH_STRUCTURAL_ORACLE_TIMEOUT_CAP_MS,
+            ),
+        )
 
 
 def _storage_arrays_structurally_equal(a, b) -> bool:
@@ -152,6 +195,227 @@ def _storage_arrays_syntactically_equal(a, b) -> bool:
         return False
 
 
+def _collect_and_conjuncts(expr):
+    """把一个 BoolRef 展平成它的 And-conjunct 列表（递归穿透嵌套 And）。
+
+    用于 path-condition-aware 的 If 守卫 syntactic 匹配：path_condition
+    在 path-pair 检查里通常是 `And(evm_cond, x86_cond)`，其中 evm/x86_cond
+    自己又是 `And(*conjuncts)`。展平后我们才能 O(N) 查找某个守卫表达式
+    是否作为 conjunct 出现。
+    """
+    from z3 import Z3_OP_AND
+    out = []
+    stack = [expr]
+    while stack:
+        cur = stack.pop()
+        if cur is None:
+            continue
+        try:
+            if hasattr(cur, "decl") and cur.decl().kind() == Z3_OP_AND:
+                stack.extend(cur.children())
+                continue
+        except Exception:
+            pass
+        out.append(cur)
+    return out
+
+
+def _bool_implied_by_conjuncts(conjuncts, target) -> bool:
+    """如果 target syntactic 出现在 conjuncts 中，返回 True；否则 False。
+
+    这里不调 solver；不确认即返回 False，交给后续 oracle 或完整 SAT 检查。
+    """
+    from z3 import eq as _z3_eq
+    for c in conjuncts:
+        try:
+            if _z3_eq(c, target):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _negate_syntactic(expr):
+    """构造 Not(expr)，但如果 expr 本身是 Not(x)，返回 x。"""
+    from z3 import Not, Z3_OP_NOT
+    try:
+        if hasattr(expr, "decl") and expr.decl().kind() == Z3_OP_NOT:
+            children = expr.children()
+            if len(children) == 1:
+                return children[0]
+    except Exception:
+        pass
+    try:
+        return Not(expr)
+    except Exception:
+        return None
+
+
+def _resolve_if_branch_under_path_condition(if_expr, path_conjuncts, solver_check):
+    """对一个 ITE 节点 `If(C, then, else)`，在给定 path_condition（已展平的
+    conjuncts list）下判断哪一支被 "选中"。
+
+    返回值：
+    - 0 表示 path_condition ⇒ C，应取 then 分支
+    - 1 表示 path_condition ⇒ ¬C，应取 else 分支
+    - None 表示无法判断（fast path miss）
+
+    syntactic 优先（O(|conjuncts|)），失败再用可选的 solver_check。
+    solver_check(expr) 应当返回 True 当且仅当 expr unsat（即该方向可剪枝）。
+    传 None 则跳过 solver，纯靠 syntactic 匹配。
+    """
+    children = if_expr.children()
+    if len(children) != 3:
+        return None
+    cond, then_branch, else_branch = children
+
+    # 1) syntactic: C ∈ conjuncts? then-branch active.
+    if _bool_implied_by_conjuncts(path_conjuncts, cond):
+        return 0
+    # 2) syntactic: ¬C ∈ conjuncts? else-branch active. 也接受 conjuncts
+    #    中出现 NotOf(C)（即 children[0] of cond 若 cond 自身是 Not）。
+    neg_cond = _negate_syntactic(cond)
+    if neg_cond is not None and _bool_implied_by_conjuncts(path_conjuncts, neg_cond):
+        return 1
+
+    # 3) solver-assisted: 试两个方向，oracle 内部做 equality-confirmed cache。
+    if solver_check is None:
+        return None
+    try:
+        from z3 import And as _And
+        # path_condition ∧ ¬C unsat -> path 强制 C 为真 -> then 分支 active.
+        pc_then_expr = _And(*path_conjuncts, neg_cond) if neg_cond is not None else None
+        if pc_then_expr is not None and solver_check(pc_then_expr):
+            return 0
+        # path_condition ∧ C unsat -> path 强制 ¬C -> else 分支 active.
+        pc_else_expr = _And(*path_conjuncts, cond)
+        if solver_check(pc_else_expr):
+            return 1
+    except Exception:
+        return None
+    return None
+
+
+def _storage_arrays_eq_under_path(
+    a,
+    b,
+    path_conjuncts,
+    solver_check,
+    *,
+    max_depth: int = 32,
+):
+    """path-condition-aware 版本的 Storage AST 等价比较。
+
+    与 _storage_arrays_syntactically_equal 的差别：遇到一侧是 If(C, T, E)
+    而另一侧不是 If（或形状不同），尝试在 path_condition 下确定 If 被
+    "压平" 到 T 还是 E，递归比较选中支。
+
+    **Sound case-splitting**：当 path_condition 不能 syntactic 或 oracle
+    entail `C` / `¬C` 时（典型情况：merged state 的 constraints 是
+    `Or(C1,C2,...)`，pair path_condition 包含的是这个 Or 而非具体 C_i），
+    回退到 case split：要求 `then` 分支在 `path ∧ C` 下、`else` 分支在
+    `path ∧ ¬C` 下都与对侧等价。这两支若都 holds 则不论 C 真假都等价
+    (codex review 2026-05-21 的关键建议)。
+
+    `max_depth` 用于避免病态 If 嵌套深度爆栈/卡死；命中 cap 时返回 False。
+
+    sound：返回 True 时两个 Storage 在 path_condition 约束下等价；False 时
+    fast path miss，调用方会 fallback 到 z3 SAT。
+    """
+    from z3 import eq as _z3_eq, Z3_OP_STORE, Z3_OP_ITE
+    if a is None or b is None:
+        return False
+    if max_depth <= 0:
+        return False
+    # Direct AST equality short-circuit.
+    try:
+        if a is b or _z3_eq(a, b):
+            return True
+    except Exception:
+        return False
+
+    a_is_ite = False
+    b_is_ite = False
+    try:
+        a_is_ite = hasattr(a, "decl") and a.decl().kind() == Z3_OP_ITE
+    except Exception:
+        pass
+    try:
+        b_is_ite = hasattr(b, "decl") and b.decl().kind() == Z3_OP_ITE
+    except Exception:
+        pass
+
+    # 单侧 ITE：在 path_condition 下消解 If 守卫，再递归。
+    if a_is_ite and not b_is_ite:
+        return _eq_under_path_ite_one_sided(
+            a, b, path_conjuncts, solver_check, max_depth,
+        )
+    if b_is_ite and not a_is_ite:
+        return _eq_under_path_ite_one_sided(
+            b, a, path_conjuncts, solver_check, max_depth,
+        )
+
+    # 双侧同形（Store/ITE 类组合节点）：递归 children。
+    try:
+        if not (hasattr(a, "decl") and hasattr(b, "decl")):
+            return False
+        ka = a.decl().kind()
+        kb = b.decl().kind()
+        if ka != kb:
+            return False
+        if ka not in (Z3_OP_STORE, Z3_OP_ITE):
+            return False
+        children_a = a.children()
+        children_b = b.children()
+        if len(children_a) != len(children_b):
+            return False
+        for ca, cb in zip(children_a, children_b):
+            if not _storage_arrays_eq_under_path(
+                ca, cb, path_conjuncts, solver_check, max_depth=max_depth - 1,
+            ):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _eq_under_path_ite_one_sided(ite_side, other, path_conjuncts, solver_check, max_depth):
+    """处理单侧 ITE：先尝试 entailment 选支，否则 case-split.
+
+    sound: case-split 要求两侧都成立。
+    """
+    children = ite_side.children()
+    if len(children) != 3:
+        return False
+    cond, then_branch, else_branch = children
+
+    idx = _resolve_if_branch_under_path_condition(ite_side, path_conjuncts, solver_check)
+    if idx == 0:
+        # path ⇒ cond，only then-branch reachable
+        return _storage_arrays_eq_under_path(
+            then_branch, other, path_conjuncts, solver_check, max_depth=max_depth - 1,
+        )
+    if idx == 1:
+        # path ⇒ ¬cond，only else-branch reachable
+        return _storage_arrays_eq_under_path(
+            else_branch, other, path_conjuncts, solver_check, max_depth=max_depth - 1,
+        )
+    # 守卫无法被 entail。case-split：要求 then 在 path∧C 下等价，else 在
+    # path∧¬C 下也等价。
+    neg_cond = _negate_syntactic(cond)
+    conjuncts_then = list(path_conjuncts) + [cond]
+    if not _storage_arrays_eq_under_path(
+        then_branch, other, conjuncts_then, solver_check, max_depth=max_depth - 1,
+    ):
+        return False
+    conjuncts_else = list(path_conjuncts)
+    if neg_cond is not None:
+        conjuncts_else = conjuncts_else + [neg_cond]
+    return _storage_arrays_eq_under_path(
+        else_branch, other, conjuncts_else, solver_check, max_depth=max_depth - 1,
+    )
+
+
 def _storage_store_chains_equal(a, b) -> bool:
     """更深一层结构性等价：递归走 Store / If 节点比较 AST 形态。
 
@@ -187,6 +451,7 @@ class RefinementChecker:
         """
         self.timeout_ms = timeout_ms
         self.verbose = verbose
+        self._tuning = _RefinementCheckTuning.for_timeout(timeout_ms)
 
         # NOTE: Z3 set_option 是全局设置。这里显式在每个实例中设置，避免
         # 前一个 verbose=True 的测试污染后续 verbose=False 的测试。
@@ -197,6 +462,28 @@ class RefinementChecker:
         # QF_BV不支持Arrays，所以我们需要QF_AUFBV
         self.solver = SolverFor("QF_AUFBV")
         self.solver.set("timeout", timeout_ms)
+
+        # path-aware structural fast path 用的小型结果缓存。key 包含 context
+        # identity 和 expr.hash()；hash 只用于分桶，复用结果前必须再用 z3.eq
+        # 确认是同一个 AST，避免 hash collision 或 cross-context AST 混用。
+        self._unsat_oracle_cache: dict[tuple[int, int], list[tuple[object, bool]]] = {}
+        self._unsat_oracle_cache_lock = threading.Lock()
+
+        # Backward-compatible aliases for tests or ad-hoc debug scripts that
+        # inspect these knobs directly.  New code should read from _tuning.
+        self.path_pair_feasibility_timeout_ms = (
+            self._tuning.path_pair_feasibility_timeout_ms
+        )
+        self.storage_quick_timeout_ms = self._tuning.storage_quick_timeout_ms
+        self.storage_calldatasize_exact_partition_limit = (
+            self._tuning.storage_calldatasize_exact_partition_limit
+        )
+        self.storage_calldatasize_exact_partition_timeout_ms = (
+            self._tuning.storage_calldatasize_exact_partition_timeout_ms
+        )
+        self.storage_calldatasize_tail_partition_timeout_ms = (
+            self._tuning.storage_calldatasize_tail_partition_timeout_ms
+        )
 
     @staticmethod
     def _timeout_message_for(timeout_ms: int) -> str:
@@ -232,9 +519,335 @@ class RefinementChecker:
         solver.set("timeout", solver_timeout_ms)
         return True
 
+    @staticmethod
+    def _reset_solver_with_capped_budget_for(
+        solver,
+        timeout_ms: int,
+        deadline: Optional[float],
+        cap_ms: Optional[int],
+    ) -> bool:
+        if not RefinementChecker._reset_solver_with_budget_for(solver, timeout_ms, deadline):
+            return False
+        if cap_ms is not None and cap_ms > 0:
+            now = time.time()
+            if deadline is None:
+                effective = min(timeout_ms, cap_ms)
+            else:
+                remaining_ms = max(int((deadline - now) * 1000), 1)
+                effective = min(timeout_ms, remaining_ms, cap_ms)
+            solver.set("timeout", max(effective, 1))
+        return True
+
     def _reset_solver_with_budget(self, deadline: Optional[float]) -> bool:
         """重置求解器并为本次 check 设置剩余预算。"""
         return self._reset_solver_with_budget_for(self.solver, self.timeout_ms, deadline)
+
+    def _make_unsat_oracle(self, _parent_solver, deadline: Optional[float], ctx):
+        """返回一个闭包 oracle(expr) -> bool 用于 path-aware structural fast path。
+
+        语义：oracle(expr) 返回 True 当且仅当 expr 在很短预算内被证 unsat。
+        - 用独立的 short-timeout solver，与外层 storage SAT fallback 隔离。
+        - `_unsat_oracle_cache` 按 context/hash 分桶；复用前检查 AST equality。
+        - 任何 unknown / sat / 异常返回 False（保守，sound）。
+
+        如果 ctx 不是 None（worker-local Context），用同一 ctx 创建独立 solver；
+        否则用 main context。
+        """
+        # 这是 path-aware fast path 内部的 implication 探测预算，不影响外层
+        # storage fallback 的完整 solver budget。
+        local_budget_ms = self._tuning.path_structural_oracle_timeout_ms
+        cache_miss = object()
+
+        def _cache_key(expr):
+            try:
+                return (id(expr.ctx), expr.hash())
+            except Exception:
+                return None
+
+        def _lookup_cached(expr, key):
+            from z3 import eq as _z3_eq
+
+            with self._unsat_oracle_cache_lock:
+                for cached_expr, cached_result in self._unsat_oracle_cache.get(key, []):
+                    try:
+                        if _z3_eq(cached_expr, expr):
+                            return cached_result
+                    except Exception:
+                        continue
+            return cache_miss
+
+        def _remember_result(expr, key, result: bool) -> None:
+            from z3 import eq as _z3_eq
+
+            with self._unsat_oracle_cache_lock:
+                bucket = self._unsat_oracle_cache.setdefault(key, [])
+                for index, (cached_expr, cached_result) in enumerate(bucket):
+                    try:
+                        if _z3_eq(cached_expr, expr):
+                            # Prefer a later proven-unsat result over an earlier
+                            # conservative False from UNKNOWN.
+                            if result and not cached_result:
+                                bucket[index] = (expr, result)
+                            return
+                    except Exception:
+                        continue
+                bucket.append((expr, result))
+
+        def _oracle(expr) -> bool:
+            key = _cache_key(expr)
+            if key is None:
+                return False
+            cached = _lookup_cached(expr, key)
+            if cached is not cache_miss:
+                return cached
+            budget_ms = local_budget_ms
+            if deadline is not None:
+                remaining_ms = int((deadline - time.time()) * 1000)
+                if remaining_ms <= 0:
+                    return False
+                budget_ms = min(local_budget_ms, max(remaining_ms, 1))
+            try:
+                if ctx is not None:
+                    probe = SolverFor("QF_AUFBV", ctx=ctx)
+                else:
+                    probe = SolverFor("QF_AUFBV")
+                probe.set("timeout", budget_ms)
+                probe.add(expr)
+                result = probe.check()
+            except Exception:
+                return False
+            is_unsat = result == unsat
+            if is_unsat or result == sat or budget_ms >= local_budget_ms:
+                _remember_result(expr, key, is_unsat)
+            return is_unsat
+
+        return _oracle
+
+    @staticmethod
+    def _expr_mentions_symbol(expr, symbol_name: str) -> bool:
+        """Return True if ``expr`` contains an uninterpreted const by name."""
+        from z3 import Z3_OP_UNINTERPRETED
+
+        seen = set()
+        stack = [expr]
+        while stack:
+            cur = stack.pop()
+            if cur is None:
+                continue
+            try:
+                key = cur.hash()
+            except Exception:
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            try:
+                decl = cur.decl()
+                if (
+                    decl.kind() == Z3_OP_UNINTERPRETED
+                    and decl.name() == symbol_name
+                    and len(cur.children()) == 0
+                ):
+                    return True
+                stack.extend(cur.children())
+            except Exception:
+                continue
+        return False
+
+    def _array_mismatch_query_with_solver(
+        self,
+        solver,
+        evm_array,
+        x86_array,
+        deadline: Optional[float],
+        path_condition,
+        ctx,
+        *,
+        timeout_cap_ms: Optional[int] = None,
+        key_name: str = "storage_check_key",
+    ):
+        if not self._reset_solver_with_capped_budget_for(
+            solver,
+            self.timeout_ms,
+            deadline,
+            timeout_cap_ms,
+        ):
+            return None, 0.0
+
+        key = BitVec(key_name, 256, ctx=ctx)
+        if path_condition is not None:
+            solver.add(path_condition)
+        solver.add(Select(evm_array, key) != Select(x86_array, key))
+
+        start_time = time.time()
+        result = solver.check()
+        solve_time = time.time() - start_time
+        return result, solve_time
+
+    @staticmethod
+    def _context_prefix(context: str) -> str:
+        return f"{context}: " if context else ""
+
+    @staticmethod
+    def _observable_counterexample_message(
+        observable_name: str,
+        context: str = "",
+        detail: str = "",
+    ) -> str:
+        msg = (
+            f"✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
+            f"({observable_name} differs)"
+        )
+        qualifiers = [part for part in (context, detail) if part]
+        if qualifiers:
+            msg = f"{msg} ({', '.join(qualifiers)})"
+        return msg
+
+    def _try_array_structural_fast_path(
+        self,
+        evm_array,
+        x86_array,
+        path_condition,
+        solver,
+        deadline: Optional[float],
+        ctx,
+        context: str,
+        logs: Optional[list[str]],
+        *,
+        log_label: str,
+        success_subject: str,
+    ) -> Optional[tuple[bool, str]]:
+        """Try cheap, sound structural proofs for storage-like Array equality."""
+        prefix = self._context_prefix(context)
+        if _storage_store_chains_equal(evm_array, x86_array):
+            self._emit_solver_log(
+                logs,
+                f"    ├─ {prefix}{log_label} equivalence check: "
+                f"0.000s, structural-eq fast path",
+            )
+            return True, f"{success_subject} equivalent (structural)"
+
+        if path_condition is None:
+            return None
+
+        path_conjuncts = _collect_and_conjuncts(path_condition)
+        if _storage_arrays_eq_under_path(
+            evm_array,
+            x86_array,
+            path_conjuncts,
+            solver_check=self._make_unsat_oracle(solver, deadline, ctx),
+        ):
+            self._emit_solver_log(
+                logs,
+                f"    ├─ {prefix}{log_label} equivalence check: "
+                f"~0s, path-aware structural-eq fast path",
+            )
+            return True, f"{success_subject} equivalent (path-aware structural)"
+
+        return None
+
+    def _storage_mentions_symbolic_calldatasize(
+        self,
+        evm_storage,
+        x86_storage,
+        path_condition,
+    ) -> bool:
+        if path_condition is None:
+            return False
+        return (
+            self._expr_mentions_symbol(path_condition, "CallDataSize")
+            or self._expr_mentions_symbol(evm_storage, "CallDataSize")
+            or self._expr_mentions_symbol(x86_storage, "CallDataSize")
+        )
+
+    def _calldatasize_partitions(self, ctx):
+        calldata_size = BitVec("CallDataSize", 64, ctx=ctx)
+        exact_limit = self._tuning.storage_calldatasize_exact_partition_limit
+        for i in range(exact_limit):
+            yield (
+                f"size={i}",
+                calldata_size == BitVecVal(i, 64, ctx=ctx),
+                self._tuning.storage_calldatasize_exact_partition_timeout_ms,
+            )
+        yield (
+            f"size>={exact_limit}",
+            UGE(calldata_size, BitVecVal(exact_limit, 64, ctx=ctx)),
+            self._tuning.storage_calldatasize_tail_partition_timeout_ms,
+        )
+
+    def _check_storage_equivalence_by_calldatasize_partition(
+        self,
+        solver,
+        evm_storage,
+        x86_storage,
+        deadline: Optional[float],
+        path_condition,
+        context: str,
+        logs: Optional[list[str]],
+        ctx,
+    ):
+        """Exhaustive split for storage queries mentioning symbolic CallDataSize.
+
+        Instead of asking Z3 to solve one large formula with symbolic
+        CallDataSize in many byte-range guards, prove the same storage mismatch
+        query over a complete uint64 partition: exact sizes below
+        ``storage_calldatasize_exact_partition_limit`` plus one unsigned tail.
+
+        The limit is a performance knob, not a semantic assumption.  Soundness
+        comes from each subquery keeping the original path condition and storage
+        expressions while adding one constraint from this exhaustive partition.
+        """
+        total_solve_time = 0.0
+        start = time.time()
+        for label, size_condition, partition_timeout_ms in self._calldatasize_partitions(ctx):
+            partition_condition = (
+                And(path_condition, size_condition)
+                if path_condition is not None
+                else size_condition
+            )
+            result, solve_time = self._array_mismatch_query_with_solver(
+                solver,
+                evm_storage,
+                x86_storage,
+                deadline,
+                partition_condition,
+                ctx,
+                timeout_cap_ms=partition_timeout_ms,
+                key_name=f"storage_check_key_{label.replace('>=', 'ge').replace('=', '_')}",
+            )
+            total_solve_time += solve_time
+            if result is None:
+                msg = self._timeout_message()
+                self._emit_solver_log(logs, f"    └─ {msg}")
+                return False, msg
+            if result == unsat:
+                continue
+            prefix = self._context_prefix(context)
+            self._emit_solver_log(
+                logs,
+                f"    ├─ {prefix}Storage calldata-size split {label}: "
+                f"{solve_time:.3f}s, result={result}",
+            )
+            if result == sat:
+                msg = self._observable_counterexample_message(
+                    "storage",
+                    context,
+                    label,
+                )
+                self._emit_solver_log(logs, f"    └─ {msg}")
+                return False, msg
+            msg = self._unknown_message_for_solver(solver, partition_timeout_ms)
+            self._emit_solver_log(logs, f"    └─ {msg} ({label})")
+            return False, msg
+
+        prefix = self._context_prefix(context)
+        self._emit_solver_log(
+            logs,
+            f"    ├─ {prefix}Storage equivalence check: "
+            f"{time.time() - start:.3f}s wall / {total_solve_time:.3f}s solve, "
+            "calldatasize partition",
+        )
+        return True, "Storage equivalent (calldatasize partition)"
 
     def _emit_solver_log(self, logs: Optional[list[str]], line: str) -> None:
         if not self.verbose:
@@ -564,7 +1177,12 @@ class RefinementChecker:
         label: str,
         logs: Optional[list[str]],
     ) -> tuple[bool, Optional[str]]:
-        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
+        if not self._reset_solver_with_capped_budget_for(
+            solver,
+            self.timeout_ms,
+            deadline,
+            self._tuning.path_pair_feasibility_timeout_ms,
+        ):
             msg = self._timeout_message()
             self._emit_solver_log(logs, f"    └─ {msg}")
             return True, msg
@@ -849,37 +1467,80 @@ class RefinementChecker:
         logs: Optional[list[str]] = None,
         ctx=None,
     ):
-        # 结构性短路：如果两侧 Storage 是同一 Z3 AST（同一 Array 表达式），
-        # 或可证明等价的 Store 链，则可跳过 z3 SAT 检查。perf_erc20_lite 这类
-        # 测试里 EVM IR 和 x86 host SSTORE 实际写的是同一 Z3 Array（共享 base
-        # storage），SSTORE 语义一致 -> 大部分 path pair 的两侧 Storage AST 直接
-        # 相等，能跳过 Storage equivalence 的 SAT 调用（其上做 256-bit key
-        # universal quantification 是慢的根源 — codex review 标注的 hot spot）。
-        # _storage_store_chains_equal 进一步沿 Store 链 syntactic 比较 (k,v)
-        # 序列，覆盖两侧 AST 顶层结构不同但写入序列一致的情况。
-        if _storage_store_chains_equal(evm_storage, x86_storage):
-            prefix = f"{context}: " if context else ""
+        fast_path = self._try_array_structural_fast_path(
+            evm_storage,
+            x86_storage,
+            path_condition,
+            solver,
+            deadline,
+            ctx,
+            context,
+            logs,
+            log_label="Storage",
+            success_subject="Storage",
+        )
+        if fast_path is not None:
+            return fast_path
+
+        prefix = self._context_prefix(context)
+        if self._storage_mentions_symbolic_calldatasize(
+            evm_storage,
+            x86_storage,
+            path_condition,
+        ):
+            result, solve_time = self._array_mismatch_query_with_solver(
+                solver,
+                evm_storage,
+                x86_storage,
+                deadline,
+                path_condition,
+                ctx,
+                timeout_cap_ms=self._tuning.storage_quick_timeout_ms,
+                key_name="storage_check_key_quick",
+            )
+            if result is None:
+                msg = self._timeout_message()
+                self._emit_solver_log(logs, f"    └─ {msg}")
+                return False, msg
             self._emit_solver_log(
                 logs,
-                f"    ├─ {prefix}Storage equivalence check: 0.000s, structural-eq fast path",
+                f"    ├─ {prefix}Storage equivalence quick check: "
+                f"{solve_time:.3f}s, result={result}",
             )
-            return True, "Storage equivalent (structural)"
+            if result == unsat:
+                return True, "Storage equivalent"
+            if result == sat:
+                msg = self._observable_counterexample_message("storage", context)
+                self._emit_solver_log(logs, f"    └─ {msg}")
+                return False, msg
 
-        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
+            verified, msg = self._check_storage_equivalence_by_calldatasize_partition(
+                solver,
+                evm_storage,
+                x86_storage,
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            return verified, msg
+
+        result, solve_time = self._array_mismatch_query_with_solver(
+            solver,
+            evm_storage,
+            x86_storage,
+            deadline,
+            path_condition,
+            ctx,
+            timeout_cap_ms=None,
+            key_name="storage_check_key",
+        )
+        if result is None:
             msg = self._timeout_message()
             self._emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        key = BitVec('storage_check_key', 256, ctx=ctx)
-        if path_condition is not None:
-            solver.add(path_condition)
-        solver.add(Select(evm_storage, key) != Select(x86_storage, key))
-
-        start_time = time.time()
-        result = solver.check()
-        solve_time = time.time() - start_time
-
-        prefix = f"{context}: " if context else ""
         self._emit_solver_log(
             logs,
             f"    ├─ {prefix}Storage equivalence check: {solve_time:.3f}s, result={result}",
@@ -888,9 +1549,7 @@ class RefinementChecker:
         if result == unsat:
             return True, "Storage equivalent"
         if result == sat:
-            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (storage differs)"
-            if context:
-                msg = f"{msg} ({context})"
+            msg = self._observable_counterexample_message("storage", context)
             self._emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
@@ -1035,32 +1694,36 @@ class RefinementChecker:
         logs: Optional[list[str]] = None,
         ctx=None,
     ):
-        # Structural fast path, same as 普通 storage：两侧若是同一 Z3 Array AST
-        # 直接跳过 z3。
-        if _storage_store_chains_equal(evm_ts, x86_ts):
-            prefix = f"{context}: " if context else ""
-            self._emit_solver_log(
-                logs,
-                f"    ├─ {prefix}Transient storage equivalence check: "
-                f"0.000s, structural-eq fast path",
-            )
-            return True, "Transient storage equivalent (structural)"
+        fast_path = self._try_array_structural_fast_path(
+            evm_ts,
+            x86_ts,
+            path_condition,
+            solver,
+            deadline,
+            ctx,
+            context,
+            logs,
+            log_label="Transient storage",
+            success_subject="Transient storage",
+        )
+        if fast_path is not None:
+            return fast_path
 
-        if not self._reset_solver_with_budget_for(solver, self.timeout_ms, deadline):
+        result, solve_time = self._array_mismatch_query_with_solver(
+            solver,
+            evm_ts,
+            x86_ts,
+            deadline,
+            path_condition,
+            ctx,
+            key_name="transient_storage_check_key",
+        )
+        if result is None:
             msg = self._timeout_message()
             self._emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        key = BitVec('transient_storage_check_key', 256, ctx=ctx)
-        if path_condition is not None:
-            solver.add(path_condition)
-        solver.add(Select(evm_ts, key) != Select(x86_ts, key))
-
-        start_time = time.time()
-        result = solver.check()
-        solve_time = time.time() - start_time
-
-        prefix = f"{context}: " if context else ""
+        prefix = self._context_prefix(context)
         self._emit_solver_log(
             logs,
             f"    ├─ {prefix}Transient storage equivalence check: "
@@ -1070,9 +1733,10 @@ class RefinementChecker:
         if result == unsat:
             return True, "Transient storage equivalent"
         if result == sat:
-            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (transient storage differs)"
-            if context:
-                msg = f"{msg} ({context})"
+            msg = self._observable_counterexample_message(
+                "transient storage",
+                context,
+            )
             self._emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
