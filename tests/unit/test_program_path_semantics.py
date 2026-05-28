@@ -182,9 +182,9 @@ def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monke
             logs=["cancelled worker log"],
         )
 
-    monkeypatch.setattr(checker, "_check_path_pair_chunk", fake_check_chunk)
+    monkeypatch.setattr(checker._paths, "_check_path_pair_chunk", fake_check_chunk)
 
-    checked_pair_count, pair_count, failure = checker._check_path_pairs_parallel(
+    checked_pair_count, pair_count, failure = checker._paths._check_path_pairs_parallel(
         evm_results=[object(), object()],
         x86_results=[object(), object()],
         deadline=None,

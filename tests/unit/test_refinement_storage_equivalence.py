@@ -46,7 +46,7 @@ def test_storage_path_aware_fast_path_does_not_hide_wrong_branch():
 def test_calldatasize_partition_shape_is_exhaustive_tail_split():
     checker = RefinementChecker(timeout_ms=1000)
 
-    partitions = list(checker._calldatasize_partitions(ctx=None))
+    partitions = list(checker._storage._calldatasize_partitions(ctx=None))
 
     assert len(partitions) == 69
     assert partitions[0][0] == "size=0"

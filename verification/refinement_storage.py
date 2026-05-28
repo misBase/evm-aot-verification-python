@@ -1,7 +1,6 @@
 """Storage and transient-storage equivalence helpers for refinement checks."""
 
 import time
-from dataclasses import dataclass
 from typing import Optional
 
 from z3 import (
@@ -15,50 +14,7 @@ from z3 import (
     unsat,
 )
 
-
-_PATH_PAIR_FEASIBILITY_TIMEOUT_CAP_MS = 250
-_STORAGE_QUICK_TIMEOUT_CAP_MS = 750
-_STORAGE_CALLDATASIZE_EXACT_PARTITION_LIMIT = 68
-_STORAGE_CALLDATASIZE_TAIL_TIMEOUT_CAP_MS = 30000
-_PATH_STRUCTURAL_ORACLE_TIMEOUT_CAP_MS = 200
-
-
-@dataclass(frozen=True)
-class _RefinementCheckTuning:
-    """Small timeout and partition knobs used by refinement sub-checks."""
-
-    path_pair_feasibility_timeout_ms: int
-    storage_quick_timeout_ms: int
-    storage_calldatasize_exact_partition_limit: int
-    storage_calldatasize_exact_partition_timeout_ms: int
-    storage_calldatasize_tail_partition_timeout_ms: int
-    path_structural_oracle_timeout_ms: int
-
-    @classmethod
-    def for_timeout(cls, timeout_ms: int) -> "_RefinementCheckTuning":
-        storage_quick_timeout_ms = min(timeout_ms, _STORAGE_QUICK_TIMEOUT_CAP_MS)
-        return cls(
-            path_pair_feasibility_timeout_ms=min(
-                timeout_ms,
-                _PATH_PAIR_FEASIBILITY_TIMEOUT_CAP_MS,
-            ),
-            storage_quick_timeout_ms=storage_quick_timeout_ms,
-            storage_calldatasize_exact_partition_limit=(
-                _STORAGE_CALLDATASIZE_EXACT_PARTITION_LIMIT
-            ),
-            storage_calldatasize_exact_partition_timeout_ms=min(
-                timeout_ms,
-                max(storage_quick_timeout_ms, 1000),
-            ),
-            storage_calldatasize_tail_partition_timeout_ms=min(
-                timeout_ms,
-                _STORAGE_CALLDATASIZE_TAIL_TIMEOUT_CAP_MS,
-            ),
-            path_structural_oracle_timeout_ms=min(
-                timeout_ms,
-                _PATH_STRUCTURAL_ORACLE_TIMEOUT_CAP_MS,
-            ),
-        )
+from .refinement_context import _RefinementContext
 
 
 def _storage_arrays_structurally_equal(a, b) -> bool:
@@ -320,11 +276,14 @@ def _storage_store_chains_equal(a, b) -> bool:
 
 
 class StorageEquivalenceChecks:
+    def __init__(self, ctx: _RefinementContext):
+        self._ctx = ctx
+
     def _make_unsat_oracle(self, _parent_solver, deadline: Optional[float], ctx):
         """返回一个闭包 oracle(expr) -> bool 用于 path-aware structural fast path。"""
         # 这是 path-aware fast path 内部的 implication 探测预算，不影响外层
         # storage fallback 的完整 solver budget。
-        local_budget_ms = self._tuning.path_structural_oracle_timeout_ms
+        local_budget_ms = self._ctx.tuning.path_structural_oracle_timeout_ms
         cache_miss = object()
 
         def _cache_key(expr):
@@ -336,8 +295,8 @@ class StorageEquivalenceChecks:
         def _lookup_cached(expr, key):
             from z3 import eq as _z3_eq
 
-            with self._unsat_oracle_cache_lock:
-                for cached_expr, cached_result in self._unsat_oracle_cache.get(key, []):
+            with self._ctx.unsat_oracle_cache_lock:
+                for cached_expr, cached_result in self._ctx.unsat_oracle_cache.get(key, []):
                     try:
                         if _z3_eq(cached_expr, expr):
                             return cached_result
@@ -348,8 +307,8 @@ class StorageEquivalenceChecks:
         def _remember_result(expr, key, result: bool) -> None:
             from z3 import eq as _z3_eq
 
-            with self._unsat_oracle_cache_lock:
-                bucket = self._unsat_oracle_cache.setdefault(key, [])
+            with self._ctx.unsat_oracle_cache_lock:
+                bucket = self._ctx.unsat_oracle_cache.setdefault(key, [])
                 for index, (cached_expr, cached_result) in enumerate(bucket):
                     try:
                         if _z3_eq(cached_expr, expr):
@@ -435,9 +394,9 @@ class StorageEquivalenceChecks:
         timeout_cap_ms: Optional[int] = None,
         key_name: str = "storage_check_key",
     ):
-        if not self._reset_solver_with_capped_budget_for(
+        if not self._ctx.reset_solver_with_capped_budget_for(
             solver,
-            self.timeout_ms,
+            self._ctx.timeout_ms,
             deadline,
             timeout_cap_ms,
         ):
@@ -468,9 +427,9 @@ class StorageEquivalenceChecks:
         success_subject: str,
     ) -> Optional[tuple[bool, str]]:
         """Try cheap, sound structural proofs for storage-like Array equality."""
-        prefix = self._context_prefix(context)
+        prefix = self._ctx.context_prefix(context)
         if _storage_store_chains_equal(evm_array, x86_array):
-            self._emit_solver_log(
+            self._ctx.emit_solver_log(
                 logs,
                 f"    ├─ {prefix}{log_label} equivalence check: "
                 f"0.000s, structural-eq fast path",
@@ -487,7 +446,7 @@ class StorageEquivalenceChecks:
             path_conjuncts,
             solver_check=self._make_unsat_oracle(solver, deadline, ctx),
         ):
-            self._emit_solver_log(
+            self._ctx.emit_solver_log(
                 logs,
                 f"    ├─ {prefix}{log_label} equivalence check: "
                 f"~0s, path-aware structural-eq fast path",
@@ -512,17 +471,17 @@ class StorageEquivalenceChecks:
 
     def _calldatasize_partitions(self, ctx):
         calldata_size = BitVec("CallDataSize", 64, ctx=ctx)
-        exact_limit = self._tuning.storage_calldatasize_exact_partition_limit
+        exact_limit = self._ctx.tuning.storage_calldatasize_exact_partition_limit
         for i in range(exact_limit):
             yield (
                 f"size={i}",
                 calldata_size == BitVecVal(i, 64, ctx=ctx),
-                self._tuning.storage_calldatasize_exact_partition_timeout_ms,
+                self._ctx.tuning.storage_calldatasize_exact_partition_timeout_ms,
             )
         yield (
             f"size>={exact_limit}",
             UGE(calldata_size, BitVecVal(exact_limit, 64, ctx=ctx)),
-            self._tuning.storage_calldatasize_tail_partition_timeout_ms,
+            self._ctx.tuning.storage_calldatasize_tail_partition_timeout_ms,
         )
 
     def _check_storage_equivalence_by_calldatasize_partition(
@@ -557,31 +516,31 @@ class StorageEquivalenceChecks:
             )
             total_solve_time += solve_time
             if result is None:
-                msg = self._timeout_message()
-                self._emit_solver_log(logs, f"    └─ {msg}")
+                msg = self._ctx.timeout_message()
+                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
                 return False, msg
             if result == unsat:
                 continue
-            prefix = self._context_prefix(context)
-            self._emit_solver_log(
+            prefix = self._ctx.context_prefix(context)
+            self._ctx.emit_solver_log(
                 logs,
                 f"    ├─ {prefix}Storage calldata-size split {label}: "
                 f"{solve_time:.3f}s, result={result}",
             )
             if result == sat:
-                msg = self._observable_counterexample_message(
+                msg = self._ctx.observable_counterexample_message(
                     "storage",
                     context,
                     label,
                 )
-                self._emit_solver_log(logs, f"    └─ {msg}")
+                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
                 return False, msg
-            msg = self._unknown_message_for_solver(solver, partition_timeout_ms)
-            self._emit_solver_log(logs, f"    └─ {msg} ({label})")
+            msg = self._ctx.unknown_message_for_solver(solver, partition_timeout_ms)
+            self._ctx.emit_solver_log(logs, f"    └─ {msg} ({label})")
             return False, msg
 
-        prefix = self._context_prefix(context)
-        self._emit_solver_log(
+        prefix = self._ctx.context_prefix(context)
+        self._ctx.emit_solver_log(
             logs,
             f"    ├─ {prefix}Storage equivalence check: "
             f"{time.time() - start:.3f}s wall / {total_solve_time:.3f}s solve, "
@@ -599,7 +558,7 @@ class StorageEquivalenceChecks:
     ):
         """检查EVM和x86的Storage是否等价。"""
         return self._check_storage_equivalence_with_solver(
-            self.solver,
+            self._ctx.solver,
             evm_storage,
             x86_storage,
             deadline,
@@ -635,7 +594,7 @@ class StorageEquivalenceChecks:
         if fast_path is not None:
             return fast_path
 
-        prefix = self._context_prefix(context)
+        prefix = self._ctx.context_prefix(context)
         if self._storage_mentions_symbolic_calldatasize(
             evm_storage,
             x86_storage,
@@ -648,14 +607,14 @@ class StorageEquivalenceChecks:
                 deadline,
                 path_condition,
                 ctx,
-                timeout_cap_ms=self._tuning.storage_quick_timeout_ms,
+                timeout_cap_ms=self._ctx.tuning.storage_quick_timeout_ms,
                 key_name="storage_check_key_quick",
             )
             if result is None:
-                msg = self._timeout_message()
-                self._emit_solver_log(logs, f"    └─ {msg}")
+                msg = self._ctx.timeout_message()
+                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
                 return False, msg
-            self._emit_solver_log(
+            self._ctx.emit_solver_log(
                 logs,
                 f"    ├─ {prefix}Storage equivalence quick check: "
                 f"{solve_time:.3f}s, result={result}",
@@ -663,8 +622,8 @@ class StorageEquivalenceChecks:
             if result == unsat:
                 return True, "Storage equivalent"
             if result == sat:
-                msg = self._observable_counterexample_message("storage", context)
-                self._emit_solver_log(logs, f"    └─ {msg}")
+                msg = self._ctx.observable_counterexample_message("storage", context)
+                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
                 return False, msg
 
             verified, msg = self._check_storage_equivalence_by_calldatasize_partition(
@@ -690,11 +649,11 @@ class StorageEquivalenceChecks:
             key_name="storage_check_key",
         )
         if result is None:
-            msg = self._timeout_message()
-            self._emit_solver_log(logs, f"    └─ {msg}")
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        self._emit_solver_log(
+        self._ctx.emit_solver_log(
             logs,
             f"    ├─ {prefix}Storage equivalence check: {solve_time:.3f}s, result={result}",
         )
@@ -702,12 +661,12 @@ class StorageEquivalenceChecks:
         if result == unsat:
             return True, "Storage equivalent"
         if result == sat:
-            msg = self._observable_counterexample_message("storage", context)
-            self._emit_solver_log(logs, f"    └─ {msg}")
+            msg = self._ctx.observable_counterexample_message("storage", context)
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        msg = self._unknown_message_for_solver(solver, self.timeout_ms)
-        self._emit_solver_log(logs, f"    └─ {msg}")
+        msg = self._ctx.unknown_message_for_solver(solver, self._ctx.timeout_ms)
+        self._ctx.emit_solver_log(logs, f"    └─ {msg}")
         return False, msg
 
     def _check_transient_storage_equivalence(
@@ -720,7 +679,7 @@ class StorageEquivalenceChecks:
     ):
         """检查EVM和x86的Transient Storage是否等价。"""
         return self._check_transient_storage_equivalence_with_solver(
-            self.solver,
+            self._ctx.solver,
             evm_ts,
             x86_ts,
             deadline,
@@ -766,12 +725,12 @@ class StorageEquivalenceChecks:
             key_name="transient_storage_check_key",
         )
         if result is None:
-            msg = self._timeout_message()
-            self._emit_solver_log(logs, f"    └─ {msg}")
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        prefix = self._context_prefix(context)
-        self._emit_solver_log(
+        prefix = self._ctx.context_prefix(context)
+        self._ctx.emit_solver_log(
             logs,
             f"    ├─ {prefix}Transient storage equivalence check: "
             f"{solve_time:.3f}s, result={result}",
@@ -780,13 +739,13 @@ class StorageEquivalenceChecks:
         if result == unsat:
             return True, "Transient storage equivalent"
         if result == sat:
-            msg = self._observable_counterexample_message(
+            msg = self._ctx.observable_counterexample_message(
                 "transient storage",
                 context,
             )
-            self._emit_solver_log(logs, f"    └─ {msg}")
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        msg = self._unknown_message_for_solver(solver, self.timeout_ms)
-        self._emit_solver_log(logs, f"    └─ {msg}")
+        msg = self._ctx.unknown_message_for_solver(solver, self._ctx.timeout_ms)
+        self._ctx.emit_solver_log(logs, f"    └─ {msg}")
         return False, msg

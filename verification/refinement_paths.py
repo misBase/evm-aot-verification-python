@@ -17,6 +17,9 @@ from z3 import (
     unsat,
 )
 
+from .refinement_context import _RefinementContext
+from .refinement_outputs import OutputRefinementChecks
+
 
 _Z3_TRANSLATE_LOCK = threading.Lock()
 _PATH_RESULT_KEYS = (
@@ -40,6 +43,14 @@ class _PathPairChunkCheckResult:
 
 
 class PathRefinementChecks:
+    def __init__(
+        self,
+        ctx: _RefinementContext,
+        outputs: OutputRefinementChecks,
+    ):
+        self._ctx = ctx
+        self._outputs = outputs
+
     def check_refinement_paths(
         self,
         evm_results: list[dict],
@@ -64,7 +75,7 @@ class PathRefinementChecks:
         if path_pair_workers <= 0:
             raise ValueError("path_pair_workers must be a positive integer")
 
-        deadline = time.time() + (self.timeout_ms / 1000.0)
+        deadline = time.time() + (self._ctx.timeout_ms / 1000.0)
 
         if not evm_results:
             return False, "✗ NO TERMINAL PATHS: EVM program produced no terminal state"
@@ -101,7 +112,7 @@ class PathRefinementChecks:
             f"({len(evm_results)} EVM path(s), {len(x86_results)} x86 path(s), "
             f"{checked_pair_count}/{pair_count} feasible pair(s))"
         )
-        if self.verbose:
+        if self._ctx.verbose:
             print(f"    └─ {msg}")
         return True, msg
 
@@ -131,7 +142,7 @@ class PathRefinementChecks:
                     if not may_be_feasible:
                         continue
                 checked_pair_count += 1
-                verified, msg = self._check_refinement_direct_memory(
+                verified, msg = self._outputs._check_refinement_direct_memory(
                     evm_result,
                     x86_result,
                     deadline,
@@ -163,7 +174,7 @@ class PathRefinementChecks:
             for worker_index in range(max_workers)
         ]
 
-        if self.verbose:
+        if self._ctx.verbose:
             print(
                 f"    ├─ Checking {pair_count} path pair(s) with "
                 f"{max_workers} worker thread(s)"
@@ -186,7 +197,7 @@ class PathRefinementChecks:
             ]
             for future in as_completed(futures):
                 result = future.result()
-                if self.verbose:
+                if self._ctx.verbose:
                     for line in result.logs:
                         print(line)
                 checked_pair_count += result.checked_pair_count
@@ -244,7 +255,7 @@ class PathRefinementChecks:
                     continue
 
             checked_pair_count += 1
-            verified, msg = self._check_refinement_direct_memory_with_solver(
+            verified, msg = self._outputs._check_refinement_direct_memory_with_solver(
                 solver,
                 evm_result,
                 x86_result,
@@ -288,27 +299,27 @@ class PathRefinementChecks:
         label: str,
         deadline: Optional[float],
     ) -> Tuple[bool, Optional[str]]:
-        if not self._reset_solver_with_budget(deadline):
-            msg = self._timeout_message()
-            if self.verbose:
+        if not self._ctx.reset_solver_with_budget(deadline):
+            msg = self._ctx.timeout_message()
+            if self._ctx.verbose:
                 print(f"    └─ {msg}")
             return False, msg
 
         conditions = [result.get("condition", BoolVal(True)) for result in path_results]
-        self.solver.add(Not(Or(*conditions)))
+        self._ctx.solver.add(Not(Or(*conditions)))
 
         start_time = time.time()
-        result = self.solver.check()
+        result = self._ctx.solver.check()
         solve_time = time.time() - start_time
 
-        if self.verbose:
+        if self._ctx.verbose:
             print(f"    ├─ {label} terminal path coverage check: {solve_time:.3f}s, result={result}")
 
         if result == unsat:
             return True, None
         if result == sat:
             return False, f"✗ COUNTEREXAMPLE: {label} terminal paths do not cover all inputs"
-        return False, self._unknown_message()
+        return False, self._ctx.unknown_message()
 
     def _check_path_pair_may_be_feasible(
         self,
@@ -317,7 +328,7 @@ class PathRefinementChecks:
         label: str,
     ) -> tuple[bool, Optional[str]]:
         return self._check_path_pair_may_be_feasible_with_solver(
-            self.solver,
+            self._ctx.solver,
             path_condition,
             deadline,
             label,
@@ -332,14 +343,14 @@ class PathRefinementChecks:
         label: str,
         logs: Optional[list[str]],
     ) -> tuple[bool, Optional[str]]:
-        if not self._reset_solver_with_capped_budget_for(
+        if not self._ctx.reset_solver_with_capped_budget_for(
             solver,
-            self.timeout_ms,
+            self._ctx.timeout_ms,
             deadline,
-            self._tuning.path_pair_feasibility_timeout_ms,
+            self._ctx.tuning.path_pair_feasibility_timeout_ms,
         ):
-            msg = self._timeout_message()
-            self._emit_solver_log(logs, f"    └─ {msg}")
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return True, msg
 
         solver.add(path_condition)
@@ -348,7 +359,7 @@ class PathRefinementChecks:
         result = solver.check()
         solve_time = time.time() - start_time
 
-        self._emit_solver_log(
+        self._ctx.emit_solver_log(
             logs,
             f"    ├─ Path pair feasibility {label}: {solve_time:.3f}s, result={result}",
         )
