@@ -420,6 +420,8 @@ def test_verify_perf_erc20_lite_program_pair():
         f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
         f"should produce equivalent observable results. Error: {msg}"
     )
+    assert x86_program.last_calldataload_summary_count == 5
+    assert x86_program.last_calldataload_summary_hits == 5
 
 
 @pytest.mark.skip(reason="Not impl well")

@@ -44,6 +44,9 @@ class X86Program:
         self.base_addr = base_addr
         self.aot_profile = aot_profile or GO_HPC_EVM_PROFILE
         self.semantics = X86SemanticsModel()
+        self.last_calldataload_summary_count = 0
+        self.last_calldataload_summary_hits = 0
+        self.last_calldataload_summary_hit_entries = set()
         
         # 如果提供了hex_sequence但没有块，则反汇编它
         if hex_sequence and not blocks:
@@ -143,7 +146,8 @@ class X86Program:
              enable_go_bridge: bool = True,
              enable_merge: bool = False,
              reachability_timeout_ms: Optional[int] = 50,
-             call_site_mapping=None) -> Tuple[SMTState, Dict[str, Any]]:
+             call_site_mapping=None,
+             calldataload_summary_mode: str = "fallback") -> Tuple[SMTState, Dict[str, Any]]:
         """使用 worklist 驱动的符号执行为整个程序构建Z3公式。
 
         参考 evm_ir 的设计：
@@ -161,12 +165,15 @@ class X86Program:
             enable_go_bridge: 是否启用 ret -> GO_HOST -> returnAddress 建模
             enable_merge: 是否启用合流点合并优化（大规模 CFG 推荐开启）
             reachability_timeout_ms: 单次可达性 SMT 检查预算；None 表示使用默认全局预算
+            calldataload_summary_mode: off/fallback/strict；fallback 默认命中
+                CALLDATALOAD slice 时使用 trusted summary
 
         Returns:
             (final_state, result_dict)元组，其中：
             - final_state: 程序执行后的最终SMT状态（从所有路径合并）
             - result_dict: 包含合并返回值的字典（offset, length, memory, base_addr, has_return_data）
         """
+        self._clear_calldataload_summary_stats()
         # 获取要执行的指令
         instructions_to_execute = self._get_instructions()
 
@@ -192,10 +199,12 @@ class X86Program:
             reachability_timeout_ms=reachability_timeout_ms,
             call_site_mapping=call_site_mapping,
             aot_profile=self.aot_profile,
+            calldataload_summary_mode=calldataload_summary_mode,
         )
 
         # 执行符号执行
         final_global_states = executor.execute(state)
+        self._record_calldataload_summary_stats(executor)
 
         if not final_global_states:
             # 没有终止状态，返回默认结果
@@ -231,6 +240,8 @@ class X86Program:
             'has_return_data': has_return_data,
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
+            'calldataload_summary_hits': self.last_calldataload_summary_hits,
+            'calldataload_summary_entries': len(self.last_calldataload_summary_hit_entries),
         }
 
         return merged_state, result
@@ -246,6 +257,7 @@ class X86Program:
         reachability_timeout_ms: Optional[int] = 50,
         call_site_mapping=None,
         merge_state: bool = False,
+        calldataload_summary_mode: str = "fallback",
     ) -> PathSemantics:
         """Build terminal path observations for the x86 program.
 
@@ -253,6 +265,7 @@ class X86Program:
         separate and avoids merging whole memory arrays unless ``merge_state``
         is requested by a debug stack check.
         """
+        self._clear_calldataload_summary_stats()
         instructions_to_execute = self._get_instructions()
 
         if not instructions_to_execute:
@@ -285,9 +298,11 @@ class X86Program:
             reachability_timeout_ms=reachability_timeout_ms,
             call_site_mapping=call_site_mapping,
             aot_profile=self.aot_profile,
+            calldataload_summary_mode=calldataload_summary_mode,
         )
 
         final_global_states = executor.execute(state)
+        self._record_calldataload_summary_stats(executor)
         observations = [
             self._path_observation(gstate)
             for gstate in final_global_states
@@ -302,6 +317,18 @@ class X86Program:
             observations=observations,
             merged_state=merged_state,
         )
+
+    def _record_calldataload_summary_stats(self, executor: X86SymbolicExecutor) -> None:
+        self.last_calldataload_summary_count = len(executor.calldataload_summaries)
+        self.last_calldataload_summary_hits = executor.calldataload_summary_hits
+        self.last_calldataload_summary_hit_entries = set(
+            executor.calldataload_summary_hit_entries
+        )
+
+    def _clear_calldataload_summary_stats(self) -> None:
+        self.last_calldataload_summary_count = 0
+        self.last_calldataload_summary_hits = 0
+        self.last_calldataload_summary_hit_entries = set()
 
     def _path_observation(self, gstate: X86GlobalState) -> PathObservation:
         """Extract the observable result of one terminal x86 path.

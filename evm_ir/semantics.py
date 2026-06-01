@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
 from common import uninterpreted
+from common.calldata import calldataload_no_overflow_assumption, calldataload_word
 from common.arithmetic import div_semantics as _div_semantics, mod_semantics as _mod_semantics, exp_semantics as _exp_semantics, addmod_semantics as _addmod_semantics, mulmod_semantics as _mulmod_semantics
 from state.smt_state import SMTState, EVMStackState, EVMMemoryState
 
@@ -763,34 +764,6 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     elif kind == "CALLDATALOAD":
         # CALLDATALOAD: Pop offset, push 32 bytes from calldata
         offset_bv, stack_after_pop = state.evm_stack.pop()
-
-        if offset_bv.size() == 256:
-            offset_64 = Extract(63, 0, offset_bv)
-            offset_overflow = Extract(255, 64, offset_bv) != BitVecVal(0, 192)
-        elif offset_bv.size() == 64:
-            offset_64 = offset_bv
-            offset_overflow = False
-        else:
-            raise ValueError(f"Offset must be 64 or 256 bits, got {offset_bv.size()}")
-
-        if state.calldatasize.size() != 64:
-            raise ValueError(f"calldatasize context must be 64 bits, got {state.calldatasize.size()}")
-        calldatasize_64 = state.calldatasize
-
-        # 对齐 go-hpc-evm/opCallDataLoad + getData:
-        # - offset Uint64WithOverflow 失败时直接返回 0
-        # - 超出 calldatasize 的字节补 0
-        bytes_list = []
-        for i in range(32):
-            byte_val = _go_getdata_byte(
-                state.calldata,
-                offset_64,
-                calldatasize_64,
-                BitVecVal(i, 64),
-            )
-            bytes_list.append(byte_val)
-
-        loaded_data = Concat(*bytes_list)
         # 全符号验证下的可选优化（默认开启）：把 "offset 高 192 bit ≠ 0 时
         # 返回 0" 这条 vacuous-同行为分支用 path-condition 假设掉。两侧语义
         # 在 overflow 时都返回 0，所以剪掉这个分支对 refinement 仍 sound；
@@ -798,10 +771,15 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # See tests/support/calldataload_analysis/README.md 对此 200× 现象的分析。
         if getattr(state, 'assume_calldata_offset_no_overflow', True) and \
                 offset_bv.size() == 256:
-            state.add_assumption(Extract(255, 64, offset_bv) == BitVecVal(0, 192))
-            data_256 = loaded_data
+            state.add_assumption(calldataload_no_overflow_assumption(offset_bv))
+            data_256 = calldataload_word(
+                state.calldata,
+                state.calldatasize,
+                offset_bv,
+                omit_overflow_guard=True,
+            )
         else:
-            data_256 = If(offset_overflow, BitVecVal(0, 256), loaded_data)
+            data_256 = calldataload_word(state.calldata, state.calldatasize, offset_bv)
         state.evm_stack = stack_after_pop.push(data_256)
         return state
 
