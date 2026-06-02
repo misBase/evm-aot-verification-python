@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 from z3 import BitVec, BitVecVal, Concat
 
 from common.calldata import calldataload_word
 from state.smt_state import MemoryDomain, SMTState
 
-from .disassembler import parse_operands
-from .models import Register, X86Block, X86Instruction
+from .base import (
+    SummaryContinuation,
+    SummaryDiscoveryContext,
+    X86Summary,
+)
+from x86_64.disassembler import parse_operands
+from x86_64.models import Register, X86Block, X86Instruction
 
 
-CALLDATALOAD_SUMMARY_MODES = frozenset({"off", "fallback", "strict"})
+CALLDATALOAD_SUMMARY_KIND = "calldataload"
 _UINT64_MASK = (1 << 64) - 1
 _MAX_NON_WRAPPING_CALLDATALOAD_OFFSET = _UINT64_MASK - 32
 
@@ -54,11 +59,45 @@ class CallDataLoadSummaryMatchError(ValueError):
     pass
 
 
-def validate_calldataload_summary_mode(mode: str) -> str:
-    if mode not in CALLDATALOAD_SUMMARY_MODES:
-        modes = ", ".join(sorted(CALLDATALOAD_SUMMARY_MODES))
-        raise ValueError(f"calldataload_summary_mode must be one of: {modes}")
-    return mode
+class CallDataLoadSummarySpec:
+    kind = CALLDATALOAD_SUMMARY_KIND
+
+    def discover(
+        self,
+        ctx: SummaryDiscoveryContext,
+        *,
+        strict: bool = False,
+    ) -> Iterable[X86Summary]:
+        summaries = discover_calldataload_summaries(ctx.blocks, strict=strict)
+        for summary in summaries.values():
+            yield X86Summary(
+                kind=self.kind,
+                entry_addr=summary.entry_addr,
+                start_block_addr=summary.entry_addr,
+                start_instruction_index=summary.entry_instruction_index,
+                continuation=SummaryContinuation(summary.exit_addr, 0),
+                covered_block_addrs=summary.internal_block_addrs,
+                clobber_registers=summary.clobber_registers,
+                payload=summary,
+            )
+
+    def apply(
+        self,
+        summary: X86Summary,
+        state: SMTState,
+        *,
+        fresh_prefix: str,
+    ) -> SMTState:
+        if not isinstance(summary.payload, CallDataLoadSummary):
+            raise TypeError(
+                "CALLDATALOAD summary payload must be CallDataLoadSummary, "
+                f"got {type(summary.payload)!r}"
+            )
+        return apply_calldataload_summary(
+            summary.payload,
+            state,
+            fresh_prefix=fresh_prefix,
+        )
 
 
 def offset_expr_from_locations(summary: CallDataLoadSummary, state: SMTState):

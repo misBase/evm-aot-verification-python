@@ -9,6 +9,7 @@ import time
 from typing import Tuple, Optional
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
+from x86_64.summaries import X86SummaryConfig
 from .refinement_checker import RefinementChecker
 from .call_site_mapping import build_call_site_mapping
 from state.smt_state import SMTState
@@ -53,7 +54,7 @@ class ProgramEquivalenceChecker:
                            path_pair_workers: int = 1,
                            enable_merge: bool = True,
                            skip_feasibility: bool = False,
-                           calldataload_summary_mode: str = "fallback") -> Tuple[bool, Optional[str]]:
+                           summary_config: Optional[X86SummaryConfig] = None) -> Tuple[bool, Optional[str]]:
         """验证EVM程序和x86程序在语义上等价。
 
         默认使用旧的 merged-result 检查路径，保持原有 Alive2 风格的
@@ -76,8 +77,7 @@ class ProgramEquivalenceChecker:
                 默认 False，保持旧 merged-result 行为
             path_pair_workers: path_observations=True 时用于 EVM/x86 terminal path
                 pair 检查的 worker 数；默认 1，保持串行行为
-            calldataload_summary_mode: x86 CALLDATALOAD summary 模式：
-                off/fallback/strict；默认 fallback，命中则加速，未命中回退原语义
+            summary_config: x86 summary 插件配置；None 表示不启用 summary
 
         Returns:
             (verified, message)，如果程序等价则verified为True
@@ -104,7 +104,7 @@ class ProgramEquivalenceChecker:
                 path_pair_workers,
                 enable_merge=enable_merge,
                 skip_feasibility=skip_feasibility,
-                calldataload_summary_mode=calldataload_summary_mode,
+                summary_config=summary_config,
             )
 
         # 步骤1：公式构建 - EVM（两级路径感知）
@@ -137,7 +137,7 @@ class ProgramEquivalenceChecker:
             initial_state,
             call_site_mapping=call_site_mapping,
             enable_merge=enable_merge,
-            calldataload_summary_mode=calldataload_summary_mode,
+            summary_config=summary_config,
         )
         x86_build_time = time.time() - x86_start
 
@@ -145,13 +145,10 @@ class ProgramEquivalenceChecker:
             x86_has_return_data = simplify(x86_state.return_length != BitVecVal(0, 64))
             print(f"    ├─ x86 has non-empty return data: {x86_has_return_data}")
             print(f"    ├─ Shared host call-site mappings: {len(call_site_mapping)}")
-            print(
-                "    ├─ CALLDATALOAD summaries: "
-                f"{len(x86_program.last_calldataload_summary_hit_entries)} unique / "
-                f"{x86_program.last_calldataload_summary_hits} hits "
-                f"(discovered {x86_program.last_calldataload_summary_count}, "
-                f"mode={calldataload_summary_mode})"
-            )
+            for line in self._summary_stats_lines(
+                getattr(x86_program, "last_summary_stats", {})
+            ):
+                print(line)
             # 估算公式复杂度
             formula_size = self._estimate_formula_size(x86_result)
             print(f"    ├─ Formula size: ~{formula_size} expressions")
@@ -241,6 +238,20 @@ class ProgramEquivalenceChecker:
             count += 20
         return f"{count}"
 
+    def _summary_stats_lines(self, stats: dict) -> list[str]:
+        if not stats:
+            return ["    ├─ x86 summaries: none registered"]
+        lines = []
+        for kind, stat in sorted(stats.items()):
+            hit_entries = stat.get("hit_entries", set())
+            lines.append(
+                f"    ├─ x86 summary {kind}: {len(hit_entries)} unique / "
+                f"{stat.get('hits', 0)} hits "
+                f"(discovered {stat.get('discovered', 0)}, "
+                f"mode={stat.get('mode')})"
+            )
+        return lines
+
     def _verify_program_pair_path_observations(
         self,
         evm_program: EVMProgram,
@@ -251,7 +262,7 @@ class ProgramEquivalenceChecker:
         path_pair_workers: int,
         enable_merge: bool = True,
         skip_feasibility: bool = False,
-        calldataload_summary_mode: str = "fallback",
+        summary_config: Optional[X86SummaryConfig] = None,
     ) -> Tuple[bool, Optional[str]]:
         if self.verbose:
             print("\n[1] Building EVM terminal path observations...")
@@ -278,7 +289,7 @@ class ProgramEquivalenceChecker:
             call_site_mapping=call_site_mapping,
             merge_state=stack_check is not None,
             enable_merge=enable_merge,
-            calldataload_summary_mode=calldataload_summary_mode,
+            summary_config=summary_config,
         )
         x86_build_time = time.time() - x86_start
         x86_state = x86_paths.merged_state
@@ -286,13 +297,10 @@ class ProgramEquivalenceChecker:
         if self.verbose:
             print(f"    ├─ Terminal paths: {len(x86_paths.observations)}")
             print(f"    ├─ Shared host call-site mappings: {len(call_site_mapping)}")
-            print(
-                "    ├─ CALLDATALOAD summaries: "
-                f"{len(x86_program.last_calldataload_summary_hit_entries)} unique / "
-                f"{x86_program.last_calldataload_summary_hits} hits "
-                f"(discovered {x86_program.last_calldataload_summary_count}, "
-                f"mode={calldataload_summary_mode})"
-            )
+            for line in self._summary_stats_lines(
+                getattr(x86_program, "last_summary_stats", {})
+            ):
+                print(line)
             print(f"    └─ ✓ Built in {x86_build_time:.3f}s")
 
         if self.verbose:

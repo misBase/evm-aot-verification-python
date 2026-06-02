@@ -19,6 +19,7 @@ from evm_ir.json_parser import load_ir_from_json
 from state.smt_state import SMTState
 from verification.program_verifier import ProgramEquivalenceChecker
 from x86_64.program import X86Program
+from x86_64.summaries import TRUSTED_SUMMARY_CONFIG
 
 
 def _flush_print(*args, **kwargs):
@@ -67,6 +68,7 @@ def main() -> int:
     checker = ProgramEquivalenceChecker(
         timeout_ms=args.timeout_ms, verbose=args.profile_subchecks,
     )
+    summary_config = TRUSTED_SUMMARY_CONFIG
     initial_state = SMTState.create_initial_state(
         calldata_size_bytes=args.calldata_size,
     )
@@ -119,6 +121,7 @@ def main() -> int:
             use_reachability_check=not args.no_reachability,
             reachability_timeout_ms=args.reach_timeout_ms,
             enable_merge=args.enable_merge,
+            summary_config=summary_config,
         )
     finally:
         _ce.X86SymbolicExecutor.execute = orig_execute
@@ -148,6 +151,7 @@ def main() -> int:
             use_reachability_check=not args.no_reachability,
             reachability_timeout_ms=args.reach_timeout_ms,
             enable_merge=args.enable_merge,
+            summary_config=summary_config,
         )
         _flush_print(
             f"[phase] path_obs build wall: {time.time()-t2_pre:.3f}s "

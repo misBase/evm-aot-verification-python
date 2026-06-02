@@ -13,6 +13,7 @@ import pytest
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
+from x86_64.summaries import TRUSTED_SUMMARY_CONFIG
 from verification.refinement_checker import RefinementChecker
 from verification.program_verifier import ProgramEquivalenceChecker
 from state.smt_state import SMTState
@@ -413,6 +414,7 @@ def test_verify_perf_erc20_lite_program_pair():
         path_observations=True,
         path_pair_workers=4,
         enable_merge=True,
+        summary_config=TRUSTED_SUMMARY_CONFIG,
     )
 
     assert verified, (
@@ -420,8 +422,9 @@ def test_verify_perf_erc20_lite_program_pair():
         f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
         f"should produce equivalent observable results. Error: {msg}"
     )
-    assert x86_program.last_calldataload_summary_count == 5
-    assert x86_program.last_calldataload_summary_hits == 5
+    calldataload_stats = x86_program.last_summary_stats["calldataload"]
+    assert calldataload_stats["discovered"] == 5
+    assert calldataload_stats["hits"] == 5
 
 
 @pytest.mark.skip(reason="Not impl well")

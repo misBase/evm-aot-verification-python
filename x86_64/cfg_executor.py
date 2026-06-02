@@ -16,11 +16,7 @@ from .cfg_structures import X86DynamicCFG, X86EdgeType
 from .cfg_state import X86GlobalState, X86WorldState
 from .cfg_strategies import X86DFSStrategy, X86TopologicalStrategy
 from .disassembler import parse_operands
-from .calldataload_summary import (
-    apply_calldataload_summary,
-    discover_calldataload_summaries,
-    validate_calldataload_summary_mode,
-)
+from .summaries.base import X86Summary, X86SummaryRuntime
 from state.smt_state import SMTState, PointerTag
 
 
@@ -48,7 +44,7 @@ class X86SymbolicExecutor:
                  reachability_timeout_ms: Optional[int] = 50,
                  call_site_mapping: Optional[Any] = None,
                  aot_profile: Optional[X86AOTProfile] = None,
-                 calldataload_summary_mode: str = "fallback"):
+                 summary_runtime: Optional[X86SummaryRuntime] = None):
         """初始化符号执行引擎。
 
         Args:
@@ -59,8 +55,8 @@ class X86SymbolicExecutor:
             enable_go_bridge: 是否启用 ret -> GO_HOST -> returnAddress 建模
             enable_merge: 是否启用合流点合并优化
             reachability_timeout_ms: 单次可达性 SMT 检查预算；超时按可能可达处理
-            calldataload_summary_mode: off/fallback/strict；fallback 命中时使用
-                CALLDATALOAD slice summary，未命中回退原 x86 指令级语义
+            summary_runtime: 预构建的 x86 summary runtime；None 表示不启用任何
+                summary，调用方负责注册插件（见 build_x86_summary_runtime）
         """
         self.blocks = blocks
         self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
@@ -72,9 +68,6 @@ class X86SymbolicExecutor:
         self.reachability_timeout_ms = reachability_timeout_ms
         self.call_site_mapping = call_site_mapping
         self.aot_profile = aot_profile or GO_HPC_EVM_PROFILE
-        self.calldataload_summary_mode = validate_calldataload_summary_mode(
-            calldataload_summary_mode
-        )
 
         # 创建动态 CFG
         self.cfg = X86DynamicCFG(blocks)
@@ -94,18 +87,9 @@ class X86SymbolicExecutor:
             # 创建搜索策略
             self.strategy = strategy_cls(self.work_list, max_depth)
 
-        if self.calldataload_summary_mode == "off":
-            self.calldataload_summaries = {}
-        else:
-            self.calldataload_summaries = discover_calldataload_summaries(
-                blocks,
-                strict=self.calldataload_summary_mode == "strict",
-            )
-        for summary in self.calldataload_summaries.values():
-            self.merge_points.pop(summary.exit_addr, None)
-        self.calldataload_summary_hits = 0
-        self.calldataload_summary_hit_entries: Set[int] = set()
-        self._calldataload_summary_instance_counter = 0
+        self.summary_runtime = summary_runtime or X86SummaryRuntime(blocks, ())
+        for summary in self.summary_runtime.summaries:
+            self.merge_points.pop(summary.continuation.block_addr, None)
 
         # 统计信息
         self.total_states = 0
@@ -501,7 +485,7 @@ class X86SymbolicExecutor:
 
                 # 更新 CFG；summary entry 已经把整个 slice 折叠成
                 # entry -> exit 的压缩边，不能再按原 entry 末尾 JNE 建普通条件边。
-                if (not getattr(global_state, "_summary_edge_managed", False)
+                if (not global_state.summary_control_flow_managed
                         and global_state.node
                         and global_state.node.block.instructions):
                     last_insn = global_state.node.block.instructions[-1]
@@ -541,7 +525,7 @@ class X86SymbolicExecutor:
                             if self._is_state_reachable(state)
                         ]
                     # 同主循环：summary entry 的 CFG 边已由 summary 自己补好。
-                    if (not getattr(merged, "_summary_edge_managed", False)
+                    if (not merged.summary_control_flow_managed
                             and merged.node
                             and merged.node.block.instructions):
                         last_insn = merged.node.block.instructions[-1]
@@ -586,7 +570,7 @@ class X86SymbolicExecutor:
                     if self._is_state_reachable(ns)
                 ]
             # 同主循环：summary entry 的 CFG 边已由 summary 自己补好。
-            if (not getattr(state, "_summary_edge_managed", False)
+            if (not state.summary_control_flow_managed
                     and state.node
                     and state.node.block.instructions):
                 last_insn = state.node.block.instructions[-1]
@@ -624,15 +608,31 @@ class X86SymbolicExecutor:
         block = node.block
         mstate = global_state.mstate
 
-        summary = self.calldataload_summaries.get(block.start_addr)
-        if summary is not None:
-            return self._execute_calldataload_summary(global_state, summary)
-
-        # 执行块中的所有指令
+        # 执行块中的所有指令。summary 命中点使用 (block_addr, instruction_index)
+        # 精确定位：命中点之前的 prefix 指令由这个主循环正常执行，summary
+        # 本身不再重复执行 prefix。这样 block-middle summary 也能保持
+        # prefix 语义等价，并为未来同 block summary 留出正确的后缀继续路径。
         new_mstate = mstate.copy()
 
-        for insn in block.instructions:
+        instruction_index = 0
+        while instruction_index < len(block.instructions):
+            summary = self.summary_runtime.get(block.start_addr, instruction_index)
+            if summary is not None:
+                new_mstate = self.summary_runtime.apply(summary, new_mstate)
+
+                if summary.is_cross_block:
+                    return self._continue_after_cross_block_summary(
+                        global_state,
+                        summary,
+                        new_mstate,
+                    )
+
+                instruction_index = summary.continuation.instruction_index
+                continue
+
+            insn = block.instructions[instruction_index]
             new_mstate = insn.to_z3(new_mstate)
+            instruction_index += 1
 
         # 持久化块执行后的机器状态，供终止判定与结果合并使用
         global_state.mstate = new_mstate
@@ -655,38 +655,25 @@ class X86SymbolicExecutor:
             # 顺序执行到下一个块
             return self._handle_fallthrough(global_state, new_mstate, block)
 
-    def _execute_calldataload_summary(self, global_state, summary) -> List[X86GlobalState]:
-        """Execute one trusted CALLDATALOAD summary and jump to its exit."""
+    def _continue_after_cross_block_summary(
+        self,
+        global_state: X86GlobalState,
+        summary: X86Summary,
+        new_mstate: SMTState,
+    ) -> List[X86GlobalState]:
+        """Jump from a cross-block summary entry to its continuation block."""
         import copy as copy_module
 
-        block = global_state.node.block
-
-        # 有些 CALLDATALOAD entry 块前面会带 block preamble（例如重新加载
-        # R14/R15）。这些指令不属于 summary 本体，必须先按原 x86 语义执行。
-        prefix_state = global_state.mstate.copy()
-        for insn in block.instructions[:summary.entry_instruction_index]:
-            prefix_state = insn.to_z3(prefix_state)
-
-        # summary 会直接把 CALLDATALOAD 的 256-bit 结果写到匹配到的
-        # [R14 + result_stack_offset]，并把被 slice 覆盖的临时寄存器/flags
-        # fresh 掉，避免后续误用旧的临时值。
-        self._calldataload_summary_instance_counter += 1
-        instance_id = self._calldataload_summary_instance_counter
-        fresh_prefix = f"calldataload_summary_{instance_id}"
-        new_mstate = apply_calldataload_summary(
-            summary,
-            prefix_state,
-            fresh_prefix=fresh_prefix,
-        )
         global_state.mstate = new_mstate
 
-        # 这条路径的 CFG 边由 summary 自己补到 exit，外层循环据此跳过
-        # entry 块原始 JNE 的普通条件边管理；标记不传递给 new_state。
-        setattr(global_state, "_summary_edge_managed", True)
+        # 只有跨 block summary 自己补压缩边并接管 entry 块原始控制流。
+        # 同 block summary 会继续执行后缀，块末尾真实控制流仍必须由外层
+        # manage_cfg / terminal check 正常处理。
+        global_state.summary_control_flow_managed = True
 
-        # 跳过整个 CALLDATALOAD slice，直接从 summary 的 exit block 继续执行。
-        # world_state 只复制路径约束，不新增 entry 内部的分支约束。
-        target_node = self.cfg.get_or_create_node(summary.exit_addr)
+        # 跳过整个 summary slice，直接从 continuation block 继续执行。
+        # world_state 只复制路径约束，不新增 summary 内部的分支约束。
+        target_node = self.cfg.get_or_create_node(summary.continuation.block_addr)
         new_state = X86GlobalState(
             mstate=new_mstate,
             world_state=copy_module.copy(global_state.world_state),
@@ -694,11 +681,8 @@ class X86SymbolicExecutor:
         )
         new_state.depth = global_state.depth + 1
 
-        self.calldataload_summary_hits += 1
-        self.calldataload_summary_hit_entries.add(summary.entry_addr)
-
         # 动态 CFG 中保留一条 entry -> exit 的压缩边，方便后续调试和统计；
-        # 真实的 fast/partial/zero 内部路径已经由 summary 语义覆盖。
+        # 真实的内部路径已经由 summary 语义覆盖。
         source_instruction = (
             global_state.node.block.instructions[-1]
             if global_state.node and global_state.node.block.instructions
@@ -707,15 +691,15 @@ class X86SymbolicExecutor:
         if global_state.node is not None:
             self.cfg.add_edge(
                 global_state.node.address,
-                summary.exit_addr,
+                summary.continuation.block_addr,
                 X86EdgeType.FALLTHROUGH,
                 source_instruction=source_instruction,
             )
         logger.debug(
-            "[CFG] CALLDATALOAD summary hit: from=0x%x to=0x%x result_stack_offset=%d",
+            "[CFG] %s summary hit: from=0x%x to=0x%x",
+            summary.kind,
             summary.entry_addr,
-            summary.exit_addr,
-            summary.result_stack_offset,
+            summary.continuation.block_addr,
         )
         return [new_state]
 
@@ -1285,6 +1269,12 @@ class X86SymbolicExecutor:
         Returns:
             如果是终止状态则返回 True
         """
+        # 跨 block summary 已经把这个 entry state 跳到 continuation block，
+        # 它原始末尾控制流（含 ret）由 summary 接管，不应再被判为终止态，
+        # 否则一个 ret 结尾的 summary entry 块会产生额外的幽灵 final state。
+        if global_state.summary_control_flow_managed:
+            return False
+
         node = global_state.node
         if node is None or not node.block.instructions:
             return False

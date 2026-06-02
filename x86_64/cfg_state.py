@@ -201,6 +201,11 @@ class X86GlobalState:
         # 执行深度（用于循环检测）
         self.depth = 0
 
+        # 该 state 进入的 block 原始末尾控制流（建边 + 终止判定）是否已被
+        # 一个跨 block summary 接管。命中跨 block summary 时由 executor 置位，
+        # 用于让外层 manage_cfg / 终止判定跳过这个已被 summary 折叠的 entry。
+        self.summary_control_flow_managed = False
+
     def __copy__(self):
         """浅拷贝（快速，用于大多数情况）。
 
@@ -216,6 +221,7 @@ class X86GlobalState:
             node=self.node
         )
         new_state.depth = self.depth
+        new_state.summary_control_flow_managed = self.summary_control_flow_managed
         return new_state
 
     def __deepcopy__(self, memo):
@@ -231,6 +237,7 @@ class X86GlobalState:
             node=self.node
         )
         new_state.depth = self.depth
+        new_state.summary_control_flow_managed = self.summary_control_flow_managed
         return new_state
 
     def get_constraints(self) -> X86Constraints:

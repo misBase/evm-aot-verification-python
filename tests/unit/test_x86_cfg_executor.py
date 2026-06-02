@@ -4,7 +4,7 @@
 from pathlib import Path
 
 import pytest
-from z3 import BitVecVal, Bool, Solver, sat
+from z3 import BitVecVal, Bool, Solver, sat, unsat
 
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 from x86_64.cfg_executor import X86SymbolicExecutor
@@ -13,8 +13,34 @@ from x86_64.disassembler import disassemble_hex, parse_operands
 from x86_64.models import Register, X86Instruction
 from x86_64.cfg_structures import X86DynamicCFG, X86EdgeType
 from x86_64.cfg_state import X86GlobalState, X86WorldState
+from x86_64.summaries.base import (
+    SummaryContinuation,
+    SummaryMatchError,
+    X86Summary,
+    X86SummaryPlugin,
+    X86SummaryRuntime,
+)
 from visualization.cfg_visualizer import CFGVisualizer
 from state.smt_state import SMTState, MemoryDomain, MemoryDomainError, PointerTag
+
+
+class _FakeSummarySpec:
+    kind = "fake"
+
+    def __init__(self, summaries):
+        self._summaries = summaries
+
+    def discover(self, ctx, *, strict=False):
+        return self._summaries
+
+    def apply(self, summary, state, *, fresh_prefix):
+        new_state = state.copy()
+        rax = new_state.x86_registers.get_register(Register.RAX)
+        new_state.x86_registers.set_register(
+            Register.RAX,
+            rax + BitVecVal(summary.payload, 64),
+        )
+        return new_state
 
 
 class TestX86SymbolicExecutor:
@@ -214,6 +240,280 @@ class TestX86SymbolicExecutor:
         edge_types = {edge.edge_type for edge in executor.cfg.edges}
         assert X86EdgeType.CONDITIONAL_TRUE in edge_types
         assert X86EdgeType.CONDITIONAL_FALSE in edge_types
+
+    def test_same_block_summary_executes_prefix_once_and_continues_suffix(self):
+        """同块 summary 命中时，prefix 只执行一次且后缀继续执行。"""
+        # inc rax; nop(summary +10); add rax, 2; ret
+        hex_code = "48ffc0904883c002c3"
+        blocks, _ = self.disasm_and_create_blocks(hex_code)
+        block = blocks[0]
+        summary = X86Summary(
+            kind="fake",
+            entry_addr=block.start_addr,
+            start_block_addr=block.start_addr,
+            start_instruction_index=1,
+            continuation=SummaryContinuation(block.start_addr, 2),
+            covered_block_addrs=(block.start_addr,),
+            clobber_registers=(),
+            payload=10,
+        )
+
+        state = self.create_initial_state()
+        state.x86_registers.set_register(Register.RAX, BitVecVal(0, 64))
+        executor = X86SymbolicExecutor(
+            blocks,
+            max_depth=10,
+            enable_go_bridge=False,
+            summary_runtime=X86SummaryRuntime(
+                blocks, [X86SummaryPlugin(_FakeSummarySpec([summary]))]
+            ),
+        )
+
+        final_states = executor.execute(state)
+
+        assert len(final_states) == 1
+        rax = final_states[0].mstate.x86_registers.get_register(Register.RAX)
+        solver = Solver()
+        solver.add(rax != BitVecVal(13, 64))
+        assert solver.check() == unsat
+        assert not final_states[0].summary_control_flow_managed
+        assert executor.summary_runtime.hit_count("fake") == 1
+
+    def test_summary_plugin_runs_without_default_summary_plugins(self):
+        """executor 不注册默认插件时，额外插件仍可独立工作。"""
+        # inc rax; nop(summary +10); add rax, 2; ret
+        hex_code = "48ffc0904883c002c3"
+        blocks, _ = self.disasm_and_create_blocks(hex_code)
+        block = blocks[0]
+        summary = X86Summary(
+            kind="fake",
+            entry_addr=block.start_addr,
+            start_block_addr=block.start_addr,
+            start_instruction_index=1,
+            continuation=SummaryContinuation(block.start_addr, 2),
+            covered_block_addrs=(block.start_addr,),
+            clobber_registers=(),
+            payload=10,
+        )
+
+        state = self.create_initial_state()
+        state.x86_registers.set_register(Register.RAX, BitVecVal(0, 64))
+        executor = X86SymbolicExecutor(
+            blocks,
+            max_depth=10,
+            enable_go_bridge=False,
+            summary_runtime=X86SummaryRuntime(
+                blocks, [X86SummaryPlugin(_FakeSummarySpec([summary]))]
+            ),
+        )
+
+        final_states = executor.execute(state)
+
+        assert len(final_states) == 1
+        rax = final_states[0].mstate.x86_registers.get_register(Register.RAX)
+        solver = Solver()
+        solver.add(rax != BitVecVal(13, 64))
+        assert solver.check() == unsat
+        assert executor.summary_runtime.hit_count("fake") == 1
+
+    def test_summary_plugin_mode_reflects_registered_plugin_mode(self):
+        """executor summary mode 来自插件注册项，而不是具体 summary 参数。"""
+        hex_code = "c3"
+        blocks, _ = self.disasm_and_create_blocks(hex_code)
+
+        executor = X86SymbolicExecutor(
+            blocks,
+            summary_runtime=X86SummaryRuntime(
+                blocks, [X86SummaryPlugin(_FakeSummarySpec([]), mode="strict")]
+            ),
+        )
+
+        assert executor.summary_runtime.mode_for_kind("fake") == "strict"
+
+    def test_executor_uses_summary_plugins_without_concrete_summary_branches(self):
+        """executor 只依赖通用 summary 插件入口，不 import 具体 summary。"""
+        source = Path("x86_64/cfg_executor.py").read_text()
+
+        assert "calldataload" not in source.lower()
+        assert "CallDataLoadSummarySpec" not in source
+        assert "CALLDATALOAD_SUMMARY_KIND" not in source
+        assert "summary.kind ==" not in source
+
+    def test_same_block_summary_continues_suffix_and_preserves_jump_edge(self):
+        """同块 summary 不接管 CFG 边，块末尾 jmp 仍由主循环建边。"""
+        # inc rax; nop(summary +10); add rax, 2; jmp +0; ret
+        hex_code = "48ffc0904883c002eb00c3"
+        blocks, _ = self.disasm_and_create_blocks(hex_code)
+        block = blocks[0]
+        target = blocks[1]
+        summary = X86Summary(
+            kind="fake",
+            entry_addr=block.start_addr,
+            start_block_addr=block.start_addr,
+            start_instruction_index=1,
+            continuation=SummaryContinuation(block.start_addr, 2),
+            covered_block_addrs=(block.start_addr,),
+            clobber_registers=(),
+            payload=10,
+        )
+
+        state = self.create_initial_state()
+        state.x86_registers.set_register(Register.RAX, BitVecVal(0, 64))
+        executor = X86SymbolicExecutor(
+            blocks,
+            max_depth=10,
+            enable_go_bridge=False,
+            summary_runtime=X86SummaryRuntime(
+                blocks, [X86SummaryPlugin(_FakeSummarySpec([summary]))]
+            ),
+        )
+
+        final_states = executor.execute(state)
+
+        assert len(final_states) == 1
+        rax = final_states[0].mstate.x86_registers.get_register(Register.RAX)
+        solver = Solver()
+        solver.add(rax != BitVecVal(13, 64))
+        assert solver.check() == unsat
+        assert executor.summary_runtime.hit_count("fake") == 1
+        assert any(
+            edge.node_from == block.start_addr
+            and edge.node_to == target.start_addr
+            and edge.edge_type == X86EdgeType.UNCONDITIONAL
+            for edge in executor.cfg.edges
+        )
+
+    def test_same_block_summary_rejects_final_control_transfer_instruction(self):
+        """同块 summary 不能吞掉块末尾 ret/jmp/jcc。"""
+        # nop; ret
+        hex_code = "90c3"
+        blocks, _ = self.disasm_and_create_blocks(hex_code)
+        block = blocks[0]
+        summary = X86Summary(
+            kind="fake",
+            entry_addr=block.start_addr,
+            start_block_addr=block.start_addr,
+            start_instruction_index=1,
+            continuation=SummaryContinuation(block.start_addr, 2),
+            covered_block_addrs=(block.start_addr,),
+            clobber_registers=(),
+            payload=10,
+        )
+
+        with pytest.raises(
+            SummaryMatchError,
+            match="same-block summary must not cover final control-transfer instruction",
+        ):
+            X86SummaryRuntime(
+                blocks,
+                [X86SummaryPlugin(_FakeSummarySpec([summary]))],
+            )
+
+    def test_summary_rejects_start_index_at_block_end(self):
+        """summary 起点必须指向真实指令，不能注册在块尾之后。"""
+        # block0: nop; ret
+        # block1: ret
+        hex_code = "90c3c3"
+        blocks, _ = self.disasm_and_create_blocks(hex_code)
+        block = blocks[0]
+        summary = X86Summary(
+            kind="fake",
+            entry_addr=block.start_addr,
+            start_block_addr=block.start_addr,
+            start_instruction_index=len(block.instructions),
+            continuation=SummaryContinuation(blocks[1].start_addr, 0),
+            covered_block_addrs=(block.start_addr,),
+            clobber_registers=(),
+            payload=10,
+        )
+
+        with pytest.raises(
+            SummaryMatchError,
+            match="summary start instruction index out of range",
+        ):
+            X86SummaryRuntime(
+                blocks,
+                [X86SummaryPlugin(_FakeSummarySpec([summary]))],
+            )
+
+    def test_cross_block_summary_sets_edge_managed_and_adds_compressed_edge(self):
+        """跨块 summary 自己管理压缩边，外层不再按原块末尾建边。"""
+        # block0: nop; ret
+        # block1: ret
+        hex_code = "90c3c3"
+        blocks, _ = self.disasm_and_create_blocks(hex_code)
+        summary = X86Summary(
+            kind="fake",
+            entry_addr=blocks[0].start_addr,
+            start_block_addr=blocks[0].start_addr,
+            start_instruction_index=0,
+            continuation=SummaryContinuation(blocks[1].start_addr, 0),
+            covered_block_addrs=(blocks[0].start_addr,),
+            clobber_registers=(),
+            payload=7,
+        )
+
+        state = self.create_initial_state()
+        state.x86_registers.set_register(Register.RAX, BitVecVal(0, 64))
+        executor = X86SymbolicExecutor(
+            blocks,
+            max_depth=10,
+            enable_go_bridge=False,
+            summary_runtime=X86SummaryRuntime(
+                blocks, [X86SummaryPlugin(_FakeSummarySpec([summary]))]
+            ),
+        )
+
+        entry_node = executor.cfg.get_or_create_node(blocks[0].start_addr)
+        global_state = X86GlobalState(mstate=state, node=entry_node)
+        new_states = executor.execute_state(global_state)
+
+        assert global_state.summary_control_flow_managed
+        assert len(new_states) == 1
+        assert new_states[0].node.address == blocks[1].start_addr
+        assert len(executor.cfg.edges) == 1
+        edge = executor.cfg.edges[0]
+        assert edge.node_from == blocks[0].start_addr
+        assert edge.node_to == blocks[1].start_addr
+        assert edge.edge_type == X86EdgeType.FALLTHROUGH
+
+    def test_cross_block_summary_over_ret_entry_has_no_ghost_terminal(self):
+        """跨块 summary 若 entry 块以 ret 结尾，完整 execute 不应多出幽灵终止态。
+
+        entry state 已被 summary 跳到 continuation，其原始末尾 ret 由 summary
+        接管，不应再被 _is_terminal_state 判为终止并加入 final_states。
+        execute_state() 直调无法覆盖该尾判定，必须跑完整 execute()。
+        """
+        # block0: nop; ret  (summary entry, ret 结尾)
+        # block1: ret        (continuation)
+        hex_code = "90c3c3"
+        blocks, _ = self.disasm_and_create_blocks(hex_code)
+        summary = X86Summary(
+            kind="fake",
+            entry_addr=blocks[0].start_addr,
+            start_block_addr=blocks[0].start_addr,
+            start_instruction_index=0,
+            continuation=SummaryContinuation(blocks[1].start_addr, 0),
+            covered_block_addrs=(blocks[0].start_addr,),
+            clobber_registers=(),
+            payload=7,
+        )
+
+        state = self.create_initial_state()
+        state.x86_registers.set_register(Register.RAX, BitVecVal(0, 64))
+        executor = X86SymbolicExecutor(
+            blocks,
+            max_depth=10,
+            enable_go_bridge=False,
+            summary_runtime=X86SummaryRuntime(
+                blocks, [X86SummaryPlugin(_FakeSummarySpec([summary]))]
+            ),
+        )
+
+        final_states = executor.execute(state)
+
+        assert len(final_states) == 1
+        assert final_states[0].node.address == blocks[1].start_addr
 
 
 class TestRetGoBridge:

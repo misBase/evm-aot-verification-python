@@ -12,18 +12,26 @@ from z3 import (
 
 from common.calldata import calldataload_word
 from state.smt_state import MemoryDomain, SMTState
-from x86_64.calldataload_summary import (
+from x86_64.cfg import identify_basic_blocks
+from x86_64.cfg_executor import X86SymbolicExecutor
+from x86_64.disassembler import disassemble_hex
+from x86_64.models import Register, X86Block
+from x86_64.summaries.base import SummaryDiscoveryContext, X86SummaryPlugin
+from x86_64.summaries.calldataload import (
+    CALLDATALOAD_SUMMARY_KIND,
     CallDataLoadSummary,
     CallDataLoadSummaryMatchError,
+    CallDataLoadSummarySpec,
     ConstLimbLocation,
     _collect_summary_clobber_registers,
     apply_calldataload_summary,
     discover_calldataload_summaries,
-    validate_calldataload_summary_mode,
 )
-from x86_64.cfg import identify_basic_blocks
-from x86_64.disassembler import disassemble_hex
-from x86_64.models import Register, X86Block
+from x86_64.summaries.registry import (
+    TRUSTED_SUMMARY_CONFIG,
+    X86SummaryConfig,
+    build_x86_summary_runtime,
+)
 
 
 def _calldata_array(values):
@@ -96,6 +104,81 @@ def test_perf_erc20_calldataload_matcher_discovers_five_summaries():
         for summary in ordered
         if isinstance(summary.offset_limb_locs[0], ConstLimbLocation)
     ] == [0, 4, 36, 4, 36]
+
+
+def test_calldataload_spec_continuation_matches_discovered_exit_addr():
+    hex_code = Path("tests/data/perf_erc20_lite.hex").read_text()
+    blocks = identify_basic_blocks(disassemble_hex(hex_code, 0))
+    blocks_by_addr = {block.start_addr: block for block in blocks}
+    block_index = {block.start_addr: index for index, block in enumerate(blocks)}
+
+    discovered = discover_calldataload_summaries(blocks, strict=True)
+    ctx = SummaryDiscoveryContext(blocks, blocks_by_addr, block_index)
+    generic = list(CallDataLoadSummarySpec().discover(ctx, strict=True))
+
+    assert len(generic) == len(discovered)
+    for summary in generic:
+        discovered_summary = discovered[summary.entry_addr]
+        assert summary.start_key == (
+            discovered_summary.entry_addr,
+            discovered_summary.entry_instruction_index,
+        )
+        assert summary.continuation.block_addr == discovered_summary.exit_addr
+        assert summary.continuation.instruction_index == 0
+
+
+def test_calldataload_summary_merge_point_exclusion_matches_discovered_exit_addrs():
+    hex_code = Path("tests/data/perf_erc20_lite.hex").read_text()
+    blocks = identify_basic_blocks(disassemble_hex(hex_code, 0))
+
+    discovered = discover_calldataload_summaries(blocks, strict=True)
+    summary_runtime = build_x86_summary_runtime(
+        blocks,
+        summary_config=X86SummaryConfig.enabled(calldataload="fallback"),
+    )
+    executor = X86SymbolicExecutor(
+        blocks,
+        enable_merge=True,
+        summary_runtime=summary_runtime,
+    )
+    calldataload_summaries = {
+        summary.payload.entry_addr: summary.payload
+        for summary in summary_runtime.summaries_for_kind(CALLDATALOAD_SUMMARY_KIND)
+    }
+
+    assert set(calldataload_summaries) == set(discovered)
+    for entry_addr, payload in calldataload_summaries.items():
+        assert isinstance(payload, CallDataLoadSummary)
+        assert payload.entry_addr == entry_addr
+        assert payload.exit_addr == discovered[entry_addr].exit_addr
+    for summary in discovered.values():
+        assert summary.exit_addr not in executor.merge_points
+
+
+def test_x86_summary_runtime_defaults_to_no_builtin_summaries():
+    hex_code = Path("tests/data/perf_erc20_lite.hex").read_text()
+    blocks = identify_basic_blocks(disassemble_hex(hex_code, 0))
+
+    summary_runtime = build_x86_summary_runtime(blocks)
+
+    assert summary_runtime.summaries == []
+    assert summary_runtime.summaries_for_kind(CALLDATALOAD_SUMMARY_KIND) == []
+    assert summary_runtime.mode_for_kind(CALLDATALOAD_SUMMARY_KIND) is None
+
+
+def test_trusted_summary_config_is_immutable_and_explicitly_enables_calldataload():
+    with pytest.raises(TypeError):
+        TRUSTED_SUMMARY_CONFIG.builtin_modes["oops"] = "fallback"
+
+    assert TRUSTED_SUMMARY_CONFIG.builtin_modes[CALLDATALOAD_SUMMARY_KIND] == "fallback"
+
+
+def test_x86_summary_runtime_rejects_unknown_builtin_summary_kind():
+    with pytest.raises(ValueError, match="unknown builtin x86 summary plugin"):
+        build_x86_summary_runtime(
+            [],
+            summary_config=X86SummaryConfig.enabled(unknown="fallback"),
+        )
 
 
 def test_matcher_skips_dynamic_low_offsets_for_wrap_soundness():
@@ -196,7 +279,8 @@ def test_apply_calldataload_summary_writes_x86_stack_word():
     _assert_bv_eq(loaded, expected, 256)
 
 
-def test_calldataload_summary_mode_validation():
-    assert validate_calldataload_summary_mode("fallback") == "fallback"
+def test_calldataload_summary_plugin_mode_validation():
+    plugin = X86SummaryPlugin(CallDataLoadSummarySpec(), mode="fallback")
+    assert plugin.mode == "fallback"
     with pytest.raises(ValueError):
-        validate_calldataload_summary_mode("always")
+        X86SummaryPlugin(CallDataLoadSummarySpec(), mode="always")
