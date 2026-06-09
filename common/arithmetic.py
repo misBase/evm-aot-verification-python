@@ -2,7 +2,18 @@
 
 操作 BitVec(256)，无状态，供 evm_ir 和 x86_64 两侧共用。
 """
-from z3 import BitVecVal, Extract, Function, BitVecSort, If, UDiv, URem, ZeroExt
+from z3 import (
+    BitVecVal,
+    Extract,
+    Function,
+    BitVecSort,
+    If,
+    UDiv,
+    URem,
+    ZeroExt,
+    is_bv_value,
+    simplify,
+)
 
 
 def div_semantics(a, b):
@@ -16,7 +27,14 @@ def mod_semantics(a, b):
 
 
 def exp_semantics(base, exponent):
-    """EVM EXP: base^exponent，使用未解释函数。"""
+    """EVM EXP: base^exponent，常见常量指数直接折叠，其余使用未解释函数。"""
+    exponent_simplified = simplify(exponent)
+    if is_bv_value(exponent_simplified):
+        exponent_value = exponent_simplified.as_long()
+        if exponent_value == 0:
+            return BitVecVal(1, 256)
+        if exponent_value == 1:
+            return base
     exp_func = Function('evm_exp', BitVecSort(256), BitVecSort(256), BitVecSort(256))
     return exp_func(base, exponent)
 

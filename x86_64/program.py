@@ -19,7 +19,11 @@ from .cfg_strategies import X86DFSStrategy
 from .cfg_state import X86GlobalState
 from .summaries.base import X86SummaryRuntime
 from .summaries.registry import X86SummaryConfig, build_x86_summary_runtime
-from common.path_observation import PathObservation, PathSemantics
+from common.path_observation import (
+    PathCoverageCertificate,
+    PathObservation,
+    PathSemantics,
+)
 from state.smt_state import SMTState, PointerTag
 
 
@@ -261,11 +265,10 @@ class X86Program:
         merge_state: bool = False,
         summary_config: Optional[X86SummaryConfig] = None,
     ) -> PathSemantics:
-        """Build terminal path observations for the x86 program.
+        """为 x86 程序构造终止路径 observation。
 
-        This mirrors ``to_z3()`` execution choices, but keeps terminal paths
-        separate and avoids merging whole memory arrays unless ``merge_state``
-        is requested by a debug stack check.
+        这里沿用 ``to_z3()`` 的执行选项，但保留独立终止路径；除非调试用
+        stack check 显式请求 ``merge_state``，否则不合并整块 memory array。
         """
         self._clear_summary_stats()
         instructions_to_execute = self._get_instructions()
@@ -276,6 +279,11 @@ class X86Program:
                 global_states=[],
                 observations=[observation],
                 merged_state=state if merge_state else None,
+                coverage=PathCoverageCertificate.by_construction(
+                    "empty x86 program has one unconditional terminal observation",
+                    source="x86-program",
+                    details=(("terminal_paths", 1),),
+                ),
             )
 
         blocks = identify_basic_blocks(instructions_to_execute)
@@ -288,6 +296,11 @@ class X86Program:
                 global_states=[global_state],
                 observations=[observation],
                 merged_state=final_state if merge_state else None,
+                coverage=PathCoverageCertificate.by_construction(
+                    "sequential x86 fallback has one unconditional terminal observation",
+                    source="x86-program",
+                    details=(("terminal_paths", 1),),
+                ),
             )
 
         summary_runtime = self._build_summary_runtime(
@@ -322,6 +335,7 @@ class X86Program:
             global_states=final_global_states,
             observations=observations,
             merged_state=merged_state,
+            coverage=executor.path_coverage_certificate(),
         )
 
     def _build_summary_runtime(

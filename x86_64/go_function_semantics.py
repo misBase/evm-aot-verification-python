@@ -11,7 +11,7 @@ Go host/builtin 函数的 Z3 语义建模。
 import logging
 from typing import Optional, Tuple
 
-from z3 import And, BitVec, BitVecVal, If, Lambda, Select, UGE, ULT
+from z3 import And, BitVec, BitVecVal, If, Lambda, Select, UGE, ULT, simplify
 
 from .aot_profile import X86AOTProfile
 from state.smt_state import SMTState, MemoryDomain
@@ -120,7 +120,9 @@ class GoFunctionSemantics:
         addr_offset = self._compute_stack_address(new_sp)
         r14 = mstate.x86_registers.get_register(Register.R14)
         base_offset = r14 + BitVecVal(addr_offset, 64)
-        value = mstate.x86_memory.load_256bit(base_offset, domain=MemoryDomain.STACK)
+        value = simplify(
+            mstate.x86_memory.load_256bit(base_offset, domain=MemoryDomain.STACK)
+        )
         return value, new_sp, mstate
 
     def _push_uint256(self, sp: int, value: BitVec, mstate: SMTState) -> Tuple[int, SMTState]:
@@ -142,7 +144,11 @@ class GoFunctionSemantics:
         addr_offset = self._compute_stack_address(sp)
         r14 = mstate.x86_registers.get_register(Register.R14)
         base_offset = r14 + BitVecVal(addr_offset, 64)
-        mstate.x86_memory = mstate.x86_memory.store_256bit(base_offset, value, domain=MemoryDomain.STACK)
+        mstate.x86_memory = mstate.x86_memory.store_256bit(
+            base_offset,
+            simplify(value),
+            domain=MemoryDomain.STACK,
+        )
         new_sp = sp + LIMBS_PER_UINT256
         return new_sp, mstate
 
@@ -476,15 +482,16 @@ class GoFunctionSemantics:
         （LOG0..LOG4），所以验证时通常可被 Z3 直接化简。
         为安全起见，最多只弹 4 个 topic。
         """
-        from z3 import is_bv_value
+        from z3 import is_bv_value, simplify
         n_topics_bv, sp, mstate = self._pop_uint256(sp, mstate)
         _mstart, sp, mstate = self._pop_uint256(sp, mstate)
         _msize, sp, mstate = self._pop_uint256(sp, mstate)
 
         # 确定需要额外弹出的 topic 数量
         # AOT 编译器压入的是常量 N（0-4），这里可以直接提取
-        if is_bv_value(n_topics_bv):
-            n = n_topics_bv.as_long()
+        n_topics_simplified = simplify(n_topics_bv)
+        if is_bv_value(n_topics_simplified):
+            n = n_topics_simplified.as_long()
             if n > 4:
                 n = 4  # EVM 最多 4 个 topic
         else:

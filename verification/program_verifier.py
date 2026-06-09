@@ -54,7 +54,8 @@ class ProgramEquivalenceChecker:
                            path_pair_workers: int = 1,
                            enable_merge: bool = True,
                            skip_feasibility: bool = False,
-                           summary_config: Optional[X86SummaryConfig] = None) -> Tuple[bool, Optional[str]]:
+                           summary_config: Optional[X86SummaryConfig] = None,
+                           x86_reachability_timeout_ms: Optional[int] = 50) -> Tuple[bool, Optional[str]]:
         """验证EVM程序和x86程序在语义上等价。
 
         默认使用旧的 merged-result 检查路径，保持原有 Alive2 风格的
@@ -78,6 +79,8 @@ class ProgramEquivalenceChecker:
             path_pair_workers: path_observations=True 时用于 EVM/x86 terminal path
                 pair 检查的 worker 数；默认 1，保持串行行为
             summary_config: x86 summary 插件配置；None 表示不启用 summary
+            x86_reachability_timeout_ms: path_observations=True 时 x86 CFG
+                executor 每次 reachability pruning 的局部 timeout；None 表示不设 cap
 
         Returns:
             (verified, message)，如果程序等价则verified为True
@@ -105,6 +108,7 @@ class ProgramEquivalenceChecker:
                 enable_merge=enable_merge,
                 skip_feasibility=skip_feasibility,
                 summary_config=summary_config,
+                x86_reachability_timeout_ms=x86_reachability_timeout_ms,
             )
 
         # 步骤1：公式构建 - EVM（两级路径感知）
@@ -263,6 +267,7 @@ class ProgramEquivalenceChecker:
         enable_merge: bool = True,
         skip_feasibility: bool = False,
         summary_config: Optional[X86SummaryConfig] = None,
+        x86_reachability_timeout_ms: Optional[int] = 50,
     ) -> Tuple[bool, Optional[str]]:
         if self.verbose:
             print("\n[1] Building EVM terminal path observations...")
@@ -290,6 +295,7 @@ class ProgramEquivalenceChecker:
             merge_state=stack_check is not None,
             enable_merge=enable_merge,
             summary_config=summary_config,
+            reachability_timeout_ms=x86_reachability_timeout_ms,
         )
         x86_build_time = time.time() - x86_start
         x86_state = x86_paths.merged_state
@@ -325,16 +331,18 @@ class ProgramEquivalenceChecker:
         path_assumptions = _collect_assumptions(initial_state, evm_state, x86_state)
         if path_assumptions:
             from dataclasses import replace
-            from z3 import And
+            from z3 import And, BoolVal
+            coverage_precondition = And(BoolVal(True), *path_assumptions)
             evm_paths_obs = [
-                replace(obs, condition=And(obs.condition, *path_assumptions))
+                replace(obs, condition=And(obs.condition, coverage_precondition))
                 for obs in evm_paths.observations
             ]
             x86_paths_obs = [
-                replace(obs, condition=And(obs.condition, *path_assumptions))
+                replace(obs, condition=And(obs.condition, coverage_precondition))
                 for obs in x86_paths.observations
             ]
         else:
+            coverage_precondition = None
             evm_paths_obs = evm_paths.observations
             x86_paths_obs = x86_paths.observations
         if path_pair_workers == 1:
@@ -342,6 +350,9 @@ class ProgramEquivalenceChecker:
                 evm_paths_obs,
                 x86_paths_obs,
                 skip_feasibility=skip_feasibility,
+                evm_coverage=evm_paths.coverage,
+                x86_coverage=x86_paths.coverage,
+                coverage_precondition=coverage_precondition,
             )
         else:
             verified, message = self.refinement_checker.check_refinement_paths(
@@ -349,6 +360,9 @@ class ProgramEquivalenceChecker:
                 x86_paths_obs,
                 path_pair_workers=path_pair_workers,
                 skip_feasibility=skip_feasibility,
+                evm_coverage=evm_paths.coverage,
+                x86_coverage=x86_paths.coverage,
+                coverage_precondition=coverage_precondition,
             )
         check_time = time.time() - check_start
 

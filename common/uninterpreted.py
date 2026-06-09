@@ -62,17 +62,15 @@ def sha3_semantics(memory, base: BitVecRef, offset: BitVecRef,
         concrete_length = length_id.as_long()
         if 0 <= concrete_length <= SHA3_FAST_PATH_MAX_BYTES:
             bytes_list = []
-            for i in range(SHA3_FAST_PATH_MAX_BYTES):
-                if i < concrete_length:
-                    bytes_list.append(Select(memory, start + BitVecVal(i, 64)))
-                else:
-                    bytes_list.append(BitVecVal(0, 8))
-            data_2048 = Concat(*bytes_list)
-            f = Function('sha3_bytes',
-                         BitVecSort(SHA3_FAST_PATH_MAX_BYTES * 8),
-                         BitVecSort(256),
-                         BitVecSort(256))
-            return f(data_2048, BitVecVal(concrete_length, 256))
+            for i in range(concrete_length):
+                bytes_list.append(Select(memory, start + BitVecVal(i, 64)))
+            data_arg = Concat(*bytes_list) if bytes_list else BitVecVal(0, 8)
+            f = Function(
+                f"sha3_bytes_{concrete_length}",
+                BitVecSort(data_arg.size()),
+                BitVecSort(256),
+            )
+            return f(data_arg)
 
     # BV64 length only bounds memory indexing in this model; length_id keeps the
     # original BV256 value in the hash identity.

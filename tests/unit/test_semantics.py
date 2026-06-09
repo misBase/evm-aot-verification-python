@@ -163,6 +163,17 @@ def test_byte_semantics():
     assert is_true(simplify(byte32 == BitVecVal(0, 256)))
 
 
+def test_exp_semantics_folds_zero_and_one_exponents():
+    evm_op = EVMOperationSemantics()
+    symbolic_base = BitVec("exp_base", 256)
+
+    exp_zero = evm_op.exp_semantics(symbolic_base, BitVecVal(0, 256))
+    assert is_true(simplify(exp_zero == BitVecVal(1, 256)))
+
+    exp_one = evm_op.exp_semantics(symbolic_base, BitVecVal(1, 256))
+    assert is_true(simplify(exp_one == symbolic_base))
+
+
 def test_addmod_mulmod_semantics():
     """测试ADDMOD/MULMOD（含大数场景与mod=0）。"""
     evm_op = EVMOperationSemantics()

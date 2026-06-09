@@ -1,6 +1,6 @@
-"""Neutral path-observation containers for program-level semantics."""
+"""程序级语义使用的中立 path-observation 容器。"""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 OBSERVATION_KEYS = frozenset({
@@ -17,7 +17,7 @@ OBSERVATION_KEYS = frozenset({
 
 @dataclass(frozen=True)
 class PathObservation:
-    """Observable result of one terminal execution path."""
+    """一条终止执行路径的可观察结果。"""
 
     condition: Any
     offset: Any
@@ -34,13 +34,13 @@ class PathObservation:
         return getattr(self, key)
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Dictionary-compatible accessor for existing checkers."""
+        """兼容现有 checker 的 dict 风格访问器。"""
         if key not in OBSERVATION_KEYS:
             return default
         return getattr(self, key)
 
     def as_dict(self) -> dict[str, Any]:
-        """Return the legacy dict shape consumed by ``RefinementChecker``."""
+        """返回 ``RefinementChecker`` 仍在使用的旧 dict 形状。"""
         return {
             "condition": self.condition,
             "offset": self.offset,
@@ -54,13 +54,45 @@ class PathObservation:
 
 
 @dataclass(frozen=True)
+class PathCoverageCertificate:
+    """path-observation 集合覆盖其建模输入的证据。"""
+
+    complete: bool
+    reason: str
+    source: str = ""
+    details: tuple[tuple[str, Any], ...] = ()
+
+    @classmethod
+    def unknown(cls, reason: str = "no coverage certificate") -> "PathCoverageCertificate":
+        return cls(complete=False, reason=reason)
+
+    @classmethod
+    def by_construction(
+        cls,
+        reason: str,
+        *,
+        source: str = "",
+        details: tuple[tuple[str, Any], ...] = (),
+    ) -> "PathCoverageCertificate":
+        return cls(
+            complete=True,
+            reason=reason,
+            source=source,
+            details=details,
+        )
+
+
+@dataclass(frozen=True)
 class PathSemantics:
-    """Result of a path-sensitive program execution."""
+    """路径敏感程序执行的结果。"""
 
     global_states: list[Any]
     observations: list[PathObservation]
     merged_state: Any = None
+    coverage: PathCoverageCertificate = field(
+        default_factory=PathCoverageCertificate.unknown
+    )
 
     def as_result_dicts(self) -> list[dict[str, Any]]:
-        """Return observations in the legacy result-dict shape."""
+        """以旧 result-dict 形状返回 observation。"""
         return [observation.as_dict() for observation in self.observations]

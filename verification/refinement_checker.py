@@ -102,9 +102,18 @@ class RefinementChecker:
         x86_results,
         path_pair_workers: int = 1,
         skip_feasibility: bool = False,
+        evm_coverage=None,
+        x86_coverage=None,
+        coverage_precondition=None,
     ) -> Tuple[bool, Optional[str]]:
         return self._paths.check_refinement_paths(
-            evm_results, x86_results, path_pair_workers, skip_feasibility,
+            evm_results,
+            x86_results,
+            path_pair_workers,
+            skip_feasibility,
+            evm_coverage=evm_coverage,
+            x86_coverage=x86_coverage,
+            coverage_precondition=coverage_precondition,
         )
 
     def _check_storage_equivalence(

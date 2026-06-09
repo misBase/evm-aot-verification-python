@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RefinementChecker 当前 return-data 抽象边界的 characterization tests。"""
+"""刻画 RefinementChecker 当前 return-data 抽象边界的测试。"""
 
 from z3 import Array, BitVecSort, BitVecVal, BoolVal, Store
 
@@ -83,3 +83,29 @@ def test_stop_and_zero_length_return_are_equivalent_under_current_abstraction():
     verified, msg = checker.check_refinement(evm_result, x86_result)
 
     assert verified, msg
+
+
+def test_zero_length_fast_path_still_checks_return_presence():
+    checker = _make_checker()
+    evm_memory = Array("zero_len_presence_evm_mem", BitVecSort(64), BitVecSort(8))
+    x86_memory = Array("zero_len_presence_x86_mem", BitVecSort(64), BitVecSort(8))
+
+    evm_result = _make_result(
+        offset=0,
+        length=0,
+        memory=evm_memory,
+        base_addr=None,
+        has_return_data=False,
+    )
+    x86_result = _make_result(
+        offset=0,
+        length=32,
+        memory=x86_memory,
+        base_addr=0,
+        has_return_data=True,
+    )
+
+    verified, msg = checker.check_refinement(evm_result, x86_result)
+
+    assert not verified
+    assert "Non-empty return-data conditions differ" in msg

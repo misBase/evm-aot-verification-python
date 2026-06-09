@@ -1713,7 +1713,7 @@ class TestComplexScenarios:
 
         # 执行符号执行，动态构建CFG
         state = self.create_initial_state()
-        executor = X86SymbolicExecutor(blocks, max_depth=100, use_reachability_check=False)
+        executor = X86SymbolicExecutor(blocks, max_depth=10000, use_reachability_check=False)
         # 从机器码起始入口执行，避免跳过前导控制流（含 Go bridge 站点）
         final_states = executor.execute(state, entry_addr=0x0)
         assert len(final_states) >= 1

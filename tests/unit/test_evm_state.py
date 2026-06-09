@@ -5,7 +5,7 @@ EVM状态模型的单元测试。
 """
 
 import pytest
-from z3 import BitVec, BitVecVal, IntVal, Solver, sat, unsat
+from z3 import BitVec, BitVecVal, IntVal, Solver, UGT, sat, unsat
 from state.smt_state import EVMStackState, EVMStorageState, EVMGasState, SMTState
 
 
@@ -154,6 +154,29 @@ class TestSMTState:
 
         with pytest.raises(ValueError, match="calldata_size_bytes must fit in uint64"):
             SMTState.create_initial_state(calldata_size_bytes=1 << 64)
+
+    def test_symbolic_calldata_size_can_have_uint64_upper_bound(self):
+        state = SMTState.create_initial_state(calldata_size_max_bytes=(1 << 63) - 1)
+
+        assert state.assumptions
+
+        solver = Solver()
+        solver.add(*state.assumptions)
+        solver.add(UGT(state.calldatasize, BitVecVal((1 << 63) - 1, 64)))
+        assert solver.check() == unsat
+
+    def test_calldata_size_upper_bound_is_validated(self):
+        with pytest.raises(ValueError, match="calldata_size_max_bytes must be non-negative"):
+            SMTState.create_initial_state(calldata_size_max_bytes=-1)
+
+        with pytest.raises(ValueError, match="calldata_size_max_bytes must fit in uint64"):
+            SMTState.create_initial_state(calldata_size_max_bytes=1 << 64)
+
+        with pytest.raises(ValueError, match="calldata_size_bytes must be <= calldata_size_max_bytes"):
+            SMTState.create_initial_state(
+                calldata_size_bytes=2,
+                calldata_size_max_bytes=1,
+            )
 
 
 class TestEVMStorageState:

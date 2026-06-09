@@ -28,6 +28,7 @@ class X86SearchStrategy(ABC):
         """
         self.work_list = work_list
         self.max_depth = max_depth
+        self.depth_pruned_count = 0
 
     @abstractmethod
     def get_strategic_global_state(self) -> Optional[X86GlobalState]:
@@ -64,6 +65,7 @@ class X86SearchStrategy(ABC):
 
             # 检查深度限制
             if global_state.depth >= self.max_depth:
+                self.depth_pruned_count += 1
                 node_addr = f"0x{global_state.node.address:x}" if global_state.node else "None"
                 logger.debug(
                     "[CFG] 剪枝：depth=%d >= max_depth=%d，跳过状态 node=%s",

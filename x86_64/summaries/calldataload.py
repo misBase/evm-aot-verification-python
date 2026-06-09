@@ -1,13 +1,13 @@
-"""CALLDATALOAD slice summaries for go-hpc-evm amd64 output."""
+"""go-hpc-evm amd64 输出中的 CALLDATALOAD slice 摘要。"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
-from z3 import BitVec, BitVecVal, Concat
+from z3 import BitVec, BitVecVal, Concat, is_bv_value, simplify
 
-from common.calldata import calldataload_word
+from common.calldata import calldataload_no_overflow_assumption, calldataload_word
 from state.smt_state import MemoryDomain, SMTState
 
 from .base import (
@@ -53,6 +53,7 @@ class CallDataLoadSummary:
     offset_limb_locs: Tuple[LimbLocation, LimbLocation, LimbLocation, LimbLocation]
     clobber_registers: Tuple[Register, ...]
     internal_block_addrs: Tuple[int, ...]
+    require_concrete_offset: bool = False
 
 
 class CallDataLoadSummaryMatchError(ValueError):
@@ -111,14 +112,33 @@ def apply_calldataload_summary(
     *,
     fresh_prefix: str = "calldataload_summary",
 ) -> SMTState:
-    """Apply a trusted CALLDATALOAD summary to an x86 machine state."""
+    """把可信的 CALLDATALOAD 摘要应用到 x86 机器状态。"""
     new_state = state.copy()
     offset_bv = offset_expr_from_locations(summary, state)
+    if summary.require_concrete_offset:
+        concrete_offset = simplify(offset_bv)
+        if not is_bv_value(concrete_offset):
+            raise CallDataLoadSummaryMatchError(
+                "dynamic CALLDATALOAD summary offset did not simplify to a concrete value"
+            )
+        concrete_value = concrete_offset.as_long()
+        if concrete_value > _MAX_NON_WRAPPING_CALLDATALOAD_OFFSET:
+            raise CallDataLoadSummaryMatchError(
+                "dynamic CALLDATALOAD summary offset can wrap in offset+32 check"
+            )
+        offset_bv = BitVecVal(concrete_value, 256)
+    omit_overflow_guard = False
+    if getattr(state, "assume_calldata_offset_no_overflow", True):
+        no_overflow = calldataload_no_overflow_assumption(offset_bv)
+        if no_overflow is not None:
+            new_state.add_assumption(no_overflow)
+            omit_overflow_guard = True
     result = calldataload_word(
         state.calldata,
         state.callengine_input_size_bytes,
         offset_bv,
-        omit_overflow_guard=False,
+        omit_overflow_guard=omit_overflow_guard,
+        abstract=getattr(state, "abstract_calldataload_words", False),
     )
 
     r14 = state.x86_registers.get_register(Register.R14)
@@ -147,7 +167,7 @@ def discover_calldataload_summaries(
     *,
     strict: bool = False,
 ) -> Dict[int, CallDataLoadSummary]:
-    """Discover compileEVMCALLDATALOAD-shaped CFG slices by entry address."""
+    """按入口地址发现形如 compileEVMCALLDATALOAD 的 CFG slice。"""
     blocks_by_addr = {block.start_addr: block for block in blocks}
     block_index = {block.start_addr: i for i, block in enumerate(blocks)}
     summaries: Dict[int, CallDataLoadSummary] = {}
@@ -215,7 +235,7 @@ def _match_calldataload_at(
     high_locs, entry_instruction_index = _parse_high_limb_locations(entry)
     size_block = _next_block(blocks, entry_idx, "missing input-size block")
     size_reg, low_loc = _parse_size_check_block(size_block, zero_addr)
-    _require_safe_low_offset(low_loc)
+    require_concrete_offset = _requires_concrete_low_offset(low_loc)
 
     # 3. prep 块加载 calldata pointer，计算 input+offset，并分出
     #    fast path（完整 32 字节）和 partial path（需要补零）。
@@ -272,9 +292,9 @@ def _match_calldataload_at(
         entry_instruction_index,
     )
 
-    # Limb order is x1(low), x2, x3, x4.
+    # limb 顺序是 x1（低位）、x2、x3、x4。
     offset_locs = (low_loc, high_locs[0], high_locs[1], high_locs[2])
-    _ = offset_reg  # Parsed as a structural guard; not needed by the summary.
+    _ = offset_reg  # 已作为结构守卫解析；摘要本身不需要它。
     return CallDataLoadSummary(
         entry_addr=entry.start_addr,
         exit_addr=exit_addr,
@@ -285,6 +305,7 @@ def _match_calldataload_at(
         offset_limb_locs=offset_locs,
         clobber_registers=clobbers,
         internal_block_addrs=internal_blocks,
+        require_concrete_offset=require_concrete_offset,
     )
 
 
@@ -346,11 +367,11 @@ def _is_potential_calldataload_entry(
     blocks_by_addr: Dict[int, X86Block],
     idx: int,
 ) -> bool:
-    """Loose strict-mode candidate check.
+    """strict 模式下的宽松候选检查。
 
-    This intentionally avoids full validation such as ``_parse_zero_block``.
-    Strict mode should report CALLDATALOAD-like slices whose detailed template is
-    malformed, while fallback mode keeps the narrower fast filter.
+    这里故意不做 ``_parse_zero_block`` 这类完整校验。
+    strict 模式需要报告“像 CALLDATALOAD 但模板细节不匹配”的 slice；
+    fallback 模式则继续使用更窄的快速过滤。
     """
     insns = _meaningful(block.instructions)
     if len(insns) < 3 or insns[-1].mnemonic.lower() != "jne":
@@ -526,24 +547,23 @@ def _parse_size_check_block(
     return size_reg, low_loc
 
 
-def _require_safe_low_offset(low_loc: LimbLocation) -> None:
-    """Keep the trusted summary to offsets whose x64 ``offset+32`` cannot wrap.
+def _requires_concrete_low_offset(low_loc: LimbLocation) -> bool:
+    """只接受 x64 ``offset+32`` 不会回绕的可信摘要。
 
-    The compiled x64 slice performs a 64-bit ``add offset, 32`` before deciding
-    between fast and partial paths.  The shared helper models the Go/EVM
-    non-wrapping ``getData(input, offset, 32)`` semantics.  Until a local lemma
-    or an explicit calldata-size/no-wrap precondition is available, dynamic
-    low-limb offsets must fall back to instruction-level x64 semantics.
+    编译后的 x64 slice 会先执行 64-bit ``add offset, 32``，再选择 fast/partial
+    path。共享 helper 建模的是 Go/EVM 中不会回绕的 ``getData(input, offset, 32)``
+    语义。常量 offset 可以静态检查；形如 ``4+32`` 的链式编译器 offset 在从 block
+    中间开始摘要时可能表现为寄存器，这种情况只有在运行时状态能把完整 256-bit
+    offset 化简成安全的具体值时才接受。
     """
     if not isinstance(low_loc, ConstLimbLocation):
-        raise CallDataLoadSummaryMatchError(
-            "low offset is dynamic; CALLDATALOAD summary requires a safe constant"
-        )
+        return True
     value = low_loc.value & _UINT64_MASK
     if value > _MAX_NON_WRAPPING_CALLDATALOAD_OFFSET:
         raise CallDataLoadSummaryMatchError(
             "low offset can wrap in x64 offset+32 check"
         )
+    return False
 
 
 def _parse_prep_block(

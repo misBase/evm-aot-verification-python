@@ -2,11 +2,14 @@ from pathlib import Path
 
 import pytest
 from z3 import (
+    BitVec,
     BitVecSort,
     BitVecVal,
     K,
     Solver,
     Store,
+    Z3_OP_UNINTERPRETED,
+    sat,
     unsat,
 )
 
@@ -23,6 +26,7 @@ from x86_64.summaries.calldataload import (
     CallDataLoadSummaryMatchError,
     CallDataLoadSummarySpec,
     ConstLimbLocation,
+    RegisterLimbLocation,
     _collect_summary_clobber_registers,
     apply_calldataload_summary,
     discover_calldataload_summaries,
@@ -47,6 +51,32 @@ def _assert_bv_eq(expr, expected, bits):
     assert solver.check() == unsat
 
 
+def _mentions_uninterpreted_const(expr, name):
+    seen = set()
+    stack = [expr]
+    while stack:
+        cur = stack.pop()
+        try:
+            key = cur.hash()
+        except Exception:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            decl = cur.decl()
+            if (
+                decl.kind() == Z3_OP_UNINTERPRETED
+                and decl.name() == name
+                and len(cur.children()) == 0
+            ):
+                return True
+            stack.extend(cur.children())
+        except Exception:
+            continue
+    return False
+
+
 def test_calldataload_word_reads_full_word():
     data = list(range(32))
     expr = calldataload_word(
@@ -65,6 +95,57 @@ def test_calldataload_word_zero_pads_short_read():
     )
     expected = (0x12 << 248) | (0x34 << 240)
     _assert_bv_eq(expr, expected, 256)
+
+
+def test_abstract_calldataload_keeps_selector_word_byte_precise():
+    data = [0x12, 0x34, 0x56, 0x78] + [0] * 28
+    expr = calldataload_word(
+        _calldata_array(data),
+        BitVecVal(32, 64),
+        BitVecVal(0, 256),
+        abstract=True,
+    )
+
+    _assert_bv_eq(expr, int.from_bytes(bytes(data), "big"), 256)
+
+
+def test_abstract_calldataload_abi_word_is_unconstrained_at_end():
+    expr = calldataload_word(
+        _calldata_array([0x12, 0x34, 0x56, 0x78]),
+        BitVecVal(4, 64),
+        BitVecVal(4, 256),
+        abstract=True,
+    )
+
+    solver = Solver()
+    solver.add(expr != BitVecVal(0, 256))
+    assert solver.check() == sat
+
+
+def test_abstract_calldataload_concrete_abi_word_ignores_size_symbol():
+    size = BitVec("abstract_calldataload_size", 64)
+    expr = calldataload_word(
+        _calldata_array([0x12, 0x34, 0x56, 0x78]),
+        size,
+        BitVecVal(4, 256),
+        abstract=True,
+    )
+
+    assert not _mentions_uninterpreted_const(expr, "abstract_calldataload_size")
+
+
+def test_abstract_calldataload_abstracts_abi_partial_read():
+    expr = calldataload_word(
+        _calldata_array([0, 1, 2, 3, 0xAB, 0xCD]),
+        BitVecVal(6, 64),
+        BitVecVal(4, 256),
+        abstract=True,
+    )
+    expected = (0xAB << 248) | (0xCD << 240)
+
+    solver = Solver()
+    solver.add(expr != BitVecVal(expected, 256))
+    assert solver.check() == sat
 
 
 def test_calldataload_word_returns_zero_past_end_and_on_overflow():
@@ -181,19 +262,20 @@ def test_x86_summary_runtime_rejects_unknown_builtin_summary_kind():
         )
 
 
-def test_matcher_skips_dynamic_low_offsets_for_wrap_soundness():
+def test_matcher_guards_dynamic_low_offsets_for_wrap_soundness():
     hex_code = Path("tests/data/muti_block_08.hex").read_text()
     blocks = identify_basic_blocks(disassemble_hex(hex_code, 0))
 
     summaries = discover_calldataload_summaries(blocks)
 
-    assert len(summaries) == 1
-    assert all(
-        isinstance(summary.offset_limb_locs[0], ConstLimbLocation)
+    assert len(summaries) == 3
+    dynamic = [
+        summary
         for summary in summaries.values()
-    )
-    with pytest.raises(CallDataLoadSummaryMatchError, match="dynamic"):
-        discover_calldataload_summaries(blocks, strict=True)
+        if not isinstance(summary.offset_limb_locs[0], ConstLimbLocation)
+    ]
+    assert len(dynamic) == 2
+    assert all(summary.require_concrete_offset for summary in dynamic)
 
 
 def test_strict_reports_malformed_calldataload_like_zero_block():
@@ -277,6 +359,40 @@ def test_apply_calldataload_summary_writes_x86_stack_word():
     )
     expected = (0xAA << 248) | (0xBB << 240)
     _assert_bv_eq(loaded, expected, 256)
+    assert new_state.assumptions
+
+
+def test_apply_calldataload_summary_records_no_overflow_assumption():
+    state = SMTState()
+    state.callengine_input_size_bytes = BitVecVal(32, 64)
+    state.x86_registers.set_register(Register.R14, BitVecVal(0x1000, 64))
+    high_limb = BitVec("calldataload_summary_high_limb", 64)
+    state.x86_registers.set_register(Register.RAX, high_limb)
+
+    summary = CallDataLoadSummary(
+        entry_addr=0x10,
+        exit_addr=0x20,
+        zero_addr=0x30,
+        partial_addr=0x40,
+        entry_instruction_index=0,
+        result_stack_offset=-32,
+        offset_limb_locs=(
+            ConstLimbLocation(0),
+            ConstLimbLocation(0),
+            ConstLimbLocation(0),
+            RegisterLimbLocation(Register.RAX),
+        ),
+        clobber_registers=(),
+        internal_block_addrs=(),
+    )
+
+    new_state = apply_calldataload_summary(summary, state, fresh_prefix="test_summary")
+
+    assert new_state.assumptions
+    solver = Solver()
+    solver.add(*new_state.assumptions)
+    solver.add(high_limb != BitVecVal(0, 64))
+    assert solver.check() == unsat
 
 
 def test_calldataload_summary_plugin_mode_validation():

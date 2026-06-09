@@ -168,6 +168,7 @@ class SMTState:
         # 大幅压缩 bit-blast 后的搜索空间。需要建模 overflow 行为差异的单测可
         # 以显式把这个字段置 False。
         self.assume_calldata_offset_no_overflow: bool = True
+        self.abstract_calldataload_words: bool = False
 
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
         self.stack_base = None
@@ -238,11 +239,18 @@ class SMTState:
         # 后续 add_assumption() 只影响当前路径，不会回流到父/兄弟路径。
         src_assumptions = getattr(self, 'assumptions', None)
         new_state.assumptions = list(src_assumptions) if src_assumptions else None
-        new_state.assume_calldata_offset_no_overflow = getattr(
-            self, 'assume_calldata_offset_no_overflow', True,
-        )
+        self.copy_verification_options_to(new_state)
 
         return new_state
+
+    def copy_verification_options_to(self, other: 'SMTState') -> None:
+        """复制 verifier 局部建模开关到另一个 state。"""
+        other.assume_calldata_offset_no_overflow = getattr(
+            self, 'assume_calldata_offset_no_overflow', True,
+        )
+        other.abstract_calldataload_words = getattr(
+            self, 'abstract_calldataload_words', False,
+        )
 
     def copy_callengine_side_channels_to(self, other: 'SMTState') -> None:
         """复制 callEngine side-channel 字段到另一个 SMTState。"""
@@ -303,6 +311,7 @@ class SMTState:
     def create_initial_state(
         num_inputs: int = 0,
         calldata_size_bytes: Optional[int] = None,
+        calldata_size_max_bytes: Optional[int] = None,
     ) -> 'SMTState':
         """创建具有符号输入的初始SMT状态。
 
@@ -314,17 +323,18 @@ class SMTState:
         Args:
             num_inputs: 要创建的符号输入数量（默认0）
             calldata_size_bytes: 固定 calldata 字节长度；None 表示使用 64-bit 符号长度。
+            calldata_size_max_bytes: 符号 calldata 长度的无符号上界；None 表示不添加上界。
 
         Returns:
             具有符号输入的已初始化SMTState
 
         Raises:
-            ValueError: 如果num_inputs为负数或过大（>1024），或 calldata_size_bytes 超出 uint64
+            ValueError: 如果num_inputs为负数或过大（>1024），或 calldata 长度参数超出 uint64
         """
         # Lazy imports to avoid circular dependencies
         from common.uint256 import Uint256
         from verification.memory_mapping import StackMemoryMapper
-        from z3 import IntVal, BitVecVal, ZeroExt
+        from z3 import IntVal, BitVecVal, ULE, ZeroExt
         from x86_64.models import Register
         from x86_64.aot_profile import GO_HPC_EVM_PROFILE
 
@@ -343,6 +353,23 @@ class SMTState:
             if calldata_size_bytes > (1 << 64) - 1:
                 raise ValueError(
                     f"calldata_size_bytes must fit in uint64, got {calldata_size_bytes}"
+                )
+        if calldata_size_max_bytes is not None:
+            if calldata_size_max_bytes < 0:
+                raise ValueError(
+                    f"calldata_size_max_bytes must be non-negative, got {calldata_size_max_bytes}"
+                )
+            if calldata_size_max_bytes > (1 << 64) - 1:
+                raise ValueError(
+                    f"calldata_size_max_bytes must fit in uint64, got {calldata_size_max_bytes}"
+                )
+            if (
+                calldata_size_bytes is not None
+                and calldata_size_bytes > calldata_size_max_bytes
+            ):
+                raise ValueError(
+                    "calldata_size_bytes must be <= calldata_size_max_bytes, "
+                    f"got {calldata_size_bytes} > {calldata_size_max_bytes}"
                 )
 
         # 创建基础状态
@@ -488,6 +515,10 @@ class SMTState:
 
         if calldata_size_bytes is None:
             calldata_size_64 = initial_state.calldatasize
+            if calldata_size_max_bytes is not None:
+                initial_state.add_assumption(
+                    ULE(calldata_size_64, BitVecVal(calldata_size_max_bytes, 64))
+                )
         else:
             calldata_size_64 = BitVecVal(calldata_size_bytes, 64)
             initial_state.calldatasize = calldata_size_64

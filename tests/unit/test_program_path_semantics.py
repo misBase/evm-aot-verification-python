@@ -4,12 +4,15 @@
 import threading
 
 import x86_64.program as x86_program_module
-from common.path_observation import PathObservation
+from common.path_observation import PathCoverageCertificate, PathObservation
 from evm_ir.json_parser import CompilerEVMResult
 from evm_ir.models import EVMBlock, EvmOperator
 from evm_ir.program import EVMProgram
 from state.smt_state import SMTState
 from verification.refinement_checker import RefinementChecker, _PathPairChunkCheckResult
+from x86_64.cfg import identify_basic_blocks
+from x86_64.cfg_executor import X86SymbolicExecutor
+from x86_64.disassembler import disassemble_hex
 from x86_64.models import X86Block, X86Instruction
 from x86_64.program import X86Program
 from z3 import BitVec, BitVecVal, BoolVal
@@ -158,6 +161,44 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
     assert "2/2 feasible pair(s)" in message
 
 
+def test_path_coverage_is_checked_under_precondition():
+    state = SMTState.create_initial_state()
+    selector = BitVec("coverage_selector", 1)
+    evm_observations = [
+        PathObservation(
+            condition=selector == BitVecVal(0, 1),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.evm_memory.Memory,
+            base_addr=None,
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        )
+    ]
+    x86_observations = [
+        PathObservation(
+            condition=BoolVal(True),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.x86_memory.evm_mem,
+            base_addr=BitVecVal(0, 64),
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        )
+    ]
+
+    checker = RefinementChecker(timeout_ms=1000)
+    verified, message = checker.check_refinement_paths(
+        evm_observations,
+        x86_observations,
+        coverage_precondition=selector == BitVecVal(0, 1),
+    )
+
+    assert verified, message
+
+
 def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monkeypatch):
     checker = RefinementChecker(timeout_ms=1000)
     cancelled_worker_started = threading.Event()
@@ -195,4 +236,60 @@ def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monke
     assert cancelled_worker_saw_cancel.is_set()
     assert failure == "boom"
     assert pair_count == 4
-    assert checked_pair_count == 2
+    assert 2 <= checked_pair_count <= pair_count
+
+
+def test_path_coverage_accepts_complete_certificate_without_solver(monkeypatch):
+    checker = RefinementChecker(timeout_ms=1000)
+
+    def fail_if_called(_deadline):
+        raise AssertionError("coverage solver should not run")
+
+    monkeypatch.setattr(
+        checker._paths._ctx,
+        "reset_solver_with_budget",
+        fail_if_called,
+    )
+
+    verified, message = checker._paths._check_path_coverage(
+        [],
+        "x86",
+        deadline=None,
+        coverage=PathCoverageCertificate.by_construction(
+            "unit-test certificate",
+            source="test",
+        ),
+    )
+
+    assert verified
+    assert message is None
+
+
+def test_x86_executor_reports_complete_coverage_for_modeled_branch():
+    # xor rax,rax; je +1; ret; ret，两条后继都在本地 CFG 内。
+    instructions = disassemble_hex("4831c07401c3c3", base_addr=0)
+    blocks = identify_basic_blocks(instructions)
+    executor = X86SymbolicExecutor(
+        blocks,
+        max_depth=10,
+        use_reachability_check=False,
+    )
+
+    final_states = executor.execute(SMTState.create_initial_state(), entry_addr=0)
+    certificate = executor.path_coverage_certificate()
+
+    assert len(final_states) == 2
+    assert certificate.complete, certificate.reason
+
+
+def test_x86_executor_coverage_certificate_fails_closed_for_external_jmp():
+    # jmp 0x1000，目标超出本地反汇编范围。
+    instructions = disassemble_hex("e9fb0f0000", base_addr=0)
+    blocks = identify_basic_blocks(instructions)
+    executor = X86SymbolicExecutor(blocks, max_depth=10)
+
+    executor.execute(SMTState.create_initial_state(), entry_addr=0)
+    certificate = executor.path_coverage_certificate()
+
+    assert not certificate.complete
+    assert "outside the local CFG" in certificate.reason

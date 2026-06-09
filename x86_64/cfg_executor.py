@@ -17,6 +17,7 @@ from .cfg_state import X86GlobalState, X86WorldState
 from .cfg_strategies import X86DFSStrategy, X86TopologicalStrategy
 from .disassembler import parse_operands
 from .summaries.base import X86Summary, X86SummaryRuntime
+from common.path_observation import PathCoverageCertificate
 from state.smt_state import SMTState, PointerTag
 
 
@@ -94,6 +95,8 @@ class X86SymbolicExecutor:
         # 统计信息
         self.total_states = 0
         self.pruned_states = 0
+        self.flush_depth_pruned_count = 0
+        self.coverage_incomplete_reasons: List[str] = []
         # 可达性检查的累计耗时与调用次数，便于 perf 实验诊断 build 慢的来源。
         self.reachability_call_count = 0
         self.reachability_total_wall = 0.0
@@ -104,6 +107,47 @@ class X86SymbolicExecutor:
 
         # 每个 CallGoFunction-ret 站点对应一个独立 GO_HOST 外部节点
         self._go_host_addr_by_ret_block: Dict[int, int] = {}
+
+    def _mark_coverage_incomplete(self, reason: str) -> None:
+        if reason not in self.coverage_incomplete_reasons:
+            self.coverage_incomplete_reasons.append(reason)
+
+    def path_coverage_certificate(self) -> PathCoverageCertificate:
+        """返回终止路径覆盖性的 fail-closed 证书。
+
+        该证书只声明 executor 已探索所有未被证明不可达的建模控制流后继；
+        它不证明指令语义或 host-call summary 的语义正确性。
+        """
+        strategy_depth_pruned = getattr(self.strategy, "depth_pruned_count", 0)
+        depth_pruned = strategy_depth_pruned + self.flush_depth_pruned_count
+        reasons = list(self.coverage_incomplete_reasons)
+        if depth_pruned:
+            reasons.append(f"depth-pruned state count: {depth_pruned}")
+        if self.work_list:
+            reasons.append(f"work-list not drained: {len(self.work_list)} state(s)")
+        if self.merge_buffers:
+            buffered = sum(len(buf) for buf in self.merge_buffers.values())
+            reasons.append(f"merge buffers not drained: {buffered} state(s)")
+
+        details = (
+            ("terminal_paths", len(self.final_states)),
+            ("total_states", self.total_states),
+            ("unsat_pruned_states", self.pruned_states),
+            ("reachability_calls", self.reachability_call_count),
+            ("depth_pruned_states", depth_pruned),
+        )
+        if reasons:
+            return PathCoverageCertificate(
+                complete=False,
+                reason="; ".join(reasons),
+                source="x86-symbolic-executor",
+                details=details,
+            )
+        return PathCoverageCertificate.by_construction(
+            "x86 CFG executor explored all modeled successors",
+            source="x86-symbolic-executor",
+            details=details,
+        )
 
     def _is_state_reachable(self, state: X86GlobalState) -> bool:
         """Check path feasibility."""
@@ -343,6 +387,25 @@ class X86SymbolicExecutor:
         merged_mstate.return_data = _merge_array(lambda s: s.mstate.return_data)
         merged_mstate.stack_base = states[0].mstate.stack_base
         merged_mstate.stack_num_inputs = states[0].mstate.stack_num_inputs
+        states[0].mstate.copy_verification_options_to(merged_mstate)
+        guarded_assumptions = []
+        seen_assumptions = set()
+        for s in states:
+            cond = s.get_constraints().as_bool()
+            for assumption in getattr(s.mstate, 'assumptions', None) or []:
+                guarded = simplify(Or(Not(cond), assumption))
+                try:
+                    key = guarded.hash()
+                except Exception:
+                    key = None
+                if key is not None and key in seen_assumptions:
+                    continue
+                if key is not None:
+                    seen_assumptions.add(key)
+                guarded_assumptions.append(guarded)
+        merged_mstate.assumptions = (
+            guarded_assumptions if guarded_assumptions else None
+        )
         # 保留所有路径共享的 unrouted_memory_domain（生产路径都是 None）
         merged_mstate.unrouted_memory_domain = getattr(
             states[0].mstate, 'unrouted_memory_domain', None
@@ -553,6 +616,10 @@ class X86SymbolicExecutor:
         depth >= max_depth 时停止递归，防止无限循环。
         """
         if state.depth >= self.max_depth:
+            self.flush_depth_pruned_count += 1
+            self._mark_coverage_incomplete(
+                f"flush depth limit reached at depth {state.depth}"
+            )
             node_addr = f"0x{state.node.address:x}" if state.node else "None"
             logger.debug(
                 "[CFG] flush 剪枝：depth=%d >= max_depth=%d，停止递归 node=%s",
@@ -600,6 +667,7 @@ class X86SymbolicExecutor:
         """
         node = global_state.node
         if node is None:
+            self._mark_coverage_incomplete("encountered state without CFG node")
             return []
 
         # 将当前状态添加到节点的状态列表（用于追踪和调试）
@@ -738,6 +806,9 @@ class X86SymbolicExecutor:
                     "x86 indirect jumps are not supported by the compiler"
                 )
             # 否则返回空列表（可能是解析失败或外部目标）
+            self._mark_coverage_incomplete(
+                f"unresolved jmp target at 0x{insn.addr:x}"
+            )
             return []
 
         # 直接跳转（静态目标）
@@ -745,6 +816,9 @@ class X86SymbolicExecutor:
 
         if target_block is None:
             # 目标块不存在，可能是外部跳转或超出范围
+            self._mark_coverage_incomplete(
+                f"jmp target 0x{target_addr:x} is outside the local CFG"
+            )
             return []
 
         target_node = self.cfg.get_or_create_node(target_addr)
@@ -818,6 +892,16 @@ class X86SymbolicExecutor:
 
         new_states = []
 
+        if target_block is None and _keep_branch(jump_condition):
+            if target_addr is None:
+                self._mark_coverage_incomplete(
+                    f"unresolved conditional target at 0x{insn.addr:x}"
+                )
+            else:
+                self._mark_coverage_incomplete(
+                    f"conditional target 0x{target_addr:x} is outside the local CFG"
+                )
+
         # 分支 1：跳转到目标（条件为真）
         if target_block is not None and _keep_branch(jump_condition):
             target_node = self.cfg.get_or_create_node(target_addr)
@@ -863,6 +947,10 @@ class X86SymbolicExecutor:
                 fallthrough_addr
             )
             new_states.append(fallthrough_state)
+        elif current_idx + 1 >= len(self.blocks) and _keep_branch(fallthrough_condition):
+            self._mark_coverage_incomplete(
+                f"conditional fallthrough at 0x{insn.addr:x} leaves the local CFG"
+            )
 
         return new_states
 
@@ -1114,9 +1202,17 @@ class X86SymbolicExecutor:
                 "GO compileCallGoFunction always uses static return addresses"
             )
 
+        if not return_addr_analysis.targets:
+            self._mark_coverage_incomplete(
+                f"GO bridge ret at 0x{block.start_addr:x} has no static return target"
+            )
+
         for target_addr, _ in return_addr_analysis.targets:
             target_block = self.blocks_by_addr.get(target_addr)
             if target_block is None:
+                self._mark_coverage_incomplete(
+                    f"GO bridge return target 0x{target_addr:x} is outside the local CFG"
+                )
                 continue
 
             resume_world_state = copy_module.copy(global_state.world_state)

@@ -8,20 +8,33 @@ from typing import Optional, Tuple
 
 from z3 import (
     And,
+    BitVec,
+    BitVecVal,
     BoolVal,
     Context,
+    Goal,
     Not,
     Or,
+    Select,
     SolverFor,
+    Tactic,
+    Then,
+    simplify,
+    substitute,
+    UGE,
     sat,
     unsat,
 )
+
+from common.path_observation import PathCoverageCertificate
 
 from .refinement_context import _RefinementContext
 from .refinement_outputs import OutputRefinementChecks
 
 
 _Z3_TRANSLATE_LOCK = threading.Lock()
+_PATH_FEASIBILITY_RESCUE_LOCK = threading.Lock()
+_PATH_FEASIBILITY_RESCUE_ATTEMPTS = 1
 _PATH_RESULT_KEYS = (
     "condition",
     "offset",
@@ -32,6 +45,60 @@ _PATH_RESULT_KEYS = (
     "storage",
     "transient_storage",
 )
+
+
+def _expr_mentions_symbol(expr, symbol_name: str) -> bool:
+    """判断表达式是否包含指定名称的未解释常量。"""
+    from z3 import Z3_OP_UNINTERPRETED
+
+    seen = set()
+    stack = [expr]
+    while stack:
+        cur = stack.pop()
+        if cur is None:
+            continue
+        try:
+            key = cur.hash()
+        except Exception:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            decl = cur.decl()
+            if (
+                decl.kind() == Z3_OP_UNINTERPRETED
+                and decl.name() == symbol_name
+                and len(cur.children()) == 0
+            ):
+                return True
+            stack.extend(cur.children())
+        except Exception:
+            continue
+    return False
+
+
+def _preprocess_partition_query(query, ctx):
+    """对具体 partition 查询做轻量预处理。"""
+    try:
+        goal = Goal(ctx=ctx) if ctx is not None else Goal()
+        goal.add(query)
+        tactic = (
+            Then(
+                Tactic("simplify", ctx=ctx),
+                Tactic("propagate-values", ctx=ctx),
+                Tactic("solve-eqs", ctx=ctx),
+            )
+            if ctx is not None
+            else Then("simplify", "propagate-values", "solve-eqs")
+        )
+        subgoals = tactic(goal)
+        if len(subgoals) != 1:
+            return query
+        formulas = list(subgoals[0])
+        return simplify(And(BoolVal(True, ctx=ctx), *formulas))
+    except Exception:
+        return query
 
 
 @dataclass
@@ -57,6 +124,9 @@ class PathRefinementChecks:
         x86_results: list[dict],
         path_pair_workers: int = 1,
         skip_feasibility: bool = False,
+        evm_coverage: Optional[PathCoverageCertificate] = None,
+        x86_coverage: Optional[PathCoverageCertificate] = None,
+        coverage_precondition=None,
     ) -> Tuple[bool, Optional[str]]:
         """Check refinement directly over terminal path observations.
 
@@ -82,10 +152,22 @@ class PathRefinementChecks:
         if not x86_results:
             return False, "✗ NO TERMINAL PATHS: x86 program produced no terminal state"
 
-        verified, msg = self._check_path_coverage(evm_results, "EVM", deadline)
+        verified, msg = self._check_path_coverage(
+            evm_results,
+            "EVM",
+            deadline,
+            evm_coverage,
+            coverage_precondition,
+        )
         if not verified:
             return False, msg
-        verified, msg = self._check_path_coverage(x86_results, "x86", deadline)
+        verified, msg = self._check_path_coverage(
+            x86_results,
+            "x86",
+            deadline,
+            x86_coverage,
+            coverage_precondition,
+        )
         if not verified:
             return False, msg
 
@@ -125,6 +207,7 @@ class PathRefinementChecks:
     ) -> tuple[int, int, Optional[str]]:
         pair_count = 0
         checked_pair_count = 0
+        aggregate_memory_verified_evm_paths: set[int] = set()
         for evm_index, evm_result in enumerate(evm_results):
             evm_condition = evm_result.get("condition", BoolVal(True))
             for x86_index, x86_result in enumerate(x86_results):
@@ -136,22 +219,208 @@ class PathRefinementChecks:
                         path_condition,
                         deadline,
                         f"evm[{evm_index}], x86[{x86_index}]",
+                        ctx=None,
                     )
                     if msg is not None:
                         return checked_pair_count, pair_count, msg
                     if not may_be_feasible:
                         continue
                 checked_pair_count += 1
-                verified, msg = self._outputs._check_refinement_direct_memory(
-                    evm_result,
-                    x86_result,
-                    deadline,
-                    path_condition=path_condition,
-                    context=f"path pair evm[{evm_index}], x86[{x86_index}]",
-                )
+                context = f"path pair evm[{evm_index}], x86[{x86_index}]"
+                if evm_index in aggregate_memory_verified_evm_paths:
+                    verified, msg = self._check_path_pair_storage_transient(
+                        evm_result,
+                        x86_result,
+                        deadline,
+                        path_condition,
+                        context,
+                    )
+                else:
+                    verified, msg = self._outputs._check_refinement_direct_memory(
+                        evm_result,
+                        x86_result,
+                        deadline,
+                        path_condition=path_condition,
+                        context=context,
+                    )
                 if not verified:
+                    aggregate_verified = self._check_evm_path_return_memory_against_x86_union(
+                        evm_result,
+                        x86_results,
+                        deadline,
+                        f"evm[{evm_index}]",
+                    )
+                    if aggregate_verified:
+                        aggregate_memory_verified_evm_paths.add(evm_index)
+                        if self._ctx.verbose:
+                            print(
+                                f"    ├─ EVM path evm[{evm_index}] aggregate "
+                                "x86 return/memory fallback succeeded"
+                            )
+                        verified, msg = self._check_path_pair_storage_transient(
+                            evm_result,
+                            x86_result,
+                            deadline,
+                            path_condition,
+                            context,
+                        )
+                        if verified:
+                            continue
                     return checked_pair_count, pair_count, msg
         return checked_pair_count, pair_count, None
+
+    def _check_path_pair_storage_transient(
+        self,
+        evm_result,
+        x86_result,
+        deadline: Optional[float],
+        path_condition,
+        context: str,
+    ) -> tuple[bool, Optional[str]]:
+        evm_storage = evm_result.get("storage")
+        x86_storage = x86_result.get("storage")
+        if evm_storage is not None and x86_storage is not None:
+            verified, msg = self._outputs._storage._check_storage_equivalence(
+                evm_storage,
+                x86_storage,
+                deadline,
+                path_condition,
+                context,
+            )
+            if not verified:
+                return False, msg
+
+        evm_ts = evm_result.get("transient_storage")
+        x86_ts = x86_result.get("transient_storage")
+        if evm_ts is not None and x86_ts is not None:
+            verified, msg = self._outputs._storage._check_transient_storage_equivalence(
+                evm_ts,
+                x86_ts,
+                deadline,
+                path_condition,
+                context,
+            )
+            if not verified:
+                return False, msg
+
+        return True, "Storage and transient storage equivalent"
+
+    def _check_evm_path_return_memory_against_x86_union(
+        self,
+        evm_result,
+        x86_results: list[dict],
+        deadline: Optional[float],
+        label: str,
+    ) -> bool:
+        """用所有 x86 路径联合证明单条 EVM 终止路径的 fallback。
+
+        pairwise 检查会证明每个可行的 ``evm_i ∧ x86_j`` 交集。部分不可行交集
+        会很难判，因为 x86 路径条件含有较大的 merge-origin ``Or/If`` 项。
+        这个 fallback 改问对偶问题：在一条 EVM 路径下，是否存在任意 x86
+        终止路径产生坏 observable？如果所有这类存在性坏查询都是 UNSAT，则该
+        EVM 路径已被完整的 x86 终止路径集合 refinement，剩余 pairwise 检查可省略。
+        """
+        evm_condition = evm_result.get("condition", BoolVal(True))
+        evm_has_return_data = evm_result.get(
+            "has_return_data",
+            evm_result["length"] != BitVecVal(0, 64),
+        )
+        evm_length = evm_result["length"]
+
+        def _x86_bad_disjunction(build_bad):
+            bad_cases = []
+            for x86_result in x86_results:
+                x86_condition = x86_result.get("condition", BoolVal(True))
+                x86_has_return_data = x86_result.get(
+                    "has_return_data",
+                    x86_result["length"] != BitVecVal(0, 64),
+                )
+                bad_cases.append(And(x86_condition, build_bad(x86_result, x86_has_return_data)))
+            return And(evm_condition, Or(*bad_cases))
+
+        if not self._check_union_bad_query_unsat(
+            _x86_bad_disjunction(
+                lambda _x86_result, x86_has_return_data: (
+                    evm_has_return_data != x86_has_return_data
+                )
+            ),
+            deadline,
+            f"{label} aggregate return-presence",
+        ):
+            return False
+
+        if not self._check_union_bad_query_unsat(
+            _x86_bad_disjunction(
+                lambda x86_result, x86_has_return_data: And(
+                    evm_has_return_data,
+                    x86_has_return_data,
+                    evm_length != x86_result["length"],
+                )
+            ),
+            deadline,
+            f"{label} aggregate return-length",
+        ):
+            return False
+
+        concrete_length = self._outputs._concrete_bv_value(evm_length)
+        if concrete_length is None:
+            return False
+        if concrete_length > self._ctx.tuning.memory_unroll_byte_limit:
+            return False
+
+        for byte_index in range(concrete_length):
+            index = BitVecVal(byte_index, 64)
+            evm_byte = Select(evm_result["memory"], evm_result["offset"] + index)
+            if not self._check_union_bad_query_unsat(
+                _x86_bad_disjunction(
+                    lambda x86_result, x86_has_return_data, index=index, evm_byte=evm_byte: And(
+                        evm_has_return_data,
+                        x86_has_return_data,
+                        evm_length == x86_result["length"],
+                        evm_byte != Select(
+                            x86_result["memory"],
+                            x86_result["base_addr"] + x86_result["offset"] + index,
+                        ),
+                    )
+                ),
+                deadline,
+                f"{label} aggregate memory byte {byte_index}",
+            ):
+                return False
+
+        return True
+
+    def _check_union_bad_query_unsat(
+        self,
+        query,
+        deadline: Optional[float],
+        label: str,
+        *,
+        timeout_cap_ms: Optional[int] = None,
+    ) -> bool:
+        solver = SolverFor("QF_AUFBV")
+        cap = (
+            self._ctx.tuning.storage_calldatasize_tail_partition_timeout_ms
+            if timeout_cap_ms is None
+            else timeout_cap_ms
+        )
+        if not self._ctx.reset_solver_with_capped_budget_for(
+            solver,
+            self._ctx.timeout_ms,
+            deadline,
+            cap,
+        ):
+            return False
+
+        solver.add(query)
+        start = time.time()
+        result = solver.check()
+        solve_time = time.time() - start
+        if self._ctx.verbose:
+            print(
+                f"    ├─ {label}: {solve_time:.3f}s, result={result}"
+            )
+        return result == unsat
 
     def _check_path_pairs_parallel(
         self,
@@ -169,15 +438,17 @@ class PathRefinementChecks:
         pair_count = len(pair_specs)
         checked_pair_count = 0
         max_workers = min(path_pair_workers, pair_count)
+        target_chunk_count = max_workers * 16
+        chunk_size = max(1, (pair_count + target_chunk_count - 1) // target_chunk_count)
         chunks = [
-            pair_specs[worker_index::max_workers]
-            for worker_index in range(max_workers)
+            pair_specs[start:start + chunk_size]
+            for start in range(0, pair_count, chunk_size)
         ]
 
         if self._ctx.verbose:
             print(
                 f"    ├─ Checking {pair_count} path pair(s) with "
-                f"{max_workers} worker thread(s)"
+                f"{max_workers} worker thread(s), {len(chunks)} batch(es)"
             )
 
         failure_message = None
@@ -248,6 +519,7 @@ class PathRefinementChecks:
                     deadline,
                     label,
                     logs,
+                    ctx=ctx,
                 )
                 if msg is not None:
                     return _PathPairChunkCheckResult(checked_pair_count, False, msg, logs)
@@ -298,7 +570,23 @@ class PathRefinementChecks:
         path_results: list[dict],
         label: str,
         deadline: Optional[float],
+        coverage: Optional[PathCoverageCertificate] = None,
+        precondition=None,
     ) -> Tuple[bool, Optional[str]]:
+        if coverage is not None and coverage.complete:
+            if self._ctx.verbose:
+                source = f" ({coverage.source})" if coverage.source else ""
+                print(
+                    f"    ├─ {label} terminal path coverage check: "
+                    f"0.000s, by-construction{source}: {coverage.reason}"
+                )
+            return True, None
+        if coverage is not None and self._ctx.verbose:
+            print(
+                f"    ├─ {label} terminal path coverage certificate incomplete: "
+                f"{coverage.reason}; falling back to SMT"
+            )
+
         if not self._ctx.reset_solver_with_budget(deadline):
             msg = self._ctx.timeout_message()
             if self._ctx.verbose:
@@ -306,6 +594,8 @@ class PathRefinementChecks:
             return False, msg
 
         conditions = [result.get("condition", BoolVal(True)) for result in path_results]
+        if precondition is not None:
+            self._ctx.solver.add(precondition)
         self._ctx.solver.add(Not(Or(*conditions)))
 
         start_time = time.time()
@@ -326,6 +616,7 @@ class PathRefinementChecks:
         path_condition,
         deadline: Optional[float],
         label: str,
+        ctx=None,
     ) -> tuple[bool, Optional[str]]:
         return self._check_path_pair_may_be_feasible_with_solver(
             self._ctx.solver,
@@ -333,6 +624,7 @@ class PathRefinementChecks:
             deadline,
             label,
             logs=None,
+            ctx=ctx,
         )
 
     def _check_path_pair_may_be_feasible_with_solver(
@@ -342,6 +634,7 @@ class PathRefinementChecks:
         deadline: Optional[float],
         label: str,
         logs: Optional[list[str]],
+        ctx=None,
     ) -> tuple[bool, Optional[str]]:
         if not self._ctx.reset_solver_with_capped_budget_for(
             solver,
@@ -368,5 +661,145 @@ class PathRefinementChecks:
             return False, None
         if result == sat:
             return True, None
-        # UNKNOWN is handled conservatively: do not prune the pair.
+
+        for attempt in range(_PATH_FEASIBILITY_RESCUE_ATTEMPTS):
+            rescue_ctx = Context()
+            rescue_condition = path_condition.translate(rescue_ctx)
+            rescue_solver = (
+                SolverFor("QF_AUFBV", ctx=rescue_ctx)
+            )
+            if not self._ctx.reset_solver_with_capped_budget_for(
+                rescue_solver,
+                self._ctx.timeout_ms,
+                deadline,
+                self._ctx.tuning.path_pair_feasibility_rescue_timeout_ms,
+            ):
+                msg = self._ctx.timeout_message()
+                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+                return True, msg
+
+            rescue_solver.add(rescue_condition)
+            start_time = time.time()
+            with _PATH_FEASIBILITY_RESCUE_LOCK:
+                rescue_result = rescue_solver.check()
+            solve_time = time.time() - start_time
+
+            retry = f" retry {attempt + 1}" if attempt else ""
+            self._ctx.emit_solver_log(
+                logs,
+                f"    ├─ Path pair feasibility rescue{retry} {label}: "
+                f"{solve_time:.3f}s, result={rescue_result}",
+            )
+
+            if rescue_result == unsat:
+                return False, None
+            if rescue_result == sat:
+                return True, None
+        partition_result, msg = self._check_path_pair_calldatasize_partition_unsat(
+            path_condition,
+            deadline,
+            label,
+            logs,
+        )
+        if msg is not None:
+            return True, msg
+        if partition_result:
+            return False, None
+        # UNKNOWN 保守处理：不剪掉这个 pair。
+        return True, None
+
+    def _check_path_pair_calldatasize_partition_unsat(
+        self,
+        path_condition,
+        deadline: Optional[float],
+        label: str,
+        logs: Optional[list[str]],
+    ) -> tuple[bool, Optional[str]]:
+        """对难解可行性查询尝试按 calldata size 穷举切分。"""
+        if not _expr_mentions_symbol(path_condition, "CallDataSize"):
+            return False, None
+
+        partition_ctx = Context()
+        condition = path_condition.translate(partition_ctx)
+        calldata_size = BitVec("CallDataSize", 64, ctx=partition_ctx)
+        exact_limit = self._ctx.tuning.path_pair_calldatasize_exact_partition_limit
+        exact_timeout_ms = (
+            self._ctx.tuning.path_pair_calldatasize_exact_partition_timeout_ms
+        )
+        tail_timeout_ms = (
+            self._ctx.tuning.path_pair_calldatasize_tail_partition_timeout_ms
+        )
+        total_solve_time = 0.0
+        start = time.time()
+
+        def _check_query(query_condition, timeout_ms):
+            query_condition = _preprocess_partition_query(
+                query_condition,
+                partition_ctx,
+            )
+            solver = SolverFor("QF_AUFBV", ctx=partition_ctx)
+            if not self._ctx.reset_solver_with_capped_budget_for(
+                solver,
+                self._ctx.timeout_ms,
+                deadline,
+                timeout_ms,
+            ):
+                return None, 0.0
+            solver.add(query_condition)
+            query_start = time.time()
+            with _PATH_FEASIBILITY_RESCUE_LOCK:
+                result = solver.check()
+            solve_time = time.time() - query_start
+            return result, solve_time
+
+        for i in range(exact_limit):
+            size_value = BitVecVal(i, 64, ctx=partition_ctx)
+            exact_condition = simplify(
+                substitute(condition, (calldata_size, size_value))
+            )
+            result, solve_time = _check_query(
+                exact_condition,
+                exact_timeout_ms,
+            )
+            total_solve_time += solve_time
+            if result is None:
+                msg = self._ctx.timeout_message()
+                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+                return False, msg
+            if result == unsat:
+                continue
+            self._ctx.emit_solver_log(
+                logs,
+                f"    ├─ Path pair feasibility calldata-size split {label} "
+                f"size={i}: {solve_time:.3f}s, result={result}",
+            )
+            return False, None
+
+        tail_condition = UGE(
+            calldata_size,
+            BitVecVal(exact_limit, 64, ctx=partition_ctx),
+        )
+        result, solve_time = _check_query(
+            And(condition, tail_condition),
+            tail_timeout_ms,
+        )
+        total_solve_time += solve_time
+        if result is None:
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        if result != unsat:
+            self._ctx.emit_solver_log(
+                logs,
+                f"    ├─ Path pair feasibility calldata-size split {label} "
+                f"size>={exact_limit}: {solve_time:.3f}s, result={result}",
+            )
+            return False, None
+
+        self._ctx.emit_solver_log(
+            logs,
+            f"    ├─ Path pair feasibility calldata-size partition {label}: "
+            f"{time.time() - start:.3f}s wall / {total_solve_time:.3f}s solve, "
+            "all partitions unsat",
+        )
         return True, None

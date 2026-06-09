@@ -58,6 +58,7 @@ X86_ADD_FULL_BASE_ADDR = 0x0
 # muti_block 程序级样本（文件中存放十六进制机器码）
 X86_MUTI_BLOCK_BASE_ADDR = 0x0
 X86_MUTI_BLOCK_08_BASE_ADDR = 0x0
+GO_AMD64_MAX_SLICE_LEN = (1 << 63) - 1
 
 
 # ===========================
@@ -172,9 +173,9 @@ def test_verify_mstore_return_program_pair():
     所有值为具体常量，无符号输入。
 
     RefinementChecker 验证三项属性：
-    1. Return 条件一致（双方都 return）
-    2. Return 长度一致（都是 32 字节）
-    3. Return 区域的内存内容一致
+    1. 返回条件一致（双方都 return）
+    2. 返回长度一致（都是 32 字节）
+    3. 返回区域的内存内容一致
     """
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "mstore_return.json")
@@ -427,9 +428,8 @@ def test_verify_perf_erc20_lite_program_pair():
     assert calldataload_stats["hits"] == 5
 
 
-@pytest.mark.skip(reason="Not impl well")
 def test_verify_muti_block_program_pair_full():
-    """使用 muti_block.json 与 muti_block.hex 进行全量程序等价验证。"""
+    """使用 muti_block.json 与 muti_block.hex 进行 path observation 等价验证。"""
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "muti_block.json")
     x86_hex_path = os.path.join(test_dir, "..", "data", "muti_block.hex")
@@ -441,14 +441,35 @@ def test_verify_muti_block_program_pair_full():
         x86_hex_sequence = f.read().strip()
     x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=X86_MUTI_BLOCK_BASE_ADDR)
 
-    checker = ProgramEquivalenceChecker(timeout_ms=180000, verbose=False)
-    initial_state = SMTState.create_initial_state(0)
-    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
+    checker = ProgramEquivalenceChecker(timeout_ms=1200000, verbose=False)
+    initial_state = SMTState.create_initial_state(
+        calldata_size_max_bytes=GO_AMD64_MAX_SLICE_LEN,
+    )
+    initial_state.abstract_calldataload_words = True
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+        path_observations=True,
+        # pair checker 保持单线程路径：这个实现带有本 fixture 需要的
+        # aggregate x86-memory fallback；同时 x86 不 merge 时 pair 数仍足够小。
+        path_pair_workers=1,
+        # 对这个样本，merge 只把 x86 终止路径从 30 条降到 26 条，
+        # 却会把大的 path-conditioned ITE 注入 stack/storage 表达式。
+        enable_merge=False,
+        summary_config=TRUSTED_SUMMARY_CONFIG,
+        x86_reachability_timeout_ms=250,
+    )
 
     assert verified, (
         f"muti_block program pair verification failed. "
-        f"EVM program from {ir_path} and x86 program from {x86_hex_path} should be equivalent. Error: {msg}"
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent observable results. Error: {msg}"
     )
+    calldataload_stats = x86_program.last_summary_stats["calldataload"]
+    assert calldataload_stats["discovered"] == 8
+    assert calldataload_stats["hits"] == 8
 
 
 @pytest.mark.skip(reason="Not impl well")

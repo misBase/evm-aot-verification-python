@@ -777,9 +777,15 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
                 state.calldatasize,
                 offset_bv,
                 omit_overflow_guard=True,
+                abstract=getattr(state, 'abstract_calldataload_words', False),
             )
         else:
-            data_256 = calldataload_word(state.calldata, state.calldatasize, offset_bv)
+            data_256 = calldataload_word(
+                state.calldata,
+                state.calldatasize,
+                offset_bv,
+                abstract=getattr(state, 'abstract_calldataload_words', False),
+            )
         state.evm_stack = stack_after_pop.push(data_256)
         return state
 
