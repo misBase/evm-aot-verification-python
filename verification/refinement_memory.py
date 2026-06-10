@@ -1,4 +1,4 @@
-"""Return-data memory content equivalence helpers."""
+"""return-data memory 内容等价检查辅助函数。"""
 
 import time
 from typing import Optional, Tuple
@@ -34,7 +34,7 @@ from .refinement_context import _RefinementContext
 
 
 class MemoryContentChecks:
-    """Concrete-length return-data memory equivalence checks."""
+    """小具体长度 return-data memory 等价检查。"""
 
     def __init__(self, ctx: _RefinementContext):
         self._ctx = ctx
@@ -65,7 +65,7 @@ class MemoryContentChecks:
 
     @staticmethod
     def _cached_store_chain(memory, select_cache: dict):
-        """Return a cache entry for Select(Store(...), key) lookups."""
+        """缓存 Store 链拆解结果，供 Select(Store(...), key) 快速命中。"""
         try:
             memory_hash = memory.hash()
         except Exception:
@@ -93,7 +93,7 @@ class MemoryContentChecks:
 
     @staticmethod
     def memory_select_expr(memory, index, select_cache: Optional[dict] = None):
-        """Select one memory byte, cheaply resolving exact Store-chain hits."""
+        """读取一个 memory byte，并尽量直接化简精确命中的 Store 链。"""
         if select_cache is not None:
             entry = MemoryContentChecks._cached_store_chain(
                 memory,
@@ -115,8 +115,8 @@ class MemoryContentChecks:
                             continue
                     except Exception:
                         pass
-                    # A newer symbolic Store may alias this index; keep Z3's
-                    # native latest-write semantics instead of guessing.
+                    # 较新的符号 Store 可能 alias 当前下标；这里交回 Z3 保持
+                    # 原生 latest-write 语义，避免自行猜测。
                     return Select(memory, index)
                 return simplify(Select(base, index))
 
@@ -124,7 +124,7 @@ class MemoryContentChecks:
 
     @staticmethod
     def _memory_chunk_expr(memory, base, start: int, size: int, ctx, select_cache=None):
-        """Return a big-endian byte chunk expression from an Array memory."""
+        """从 Array memory 拼出一个 big-endian byte chunk 表达式。"""
         if size <= 0:
             raise ValueError("memory chunk size must be positive")
         bytes_list = [
@@ -136,6 +136,80 @@ class MemoryContentChecks:
             for i in range(size)
         ]
         return simplify(bytes_list[0] if size == 1 else Concat(*bytes_list))
+
+    @staticmethod
+    def _return_memory_mismatch_query(
+        condition,
+        evm_has_return_data,
+        x86_has_return_data,
+        evm_length,
+        x86_length,
+        mismatch,
+        ctx,
+    ):
+        """组装 return memory 反例查询的公共约束。"""
+        return And(
+            BoolVal(True, ctx=ctx),
+            condition,
+            evm_has_return_data,
+            x86_has_return_data,
+            evm_length == x86_length,
+            mismatch,
+        )
+
+    def _check_return_memory_mismatch_with_solver(
+        self,
+        solver,
+        condition,
+        mismatch,
+        evm_has_return_data,
+        x86_has_return_data,
+        evm_length,
+        x86_length,
+        deadline: Optional[float],
+        timeout_ms: int,
+        logs: Optional[list[str]],
+        ctx,
+    ):
+        """带预算查询是否存在 return memory mismatch 反例。"""
+        if not self._ctx.reset_solver_with_capped_budget_for(
+            solver,
+            self._ctx.timeout_ms,
+            deadline,
+            timeout_ms,
+        ):
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return None, 0.0, msg
+
+        solver.add(
+            self._return_memory_mismatch_query(
+                condition,
+                evm_has_return_data,
+                x86_has_return_data,
+                evm_length,
+                x86_length,
+                mismatch,
+                ctx,
+            )
+        )
+
+        query_start = time.time()
+        result = solver.check()
+        solve_time = time.time() - query_start
+        return result, solve_time, None
+
+    @staticmethod
+    def _memory_counterexample_message(context: str, detail: Optional[str] = None):
+        """构造 memory 内容不一致的反例消息。"""
+        msg = (
+            "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
+            "(memory contents differ)"
+        )
+        if context:
+            suffix = context if detail is None else f"{context}, {detail}"
+            msg = f"{msg} ({suffix})"
+        return msg
 
     def _check_memory_content_chunked_with_solver(
         self,
@@ -157,12 +231,12 @@ class MemoryContentChecks:
         logs: Optional[list[str]],
         ctx,
     ) -> Tuple[Optional[bool], Optional[str], set[int], float]:
-        """Prove return memory equality in coarse byte chunks.
+        """用较粗的 byte chunk 证明 return memory 内容一致。
 
-        The byte fallback below is still the ground truth.  This helper only
-        records byte ranges whose concatenated mismatch query is UNSAT; unknown
-        chunk queries fall back to the original per-byte checks.
+        逐 byte fallback 仍是最终基准；这里仅记录 chunk mismatch 查询已
+        UNSAT 的 byte 范围，难解的 chunk 会回退到逐 byte 检查。
         """
+        # 优先尝试大块，剩余长度不足时逐步降到 4 byte。
         chunk_sizes = (32, 16, 8, 4)
         if length < chunk_sizes[-1]:
             return None, None, set(), 0.0
@@ -198,6 +272,7 @@ class MemoryContentChecks:
             )
             mismatch = simplify(evm_chunk != x86_chunk)
 
+            # 先尝试更弱的 storage-independent 条件；失败再用完整条件确认。
             conditions = []
             if storage_independent_condition is not None:
                 conditions.append(("storage-independent", storage_independent_condition))
@@ -205,41 +280,33 @@ class MemoryContentChecks:
 
             proved = False
             for condition_kind, condition in conditions:
-                if not self._ctx.reset_solver_with_capped_budget_for(
+                result, solve_time, error_msg = self._check_return_memory_mismatch_with_solver(
                     solver,
-                    self._ctx.timeout_ms,
+                    condition,
+                    mismatch,
+                    evm_has_return_data,
+                    x86_has_return_data,
+                    evm_length,
+                    x86_length,
                     deadline,
                     chunk_timeout_ms,
-                ):
-                    msg = self._ctx.timeout_message()
-                    self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                    return False, msg, verified_indices, total_solve_time
-
-                solver.add(condition)
-                solver.add(evm_has_return_data)
-                solver.add(x86_has_return_data)
-                solver.add(evm_length == x86_length)
-                solver.add(mismatch)
-
-                query_start = time.time()
-                result = solver.check()
-                solve_time = time.time() - query_start
+                    logs,
+                    ctx,
+                )
                 total_solve_time += solve_time
+                if error_msg is not None:
+                    return False, error_msg, verified_indices, total_solve_time
 
                 if result == unsat:
                     verified_indices.update(range(start, start + size))
                     proved = True
                     break
                 if result == sat and condition_kind == "full":
-                    msg = (
-                        "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
-                        "(memory contents differ)"
+                    # 只有完整 path_condition 下 SAT 才是真实内存反例。
+                    msg = self._memory_counterexample_message(
+                        context,
+                        f"bytes {start}..{start + size - 1}",
                     )
-                    if context:
-                        msg = (
-                            f"{msg} ({context}, bytes {start}"
-                            f"..{start + size - 1})"
-                        )
                     self._ctx.emit_solver_log(logs, f"    └─ {msg}")
                     return False, msg, verified_indices, total_solve_time
 
@@ -255,6 +322,7 @@ class MemoryContentChecks:
                 fallback_streak = 0
             start += size
             if fallback_streak >= fallback_streak_limit and start < length:
+                # 连续多个 chunk 都难以证明时，停止 chunk 尝试，交给逐 byte 检查。
                 prefix = f"{context}: " if context else ""
                 self._ctx.emit_solver_log(
                     logs,
@@ -282,6 +350,7 @@ class MemoryContentChecks:
         ctx,
     ) -> Optional[Tuple[bool, Optional[str], float]]:
         """按 CallDataSize 穷举切分难解的 byte mismatch 查询。"""
+        # 只有查询真的依赖 CallDataSize 时，分区才可能带来化简收益。
         if not expr_mentions_symbol(mismatch_query, "CallDataSize"):
             return None
 
@@ -292,6 +361,7 @@ class MemoryContentChecks:
         total_solve_time = 0.0
         start = time.time()
 
+        # 每个分区先轻量化简，消掉替换 CallDataSize 后的分支条件。
         def _preprocess_query(query):
             try:
                 goal = Goal(ctx=ctx) if ctx is not None else Goal()
@@ -332,6 +402,7 @@ class MemoryContentChecks:
             result = partition_solver.check()
             return result, time.time() - query_start
 
+        # 先枚举小的精确 calldata size。
         for size in range(exact_limit):
             size_value = BitVecVal(size, 64, ctx=ctx)
             exact_query = simplify(
@@ -352,16 +423,15 @@ class MemoryContentChecks:
                 f"size={size}: {solve_time:.3f}s, result={result}",
             )
             if result == sat:
-                msg = (
-                    "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
-                    "(memory contents differ)"
+                msg = self._memory_counterexample_message(
+                    context,
+                    f"byte {byte_index}, size={size}",
                 )
-                if context:
-                    msg = f"{msg} ({context}, byte {byte_index}, size={size})"
                 self._ctx.emit_solver_log(logs, f"    └─ {msg}")
                 return False, msg, total_solve_time
             return None
 
+        # 剩余较大的 calldata size 合并成一个尾部分区。
         tail_query = And(
             mismatch_query,
             UGE(calldata_size, BitVecVal(exact_limit, 64, ctx=ctx)),
@@ -388,12 +458,10 @@ class MemoryContentChecks:
             f"size>={exact_limit}: {solve_time:.3f}s, result={result}",
         )
         if result == sat:
-            msg = (
-                "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
-                "(memory contents differ)"
+            msg = self._memory_counterexample_message(
+                context,
+                f"byte {byte_index}, size>={exact_limit}",
             )
-            if context:
-                msg = f"{msg} ({context}, byte {byte_index}, size>={exact_limit})"
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return False, msg, total_solve_time
         return None
@@ -417,11 +485,17 @@ class MemoryContentChecks:
         logs: Optional[list[str]],
         ctx,
     ) -> Optional[Tuple[bool, Optional[str]]]:
+        """证明小具体长度 return data 的 memory 内容一致。
+
+        返回 None 表示快路径不适用，调用方应退回符号下标的通用 memory 检查。
+        """
+        # 只处理可安全展开的小长度；更长的返回数据交给通用路径。
         if length > self._ctx.tuning.memory_unroll_byte_limit:
             return None
 
         total_solve_time = 0.0
         start = time.time()
+        # 空返回区间没有 byte 需要比较；return metadata 已由调用方先证明。
         if length == 0:
             prefix = f"{context}: " if context else ""
             self._ctx.emit_solver_log(
@@ -430,10 +504,15 @@ class MemoryContentChecks:
                 "0.000s wall / 0.000s solve, unrolled 0 byte(s)",
             )
             return True, "Memory contents equivalent (unrolled)"
+
+        # 如果路径条件里混有 storage-only 事实，先尝试用更弱、更容易求解的条件
+        # 证明 memory byte 相等；证明不了再回到完整 path_condition。
         storage_independent_condition = self._storage_independent_condition(
             path_condition,
             ctx,
         )
+        # 先用 32/16/8/4-byte chunk 做粗粒度反例查询，能一次证明一段就跳过
+        # 后续逐 byte 检查。
         chunk_status, chunk_msg, chunk_verified_indices, chunk_solve_time = (
             self._check_memory_content_chunked_with_solver(
                 solver,
@@ -468,6 +547,7 @@ class MemoryContentChecks:
             )
             return True, chunk_msg
 
+        # chunk 未覆盖的部分退回逐 byte 检查；每个查询仍然按“找反例”写。
         byte_select_cache = {}
         for byte_index in range(length):
             if byte_index in chunk_verified_indices:
@@ -485,57 +565,56 @@ class MemoryContentChecks:
             )
             mismatch = simplify(evm_byte != x86_byte)
             if storage_independent_condition is not None:
-                if not self._ctx.reset_solver_with_capped_budget_for(
+                # 弱条件下 UNSAT 已足以证明完整路径下也不会有该 byte 的反例。
+                result, solve_time, error_msg = self._check_return_memory_mismatch_with_solver(
                     solver,
-                    self._ctx.timeout_ms,
+                    storage_independent_condition,
+                    mismatch,
+                    evm_has_return_data,
+                    x86_has_return_data,
+                    evm_length,
+                    x86_length,
                     deadline,
                     self._ctx.tuning.memory_unroll_byte_timeout_ms,
-                ):
-                    msg = self._ctx.timeout_message()
-                    self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                    return False, msg
-                solver.add(storage_independent_condition)
-                solver.add(evm_has_return_data)
-                solver.add(x86_has_return_data)
-                solver.add(evm_length == x86_length)
-                solver.add(mismatch)
-
-                query_start = time.time()
-                result = solver.check()
-                solve_time = time.time() - query_start
+                    logs,
+                    ctx,
+                )
                 total_solve_time += solve_time
+                if error_msg is not None:
+                    return False, error_msg
                 if result == unsat:
                     continue
 
-            if not self._ctx.reset_solver_with_capped_budget_for(
+            # 弱条件证明不了时，用完整 path_condition 确认是否真有反例。
+            result, solve_time, error_msg = self._check_return_memory_mismatch_with_solver(
                 solver,
-                self._ctx.timeout_ms,
+                path_condition,
+                mismatch,
+                evm_has_return_data,
+                x86_has_return_data,
+                evm_length,
+                x86_length,
                 deadline,
                 self._ctx.tuning.memory_unroll_byte_timeout_ms,
-            ):
-                msg = self._ctx.timeout_message()
-                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                return False, msg
-
-            solver.add(path_condition)
-            solver.add(evm_has_return_data)
-            solver.add(x86_has_return_data)
-            solver.add(evm_length == x86_length)
-            solver.add(mismatch)
-
-            query_start = time.time()
-            result = solver.check()
-            solve_time = time.time() - query_start
+                logs,
+                ctx,
+            )
             total_solve_time += solve_time
+            if error_msg is not None:
+                return False, error_msg
 
             if result == unsat:
                 continue
-            mismatch_query = And(
+            # 带 CallDataSize 的查询有时整体难解；按具体 calldata size 分区后，
+            # 很多边界 ITE 可以被化简掉。
+            mismatch_query = self._return_memory_mismatch_query(
                 path_condition,
                 evm_has_return_data,
                 x86_has_return_data,
-                evm_length == x86_length,
+                evm_length,
+                x86_length,
                 mismatch,
+                ctx,
             )
             partition_result = self._check_memory_byte_mismatch_by_calldatasize_partition(
                 mismatch_query,
@@ -559,12 +638,10 @@ class MemoryContentChecks:
                 f"{solve_time:.3f}s, result={result}",
             )
             if result == sat:
-                msg = (
-                    "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
-                    "(memory contents differ)"
+                msg = self._memory_counterexample_message(
+                    context,
+                    f"byte {byte_index}",
                 )
-                if context:
-                    msg = f"{msg} ({context}, byte {byte_index})"
                 self._ctx.emit_solver_log(logs, f"    └─ {msg}")
                 return False, msg
             msg = self._ctx.unknown_message_for_solver(
@@ -574,6 +651,7 @@ class MemoryContentChecks:
             self._ctx.emit_solver_log(logs, f"    └─ {msg} (byte {byte_index})")
             return False, msg
 
+        # 所有未被 chunk 覆盖的 byte 都已逐个证明不存在 mismatch。
         prefix = f"{context}: " if context else ""
         self._ctx.emit_solver_log(
             logs,

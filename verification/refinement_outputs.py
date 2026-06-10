@@ -79,6 +79,7 @@ class OutputRefinementChecks:
         logs: Optional[list[str]],
         ctx,
     ) -> Tuple[bool, Optional[str]]:
+        """证明 return-data 元信息一致：是否有返回数据，以及非空时的长度。"""
         if not self._ctx.reset_solver_with_budget_for(solver, self._ctx.timeout_ms, deadline):
             msg = self._ctx.timeout_message()
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")
@@ -138,6 +139,51 @@ class OutputRefinementChecks:
             return False, msg
         return True, None
 
+    def _check_state_observables_with_solver(
+        self,
+        solver,
+        evm_result: dict,
+        x86_result: dict,
+        deadline: Optional[float],
+        path_condition,
+        context: str,
+        logs: Optional[list[str]],
+        ctx,
+    ) -> Tuple[bool, Optional[str]]:
+        """检查 return data 之外的状态 observable：storage 和 transient storage。"""
+        evm_storage = evm_result.get('storage')
+        x86_storage = x86_result.get('storage')
+        if evm_storage is not None and x86_storage is not None:
+            verified, msg = self._storage._check_storage_equivalence_with_solver(
+                solver,
+                evm_storage,
+                x86_storage,
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
+
+        evm_ts = evm_result.get('transient_storage')
+        x86_ts = x86_result.get('transient_storage')
+        if evm_ts is not None and x86_ts is not None:
+            verified, msg = self._storage._check_transient_storage_equivalence_with_solver(
+                solver,
+                evm_ts,
+                x86_ts,
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
+        return True, None
+
     def check_observables_with_solver(
         self,
         solver,
@@ -149,7 +195,12 @@ class OutputRefinementChecks:
         logs: Optional[list[str]] = None,
         ctx=None,
     ) -> Tuple[bool, Optional[str]]:
-        """Check return data, memory, storage, and transient storage observables."""
+        """检查 return data、memory、storage、transient storage 是否精化一致。
+
+        这里的 solver 查询都按“寻找反例”来写：SAT 表示存在某组输入让
+        某个 observable 不一致；UNSAT 才表示在 path_condition 下已证明相等。
+        """
+        # 先取出外部可观测结果；has_return_data 缺省时退化为 length != 0。
         evm_offset = evm_result['offset']
         evm_length = evm_result['length']
         evm_memory = evm_result['memory']
@@ -168,25 +219,29 @@ class OutputRefinementChecks:
         )
         path_condition = path_condition if path_condition is not None else BoolVal(True, ctx=ctx)
 
+        # return metadata 是所有 memory 检查策略的共同前置条件，统一先证明一次。
+        verified, msg = self._check_return_metadata_with_solver(
+            solver,
+            evm_has_return_data,
+            x86_has_return_data,
+            evm_length,
+            x86_length,
+            deadline,
+            path_condition,
+            context,
+            logs,
+            ctx,
+        )
+        if not verified:
+            return False, msg
+
+        # 返回长度是小的具体常量时，优先走展开快路径，避免引入符号下标造成
+        # solver 压力。
         concrete_length = get_simplified_bv_const_value(evm_length)
         if (
             concrete_length is not None
             and concrete_length <= self._ctx.tuning.memory_unroll_byte_limit
         ):
-            verified, msg = self._check_return_metadata_with_solver(
-                solver,
-                evm_has_return_data,
-                x86_has_return_data,
-                evm_length,
-                x86_length,
-                deadline,
-                path_condition,
-                context,
-                logs,
-                ctx,
-            )
-            if not verified:
-                return False, msg
             unrolled = self._memory.check_concrete_length_memory_with_solver(
                 solver,
                 evm_memory,
@@ -209,37 +264,19 @@ class OutputRefinementChecks:
                 verified, msg = unrolled
                 if not verified:
                     return False, msg
-                evm_storage = evm_result.get('storage')
-                x86_storage = x86_result.get('storage')
-                if evm_storage is not None and x86_storage is not None:
-                    verified, msg = self._storage._check_storage_equivalence_with_solver(
-                        solver,
-                        evm_storage,
-                        x86_storage,
-                        deadline,
-                        path_condition,
-                        context,
-                        logs,
-                        ctx,
-                    )
-                    if not verified:
-                        return False, msg
-
-                evm_ts = evm_result.get('transient_storage')
-                x86_ts = x86_result.get('transient_storage')
-                if evm_ts is not None and x86_ts is not None:
-                    verified, msg = self._storage._check_transient_storage_equivalence_with_solver(
-                        solver,
-                        evm_ts,
-                        x86_ts,
-                        deadline,
-                        path_condition,
-                        context,
-                        logs,
-                        ctx,
-                    )
-                    if not verified:
-                        return False, msg
+                # 快路径只覆盖 return metadata 和 memory；storage 仍按常规等价检查。
+                verified, msg = self._check_state_observables_with_solver(
+                    solver,
+                    evm_result,
+                    x86_result,
+                    deadline,
+                    path_condition,
+                    context,
+                    logs,
+                    ctx,
+                )
+                if not verified:
+                    return False, msg
 
                 msg = (
                     "✓ VERIFIED: x86 refines EVM (non-empty return-data conditions, "
@@ -250,65 +287,8 @@ class OutputRefinementChecks:
                     self._ctx.emit_solver_log(logs, f"    └─ {msg}")
                 return True, msg
 
-        if not self._ctx.reset_solver_with_budget_for(solver, self._ctx.timeout_ms, deadline):
-            msg = self._ctx.timeout_message()
-            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-            return False, msg
-        solver.add(path_condition)
-        solver.add(evm_has_return_data != x86_has_return_data)
-
-        start_time = time.time()
-        result = solver.check()
-        solve_time = time.time() - start_time
-
-        prefix = f"{context}: " if context else ""
-        self._ctx.emit_solver_log(
-            logs,
-            f"    ├─ {prefix}Non-empty return-data condition check: "
-            f"{solve_time:.3f}s, result={result}",
-        )
-
-        if result == sat:
-            msg = "✗ COUNTEREXAMPLE: Non-empty return-data conditions differ"
-            if context:
-                msg = f"{msg} ({context})"
-            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-            return False, msg
-        if result != unsat:
-            msg = self._ctx.unknown_message_for_solver(solver, self._ctx.timeout_ms)
-            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-            return False, msg
-
-        if not self._ctx.reset_solver_with_budget_for(solver, self._ctx.timeout_ms, deadline):
-            msg = self._ctx.timeout_message()
-            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-            return False, msg
-        solver.add(path_condition)
-        solver.add(evm_has_return_data)
-        solver.add(x86_has_return_data)
-        solver.add(evm_length != x86_length)
-
-        start_time = time.time()
-        result = solver.check()
-        solve_time = time.time() - start_time
-
-        prefix = f"{context}: " if context else ""
-        self._ctx.emit_solver_log(
-            logs,
-            f"    ├─ {prefix}Length equality check: {solve_time:.3f}s, result={result}",
-        )
-
-        if result == sat:
-            msg = "✗ COUNTEREXAMPLE: Non-empty return-data lengths differ"
-            if context:
-                msg = f"{msg} ({context})"
-            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-            return False, msg
-        if result != unsat:
-            msg = self._ctx.unknown_message_for_solver(solver, self._ctx.timeout_ms)
-            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-            return False, msg
-
+        # 用一个符号下标 i 查询“是否存在某个返回字节不同”；
+        # x86 的实际内存地址需要加上运行时基址 base_addr。
         if not self._ctx.reset_solver_with_budget_for(solver, self._ctx.timeout_ms, deadline):
             msg = self._ctx.timeout_message()
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")
@@ -350,37 +330,19 @@ class OutputRefinementChecks:
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        evm_storage = evm_result.get('storage')
-        x86_storage = x86_result.get('storage')
-        if evm_storage is not None and x86_storage is not None:
-            verified, msg = self._storage._check_storage_equivalence_with_solver(
-                solver,
-                evm_storage,
-                x86_storage,
-                deadline,
-                path_condition,
-                context,
-                logs,
-                ctx,
-            )
-            if not verified:
-                return False, msg
-
-        evm_ts = evm_result.get('transient_storage')
-        x86_ts = x86_result.get('transient_storage')
-        if evm_ts is not None and x86_ts is not None:
-            verified, msg = self._storage._check_transient_storage_equivalence_with_solver(
-                solver,
-                evm_ts,
-                x86_ts,
-                deadline,
-                path_condition,
-                context,
-                logs,
-                ctx,
-            )
-            if not verified:
-                return False, msg
+        # 返回数据已证明一致后，再检查持久/临时 storage 这两个状态 observable。
+        verified, msg = self._check_state_observables_with_solver(
+            solver,
+            evm_result,
+            x86_result,
+            deadline,
+            path_condition,
+            context,
+            logs,
+            ctx,
+        )
+        if not verified:
+            return False, msg
 
         msg = (
             "✓ VERIFIED: x86 refines EVM (non-empty return-data conditions, lengths, "

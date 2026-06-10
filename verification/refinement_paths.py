@@ -1,4 +1,4 @@
-"""Terminal path-pair refinement orchestration."""
+"""终止路径 pair 级 refinement 检查编排。"""
 
 import threading
 import time
@@ -105,11 +105,11 @@ class PathRefinementChecks:
         x86_coverage: Optional[PathCoverageCertificate] = None,
         coverage_precondition=None,
     ) -> Tuple[bool, Optional[str]]:
-        """Check refinement directly over terminal path observations.
+        """直接在终止路径 observations 上检查 refinement。
 
-        This avoids first merging whole terminal memory/storage arrays.  For each
-        feasible EVM/x86 terminal-path intersection, it proves the same
-        observable properties as ``check_refinement``.
+        该模式避免先合并完整 terminal memory/storage Array。对每个可行的
+        EVM/x86 终止路径交集，证明与 ``check_refinement`` 相同的 observable
+        精化性质。
 
         Args:
             skip_feasibility: 跳过 ``_check_path_pair_may_be_feasible`` 预检查。
@@ -129,6 +129,7 @@ class PathRefinementChecks:
         if not x86_results:
             return False, "✗ NO TERMINAL PATHS: x86 program produced no terminal state"
 
+        # 先确认各自的 terminal path 条件覆盖所有输入，再做 pairwise refinement。
         verified, msg = self._check_path_coverage(
             evm_results,
             "EVM",
@@ -156,6 +157,7 @@ class PathRefinementChecks:
                 skip_feasibility=skip_feasibility,
             )
         else:
+            # 并行模式按 EVM path 分批；每个 worker 内复用自己的 Z3 Context/Solver。
             checked_pair_count, pair_count, failure = self._check_path_pairs_parallel(
                 evm_results,
                 x86_results,
@@ -191,6 +193,7 @@ class PathRefinementChecks:
                 x86_condition = x86_result.get("condition", BoolVal(True))
                 path_condition = And(evm_condition, x86_condition)
                 pair_count += 1
+                # 先用 SAT 查询剪掉明显不可行的 path 交集；可选跳过以减少重查询。
                 if not skip_feasibility:
                     may_be_feasible, msg = self._check_path_pair_may_be_feasible(
                         path_condition,
@@ -205,6 +208,8 @@ class PathRefinementChecks:
                 checked_pair_count += 1
                 context = f"path pair evm[{evm_index}], x86[{x86_index}]"
                 if evm_index in aggregate_memory_verified_evm_paths:
+                    # 该 EVM path 的 return/memory 已由 aggregate fallback 证明；
+                    # 剩余 pair 只需继续检查 storage / transient storage。
                     verified, msg = self._check_path_pair_storage_transient(
                         evm_result,
                         x86_result,
@@ -276,6 +281,7 @@ class PathRefinementChecks:
         logs: Optional[list[str]] = None,
         ctx=None,
     ) -> tuple[bool, Optional[str]]:
+        """只检查 path pair 的 storage / transient storage observable。"""
         evm_storage = evm_result.get("storage")
         x86_storage = x86_result.get("storage")
         if evm_storage is not None and x86_storage is not None:
@@ -373,6 +379,7 @@ class PathRefinementChecks:
         ):
             return False
 
+        # aggregate fallback 只处理小具体长度 return data；其它情况回到 pairwise。
         concrete_length = get_simplified_bv_const_value(evm_length)
         if concrete_length is None:
             return False
@@ -413,6 +420,7 @@ class PathRefinementChecks:
         logs: Optional[list[str]] = None,
         ctx=None,
     ) -> bool:
+        """查询某个 aggregate 坏事件是否不可满足。"""
         solver = SolverFor("QF_AUFBV", ctx=ctx) if ctx is not None else SolverFor("QF_AUFBV")
         cap = (
             self._ctx.tuning.storage_calldatasize_tail_partition_timeout_ms
@@ -445,6 +453,7 @@ class PathRefinementChecks:
         path_pair_workers: int,
         skip_feasibility: bool = False,
     ) -> tuple[int, int, Optional[str]]:
+        """并行检查 path pairs，按 EVM path 分批提交给 worker。"""
         evm_indices = list(range(len(evm_results)))
         pair_count = len(evm_results) * len(x86_results)
         checked_pair_count = 0
@@ -486,6 +495,7 @@ class PathRefinementChecks:
                 if not result.verified:
                     if failure_message is None:
                         failure_message = result.message
+                        # 一个 worker 找到失败后通知其它 worker 尽快停止后续 pair。
                         cancel_event.set()
                     continue
 
@@ -500,8 +510,10 @@ class PathRefinementChecks:
         cancel_event: threading.Event,
         skip_feasibility: bool = False,
     ) -> _PathPairChunkCheckResult:
+        """单个 worker 的 path-pair 批处理逻辑。"""
         ctx = Context()
         solver = SolverFor("QF_AUFBV", ctx=ctx)
+        # 多线程下每个 worker 使用独立 Z3 Context；先把 x86 observations 翻译过去。
         evm_cache = {}
         x86_cache = [
             self._translate_path_result(x86_result, ctx)
@@ -529,6 +541,7 @@ class PathRefinementChecks:
                 x86_condition = x86_result.get("condition", BoolVal(True, ctx=ctx))
                 path_condition = And(BoolVal(True, ctx=ctx), evm_condition, x86_condition)
 
+                # worker 内的 feasibility precheck 与串行路径保持同一语义。
                 if not skip_feasibility:
                     may_be_feasible, msg = self._check_path_pair_may_be_feasible_with_solver(
                         solver,
@@ -546,6 +559,7 @@ class PathRefinementChecks:
                 checked_pair_count += 1
                 context = f"path pair {label}"
                 if aggregate_memory_verified:
+                    # aggregate fallback 已覆盖 return/memory 后，后续 pair 只查状态 observable。
                     verified, msg = self._check_path_pair_storage_transient_with_solver(
                         solver,
                         evm_result,
@@ -601,6 +615,7 @@ class PathRefinementChecks:
 
     @classmethod
     def _translate_path_result(cls, result, ctx):
+        """把 observation 中的 Z3 表达式翻译到 worker 私有 Context。"""
         translated = {}
         with _Z3_TRANSLATE_LOCK:
             for key in _PATH_RESULT_KEYS:
@@ -630,6 +645,7 @@ class PathRefinementChecks:
         coverage: Optional[PathCoverageCertificate] = None,
         precondition=None,
     ) -> Tuple[bool, Optional[str]]:
+        """检查 terminal path 条件是否覆盖 precondition 下的所有输入。"""
         if coverage is not None and coverage.complete:
             if self._ctx.verbose:
                 source = f" ({coverage.source})" if coverage.source else ""
@@ -653,6 +669,7 @@ class PathRefinementChecks:
         conditions = [result.get("condition", BoolVal(True)) for result in path_results]
         if precondition is not None:
             self._ctx.solver.add(precondition)
+        # 反例查询：是否存在一个输入不落入任何 terminal path。
         self._ctx.solver.add(Not(Or(*conditions)))
 
         start_time = time.time()
@@ -719,6 +736,7 @@ class PathRefinementChecks:
         if result == sat:
             return True, None
 
+        # UNKNOWN 时，换一个全新 Context/Solver 低预算重试，绕开偶发 solver 状态问题。
         for attempt in range(_PATH_FEASIBILITY_RESCUE_ATTEMPTS):
             rescue_ctx = Context()
             rescue_condition = path_condition.translate(rescue_ctx)
@@ -752,6 +770,7 @@ class PathRefinementChecks:
                 return False, None
             if rescue_result == sat:
                 return True, None
+        # rescue 仍不确定时，若依赖 CallDataSize，尝试按 calldata size 分区证明 UNSAT。
         partition_result, msg = self._check_path_pair_calldatasize_partition_unsat(
             path_condition,
             deadline,
@@ -773,6 +792,7 @@ class PathRefinementChecks:
         logs: Optional[list[str]],
     ) -> tuple[bool, Optional[str]]:
         """对难解可行性查询尝试按 calldata size 穷举切分。"""
+        # 不含 CallDataSize 时没有可分区变量，直接放弃该优化。
         if not expr_mentions_symbol(path_condition, "CallDataSize"):
             return False, None
 
@@ -809,6 +829,7 @@ class PathRefinementChecks:
             solve_time = time.time() - query_start
             return result, solve_time
 
+        # 先枚举小的精确 calldata size。
         for i in range(exact_limit):
             size_value = BitVecVal(i, 64, ctx=partition_ctx)
             exact_condition = simplify(
@@ -832,6 +853,7 @@ class PathRefinementChecks:
             )
             return False, None
 
+        # 剩余较大的 calldata size 合并成一个尾部分区。
         tail_condition = UGE(
             calldata_size,
             BitVecVal(exact_limit, 64, ctx=partition_ctx),

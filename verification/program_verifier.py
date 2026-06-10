@@ -269,10 +269,19 @@ class ProgramEquivalenceChecker:
         summary_config: Optional[X86SummaryConfig] = None,
         x86_reachability_timeout_ms: Optional[int] = 50,
     ) -> Tuple[bool, Optional[str]]:
+        """用终止路径 observations 直接验证程序等价。
+
+        该路径避免先把所有 terminal states 合并成一个完整 memory Array；
+        每条终止路径保留自己的 condition 和 observable，后续做 EVM/x86
+        terminal path pair 的覆盖与精化检查。只有 debug stack_check 需要时，
+        才额外要求执行器产出 merged_state 作为栈检查 fallback。
+        """
         if self.verbose:
             print("\n[1] Building EVM terminal path observations...")
 
         evm_start = time.time()
+        # stack_check 是调试辅助检查；只有它需要 merged terminal state。
+        # 纯 observable 精化只消费 observations，避免不必要的 Array 合并。
         evm_paths = evm_program.to_z3_paths(
             initial_state,
             merge_state=stack_check is not None,
@@ -289,6 +298,8 @@ class ProgramEquivalenceChecker:
 
         x86_start = time.time()
         call_site_mapping = build_call_site_mapping(evm_program, x86_program)
+        # x86 path 构建同样保留 terminal observations；reachability pruning
+        # 只影响路径枚举剪枝，不改变后续 refinement 的证明方式。
         x86_paths = x86_program.to_z3_paths(
             initial_state,
             call_site_mapping=call_site_mapping,
@@ -325,9 +336,9 @@ class ProgramEquivalenceChecker:
             print(f"    └─ Path pair workers: {path_pair_workers}")
 
         check_start = time.time()
-        # 同样把累积 assumptions 通过 evm/x86 各路径 observation 注入：path_observations
-        # 模式下，每个 observation 自带 condition；将顶层 assumptions And 到其上即可。
-        # PathObservation 是 frozen dataclass，使用 dataclasses.replace 构造新对象。
+        # path_observations 模式下，每个 observation 自带 path condition；
+        # 顶层 assumptions 需要同时约束每条路径条件和 coverage 查询。
+        # PathObservation 是 frozen dataclass，因此用 replace 生成新对象。
         path_assumptions = _collect_assumptions(initial_state, evm_state, x86_state)
         if path_assumptions:
             from dataclasses import replace
@@ -345,6 +356,8 @@ class ProgramEquivalenceChecker:
             coverage_precondition = None
             evm_paths_obs = evm_paths.observations
             x86_paths_obs = x86_paths.observations
+
+        # 串行/并行共用同一个 refinement 入口；并行时只额外传 worker 数。
         if path_pair_workers == 1:
             verified, message = self.refinement_checker.check_refinement_paths(
                 evm_paths_obs,
@@ -371,6 +384,7 @@ class ProgramEquivalenceChecker:
             print(f"    └─ Result: {message}")
 
         if not verified and message == self.refinement_checker._timeout_message():
+            # 将底层通用 timeout 文案改写为程序级 refinement timeout，便于定位阶段。
             message = (
                 f"? TIMEOUT: refinement check exceeded overall timeout "
                 f"({self.refinement_checker.timeout_ms} ms)"
@@ -388,6 +402,8 @@ class ProgramEquivalenceChecker:
             print("\n[5] Checking stack equivalence (debug, merged state fallback)...")
             print(f"    └─ Budget: {stack_check_timeout_ms} ms")
 
+        # 正常 path observation 检查不依赖 merged_state；如果调用方要求 debug
+        # stack_check，而执行器没有产出 merged_state，则只能明确失败。
         if evm_state is None or x86_state is None:
             return (
                 False,
@@ -410,6 +426,7 @@ class ProgramEquivalenceChecker:
             print(f"    └─ Result: {message}")
 
         if not verified and message == self.refinement_checker._timeout_message():
+            # stack_check 使用独立预算，timeout 文案也按独立阶段改写。
             message = (
                 f"? TIMEOUT: stack equivalence check exceeded overall timeout "
                 f"({stack_check_timeout_ms} ms)"
