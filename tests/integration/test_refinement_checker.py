@@ -473,9 +473,8 @@ def test_verify_muti_block_program_pair_full():
     assert calldataload_stats["hits"] == 8
 
 
-@pytest.mark.skip(reason="Not impl well")
 def test_verify_muti_block_08_program_pair_full():
-    """使用 muti_block_08.json 与 muti_block_08.hex 进行全量程序等价验证。"""
+    """使用 muti_block_08.json 与 muti_block_08.hex 进行 path observation 等价验证。"""
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "muti_block_08.json")
     x86_hex_path = os.path.join(test_dir, "..", "data", "muti_block_08.hex")
@@ -487,11 +486,28 @@ def test_verify_muti_block_08_program_pair_full():
         x86_hex_sequence = f.read().strip()
     x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=X86_MUTI_BLOCK_08_BASE_ADDR)
 
-    checker = ProgramEquivalenceChecker(timeout_ms=180000, verbose=False)
-    initial_state = SMTState.create_initial_state(0)
-    verified, msg = checker.verify_program_pair(evm_program, x86_program, initial_state)
+    checker = ProgramEquivalenceChecker(timeout_ms=1200000, verbose=False)
+    initial_state = SMTState.create_initial_state(
+        calldata_size_max_bytes=GO_AMD64_MAX_SLICE_LEN,
+    )
+    initial_state.abstract_calldataload_words = True
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+        path_observations=True,
+        path_pair_workers=4,
+        enable_merge=False,
+        summary_config=TRUSTED_SUMMARY_CONFIG,
+        x86_reachability_timeout_ms=250,
+    )
 
     assert verified, (
         f"muti_block_08 program pair verification failed. "
-        f"EVM program from {ir_path} and x86 program from {x86_hex_path} should be equivalent. Error: {msg}"
+        f"EVM program from {ir_path} and x86 program from {x86_hex_path} "
+        f"should produce equivalent observable results. Error: {msg}"
     )
+    calldataload_stats = x86_program.last_summary_stats["calldataload"]
+    assert calldataload_stats["discovered"] == 3
+    assert calldataload_stats["hits"] == 8
