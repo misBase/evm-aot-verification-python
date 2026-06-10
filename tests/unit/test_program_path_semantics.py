@@ -313,7 +313,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
 
     monkeypatch.setattr(
         checker._paths._outputs,
-        "_check_refinement_direct_memory_with_solver",
+        "check_observables_with_solver",
         fake_direct_memory,
     )
     monkeypatch.setattr(

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """刻画 RefinementChecker 当前 return-data 抽象边界的测试。"""
 
-from z3 import Array, BitVecSort, BitVecVal, BoolVal, Store
+from z3 import Array, BitVec, BitVecSort, BitVecVal, BoolVal, K, Store
 
 from verification.refinement_checker import RefinementChecker
 
@@ -109,3 +109,40 @@ def test_zero_length_fast_path_still_checks_return_presence():
 
     assert not verified
     assert "Non-empty return-data conditions differ" in msg
+
+
+def test_symbolic_later_store_alias_is_not_hidden_by_memory_select_cache():
+    checker = _make_checker()
+    symbolic_offset = BitVec("return_byte_symbolic_alias", 64)
+    zero = BitVecVal(0, 64)
+    base = K(BitVecSort(64), BitVecVal(0, 8))
+    evm_memory = Store(
+        Store(base, zero, BitVecVal(0xAA, 8)),
+        symbolic_offset,
+        BitVecVal(0xBB, 8),
+    )
+    x86_memory = Store(base, zero, BitVecVal(0xAA, 8))
+
+    evm_result = _make_result(
+        offset=0,
+        length=1,
+        memory=evm_memory,
+        base_addr=None,
+        has_return_data=True,
+    )
+    x86_result = _make_result(
+        offset=0,
+        length=1,
+        memory=x86_memory,
+        base_addr=0,
+        has_return_data=True,
+    )
+
+    verified, msg = checker.check_refinement(
+        evm_result,
+        x86_result,
+        assumptions=symbolic_offset == zero,
+    )
+
+    assert not verified
+    assert "memory contents differ" in msg

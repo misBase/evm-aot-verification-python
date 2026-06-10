@@ -4,14 +4,16 @@
 验证x86精化EVM：对所有输入，x86_output = EVM_output。
 
 ``RefinementChecker`` 本身是一个薄门面：它装配共享的 ``_RefinementContext``
-以及三个按职责拆分的 check 对象（storage / outputs / paths），并把对外的公共
-方法委托给它们。check 对象之间通过构造期注入显式声明依赖（outputs→storage，
-paths→outputs），而不是经由多继承隐式共享方法。
+以及四个按职责拆分的 check 对象（storage / memory / outputs / paths），并把
+对外的公共方法委托给它们。check 对象之间通过构造期注入显式声明依赖
+（outputs→{storage,memory}，paths→{outputs,storage,memory}），而不是经由
+多继承隐式共享方法。
 """
 
 from typing import Optional, Tuple
 
 from .refinement_context import _RefinementContext
+from .refinement_memory import MemoryContentChecks
 from .refinement_outputs import OutputRefinementChecks
 from .refinement_paths import PathRefinementChecks, _PathPairChunkCheckResult
 from .refinement_storage import StorageEquivalenceChecks
@@ -39,8 +41,14 @@ class RefinementChecker:
         """
         self._ctx = _RefinementContext(timeout_ms, verbose, z3_verbose)
         self._storage = StorageEquivalenceChecks(self._ctx)
-        self._outputs = OutputRefinementChecks(self._ctx, self._storage)
-        self._paths = PathRefinementChecks(self._ctx, self._outputs)
+        self._memory = MemoryContentChecks(self._ctx)
+        self._outputs = OutputRefinementChecks(self._ctx, self._storage, self._memory)
+        self._paths = PathRefinementChecks(
+            self._ctx,
+            self._outputs,
+            self._storage,
+            self._memory,
+        )
 
     # --- 共享状态的只读转发（外部代码与测试直接读取这些 knob）---
 

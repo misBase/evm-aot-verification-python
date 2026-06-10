@@ -16,6 +16,8 @@ _STORAGE_STORE_NOOP_TIMEOUT_CAP_MS = 20000
 _PATH_STRUCTURAL_ORACLE_TIMEOUT_CAP_MS = 200
 _MEMORY_UNROLL_BYTE_LIMIT = 256
 _MEMORY_UNROLL_BYTE_TIMEOUT_CAP_MS = 10000
+_MEMORY_CHUNK_TIMEOUT_CAP_MS = 2500
+_MEMORY_CHUNK_FALLBACK_STREAK_LIMIT = 2
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,8 @@ class _RefinementCheckTuning:
     path_structural_oracle_timeout_ms: int
     memory_unroll_byte_limit: int
     memory_unroll_byte_timeout_ms: int
+    memory_chunk_timeout_ms: int
+    memory_chunk_fallback_streak_limit: int
 
     @classmethod
     def for_timeout(cls, timeout_ms: int) -> "_RefinementCheckTuning":
@@ -89,4 +93,9 @@ class _RefinementCheckTuning:
                 timeout_ms,
                 _MEMORY_UNROLL_BYTE_TIMEOUT_CAP_MS,
             ),
+            memory_chunk_timeout_ms=min(
+                timeout_ms,
+                _MEMORY_CHUNK_TIMEOUT_CAP_MS,
+            ),
+            memory_chunk_fallback_streak_limit=_MEMORY_CHUNK_FALLBACK_STREAK_LIMIT,
         )

@@ -1,8 +1,7 @@
 """
 Z3 表达式分析辅助工具。
 
-提供用于分析和解析 Z3 表达式的工具函数，
-主要用于增强跳转目标解析。
+提供用于分析、解析和轻量结构化遍历 Z3 表达式的通用 helper。
 """
 
 from typing import List, Tuple, Optional
@@ -29,6 +28,97 @@ def get_bv_const_value(expr: BitVec) -> Optional[int]:
     if is_bv_const_value(expr):
         return expr.as_long()
     return None
+
+
+def get_simplified_bv_const_value(expr) -> Optional[int]:
+    """先 simplify，再从 BitVecVal 中提取整数值。"""
+    try:
+        simplified = simplify(expr)
+    except Exception:
+        simplified = expr
+    return get_bv_const_value(simplified)
+
+
+def collect_and_conjuncts(expr):
+    """把一个 BoolRef 展平成它的 And-conjunct 列表（递归穿透嵌套 And）。"""
+    from z3 import Z3_OP_AND
+
+    out = []
+    stack = [expr]
+    while stack:
+        cur = stack.pop()
+        if cur is None:
+            continue
+        try:
+            if hasattr(cur, "decl") and cur.decl().kind() == Z3_OP_AND:
+                stack.extend(cur.children())
+                continue
+        except Exception:
+            pass
+        out.append(cur)
+    return out
+
+
+def decompose_store_chain(arr):
+    """将一个 Z3 Array 表达式分解为 (base_array, [(key, value), ...]) 形式。"""
+    from z3 import Z3_OP_STORE
+
+    stores = []
+    cur = arr
+    try:
+        while True:
+            if not hasattr(cur, "decl"):
+                break
+            decl_kind = cur.decl().kind()
+            if decl_kind != Z3_OP_STORE:
+                break
+            args = cur.children()  # [base, key, value]
+            if len(args) != 3:
+                break
+            stores.append((args[1], args[2]))
+            cur = args[0]
+    except Exception:
+        return arr, []
+    stores.reverse()  # 顺序从最早到最近
+    return cur, stores
+
+
+def expr_has_uninterpreted_decl(expr, predicate) -> bool:
+    """Return True if any uninterpreted declaration in expr matches predicate."""
+    try:
+        from z3 import Z3_OP_UNINTERPRETED
+    except Exception:
+        return False
+
+    seen = set()
+    stack = [expr]
+    while stack:
+        cur = stack.pop()
+        if cur is None:
+            continue
+        try:
+            key = cur.hash()
+        except Exception:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            decl = cur.decl()
+            if decl.kind() == Z3_OP_UNINTERPRETED and predicate(decl, cur):
+                return True
+            stack.extend(cur.children())
+        except Exception:
+            continue
+    return False
+
+
+def expr_mentions_symbol(expr, symbol_name: str) -> bool:
+    """判断表达式是否包含指定名称的未解释常量。"""
+    return expr_has_uninterpreted_decl(
+        expr,
+        lambda decl, node: decl.name() == symbol_name and len(node.children()) == 0,
+    )
 
 
 def is_if_expression(expr: BitVec) -> bool:

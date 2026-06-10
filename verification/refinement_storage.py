@@ -28,6 +28,12 @@ from z3 import (
     unsat,
 )
 
+from utils.z3_helpers import (
+    collect_and_conjuncts,
+    decompose_store_chain,
+    expr_mentions_symbol,
+)
+
 from .refinement_context import _RefinementContext
 
 
@@ -49,29 +55,6 @@ def _storage_arrays_structurally_equal(a, b) -> bool:
         return _z3_eq(a, b)
     except Exception:
         return False
-
-
-def _decompose_store_chain(arr):
-    """将一个 Z3 Array 表达式分解为 (base_array, [(key, value), ...]) 形式。"""
-    from z3 import Z3_OP_STORE
-    stores = []
-    cur = arr
-    try:
-        while True:
-            if not hasattr(cur, "decl"):
-                break
-            decl_kind = cur.decl().kind()
-            if decl_kind != Z3_OP_STORE:
-                break
-            args = cur.children()  # [base, key, value]
-            if len(args) != 3:
-                break
-            stores.append((args[1], args[2]))
-            cur = args[0]
-    except Exception:
-        return arr, []
-    stores.reverse()  # 顺序从最早到最近
-    return cur, stores
 
 
 def _storage_arrays_syntactically_equal(a, b) -> bool:
@@ -106,25 +89,6 @@ def _storage_arrays_syntactically_equal(a, b) -> bool:
         return True
     except Exception:
         return False
-
-
-def _collect_and_conjuncts(expr):
-    """把一个 BoolRef 展平成它的 And-conjunct 列表（递归穿透嵌套 And）。"""
-    from z3 import Z3_OP_AND
-    out = []
-    stack = [expr]
-    while stack:
-        cur = stack.pop()
-        if cur is None:
-            continue
-        try:
-            if hasattr(cur, "decl") and cur.decl().kind() == Z3_OP_AND:
-                stack.extend(cur.children())
-                continue
-        except Exception:
-            pass
-        out.append(cur)
-    return out
 
 
 def _expr_node_count(expr, *, limit: int = 128) -> int:
@@ -216,7 +180,7 @@ def _collect_path_value_substitutions(condition, *, max_replacements: int = 64):
     仍只能把 UNSAT 当作结论，因为从条件中消去等式可能削弱 SAT 查询。
     """
     replacements = []
-    for conjunct in _collect_and_conjuncts(condition):
+    for conjunct in collect_and_conjuncts(condition):
         try:
             if not (hasattr(conjunct, "decl") and conjunct.decl().kind_name() == "="):
                 continue
@@ -589,8 +553,8 @@ def _storage_store_chains_equal(a, b) -> bool:
 def _store_chain_lengths_differ(a, b) -> bool:
     """判断两个 array 是否有明显不同的 Store-chain 深度。"""
     try:
-        _, stores_a = _decompose_store_chain(a)
-        _, stores_b = _decompose_store_chain(b)
+        _, stores_a = decompose_store_chain(a)
+        _, stores_b = decompose_store_chain(b)
         return len(stores_a) != len(stores_b)
     except Exception:
         return False
@@ -671,37 +635,6 @@ class StorageEquivalenceChecks:
             return is_unsat
 
         return _oracle
-
-    @staticmethod
-    def _expr_mentions_symbol(expr, symbol_name: str) -> bool:
-        """判断表达式是否包含指定名称的未解释常量。"""
-        from z3 import Z3_OP_UNINTERPRETED
-
-        seen = set()
-        stack = [expr]
-        while stack:
-            cur = stack.pop()
-            if cur is None:
-                continue
-            try:
-                key = cur.hash()
-            except Exception:
-                continue
-            if key in seen:
-                continue
-            seen.add(key)
-            try:
-                decl = cur.decl()
-                if (
-                    decl.kind() == Z3_OP_UNINTERPRETED
-                    and decl.name() == symbol_name
-                    and len(cur.children()) == 0
-                ):
-                    return True
-                stack.extend(cur.children())
-            except Exception:
-                continue
-        return False
 
     def _array_mismatch_query_with_solver(
         self,
@@ -1121,7 +1054,7 @@ class StorageEquivalenceChecks:
         except Exception:
             return None
 
-        path_conjuncts = _collect_and_conjuncts(path_condition)
+        path_conjuncts = collect_and_conjuncts(path_condition)
         weak_oracle = self._make_unsat_oracle(solver, deadline, ctx)
 
         def _check_store_side(store_side, other) -> bool:
@@ -1204,7 +1137,7 @@ class StorageEquivalenceChecks:
         if path_condition is None:
             return None
 
-        path_conjuncts = _collect_and_conjuncts(path_condition)
+        path_conjuncts = collect_and_conjuncts(path_condition)
         if _storage_arrays_eq_under_path(
             evm_array,
             x86_array,
@@ -1227,8 +1160,8 @@ class StorageEquivalenceChecks:
         path_condition,
     ) -> bool:
         return (
-            self._expr_mentions_symbol(evm_storage, "CallDataSize")
-            or self._expr_mentions_symbol(x86_storage, "CallDataSize")
+            expr_mentions_symbol(evm_storage, "CallDataSize")
+            or expr_mentions_symbol(x86_storage, "CallDataSize")
         )
 
     def _storage_or_path_mentions_symbolic_calldatasize(
@@ -1245,7 +1178,7 @@ class StorageEquivalenceChecks:
             )
             or (
                 path_condition is not None
-                and self._expr_mentions_symbol(path_condition, "CallDataSize")
+                and expr_mentions_symbol(path_condition, "CallDataSize")
             )
         )
 

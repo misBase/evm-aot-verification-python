@@ -28,8 +28,12 @@ from z3 import (
 
 from common.path_observation import PathCoverageCertificate
 
+from utils.z3_helpers import expr_mentions_symbol, get_simplified_bv_const_value
+
 from .refinement_context import _RefinementContext
+from .refinement_memory import MemoryContentChecks
 from .refinement_outputs import OutputRefinementChecks
+from .refinement_storage import StorageEquivalenceChecks
 
 
 _Z3_TRANSLATE_LOCK = threading.Lock()
@@ -45,37 +49,6 @@ _PATH_RESULT_KEYS = (
     "storage",
     "transient_storage",
 )
-
-
-def _expr_mentions_symbol(expr, symbol_name: str) -> bool:
-    """判断表达式是否包含指定名称的未解释常量。"""
-    from z3 import Z3_OP_UNINTERPRETED
-
-    seen = set()
-    stack = [expr]
-    while stack:
-        cur = stack.pop()
-        if cur is None:
-            continue
-        try:
-            key = cur.hash()
-        except Exception:
-            continue
-        if key in seen:
-            continue
-        seen.add(key)
-        try:
-            decl = cur.decl()
-            if (
-                decl.kind() == Z3_OP_UNINTERPRETED
-                and decl.name() == symbol_name
-                and len(cur.children()) == 0
-            ):
-                return True
-            stack.extend(cur.children())
-        except Exception:
-            continue
-    return False
 
 
 def _preprocess_partition_query(query, ctx):
@@ -114,9 +87,13 @@ class PathRefinementChecks:
         self,
         ctx: _RefinementContext,
         outputs: OutputRefinementChecks,
+        storage: StorageEquivalenceChecks,
+        memory: MemoryContentChecks,
     ):
         self._ctx = ctx
         self._outputs = outputs
+        self._storage = storage
+        self._memory = memory
 
     def check_refinement_paths(
         self,
@@ -236,7 +213,7 @@ class PathRefinementChecks:
                         context,
                     )
                 else:
-                    verified, msg = self._outputs._check_refinement_direct_memory(
+                    verified, msg = self._outputs.check_observables(
                         evm_result,
                         x86_result,
                         deadline,
@@ -302,7 +279,7 @@ class PathRefinementChecks:
         evm_storage = evm_result.get("storage")
         x86_storage = x86_result.get("storage")
         if evm_storage is not None and x86_storage is not None:
-            verified, msg = self._outputs._storage._check_storage_equivalence_with_solver(
+            verified, msg = self._storage._check_storage_equivalence_with_solver(
                 solver,
                 evm_storage,
                 x86_storage,
@@ -318,7 +295,7 @@ class PathRefinementChecks:
         evm_ts = evm_result.get("transient_storage")
         x86_ts = x86_result.get("transient_storage")
         if evm_ts is not None and x86_ts is not None:
-            verified, msg = self._outputs._storage._check_transient_storage_equivalence_with_solver(
+            verified, msg = self._storage._check_transient_storage_equivalence_with_solver(
                 solver,
                 evm_ts,
                 x86_ts,
@@ -396,7 +373,7 @@ class PathRefinementChecks:
         ):
             return False
 
-        concrete_length = self._outputs._concrete_bv_value(evm_length)
+        concrete_length = get_simplified_bv_const_value(evm_length)
         if concrete_length is None:
             return False
         if concrete_length > self._ctx.tuning.memory_unroll_byte_limit:
@@ -580,7 +557,7 @@ class PathRefinementChecks:
                         ctx=ctx,
                     )
                 else:
-                    verified, msg = self._outputs._check_refinement_direct_memory_with_solver(
+                    verified, msg = self._outputs.check_observables_with_solver(
                         solver,
                         evm_result,
                         x86_result,
@@ -796,7 +773,7 @@ class PathRefinementChecks:
         logs: Optional[list[str]],
     ) -> tuple[bool, Optional[str]]:
         """对难解可行性查询尝试按 calldata size 穷举切分。"""
-        if not _expr_mentions_symbol(path_condition, "CallDataSize"):
+        if not expr_mentions_symbol(path_condition, "CallDataSize"):
             return False, None
 
         partition_ctx = Context()

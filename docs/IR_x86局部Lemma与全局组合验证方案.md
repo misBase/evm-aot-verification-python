@@ -130,7 +130,7 @@ PathRefinementChecks      -> terminal path coverage + path pair orchestration
 
 ### 3.1 输出比较项
 
-`OutputRefinementChecks._check_refinement_direct_memory_with_solver()` 当前按以下顺序证明没有反例：
+`OutputRefinementChecks.check_observables_with_solver()` 当前按以下顺序证明没有反例：
 
 1. `has_return_data` 条件一致。
 2. 当两侧都有非空 return data 时，`length` 一致。

@@ -1,10 +1,12 @@
 """测试 Z3 辅助工具函数。"""
 
 import pytest
-from z3 import BitVecVal, If, BitVec
+from z3 import BitVecVal, If, BitVec, BitVecSort, Function
 from utils.z3_helpers import (
     is_bv_const_value,
     get_bv_const_value,
+    get_simplified_bv_const_value,
+    expr_mentions_symbol,
     is_if_expression,
     extract_if_branches,
     analyze_jump_target,
@@ -30,6 +32,25 @@ def test_get_bv_const_value():
 
     x = BitVec('x', 256)
     assert get_bv_const_value(x) is None
+
+
+def test_get_simplified_bv_const_value():
+    """测试先化简再提取 BitVec 常量。"""
+    assert get_simplified_bv_const_value(BitVecVal(40, 256) + BitVecVal(2, 256)) == 42
+
+    x = BitVec('x', 256)
+    assert get_simplified_bv_const_value(x + BitVecVal(0, 256)) is None
+
+
+def test_expr_mentions_symbol_only_matches_uninterpreted_constants():
+    """测试未解释常量名称扫描。"""
+    calldata_size = BitVec("CallDataSize", 64)
+    offset = BitVec("Offset", 64)
+    same_named_func = Function("CallDataSize", BitVecSort(64), BitVecSort(64))
+
+    assert expr_mentions_symbol(offset + calldata_size, "CallDataSize")
+    assert not expr_mentions_symbol(offset, "CallDataSize")
+    assert not expr_mentions_symbol(same_named_func(offset), "CallDataSize")
 
 
 def test_is_if_expression():

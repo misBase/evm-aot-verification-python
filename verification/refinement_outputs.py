@@ -8,14 +8,7 @@ from z3 import (
     BitVec,
     BitVecVal,
     BoolVal,
-    Goal,
-    is_bv_value,
     Select,
-    simplify,
-    SolverFor,
-    substitute,
-    Tactic,
-    Then,
     UGE,
     ULT,
     sat,
@@ -24,8 +17,11 @@ from z3 import (
 
 from state.smt_state import MemoryDomain
 
+from utils.z3_helpers import get_simplified_bv_const_value
+
 from .refinement_context import _RefinementContext
-from .refinement_storage import StorageEquivalenceChecks, _collect_and_conjuncts
+from .refinement_memory import MemoryContentChecks
+from .refinement_storage import StorageEquivalenceChecks
 
 if TYPE_CHECKING:
     from state.smt_state import SMTState
@@ -36,368 +32,11 @@ class OutputRefinementChecks:
         self,
         ctx: _RefinementContext,
         storage: StorageEquivalenceChecks,
+        memory: MemoryContentChecks,
     ):
         self._ctx = ctx
         self._storage = storage
-
-    @staticmethod
-    def _concrete_bv_value(expr) -> Optional[int]:
-        try:
-            simplified = simplify(expr)
-        except Exception:
-            simplified = expr
-        if is_bv_value(simplified):
-            return simplified.as_long()
-        return None
-
-    @staticmethod
-    def _expr_mentions_storage_dependency(expr) -> bool:
-        try:
-            from z3 import Z3_OP_UNINTERPRETED
-        except Exception:
-            return False
-
-        seen = set()
-        stack = [expr]
-        while stack:
-            cur = stack.pop()
-            if cur is None:
-                continue
-            try:
-                key = cur.hash()
-            except Exception:
-                continue
-            if key in seen:
-                continue
-            seen.add(key)
-            try:
-                decl = cur.decl()
-                if decl.kind() == Z3_OP_UNINTERPRETED:
-                    name = decl.name()
-                    if (
-                        name in ("Storage", "TransientStorage")
-                        or name.startswith("sha3")
-                    ):
-                        return True
-                stack.extend(cur.children())
-            except Exception:
-                continue
-        return False
-
-    def _storage_independent_condition(self, path_condition, ctx):
-        """返回去掉 storage-only 分支事实后的较弱路径条件。"""
-        if path_condition is None:
-            return None
-        conjuncts = _collect_and_conjuncts(path_condition)
-        kept = [
-            conjunct
-            for conjunct in conjuncts
-            if not self._expr_mentions_storage_dependency(conjunct)
-        ]
-        if len(kept) == len(conjuncts):
-            return None
-        return And(BoolVal(True, ctx=ctx), *kept)
-
-    @staticmethod
-    def _expr_mentions_symbol(expr, symbol_name: str) -> bool:
-        """判断表达式是否包含指定名称的未解释常量。"""
-        try:
-            from z3 import Z3_OP_UNINTERPRETED
-        except Exception:
-            return False
-
-        seen = set()
-        stack = [expr]
-        while stack:
-            cur = stack.pop()
-            if cur is None:
-                continue
-            try:
-                key = cur.hash()
-            except Exception:
-                continue
-            if key in seen:
-                continue
-            seen.add(key)
-            try:
-                decl = cur.decl()
-                if (
-                    decl.kind() == Z3_OP_UNINTERPRETED
-                    and decl.name() == symbol_name
-                    and len(cur.children()) == 0
-                ):
-                    return True
-                stack.extend(cur.children())
-            except Exception:
-                continue
-        return False
-
-    def _check_memory_byte_mismatch_by_calldatasize_partition(
-        self,
-        mismatch_query,
-        deadline: Optional[float],
-        context: str,
-        byte_index: int,
-        logs: Optional[list[str]],
-        ctx,
-    ) -> Optional[Tuple[bool, Optional[str], float]]:
-        """按 CallDataSize 穷举切分难解的 byte mismatch 查询。"""
-        if not self._expr_mentions_symbol(mismatch_query, "CallDataSize"):
-            return None
-
-        calldata_size = BitVec("CallDataSize", 64, ctx=ctx)
-        exact_limit = self._ctx.tuning.path_pair_calldatasize_exact_partition_limit
-        exact_timeout_ms = self._ctx.tuning.path_pair_calldatasize_exact_partition_timeout_ms
-        tail_timeout_ms = self._ctx.tuning.memory_unroll_byte_timeout_ms
-        total_solve_time = 0.0
-        start = time.time()
-
-        def _preprocess_query(query):
-            try:
-                goal = Goal(ctx=ctx) if ctx is not None else Goal()
-                goal.add(query)
-                tactic = (
-                    Then(
-                        Tactic("simplify", ctx=ctx),
-                        Tactic("propagate-values", ctx=ctx),
-                        Tactic("solve-eqs", ctx=ctx),
-                    )
-                    if ctx is not None
-                    else Then("simplify", "propagate-values", "solve-eqs")
-                )
-                subgoals = tactic(goal)
-                if len(subgoals) != 1:
-                    return query
-                formulas = list(subgoals[0])
-                return simplify(And(BoolVal(True, ctx=ctx), *formulas))
-            except Exception:
-                return query
-
-        def _check_query(query, timeout_ms):
-            query = _preprocess_query(query)
-            partition_solver = (
-                SolverFor("QF_AUFBV", ctx=ctx)
-                if ctx is not None
-                else SolverFor("QF_AUFBV")
-            )
-            if not self._ctx.reset_solver_with_capped_budget_for(
-                partition_solver,
-                self._ctx.timeout_ms,
-                deadline,
-                timeout_ms,
-            ):
-                return None, 0.0
-            partition_solver.add(query)
-            query_start = time.time()
-            result = partition_solver.check()
-            return result, time.time() - query_start
-
-        for size in range(exact_limit):
-            size_value = BitVecVal(size, 64, ctx=ctx)
-            exact_query = simplify(
-                substitute(mismatch_query, (calldata_size, size_value))
-            )
-            result, solve_time = _check_query(exact_query, exact_timeout_ms)
-            total_solve_time += solve_time
-            if result is None:
-                msg = self._ctx.timeout_message()
-                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                return False, msg, total_solve_time
-            if result == unsat:
-                continue
-            prefix = f"{context}: " if context else ""
-            self._ctx.emit_solver_log(
-                logs,
-                f"    ├─ {prefix}Memory byte {byte_index} calldata-size split "
-                f"size={size}: {solve_time:.3f}s, result={result}",
-            )
-            if result == sat:
-                msg = (
-                    "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
-                    "(memory contents differ)"
-                )
-                if context:
-                    msg = f"{msg} ({context}, byte {byte_index}, size={size})"
-                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                return False, msg, total_solve_time
-            return None
-
-        tail_query = And(
-            mismatch_query,
-            UGE(calldata_size, BitVecVal(exact_limit, 64, ctx=ctx)),
-        )
-        result, solve_time = _check_query(tail_query, tail_timeout_ms)
-        total_solve_time += solve_time
-        if result is None:
-            msg = self._ctx.timeout_message()
-            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-            return False, msg, total_solve_time
-        if result == unsat:
-            prefix = f"{context}: " if context else ""
-            self._ctx.emit_solver_log(
-                logs,
-                f"    ├─ {prefix}Memory byte {byte_index} calldata-size partition: "
-                f"{time.time() - start:.3f}s wall / {total_solve_time:.3f}s solve, "
-                "all partitions unsat",
-            )
-            return True, None, total_solve_time
-        prefix = f"{context}: " if context else ""
-        self._ctx.emit_solver_log(
-            logs,
-            f"    ├─ {prefix}Memory byte {byte_index} calldata-size split "
-            f"size>={exact_limit}: {solve_time:.3f}s, result={result}",
-        )
-        if result == sat:
-            msg = (
-                "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
-                "(memory contents differ)"
-            )
-            if context:
-                msg = f"{msg} ({context}, byte {byte_index}, size>={exact_limit})"
-            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-            return False, msg, total_solve_time
-        return None
-
-    def _check_memory_content_unrolled_with_solver(
-        self,
-        solver,
-        evm_memory,
-        x86_memory,
-        evm_offset,
-        x86_offset,
-        x86_base_addr,
-        evm_has_return_data,
-        x86_has_return_data,
-        evm_length,
-        x86_length,
-        length: int,
-        deadline: Optional[float],
-        path_condition,
-        context: str,
-        logs: Optional[list[str]],
-        ctx,
-    ) -> Optional[Tuple[bool, Optional[str]]]:
-        if length > self._ctx.tuning.memory_unroll_byte_limit:
-            return None
-
-        total_solve_time = 0.0
-        start = time.time()
-        if length == 0:
-            prefix = f"{context}: " if context else ""
-            self._ctx.emit_solver_log(
-                logs,
-                f"    ├─ {prefix}Memory content check: "
-                "0.000s wall / 0.000s solve, unrolled 0 byte(s)",
-            )
-            return True, "Memory contents equivalent (unrolled)"
-        storage_independent_condition = self._storage_independent_condition(
-            path_condition,
-            ctx,
-        )
-        for byte_index in range(length):
-            index = BitVecVal(byte_index, 64, ctx=ctx)
-            mismatch = (
-                Select(evm_memory, evm_offset + index)
-                != Select(x86_memory, x86_base_addr + x86_offset + index)
-            )
-            if storage_independent_condition is not None:
-                if not self._ctx.reset_solver_with_capped_budget_for(
-                    solver,
-                    self._ctx.timeout_ms,
-                    deadline,
-                    self._ctx.tuning.memory_unroll_byte_timeout_ms,
-                ):
-                    msg = self._ctx.timeout_message()
-                    self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                    return False, msg
-                solver.add(storage_independent_condition)
-                solver.add(evm_has_return_data)
-                solver.add(x86_has_return_data)
-                solver.add(evm_length == x86_length)
-                solver.add(mismatch)
-
-                query_start = time.time()
-                result = solver.check()
-                solve_time = time.time() - query_start
-                total_solve_time += solve_time
-                if result == unsat:
-                    continue
-
-            if not self._ctx.reset_solver_with_capped_budget_for(
-                solver,
-                self._ctx.timeout_ms,
-                deadline,
-                self._ctx.tuning.memory_unroll_byte_timeout_ms,
-            ):
-                msg = self._ctx.timeout_message()
-                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                return False, msg
-
-            solver.add(path_condition)
-            solver.add(evm_has_return_data)
-            solver.add(x86_has_return_data)
-            solver.add(evm_length == x86_length)
-            solver.add(mismatch)
-
-            query_start = time.time()
-            result = solver.check()
-            solve_time = time.time() - query_start
-            total_solve_time += solve_time
-
-            if result == unsat:
-                continue
-            mismatch_query = And(
-                path_condition,
-                evm_has_return_data,
-                x86_has_return_data,
-                evm_length == x86_length,
-                mismatch,
-            )
-            partition_result = self._check_memory_byte_mismatch_by_calldatasize_partition(
-                mismatch_query,
-                deadline,
-                context,
-                byte_index,
-                logs,
-                ctx,
-            )
-            if partition_result is not None:
-                partition_verified, partition_msg, partition_solve_time = partition_result
-                total_solve_time += partition_solve_time
-                if partition_verified:
-                    continue
-                if partition_msg is not None:
-                    return False, partition_msg
-            prefix = f"{context}: " if context else ""
-            self._ctx.emit_solver_log(
-                logs,
-                f"    ├─ {prefix}Memory byte {byte_index} check: "
-                f"{solve_time:.3f}s, result={result}",
-            )
-            if result == sat:
-                msg = (
-                    "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
-                    "(memory contents differ)"
-                )
-                if context:
-                    msg = f"{msg} ({context}, byte {byte_index})"
-                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                return False, msg
-            msg = self._ctx.unknown_message_for_solver(
-                solver,
-                self._ctx.tuning.memory_unroll_byte_timeout_ms,
-            )
-            self._ctx.emit_solver_log(logs, f"    └─ {msg} (byte {byte_index})")
-            return False, msg
-
-        prefix = f"{context}: " if context else ""
-        self._ctx.emit_solver_log(
-            logs,
-            f"    ├─ {prefix}Memory content check: "
-            f"{time.time() - start:.3f}s wall / {total_solve_time:.3f}s solve, "
-            f"unrolled {length} byte(s)",
-        )
-        return True, "Memory contents equivalent (unrolled)"
+        self._memory = memory
 
     def check_refinement(
         self,
@@ -422,7 +61,7 @@ class OutputRefinementChecks:
         # 将 timeout_ms 作为整个 refine 检查流程的总预算（而不是每次 check 的预算）。
         deadline = time.time() + (self._ctx.timeout_ms / 1000.0)
 
-        return self._check_refinement_direct_memory(
+        return self.check_observables(
             evm_result, x86_result, deadline,
             path_condition=assumptions,
         )
@@ -499,7 +138,7 @@ class OutputRefinementChecks:
             return False, msg
         return True, None
 
-    def _check_refinement_direct_memory_with_solver(
+    def check_observables_with_solver(
         self,
         solver,
         evm_result: dict,
@@ -510,7 +149,7 @@ class OutputRefinementChecks:
         logs: Optional[list[str]] = None,
         ctx=None,
     ) -> Tuple[bool, Optional[str]]:
-        """``_check_refinement_direct_memory`` variant for worker-local solvers."""
+        """Check return data, memory, storage, and transient storage observables."""
         evm_offset = evm_result['offset']
         evm_length = evm_result['length']
         evm_memory = evm_result['memory']
@@ -529,7 +168,7 @@ class OutputRefinementChecks:
         )
         path_condition = path_condition if path_condition is not None else BoolVal(True, ctx=ctx)
 
-        concrete_length = self._concrete_bv_value(evm_length)
+        concrete_length = get_simplified_bv_const_value(evm_length)
         if (
             concrete_length is not None
             and concrete_length <= self._ctx.tuning.memory_unroll_byte_limit
@@ -548,7 +187,7 @@ class OutputRefinementChecks:
             )
             if not verified:
                 return False, msg
-            unrolled = self._check_memory_content_unrolled_with_solver(
+            unrolled = self._memory.check_concrete_length_memory_with_solver(
                 solver,
                 evm_memory,
                 x86_memory,
@@ -751,7 +390,7 @@ class OutputRefinementChecks:
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")
         return True, msg
 
-    def _check_refinement_direct_memory(
+    def check_observables(
         self,
         evm_result: dict,
         x86_result: dict,
@@ -760,7 +399,7 @@ class OutputRefinementChecks:
         context: str = "",
     ) -> Tuple[bool, Optional[str]]:
         """通过直接比较 return data 内容检查精化关系。"""
-        return self._check_refinement_direct_memory_with_solver(
+        return self.check_observables_with_solver(
             self._ctx.solver,
             evm_result,
             x86_result,
