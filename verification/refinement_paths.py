@@ -277,15 +277,40 @@ class PathRefinementChecks:
         path_condition,
         context: str,
     ) -> tuple[bool, Optional[str]]:
+        return self._check_path_pair_storage_transient_with_solver(
+            self._ctx.solver,
+            evm_result,
+            x86_result,
+            deadline,
+            path_condition,
+            context,
+            logs=None,
+            ctx=None,
+        )
+
+    def _check_path_pair_storage_transient_with_solver(
+        self,
+        solver,
+        evm_result,
+        x86_result,
+        deadline: Optional[float],
+        path_condition,
+        context: str,
+        logs: Optional[list[str]] = None,
+        ctx=None,
+    ) -> tuple[bool, Optional[str]]:
         evm_storage = evm_result.get("storage")
         x86_storage = x86_result.get("storage")
         if evm_storage is not None and x86_storage is not None:
-            verified, msg = self._outputs._storage._check_storage_equivalence(
+            verified, msg = self._outputs._storage._check_storage_equivalence_with_solver(
+                solver,
                 evm_storage,
                 x86_storage,
                 deadline,
                 path_condition,
                 context,
+                logs,
+                ctx,
             )
             if not verified:
                 return False, msg
@@ -293,12 +318,15 @@ class PathRefinementChecks:
         evm_ts = evm_result.get("transient_storage")
         x86_ts = x86_result.get("transient_storage")
         if evm_ts is not None and x86_ts is not None:
-            verified, msg = self._outputs._storage._check_transient_storage_equivalence(
+            verified, msg = self._outputs._storage._check_transient_storage_equivalence_with_solver(
+                solver,
                 evm_ts,
                 x86_ts,
                 deadline,
                 path_condition,
                 context,
+                logs,
+                ctx,
             )
             if not verified:
                 return False, msg
@@ -311,6 +339,8 @@ class PathRefinementChecks:
         x86_results: list[dict],
         deadline: Optional[float],
         label: str,
+        logs: Optional[list[str]] = None,
+        ctx=None,
     ) -> bool:
         """用所有 x86 路径联合证明单条 EVM 终止路径的 fallback。
 
@@ -320,20 +350,20 @@ class PathRefinementChecks:
         终止路径产生坏 observable？如果所有这类存在性坏查询都是 UNSAT，则该
         EVM 路径已被完整的 x86 终止路径集合 refinement，剩余 pairwise 检查可省略。
         """
-        evm_condition = evm_result.get("condition", BoolVal(True))
+        evm_condition = evm_result.get("condition", BoolVal(True, ctx=ctx))
         evm_has_return_data = evm_result.get(
             "has_return_data",
-            evm_result["length"] != BitVecVal(0, 64),
+            evm_result["length"] != BitVecVal(0, 64, ctx=ctx),
         )
         evm_length = evm_result["length"]
 
         def _x86_bad_disjunction(build_bad):
             bad_cases = []
             for x86_result in x86_results:
-                x86_condition = x86_result.get("condition", BoolVal(True))
+                x86_condition = x86_result.get("condition", BoolVal(True, ctx=ctx))
                 x86_has_return_data = x86_result.get(
                     "has_return_data",
-                    x86_result["length"] != BitVecVal(0, 64),
+                    x86_result["length"] != BitVecVal(0, 64, ctx=ctx),
                 )
                 bad_cases.append(And(x86_condition, build_bad(x86_result, x86_has_return_data)))
             return And(evm_condition, Or(*bad_cases))
@@ -346,6 +376,8 @@ class PathRefinementChecks:
             ),
             deadline,
             f"{label} aggregate return-presence",
+            logs=logs,
+            ctx=ctx,
         ):
             return False
 
@@ -359,6 +391,8 @@ class PathRefinementChecks:
             ),
             deadline,
             f"{label} aggregate return-length",
+            logs=logs,
+            ctx=ctx,
         ):
             return False
 
@@ -369,7 +403,7 @@ class PathRefinementChecks:
             return False
 
         for byte_index in range(concrete_length):
-            index = BitVecVal(byte_index, 64)
+            index = BitVecVal(byte_index, 64, ctx=ctx)
             evm_byte = Select(evm_result["memory"], evm_result["offset"] + index)
             if not self._check_union_bad_query_unsat(
                 _x86_bad_disjunction(
@@ -385,6 +419,8 @@ class PathRefinementChecks:
                 ),
                 deadline,
                 f"{label} aggregate memory byte {byte_index}",
+                logs=logs,
+                ctx=ctx,
             ):
                 return False
 
@@ -397,8 +433,10 @@ class PathRefinementChecks:
         label: str,
         *,
         timeout_cap_ms: Optional[int] = None,
+        logs: Optional[list[str]] = None,
+        ctx=None,
     ) -> bool:
-        solver = SolverFor("QF_AUFBV")
+        solver = SolverFor("QF_AUFBV", ctx=ctx) if ctx is not None else SolverFor("QF_AUFBV")
         cap = (
             self._ctx.tuning.storage_calldatasize_tail_partition_timeout_ms
             if timeout_cap_ms is None
@@ -416,10 +454,10 @@ class PathRefinementChecks:
         start = time.time()
         result = solver.check()
         solve_time = time.time() - start
-        if self._ctx.verbose:
-            print(
-                f"    ├─ {label}: {solve_time:.3f}s, result={result}"
-            )
+        self._ctx.emit_solver_log(
+            logs,
+            f"    ├─ {label}: {solve_time:.3f}s, result={result}",
+        )
         return result == unsat
 
     def _check_path_pairs_parallel(
@@ -430,25 +468,21 @@ class PathRefinementChecks:
         path_pair_workers: int,
         skip_feasibility: bool = False,
     ) -> tuple[int, int, Optional[str]]:
-        pair_specs = [
-            (evm_index, x86_index)
-            for evm_index, evm_result in enumerate(evm_results)
-            for x86_index, x86_result in enumerate(x86_results)
-        ]
-        pair_count = len(pair_specs)
+        evm_indices = list(range(len(evm_results)))
+        pair_count = len(evm_results) * len(x86_results)
         checked_pair_count = 0
-        max_workers = min(path_pair_workers, pair_count)
+        max_workers = min(path_pair_workers, len(evm_indices))
         target_chunk_count = max_workers * 16
-        chunk_size = max(1, (pair_count + target_chunk_count - 1) // target_chunk_count)
+        chunk_size = max(1, (len(evm_indices) + target_chunk_count - 1) // target_chunk_count)
         chunks = [
-            pair_specs[start:start + chunk_size]
-            for start in range(0, pair_count, chunk_size)
+            evm_indices[start:start + chunk_size]
+            for start in range(0, len(evm_indices), chunk_size)
         ]
 
         if self._ctx.verbose:
             print(
                 f"    ├─ Checking {pair_count} path pair(s) with "
-                f"{max_workers} worker thread(s), {len(chunks)} batch(es)"
+                f"{max_workers} worker thread(s), {len(chunks)} EVM-path batch(es)"
             )
 
         failure_message = None
@@ -482,7 +516,7 @@ class PathRefinementChecks:
 
     def _check_path_pair_chunk(
         self,
-        pair_specs: list[tuple[int, int]],
+        evm_indices: list[int],
         evm_results: list[dict],
         x86_results: list[dict],
         deadline: Optional[float],
@@ -492,11 +526,14 @@ class PathRefinementChecks:
         ctx = Context()
         solver = SolverFor("QF_AUFBV", ctx=ctx)
         evm_cache = {}
-        x86_cache = {}
+        x86_cache = [
+            self._translate_path_result(x86_result, ctx)
+            for x86_result in x86_results
+        ]
         checked_pair_count = 0
         logs: list[str] = []
 
-        for evm_index, x86_index in pair_specs:
+        for evm_index in evm_indices:
             if cancel_event.is_set():
                 return _PathPairChunkCheckResult(checked_pair_count, True, None, logs)
 
@@ -504,41 +541,84 @@ class PathRefinementChecks:
             if evm_result is None:
                 evm_result = self._translate_path_result(evm_results[evm_index], ctx)
                 evm_cache[evm_index] = evm_result
-            x86_result = x86_cache.get(x86_index)
-            if x86_result is None:
-                x86_result = self._translate_path_result(x86_results[x86_index], ctx)
-                x86_cache[x86_index] = x86_result
 
-            label = f"evm[{evm_index}], x86[{x86_index}]"
-            path_condition = And(BoolVal(True, ctx=ctx), evm_result["condition"], x86_result["condition"])
+            aggregate_memory_verified = False
+            evm_condition = evm_result.get("condition", BoolVal(True, ctx=ctx))
+            for x86_index, x86_result in enumerate(x86_cache):
+                if cancel_event.is_set():
+                    return _PathPairChunkCheckResult(checked_pair_count, True, None, logs)
 
-            if not skip_feasibility:
-                may_be_feasible, msg = self._check_path_pair_may_be_feasible_with_solver(
-                    solver,
-                    path_condition,
-                    deadline,
-                    label,
-                    logs,
-                    ctx=ctx,
-                )
-                if msg is not None:
+                label = f"evm[{evm_index}], x86[{x86_index}]"
+                x86_condition = x86_result.get("condition", BoolVal(True, ctx=ctx))
+                path_condition = And(BoolVal(True, ctx=ctx), evm_condition, x86_condition)
+
+                if not skip_feasibility:
+                    may_be_feasible, msg = self._check_path_pair_may_be_feasible_with_solver(
+                        solver,
+                        path_condition,
+                        deadline,
+                        label,
+                        logs,
+                        ctx=ctx,
+                    )
+                    if msg is not None:
+                        return _PathPairChunkCheckResult(checked_pair_count, False, msg, logs)
+                    if not may_be_feasible:
+                        continue
+
+                checked_pair_count += 1
+                context = f"path pair {label}"
+                if aggregate_memory_verified:
+                    verified, msg = self._check_path_pair_storage_transient_with_solver(
+                        solver,
+                        evm_result,
+                        x86_result,
+                        deadline,
+                        path_condition,
+                        context,
+                        logs=logs,
+                        ctx=ctx,
+                    )
+                else:
+                    verified, msg = self._outputs._check_refinement_direct_memory_with_solver(
+                        solver,
+                        evm_result,
+                        x86_result,
+                        deadline,
+                        path_condition=path_condition,
+                        context=context,
+                        logs=logs,
+                        ctx=ctx,
+                    )
+                if not verified:
+                    aggregate_verified = self._check_evm_path_return_memory_against_x86_union(
+                        evm_result,
+                        x86_cache,
+                        deadline,
+                        f"evm[{evm_index}]",
+                        logs=logs,
+                        ctx=ctx,
+                    )
+                    if aggregate_verified:
+                        aggregate_memory_verified = True
+                        self._ctx.emit_solver_log(
+                            logs,
+                            f"    ├─ EVM path evm[{evm_index}] aggregate "
+                            "x86 return/memory fallback succeeded",
+                        )
+                        verified, msg = self._check_path_pair_storage_transient_with_solver(
+                            solver,
+                            evm_result,
+                            x86_result,
+                            deadline,
+                            path_condition,
+                            context,
+                            logs=logs,
+                            ctx=ctx,
+                        )
+                        if verified:
+                            continue
                     return _PathPairChunkCheckResult(checked_pair_count, False, msg, logs)
-                if not may_be_feasible:
-                    continue
-
-            checked_pair_count += 1
-            verified, msg = self._outputs._check_refinement_direct_memory_with_solver(
-                solver,
-                evm_result,
-                x86_result,
-                deadline,
-                path_condition=path_condition,
-                context=f"path pair {label}",
-                logs=logs,
-                ctx=ctx,
-            )
-            if not verified:
-                return _PathPairChunkCheckResult(checked_pair_count, False, msg, logs)
 
         return _PathPairChunkCheckResult(checked_pair_count, True, None, logs)
 

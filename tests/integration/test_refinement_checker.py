@@ -452,9 +452,10 @@ def test_verify_muti_block_program_pair_full():
         initial_state,
         stack_check=None,
         path_observations=True,
-        # pair checker 保持单线程路径：这个实现带有本 fixture 需要的
-        # aggregate x86-memory fallback；同时 x86 不 merge 时 pair 数仍足够小。
-        path_pair_workers=1,
+        # 并行 pair checker 现在按 EVM terminal path 分组；实际 worker 数会受
+        # EVM path 数限制，同时每个 worker 保留本 fixture 需要的 aggregate
+        # x86-memory fallback。
+        path_pair_workers=4,
         # 对这个样本，merge 只把 x86 终止路径从 30 条降到 26 条，
         # 却会把大的 path-conditioned ITE 注入 stack/storage 表达式。
         enable_merge=False,

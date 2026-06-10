@@ -204,8 +204,8 @@ def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monke
     cancelled_worker_started = threading.Event()
     cancelled_worker_saw_cancel = threading.Event()
 
-    def fake_check_chunk(pair_specs, _evm_results, _x86_results, _deadline, cancel_event, skip_feasibility=False):
-        if pair_specs[0] == (0, 0):
+    def fake_check_chunk(evm_indices, _evm_results, _x86_results, _deadline, cancel_event, skip_feasibility=False):
+        if evm_indices[0] == 0:
             return _PathPairChunkCheckResult(
                 checked_pair_count=1,
                 verified=False,
@@ -237,6 +237,113 @@ def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monke
     assert failure == "boom"
     assert pair_count == 4
     assert 2 <= checked_pair_count <= pair_count
+
+
+def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
+    state = SMTState.create_initial_state()
+    evm_observations = [
+        PathObservation(
+            condition=BoolVal(True),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.evm_memory.Memory,
+            base_addr=None,
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        )
+    ]
+    x86_observations = [
+        PathObservation(
+            condition=BoolVal(True),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.x86_memory.evm_mem,
+            base_addr=BitVecVal(0, 64),
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        ),
+        PathObservation(
+            condition=BoolVal(True),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.x86_memory.evm_mem,
+            base_addr=BitVecVal(0, 64),
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        ),
+    ]
+
+    checker = RefinementChecker(timeout_ms=1000)
+    direct_calls = []
+    aggregate_calls = []
+    storage_only_calls = []
+
+    def fake_direct_memory(
+        _solver,
+        _evm_result,
+        _x86_result,
+        _deadline,
+        path_condition=None,
+        context="",
+        logs=None,
+        ctx=None,
+    ):
+        direct_calls.append(context)
+        return False, "direct memory failed"
+
+    def fake_aggregate(evm_result, x86_results, deadline, label, logs=None, ctx=None):
+        aggregate_calls.append((label, len(x86_results), ctx is not None))
+        return True
+
+    def fake_storage_only(
+        _solver,
+        _evm_result,
+        _x86_result,
+        _deadline,
+        _path_condition,
+        context,
+        logs=None,
+        ctx=None,
+    ):
+        storage_only_calls.append((context, ctx is not None))
+        return True, "storage ok"
+
+    monkeypatch.setattr(
+        checker._paths._outputs,
+        "_check_refinement_direct_memory_with_solver",
+        fake_direct_memory,
+    )
+    monkeypatch.setattr(
+        checker._paths,
+        "_check_evm_path_return_memory_against_x86_union",
+        fake_aggregate,
+    )
+    monkeypatch.setattr(
+        checker._paths,
+        "_check_path_pair_storage_transient_with_solver",
+        fake_storage_only,
+    )
+
+    checked_pair_count, pair_count, failure = checker._paths._check_path_pairs_parallel(
+        evm_results=evm_observations,
+        x86_results=x86_observations,
+        deadline=None,
+        path_pair_workers=2,
+        skip_feasibility=True,
+    )
+
+    assert failure is None
+    assert checked_pair_count == 2
+    assert pair_count == 2
+    assert direct_calls == ["path pair evm[0], x86[0]"]
+    assert aggregate_calls == [("evm[0]", 2, True)]
+    assert storage_only_calls == [
+        ("path pair evm[0], x86[0]", True),
+        ("path pair evm[0], x86[1]", True),
+    ]
 
 
 def test_path_coverage_accepts_complete_certificate_without_solver(monkeypatch):
