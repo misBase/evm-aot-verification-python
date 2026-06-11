@@ -376,18 +376,19 @@ def test_jumpi_2block_ok_program_pair():
 
 
 def test_verify_perf_erc20_lite_program_pair():
-    """验证 perf_erc20_lite.json 与 perf_erc20_lite.hex 的 ERC20 风格中型样本。
+    """验证 perf_erc20_lite 原始 AOT 产物可通过全符号 refinement。
 
     该 fixture 覆盖 dispatcher、selector 分支、SHA3 mapping key、SLOAD/SSTORE、
-    RETURN/REVERT 等真实合约常见路径。全部输入符号化（calldata 内容、
-    calldatasize、callvalue 等都符号化），无须固定长度。
+    RETURN/REVERT 等真实合约常见路径。全部输入保持符号化；RETURN 路径
+    返回 32 字节，REVERT/错误路径返回空数据。
 
-    全符号验证通过以下组合在 20 分钟内完成（实测 ≈ 19.3 分钟）：
-    - ``path_observations=True``：避免合并整个 memory Array，按 (evm_path, x86_path)
-      逐对检查；
-    - ``enable_merge=True``：x86 cfg 合流点状态合并，把符号 calldatasize 引发的
-      路径爆炸（25k+ states）压回到个位数 finals；
-    - ``path_pair_workers=4``：并行处理路径 pair。
+    这里作为正例 fixture：``perf_erc20_lite.hex`` 应与 IR 等价；
+    ``perf_erc20_lite_bug.hex`` 则在相同 IR 下模拟一处 SBB->SUB 的 borrow
+    传播 bug，并由负例测试验证 checker 能抓到反例。
+
+    验证使用 path observations 保留终止路径，不先合并完整 memory Array；
+    x86 CFG 开启合流点 merge，并用 TRUSTED_SUMMARY_CONFIG 覆盖
+    CALLDATALOAD 等高成本片段。
 
     EVM CALLDATALOAD 处的 ``offset 高 192-bit == 0`` 假设通过 SMTState.assumptions
     在 to_z3 末尾收集，再由 program_verifier 注入到 refinement check 的 path
@@ -426,6 +427,41 @@ def test_verify_perf_erc20_lite_program_pair():
     calldataload_stats = x86_program.last_summary_stats["calldataload"]
     assert calldataload_stats["discovered"] == 5
     assert calldataload_stats["hits"] == 5
+
+
+def test_detects_perf_erc20_lite_sbb_to_sub_bug():
+    """验证 perf_erc20_lite 中的 256-bit SUB borrow 传播错误可被检测。
+
+    perf_erc20_lite_bug.hex 仅把 0x318b 处的 ``sbb rdi, rcx`` 改为
+    ``sub rdi, rcx``，模拟编译器漏传播 borrow 的微小机器码 bug。
+    """
+    test_dir = os.path.dirname(__file__)
+    ir_path = os.path.join(test_dir, "..", "data", "perf_erc20_lite.json")
+    x86_hex_path = os.path.join(test_dir, "..", "data", "perf_erc20_lite_bug.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_hex_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    checker = ProgramEquivalenceChecker(timeout_ms=1200000, verbose=False)
+    initial_state = SMTState.create_initial_state()
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        stack_check=None,
+        path_observations=True,
+        path_pair_workers=4,
+        enable_merge=True,
+        summary_config=TRUSTED_SUMMARY_CONFIG,
+    )
+
+    assert not verified
+    assert msg is not None
+    assert "COUNTEREXAMPLE" in msg
 
 
 def test_verify_muti_block_program_pair_full():
