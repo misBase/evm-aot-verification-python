@@ -1,4 +1,4 @@
-"""Helpers for single-instruction EVM/x86 micro-refinement tests."""
+"""单指令 EVM/x86 微精化测试辅助工具。"""
 
 from __future__ import annotations
 
@@ -34,6 +34,7 @@ from state.smt_state import MemoryDomain, PointerTag, SMTState
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register
 from x86_64.program import X86Program
+from x86_64.summaries.registry import X86SummaryConfig
 
 
 _LIMB_STRIDE_BYTES = 8
@@ -54,12 +55,11 @@ _CALLENGINE_LIMB_ATTRS = {
 
 @dataclass(frozen=True)
 class InstructionRefinementCase:
-    """A single EVM opcode and its x86 core implementation.
+    """一条 EVM opcode 及其 x86 核心实现。
 
-    By default a case is a pure stack calculation with one 256-bit result in the
-    first operand slot.  Cases with ``expected_stack_height`` compare the whole
-    final stack window instead, which covers PUSH/DUP/SWAP/POP-style stack shape
-    changes.
+    默认把 case 视为纯栈运算：输入是 256-bit 栈值，输出写回第一个操作数槽。
+    设置 ``expected_stack_height`` 时改为比较完整的最终栈窗口，用来覆盖
+    PUSH/DUP/SWAP/POP 这类会改变栈形状的指令。
     """
 
     name: str
@@ -92,23 +92,22 @@ class InstructionRefinementCase:
     x86_execution_mode: Literal["linear", "cfg"] = "linear"
     x86_compare_terminal_paths: bool = False
     x86_enable_go_bridge: bool = False
+    x86_summary_config: X86SummaryConfig | None = None
     x86_max_depth: int = 50
     solver_timeout_ms: int = 10_000
 
 
 def assert_instruction_refines(case: InstructionRefinementCase) -> None:
-    """Prove one EVM operation and its x86 core produce the same stack effect.
+    """证明一条 EVM 操作和对应 x86 核心产生相同的可观测效果。
 
-    The v1 result mode covers AOT cores for pure stack calculations: operands
-    are 256-bit stack values, the result is one 256-bit value, and the x86
-    snippet writes it in-place to the bottom/result operand slot.  Stack-window
-    mode compares every final stack slot and covers PUSH/DUP/SWAP/POP.  Both
-    modes support straight-line snippets and small CFG snippets without host
-    calls.
+    纯结果模式用于 AOT 纯栈计算：操作数是 256-bit 栈值，x86 片段把一个
+    256-bit 结果原地写回底部/结果操作数槽。栈窗口模式会比较最终栈的每个槽位，
+    覆盖 PUSH/DUP/SWAP/POP。两种模式都支持直线片段和不含 host call 的小 CFG。
     """
     operands = _operands(case)
     memory_words = _symbolic_memory_words(case)
     readonly_words = _symbolic_readonly_words(case)
+    # 只要需要观察栈形状以外的状态，就切到完整状态比较路径。
     requires_state_comparison = (
         case.expected_stack_height is not None
         or bool(case.memory_check_offsets)
@@ -155,7 +154,7 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
 
 
 def _normalize_refinement_bv(expr):
-    """Fold byte-wise memory round trips back into one word-sized expression."""
+    """把按 byte 存取绕回来的表达式折叠回 word 级表达式。"""
     # x86 侧的 256-bit 值经 byte-array memory store/load 后，常会变成
     # Concat(If(c, 0, Extract(byte, x)), ...)。这里仅把这种严格连续、
     # 同条件、同来源的形状折回 If(c, 0, Extract(word, x))，避免让 Z3
@@ -297,6 +296,7 @@ def _build_evm_final_state(
 ) -> SMTState:
     state = SMTState()
     state.evm_stack = EVMStackState(sp=IntVal(0))
+    # EVM 侧直接把操作数压入符号栈，再交给 opcode 语义执行。
     for operand in operands:
         state.evm_stack = state.evm_stack.push(operand.to_bv256())
     for offset, word in zip(case.initial_memory_word_offsets, memory_words, strict=True):
@@ -359,6 +359,7 @@ def _extract_x86_stack_outputs(state: SMTState, arity: int, expected_stack_heigh
 
 def _build_aot_stack_memory(operands: list[Uint256]):
     memory = {}
+    # AOT 栈槽按 4 个 64-bit limb 存放一个 256-bit 操作数。
     for operand, offsets in zip(operands, _operand_limb_offsets(len(operands)), strict=True):
         for offset, limb in zip(
             offsets,
@@ -373,6 +374,7 @@ def _build_aot_evm_memory(case: InstructionRefinementCase, memory_words: list[Ui
     memory = {}
     for offset, word in zip(case.initial_memory_word_offsets, memory_words, strict=True):
         value = word.to_bv256()
+        # EVM memory 是 byte-addressed，需要把 256-bit word 拆成 32 个 byte。
         for byte_index in range(32):
             memory[offset + byte_index] = Extract(
                 255 - 8 * byte_index,
@@ -407,6 +409,7 @@ def _build_x86_initial_state(
     readonly_words: dict[str, list[Uint256]],
 ):
     state = SMTState()
+    # AOT 约定：R15 指向 callEngine/EVM 上下文，未标注内存默认按栈域解释。
     state.x86_registers.set_register(Register.R13, BitVecVal(0, 64))
     state.x86_registers.set_register(Register.R14, BitVecVal(0, 64))
     state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
@@ -533,7 +536,7 @@ def _initialize_x86_stack_byte_values(
 
 
 def _initialize_calldata_size(state: SMTState, case: InstructionRefinementCase):
-    """Return the shared calldata-size value for EVM and x86 callEngine views."""
+    """返回 EVM 视图和 x86 callEngine 视图共用的 calldata size。"""
     if case.calldata_size_bytes is None:
         return state.calldatasize
 
@@ -576,6 +579,7 @@ def _execute_x86_core_cfg(case: InstructionRefinementCase, state: SMTState) -> S
         max_depth=case.x86_max_depth,
         enable_go_bridge=case.x86_enable_go_bridge,
         enable_merge=False,
+        summary_config=case.x86_summary_config,
     )
     return final_state
 
@@ -588,6 +592,7 @@ def _execute_x86_core_cfg_global_states(case: InstructionRefinementCase, state: 
         enable_go_bridge=case.x86_enable_go_bridge,
         enable_merge=False,
         merge_state=False,
+        summary_config=case.x86_summary_config,
     )
     if not paths.global_states:
         raise ValueError(f"{case.name}: cfg execution produced no terminal paths")
@@ -638,6 +643,7 @@ def _path_observation_mismatches(
         evm_stack = ()
 
     path_conditions = [gstate.get_constraints().as_bool() for gstate in x86_global_states]
+    # x86 至少要有一条终止路径可行；随后逐路径比较该路径下的观测值。
     mismatches.append(Not(Or(*path_conditions)))
 
     for condition, gstate in zip(path_conditions, x86_global_states, strict=True):

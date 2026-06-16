@@ -10,6 +10,7 @@ from tests.support.instruction_refinement import (
     assert_instruction_refines,
 )
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
+from x86_64.summaries.registry import X86SummaryConfig
 
 
 X86_CORE_BASE_ADDR = 0x0
@@ -158,19 +159,15 @@ ARITHMETIC_0X00_CASES = [
         evm_operand_indices=(1, 0),
     ),
     # IR: MUL, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="MUL",
-            evm_kind="MUL",
-            arity=2,
-            x86_core_hex=X86_MUL_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(
-            reason="Full symbolic proof of 256-bit MUL is too expensive for the current bit-vector encoding.",
-            strict=True,
-        ),
+    InstructionRefinementCase(
+        name="MUL",
+        evm_kind="MUL",
+        arity=2,
+        x86_core_hex=X86_MUL_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        x86_execution_mode="cfg",
+        x86_summary_config=X86SummaryConfig.enabled(mul="strict"),
+        solver_timeout_ms=5_000,
     ),
     # IR: DIV, STOP
     InstructionRefinementCase(

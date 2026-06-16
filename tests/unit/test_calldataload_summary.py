@@ -31,6 +31,7 @@ from x86_64.summaries.calldataload import (
     apply_calldataload_summary,
     discover_calldataload_summaries,
 )
+from x86_64.summaries.mul import MUL_SUMMARY_KIND
 from x86_64.summaries.registry import (
     TRUSTED_SUMMARY_CONFIG,
     X86SummaryConfig,
@@ -252,6 +253,7 @@ def test_trusted_summary_config_is_immutable_and_explicitly_enables_calldataload
         TRUSTED_SUMMARY_CONFIG.builtin_modes["oops"] = "fallback"
 
     assert TRUSTED_SUMMARY_CONFIG.builtin_modes[CALLDATALOAD_SUMMARY_KIND] == "fallback"
+    assert TRUSTED_SUMMARY_CONFIG.builtin_modes[MUL_SUMMARY_KIND] == "fallback"
 
 
 def test_x86_summary_runtime_rejects_unknown_builtin_summary_kind():

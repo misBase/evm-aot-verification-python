@@ -361,6 +361,10 @@ class X86Program:
                 "hits": summary_runtime.hit_count(kind),
                 "hit_entries": hit_entries,
             }
+        for plugin in summary_runtime.plugins:
+            proof_stats = getattr(plugin.spec, "proof_stats", None)
+            if proof_stats and plugin.spec.kind in self.last_summary_stats:
+                self.last_summary_stats[plugin.spec.kind]["proof"] = dict(proof_stats)
 
     def _clear_summary_stats(self) -> None:
         self.last_summary_stats = {}

@@ -10,12 +10,14 @@ from x86_64.models import X86Block
 
 from .base import X86SummaryPlugin, X86SummaryRuntime, X86SummarySpec
 from .calldataload import CALLDATALOAD_SUMMARY_KIND, CallDataLoadSummarySpec
+from .mul import MUL_SUMMARY_KIND, MulSummarySpec
 
 
 # 内置 summary 注册表：key 是配置里使用的 kind，value 是 spec 类。
 # mode 是注册期策略，统一在组装 plugin 时附加，不由 spec 自己关心。
 BUILTIN_SUMMARY_SPECS: Mapping[str, Callable[[], X86SummarySpec]] = {
     CALLDATALOAD_SUMMARY_KIND: CallDataLoadSummarySpec,
+    MUL_SUMMARY_KIND: MulSummarySpec,
 }
 
 
@@ -25,9 +27,14 @@ class X86SummaryConfig:
 
     ``builtin_modes`` maps a builtin summary ``kind`` to its discovery mode
     (off/fallback/strict); only the named kinds are enabled.
+
+    ``prove_mul_hits`` 控制 MUL summary 的 per-hit glue 证明（fail-closed，
+    证明失败时 fallback 模式同样报错）；默认开启，单次实测 10-40ms。
     """
 
     builtin_modes: Mapping[str, str] = field(default_factory=dict)
+    prove_mul_hits: bool = True
+    mul_proof_timeout_ms: int = 10_000
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -41,15 +48,27 @@ class X86SummaryConfig:
         return cls()
 
     @classmethod
-    def enabled(cls, **builtin_modes: str) -> "X86SummaryConfig":
-        return cls(builtin_modes=builtin_modes)
+    def enabled(
+        cls,
+        *,
+        prove_mul_hits: bool = True,
+        mul_proof_timeout_ms: int = 10_000,
+        **builtin_modes: str,
+    ) -> "X86SummaryConfig":
+        # keyword-only 分离：除显式具名参数外，其余 kwargs 都是 summary kind。
+        return cls(
+            builtin_modes=builtin_modes,
+            prove_mul_hits=prove_mul_hits,
+            mul_proof_timeout_ms=mul_proof_timeout_ms,
+        )
 
 
-# 显式信任的 summary 配置：启用 trusted CALLDATALOAD 加速。
+# 显式信任的 summary 配置：启用 trusted CALLDATALOAD/MUL 加速。
 # 集中在一处，便于全局调档（含一键关闭做对照验证），同时仍显式可审计——
 # 调用方传 TRUSTED_SUMMARY_CONFIG 即可看出本次验证信任了哪些切片。
 TRUSTED_SUMMARY_CONFIG = X86SummaryConfig.enabled(
     calldataload="fallback",
+    mul="fallback",
 )
 
 
@@ -77,5 +96,12 @@ def build_x86_summary_runtime(
                 f"unknown builtin x86 summary plugin: {kind} "
                 f"(known: {known})"
             )
-        plugins.append(X86SummaryPlugin(spec_factory(), mode=mode))
+        if kind == MUL_SUMMARY_KIND:
+            spec = MulSummarySpec(
+                prove_hits=config.prove_mul_hits,
+                proof_timeout_ms=config.mul_proof_timeout_ms,
+            )
+        else:
+            spec = spec_factory()
+        plugins.append(X86SummaryPlugin(spec, mode=mode))
     return X86SummaryRuntime(blocks, plugins)

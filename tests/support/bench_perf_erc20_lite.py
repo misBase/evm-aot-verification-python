@@ -1,9 +1,9 @@
-"""Benchmark harness for test_verify_perf_erc20_lite_program_pair.
+"""test_verify_perf_erc20_lite_program_pair 的基准辅助脚本。
 
-Runs the full-symbolic verification (calldatasize symbolic) with explicit
-phase timings.  Used during the perf-investigation; not part of pytest.
+运行全符号验证（calldatasize 保持符号化），并显式打印各阶段耗时。
+用于性能排查，不作为 pytest 用例的一部分。
 
-Usage:
+用法:
     poetry run python -m tests.support.bench_perf_erc20_lite \
         --timeout-ms 600000 [--path-observations] [--workers N]
 """
@@ -61,10 +61,9 @@ def main() -> int:
         x86_hex_sequence = f.read().strip()
     x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
 
-    # IMPORTANT: ProgramEquivalenceChecker(verbose=True) implies
-    # z3.set_option(verbose=10), which dumps the z3 tactic chatter to stdout
-    # and drowns out our phase prints.  Keep verbose=False and emit our own
-    # timing markers via the helpers below.
+    # 注意：ProgramEquivalenceChecker(verbose=True) 会设置 z3.set_option(verbose=10)，
+    # 导致 Z3 tactic 日志刷屏并淹没阶段耗时。这里保持 verbose=False，
+    # 只用下面的 helper 打印我们自己的计时标记。
     checker = ProgramEquivalenceChecker(
         timeout_ms=args.timeout_ms, verbose=args.profile_subchecks,
     )
@@ -73,9 +72,8 @@ def main() -> int:
         calldata_size_bytes=args.calldata_size,
     )
 
-    # Optional global precondition: bound symbolic calldatasize.  Stored on
-    # the initial_state so downstream solvers (reachability + final refinement)
-    # see it as part of the assertion set.
+    # 可选全局前置条件：约束符号 calldatasize。放在 initial_state 上，
+    # 让后续求解器（可达性检查 + 最终精化检查）都能看到这条断言。
     if args.calldatasize_max is not None:
         from z3 import BitVecVal, ULE
         bound = BitVecVal(args.calldatasize_max, 64)
@@ -90,8 +88,7 @@ def main() -> int:
         f"calldata_size={args.calldata_size}"
     )
 
-    # Manually walk the two construction phases so we can record their wall
-    # times even in non-path-observation mode.
+    # 手动执行两个构造阶段，这样即使不启用 path_observations 也能记录墙钟时间。
     from verification.call_site_mapping import build_call_site_mapping
 
     t0 = time.time()
@@ -101,7 +98,7 @@ def main() -> int:
 
     t1 = time.time()
     call_site_mapping = build_call_site_mapping(evm_program, x86_program)
-    # Wire instrumentation: monkey-patch executor to capture totals.
+    # 临时接入统计：monkey-patch executor 以捕获累计指标。
     import x86_64.cfg_executor as _ce
     stats_holder = {}
     orig_execute = _ce.X86SymbolicExecutor.execute
@@ -140,9 +137,8 @@ def main() -> int:
         )
 
     if args.path_observations:
-        # path_observations mode: rebuild via to_z3_paths so we have per-path
-        # observations (the previous to_z3 call was only for stats). With
-        # enable_merge=True this is just another ~16s.
+        # path_observations 模式：通过 to_z3_paths 重建，得到逐路径观测。
+        # 前面的 to_z3 只用于统计；enable_merge=True 时这里大约再花 16s。
         t2_pre = time.time()
         evm_paths = evm_program.to_z3_paths(initial_state)
         x86_paths = x86_program.to_z3_paths(
@@ -157,7 +153,7 @@ def main() -> int:
             f"[phase] path_obs build wall: {time.time()-t2_pre:.3f}s "
             f"(evm finals={len(evm_paths.observations)}, x86 finals={len(x86_paths.observations)})"
         )
-        # Inject assumptions into each observation's path condition.
+        # 把全局 assumption 注入每个 observation 的路径条件。
         from dataclasses import replace as _dc_replace
         from z3 import And as _And
         assumptions_list = list(initial_state.assumptions or [])
@@ -165,6 +161,7 @@ def main() -> int:
             for gs in getattr(paths, 'global_states', None) or []:
                 for a in getattr(gs.mstate, 'assumptions', None) or []:
                     assumptions_list.append(a)
+        # 去重，避免重复 assumption 放大公式。
         seen = set()
         dedup = []
         for a in assumptions_list:
@@ -204,7 +201,7 @@ def main() -> int:
         for st in (evm_state, x86_state):
             for a in getattr(st, 'assumptions', None) or []:
                 assumptions_list.append(a)
-        # de-dup
+        # 去重，避免重复 assumption 放大公式。
         seen = set()
         dedup = []
         for a in assumptions_list:

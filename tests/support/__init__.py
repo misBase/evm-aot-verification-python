@@ -1,1 +1,1 @@
-"""Shared test helpers."""
+"""测试共享辅助工具。"""
