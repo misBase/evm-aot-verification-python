@@ -175,37 +175,41 @@ ARITHMETIC_0X00_CASES = [
         solver_timeout_ms=5_000,
     ),
     # IR: DIV, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="DIV",
-            evm_kind="DIV",
-            arity=2,
-            x86_core_hex=X86_DIV_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            x86_enable_go_bridge=True,
-            solver_timeout_ms=5_000,
-        ),
-        # 修复 epilogue 越界 jmp 丢弃后，DIV 的 builtin div 路径重新可达，
-        # 完整 256-bit 除法公式让 Z3 超时返回 unknown（此前的 PASS 是 bug
-        # 丢弃路径后退化公式 trivially UNSAT 的假绿）。
-        marks=pytest.mark.xfail(reason=PERF_XFAIL_REASON, strict=True),
+    # common/arithmetic.div_semantics 已镜像 holiman uint256 的分段实现（快路径
+    # limb 展开 + 大数 Knuth 长除法折未解释函数），与 x86 codegen 逐分支对齐。
+    # 用逐终止路径比较（x86_compare_terminal_paths）避免 merge 后的大 ITE，
+    # 各路径都不再需要 bit-blast 256-bit 除法即可 UNSAT。
+    # 相等借位链桥接 assumption 现由 EVM/x86 侧 MOD/DIV 语义经 state.add_assumption
+    # 自动挂上（与主路径统一来源），assert_instruction_refines 会收集注入提速。
+    InstructionRefinementCase(
+        name="DIV",
+        evm_kind="DIV",
+        arity=2,
+        x86_core_hex=X86_DIV_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        x86_enable_go_bridge=True,
+        x86_compare_terminal_paths=True,
+        expected_stack_height=1,
+        # 逐路径都是确定性 unsat（隔离时最慢约 6s）；timeout 留足余量，避免全量
+        # suite 满负载下个别路径抖动触发 unknown。
+        solver_timeout_ms=30_000,
     ),
     # IR: MOD, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="MOD",
-            evm_kind="MOD",
-            arity=2,
-            x86_core_hex=X86_MOD_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            x86_enable_go_bridge=True,
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(reason=PERF_XFAIL_REASON, strict=True),
+    # 同 DIV：common/arithmetic.mod_semantics 镜像 holiman 分段实现，逐终止路径比较。
+    InstructionRefinementCase(
+        name="MOD",
+        evm_kind="MOD",
+        arity=2,
+        x86_core_hex=X86_MOD_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        x86_enable_go_bridge=True,
+        x86_compare_terminal_paths=True,
+        expected_stack_height=1,
+        solver_timeout_ms=30_000,
     ),
     # IR: SDIV, STOP
     pytest.param(

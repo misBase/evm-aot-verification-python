@@ -773,6 +773,11 @@ class GoFunctionSemantics:
         b, sp, mstate = self._pop_uint256(sp, mstate)
         result = arithmetic.div_semantics(a, b)
         sp, mstate = self._push_uint256(sp, result, mstate)
+        # 注入恒真的相等借位链桥接 lemma 实例（见 common/arithmetic 与
+        # tests/composition/test_eq_borrow_chain_composition.py）：soundness 中性、
+        # 纯提速。x86 侧 a/b 与 EVM 侧是不同符号，两侧各自挂，主路径
+        # _collect_assumptions 会一并收集。
+        mstate.add_assumption(arithmetic.eq_borrow_chain_assumption(a, b))
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
@@ -782,6 +787,8 @@ class GoFunctionSemantics:
         b, sp, mstate = self._pop_uint256(sp, mstate)
         result = arithmetic.mod_semantics(a, b)
         sp, mstate = self._push_uint256(sp, result, mstate)
+        # 同 DIV：恒真的相等借位链桥接 lemma 实例（soundness 中性、纯提速）。
+        mstate.add_assumption(arithmetic.eq_borrow_chain_assumption(a, b))
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 

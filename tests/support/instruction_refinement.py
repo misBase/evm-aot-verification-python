@@ -116,6 +116,13 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
         or case.expected_status_code is not None
         or case.compare_return_metadata
     )
+    # 收集语义建模在**单条全局路径**上累积的 assumptions（如 EVM 侧 MOD/DIV 的相等
+    # 借位链桥接、CALLDATALOAD 的 hi-192==0），与合约验证主路径
+    # （verification.program_verifier._collect_assumptions）保持单一来源。
+    # 注意：x86 terminal-paths 模式下，各路径的 assumptions 是 path-local 的，必须由
+    # _path_observation_mismatches 逐路径 guard，**不**在这里无条件全局添加，否则某条
+    # 路径（限制输入空间的）assumption 会越界约束 sibling 路径、藏住其真实 mismatch。
+    assumption_states = []
     if not requires_state_comparison:
         evm_result = _normalize_refinement_bv(_build_evm_result(case, operands))
         x86_result = _normalize_refinement_bv(
@@ -124,6 +131,7 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
         mismatches = [evm_result != x86_result]
     else:
         evm_state = _build_evm_final_state(case, operands, memory_words, readonly_words)
+        assumption_states.append(evm_state)
         if case.x86_execution_mode == "cfg" and case.x86_compare_terminal_paths:
             x86_global_states = _build_x86_final_global_states(
                 case,
@@ -131,9 +139,12 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
                 memory_words,
                 readonly_words,
             )
+            # x86 path-local assumptions 由 _path_observation_mismatches 逐路径 guard，
+            # 不并入 assumption_states（避免无条件全局添加导致 sibling 路径假绿）。
             mismatches = _path_observation_mismatches(case, evm_state, x86_global_states)
         else:
             x86_state = _build_x86_final_state(case, operands, memory_words, readonly_words)
+            assumption_states.append(x86_state)
             mismatches = _state_observation_mismatches(case, evm_state, x86_state)
 
     if not mismatches:
@@ -141,6 +152,8 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
 
     solver = Solver()
     solver.set(timeout=case.solver_timeout_ms)
+    for assumption in _collect_state_assumptions(assumption_states):
+        solver.add(assumption)
     solver.add(Or(*mismatches))
     result = solver.check()
 
@@ -269,6 +282,28 @@ def _symbolic_readonly_words(case: InstructionRefinementCase) -> dict[str, list[
             for i, _ in enumerate(case.initial_return_data_word_offsets)
         ],
     }
+
+
+def _collect_state_assumptions(states):
+    """从一组 SMTState 收集去重后的 .assumptions（跳过 None）。
+
+    与合约验证主路径 verification.program_verifier._collect_assumptions 同款逻辑，
+    保证测试侧与主路径用单一来源（state.assumptions）注入 solver。语义建模函数
+    （如 MOD/DIV 的相等借位链桥接、CALLDATALOAD 的 hi-192==0）通过
+    SMTState.add_assumption 把恒真/无损先验挂到 state，这里统一取出。
+    """
+    seen = set()
+    out = []
+    for state in states:
+        if state is None:
+            continue
+        for assumption in getattr(state, "assumptions", None) or []:
+            key = assumption.hash()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(assumption)
+    return out
 
 
 def _build_evm_result(case: InstructionRefinementCase, operands: list[Uint256]):
@@ -673,7 +708,13 @@ def _path_observation_mismatches(
         path_mismatches.extend(_transient_storage_mismatches(case, evm_state, gstate.mstate))
 
         if path_mismatches:
-            mismatches.append(And(condition, Or(*path_mismatches)))
+            # 把该路径自身的 assumptions（如 CALLDATALOAD 的 hi-192==0）作为 guard
+            # 合进本路径 mismatch 的前置条件，等价 `condition ∧ assumptions ⇒ 检查`。
+            # 否则某条路径的（限制输入空间的）assumption 若被无条件全局添加，会越界
+            # 约束 sibling 路径、把其真实 mismatch 藏成假绿。对齐生产代码
+            # x86_64/program.py:_path_observation 把 path assumptions And 进 condition。
+            path_assumptions = getattr(gstate.mstate, "assumptions", None) or []
+            mismatches.append(And(condition, *path_assumptions, Or(*path_mismatches)))
 
     return mismatches
 

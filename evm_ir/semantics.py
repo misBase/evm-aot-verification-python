@@ -10,7 +10,7 @@ from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
 from common import uninterpreted
 from common.calldata import calldataload_no_overflow_assumption, calldataload_word
-from common.arithmetic import div_semantics as _div_semantics, mod_semantics as _mod_semantics, exp_semantics as _exp_semantics, addmod_semantics as _addmod_semantics, mulmod_semantics as _mulmod_semantics
+from common.arithmetic import div_semantics as _div_semantics, mod_semantics as _mod_semantics, exp_semantics as _exp_semantics, addmod_semantics as _addmod_semantics, mulmod_semantics as _mulmod_semantics, eq_borrow_chain_assumption
 from state.smt_state import SMTState, EVMStackState, EVMMemoryState
 
 # RETURN指令的常量
@@ -536,6 +536,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.div_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
+        # 注入相等借位链桥接：a==b ⟺ ¬(a<b)∧¬(b<a)。这是被 composition lemma
+        # （tests/composition/test_eq_borrow_chain_composition.py）证明的恒真式，
+        # 不限制输入空间、soundness 中性——纯粹给 solver 一个提速 hint，让它把
+        # x86 codegen 的借位链条件与忠实参照（eq_semantics）对齐，而无需自己做
+        # 256-bit 借位↔limb相等的慢桥接。与 CALLDATALOAD 那种"限制输入"假设不同。
+        state.add_assumption(eq_borrow_chain_assumption(a, b))
         return state
 
     elif kind == "SDIV":
@@ -550,6 +556,8 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.mod_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
+        # 同 DIV：注入恒真的相等借位链桥接 lemma 实例（soundness 中性、纯提速）。
+        state.add_assumption(eq_borrow_chain_assumption(a, b))
         return state
 
     elif kind == "SMOD":

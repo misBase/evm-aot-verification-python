@@ -3,11 +3,15 @@
 操作 BitVec(256)，无状态，供 evm_ir 和 x86_64 两侧共用。
 """
 from z3 import (
+    And,
     BitVecVal,
+    Concat,
     Extract,
     Function,
     BitVecSort,
     If,
+    Not,
+    Or,
     UDiv,
     URem,
     ZeroExt,
@@ -16,14 +20,136 @@ from z3 import (
 )
 
 
+# go-hpc-evm 的 builtin div/mod 实际调用 github.com/holiman/uint256 v1.3.2 的
+# Int.Div / Int.Mod，而 amd64 AOT codegen 就是这两个函数的逐分支翻译。两侧若都
+# 建模成裸 z3 bvurem/bvudiv，refinement 公式会让 Z3 bit-blast 256-bit 除法而超时
+# （实测 192-bit 起就 unknown）。这里改为镜像 holiman 的分段实现：快路径用 limb
+# 比较/64-bit 运算展开（Z3 秒解，且与 x86 codegen 逐路径结构对齐），仅大数 Knuth
+# 长除法路径折成未解释函数。大数路径 x86（经 builtin bridge）与 EVM 参照都调用同一
+# holiman udivrem，折同一 UF 即保证 x86 ≡ EVM（不证 ≡ 数学真值）。
+#
+# Latent gap（当前不可触发）：商和余数是**两个独立 UF**，二者无 q·b+r==a 公理。
+# 单指令 refinement 里 DIV/MOD 各用独立 solver，同一 solver 不会同时出现两个 UF，故
+# 当前安全。但若某个多指令程序对同一 (a,b) 同时含 DIV 与 MOD、且 observable 依赖两者，
+# Z3 可取 quotient/remainder 数学不一致的模型而各自 refinement 仍 pass。届时需改为单一
+# udivrem UF 返回 (q,r) 再投影，或补 q·b+r==a 一致性公理。
+_HOLIMAN_UDIVREM_UF = Function(
+    "holiman_udivrem", BitVecSort(256), BitVecSort(256), BitVecSort(256)
+)
+_HOLIMAN_UDIV_UF = Function(
+    "holiman_udiv", BitVecSort(256), BitVecSort(256), BitVecSort(256)
+)
+
+_ZERO256 = BitVecVal(0, 256)
+_ONE256 = BitVecVal(1, 256)
+
+
+def _is_uint64(value):
+    """对齐 holiman Int.IsUint64：高 192 位为 0。"""
+    return Extract(255, 64, value) == BitVecVal(0, 192)
+
+
+def eq_as_borrow_chain(a, b):
+    """把 a == b 表达成借位链形式 ¬(a<b) ∧ ¬(b<a)（a/b 为 BitVec(256)）。
+
+    **不是**参照语义——参照（div/mod_semantics、EQ opcode）始终用 Uint256.eq_semantics
+    的 4-limb 直接相等，那才是 IR 真实写法。这里只提供一个与之等价、但与 x86 codegen
+    同源的形式：x86 的 a==b/a<b 路径条件是用 sub/sbb 借位链表达的，与 4-limb 相等的
+    AST 不同，Z3 要做 256-bit 借位↔limb相等的桥接推理而显著拖慢（实测 MOD 的 a==b
+    路径单条 ~4.7s）。
+
+    `a == b ⟺ ¬(a<b) ∧ ¬(b<a)` 的等价性由 tests/composition 的 composition lemma
+    独立证明（limb 级，秒解）。验证时可把该 lemma 的 ground 实例
+    `eq_semantics(a,b) == eq_as_borrow_chain(a,b)` 作为 assumption 喂给 solver，让它无需
+    自己桥接即可对齐 x86，而参照模型本身保持忠实。
+    """
+    from common.uint256 import Uint256
+
+    x = Uint256.from_bv256(a)
+    y = Uint256.from_bv256(b)
+    return And(Not(x.lt_semantics(y)), Not(y.lt_semantics(x)))
+
+
+def eq_borrow_chain_assumption(a, b):
+    """返回 ground 实例 `eq_semantics(a,b) == eq_as_borrow_chain(a,b)`。
+
+    供 refinement 验证作为 solver assumption 使用（等价性已由 composition lemma
+    证明）。a/b 为 BitVec(256)。
+    """
+    from common.uint256 import Uint256
+
+    x = Uint256.from_bv256(a)
+    y = Uint256.from_bv256(b)
+    return x.eq_semantics(y) == eq_as_borrow_chain(a, b)
+
+
+def _div_rem_64bit(x_low, y_low):
+    """镜像 x86 `div r64` 在 64-bit 快路径产出的商/余数 AST。
+
+    x86 codegen 的 0xe6 段是 `mov rdx,0; mov rax,x0; div y0`，按
+    x86_64/semantics.py 的 div 建模即 dividend=Concat(RDX=0, RAX=x0)，
+    divisor128=ZeroExt(64, y0)，商/余取 q128/r128 的低 64 位。EVM 参照镜像同一
+    表达式，使两侧 AST 逐字一致、无需 Z3 推理 bvudiv 性质即可对齐。
+    """
+    dividend = Concat(BitVecVal(0, 64), x_low)
+    divisor128 = ZeroExt(64, y_low)
+    quotient = Extract(63, 0, UDiv(dividend, divisor128))
+    remainder = Extract(63, 0, URem(dividend, divisor128))
+    return quotient, remainder
+
+
 def div_semantics(a, b):
-    """EVM DIV: a / b，b==0时返回0。"""
-    return If(b == BitVecVal(0, 256), BitVecVal(0, 256), UDiv(a, b))
+    """EVM DIV: a / b，b==0时返回0。
+
+    分段对齐 holiman uint256 v1.3.2 Int.Div：
+      y.IsZero() || y.Gt(x) -> 0;  x.Eq(y) -> 1;  x.IsUint64() -> x0/y0(64-bit);
+      else -> 未解释函数（Knuth 长除法）。
+    """
+    from common.uint256 import Uint256
+
+    x = Uint256.from_bv256(a)
+    y = Uint256.from_bv256(b)
+    quotient64, _ = _div_rem_64bit(x.z0, y.z0)
+    return If(
+        Or(y.iszero_semantics(), y.gt_semantics(x)),
+        _ZERO256,
+        If(
+            x.eq_semantics(y),
+            _ONE256,
+            If(
+                _is_uint64(a),
+                ZeroExt(192, quotient64),
+                _HOLIMAN_UDIV_UF(a, b),
+            ),
+        ),
+    )
 
 
 def mod_semantics(a, b):
-    """EVM MOD: a % b，b==0时返回0。"""
-    return If(b == BitVecVal(0, 256), BitVecVal(0, 256), URem(a, b))
+    """EVM MOD: a % b，b==0时返回0。
+
+    分段对齐 holiman uint256 v1.3.2 Int.Mod：
+      y.IsZero() || x.Eq(y) -> 0;  x.Lt(y) -> x;  x.IsUint64() -> x0%y0(64-bit);
+      else -> 未解释函数（Knuth 长除法）。
+    """
+    from common.uint256 import Uint256
+
+    x = Uint256.from_bv256(a)
+    y = Uint256.from_bv256(b)
+    _, remainder64 = _div_rem_64bit(x.z0, y.z0)
+    return If(
+        Or(y.iszero_semantics(), x.eq_semantics(y)),
+        _ZERO256,
+        If(
+            x.lt_semantics(y),
+            a,
+            If(
+                _is_uint64(a),
+                ZeroExt(192, remainder64),
+                _HOLIMAN_UDIVREM_UF(a, b),
+            ),
+        ),
+    )
 
 
 def exp_semantics(base, exponent):

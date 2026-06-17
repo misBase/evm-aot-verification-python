@@ -6,7 +6,7 @@ Uint256 单元测试 - 测试所有语义操作的正确性。
 """
 
 import pytest
-from z3 import BitVecVal, simplify
+from z3 import BitVec, BitVecVal, Not, Solver, UGT, ULT, simplify, unsat
 
 from common.uint256 import Uint256
 
@@ -466,6 +466,64 @@ class TestUint256ComparisonSemantics:
         )
         result = val1.iszero_semantics()
         assert not simplify(result)
+
+
+class TestUint256ComparisonGroundTruth:
+    """比较原语对 Z3 原生 BitVec(256) 语义的**全符号**交叉验证（ground truth）。
+
+    上面 TestUint256ComparisonSemantics 是具体值点测，无法排除"自洽的系统性错误"
+    （如 limb 显著性整体搞反、却恰好在被测点上正确）。这些 limb 级 borrow-chain 原语
+    是 div/mod 分段建模的分支条件、以及 eq_borrow_chain_assumption 的信任基础
+    （见 common/arithmetic.py、tests/composition/test_eq_borrow_chain_composition.py），
+    属 soundness 敏感代码，必须有独立 ground-truth 锚。
+
+    原生 ULT/UGT/== 对 Z3 不需 bit-blast 除法，全符号秒解（实测 < 0.1s/条）。
+    """
+
+    @staticmethod
+    def _prove_equiv(claim):
+        """证明 claim 对全符号 256-bit 输入恒成立：¬claim 不可满足。"""
+        solver = Solver()
+        solver.set(timeout=10_000)
+        solver.add(Not(claim))
+        result = solver.check()
+        assert result == unsat, f"comparison primitive diverges from z3 native: {result}"
+
+    def test_lt_matches_native_ult(self):
+        """lt_semantics(a,b) ⟺ ULT(a,b)，全符号。"""
+        a, b = BitVec("gt_lt_a", 256), BitVec("gt_lt_b", 256)
+        x, y = Uint256.from_bv256(a), Uint256.from_bv256(b)
+        self._prove_equiv(x.lt_semantics(y) == ULT(a, b))
+
+    def test_gt_matches_native_ugt(self):
+        """gt_semantics(a,b) ⟺ UGT(a,b)，全符号。"""
+        a, b = BitVec("gt_gt_a", 256), BitVec("gt_gt_b", 256)
+        x, y = Uint256.from_bv256(a), Uint256.from_bv256(b)
+        self._prove_equiv(x.gt_semantics(y) == UGT(a, b))
+
+    def test_eq_matches_native_eq(self):
+        """eq_semantics(a,b) ⟺ (a == b)，全符号。"""
+        a, b = BitVec("gt_eq_a", 256), BitVec("gt_eq_b", 256)
+        x, y = Uint256.from_bv256(a), Uint256.from_bv256(b)
+        self._prove_equiv(x.eq_semantics(y) == (a == b))
+
+    def test_iszero_matches_native_zero(self):
+        """iszero_semantics(a) ⟺ (a == 0)，全符号。"""
+        a = BitVec("gt_iszero_a", 256)
+        x = Uint256.from_bv256(a)
+        self._prove_equiv(x.iszero_semantics() == (a == BitVecVal(0, 256)))
+
+    def test_slt_matches_native_slt(self):
+        """slt_semantics(a,b) ⟺ (a <s b)（z3 BitVec `<` 默认有符号），全符号。"""
+        a, b = BitVec("gt_slt_a", 256), BitVec("gt_slt_b", 256)
+        x, y = Uint256.from_bv256(a), Uint256.from_bv256(b)
+        self._prove_equiv(x.slt_semantics(y) == (a < b))
+
+    def test_sgt_matches_native_sgt(self):
+        """sgt_semantics(a,b) ⟺ (a >s b)（z3 BitVec `>` 默认有符号），全符号。"""
+        a, b = BitVec("gt_sgt_a", 256), BitVec("gt_sgt_b", 256)
+        x, y = Uint256.from_bv256(a), Uint256.from_bv256(b)
+        self._prove_equiv(x.sgt_semantics(y) == (a > b))
 
 
 class TestUint256Conversions:
