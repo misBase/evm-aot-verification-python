@@ -10,6 +10,7 @@ from z3 import (
     Function,
     BitVecSort,
     If,
+    Implies,
     Not,
     Or,
     UDiv,
@@ -83,19 +84,49 @@ def eq_borrow_chain_assumption(a, b):
     return x.eq_semantics(y) == eq_as_borrow_chain(a, b)
 
 
-def _div_rem_64bit(x_low, y_low):
-    """镜像 x86 `div r64` 在 64-bit 快路径产出的商/余数 AST。
+def _div_rem_64bit_128(x_low, y_low):
+    """返回 x86 `div r64` 快路径的 128-bit 商/余数（未截断）。
 
     x86 codegen 的 0xe6 段是 `mov rdx,0; mov rax,x0; div y0`，按
     x86_64/semantics.py 的 div 建模即 dividend=Concat(RDX=0, RAX=x0)，
-    divisor128=ZeroExt(64, y0)，商/余取 q128/r128 的低 64 位。EVM 参照镜像同一
-    表达式，使两侧 AST 逐字一致、无需 Z3 推理 bvudiv 性质即可对齐。
+    divisor128=ZeroExt(64, y0)。这里返回 128-bit 的 q128/r128，供 _div_rem_64bit
+    与 x86_div64_quotient_fits_assumption 复用同一份 AST。
     """
     dividend = Concat(BitVecVal(0, 64), x_low)
     divisor128 = ZeroExt(64, y_low)
-    quotient = Extract(63, 0, UDiv(dividend, divisor128))
-    remainder = Extract(63, 0, URem(dividend, divisor128))
-    return quotient, remainder
+    return UDiv(dividend, divisor128), URem(dividend, divisor128)
+
+
+def _div_rem_64bit(x_low, y_low):
+    """镜像 x86 `div r64` 在 64-bit 快路径产出的商/余数 AST。
+
+    取 _div_rem_64bit_128 的低 64 位。EVM 参照镜像同一表达式，使两侧 AST 逐字
+    一致、无需 Z3 推理 bvudiv 性质即可对齐。
+    """
+    quotient128, remainder128 = _div_rem_64bit_128(x_low, y_low)
+    return Extract(63, 0, quotient128), Extract(63, 0, remainder128)
+
+
+def x86_div64_quotient_fits_assumption(a, b):
+    """x86 `div r64` quotient_fits guard 的恒真 ground 实例（a/b 为 BitVec(256)）。
+
+    当前 x86 后端 64-bit DIV 快路径会生成 `RDX=0; RAX=x.z0; div y.z0`。
+    因此 y.z0 != 0 时，q128 高 64 位必为 0，可满足 x86 语义里的 quotient_fits。
+
+    这不是 EVM DIV 语义的一部分，只是 refinement solver hint：避免 Z3 自己证明
+    该 x86 guard，从而提速当前 x86-64 codegen 形状。
+
+    守卫只能是 `y.z0 != 0`：q128 只取 x.z0，与 a 高 192 位无关；不可用 IsUint64(a)。
+    """
+    from common.uint256 import Uint256
+
+    x = Uint256.from_bv256(a)
+    y = Uint256.from_bv256(b)
+    quotient128, _ = _div_rem_64bit_128(x.z0, y.z0)
+    return Implies(
+        y.z0 != BitVecVal(0, 64),
+        Extract(127, 64, quotient128) == BitVecVal(0, 64),
+    )
 
 
 def div_semantics(a, b):

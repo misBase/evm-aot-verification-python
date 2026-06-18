@@ -18,7 +18,11 @@ import time
 
 from z3 import And, Not, Solver, unsat
 
-from common.arithmetic import eq_as_borrow_chain, eq_borrow_chain_assumption
+from common.arithmetic import (
+    eq_as_borrow_chain,
+    eq_borrow_chain_assumption,
+    x86_div64_quotient_fits_assumption,
+)
 from common.uint256 import Uint256
 
 
@@ -68,3 +72,15 @@ def test_eq_borrow_chain_assumption_is_sound():
     x = Uint256.symbolic("eq_assume_x")
     y = Uint256.symbolic("eq_assume_y")
     _prove(eq_borrow_chain_assumption(x.to_bv256(), y.to_bv256()))
+
+
+def test_x86_div64_quotient_fits_assumption_is_sound():
+    """x86 `div r64` quotient_fits hint 对全符号输入恒真。
+
+    x86_div64_quotient_fits_assumption(a,b) =
+        (b.z0 != 0 ⟹ Extract(127,64, UDiv(Concat(0,a.z0), ZeroExt(64,b.z0))) == 0)。
+    它是 x86-64 refinement hint，不是 EVM DIV 语义；本测试确认注入后不限制输入。
+    """
+    x = Uint256.symbolic("div64_x")
+    y = Uint256.symbolic("div64_y")
+    _prove(x86_div64_quotient_fits_assumption(x.to_bv256(), y.to_bv256()))

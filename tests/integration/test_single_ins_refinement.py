@@ -180,7 +180,8 @@ ARITHMETIC_0X00_CASES = [
     # 用逐终止路径比较（x86_compare_terminal_paths）避免 merge 后的大 ITE，
     # 各路径都不再需要 bit-blast 256-bit 除法即可 UNSAT。
     # 相等借位链桥接 assumption 现由 EVM/x86 侧 MOD/DIV 语义经 state.add_assumption
-    # 自动挂上（与主路径统一来源），assert_instruction_refines 会收集注入提速。
+    # 自动挂上（与主路径统一来源），assert_instruction_refines 会收集注入提速。DIV 另挂
+    # x86_div64_quotient_fits_assumption 提速 x86 `div r64` guard；它不是 EVM DIV 语义。
     InstructionRefinementCase(
         name="DIV",
         evm_kind="DIV",
@@ -192,8 +193,8 @@ ARITHMETIC_0X00_CASES = [
         x86_enable_go_bridge=True,
         x86_compare_terminal_paths=True,
         expected_stack_height=1,
-        # 逐路径都是确定性 unsat（隔离时最慢约 6s）；timeout 留足余量，避免全量
-        # suite 满负载下个别路径抖动触发 unknown。
+        # 逐路径都是确定性 unsat；timeout 留足余量，避免全量 suite 满负载下个别
+        # 路径抖动触发 unknown。
         solver_timeout_ms=30_000,
     ),
     # IR: MOD, STOP

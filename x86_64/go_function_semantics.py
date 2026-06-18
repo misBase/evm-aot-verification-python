@@ -778,6 +778,8 @@ class GoFunctionSemantics:
         # 纯提速。x86 侧 a/b 与 EVM 侧是不同符号，两侧各自挂，主路径
         # _collect_assumptions 会一并收集。
         mstate.add_assumption(arithmetic.eq_borrow_chain_assumption(a, b))
+        # x86 `div r64` quotient_fits guard 的恒真 hint；仅用于 refinement 提速。
+        mstate.add_assumption(arithmetic.x86_div64_quotient_fits_assumption(a, b))
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 

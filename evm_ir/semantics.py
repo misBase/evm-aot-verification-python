@@ -10,7 +10,15 @@ from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
 from common import uninterpreted
 from common.calldata import calldataload_no_overflow_assumption, calldataload_word
-from common.arithmetic import div_semantics as _div_semantics, mod_semantics as _mod_semantics, exp_semantics as _exp_semantics, addmod_semantics as _addmod_semantics, mulmod_semantics as _mulmod_semantics, eq_borrow_chain_assumption
+from common.arithmetic import (
+    addmod_semantics as _addmod_semantics,
+    div_semantics as _div_semantics,
+    eq_borrow_chain_assumption,
+    exp_semantics as _exp_semantics,
+    mod_semantics as _mod_semantics,
+    mulmod_semantics as _mulmod_semantics,
+    x86_div64_quotient_fits_assumption,
+)
 from state.smt_state import SMTState, EVMStackState, EVMMemoryState
 
 # RETURN指令的常量
@@ -542,6 +550,8 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # x86 codegen 的借位链条件与忠实参照（eq_semantics）对齐，而无需自己做
         # 256-bit 借位↔limb相等的慢桥接。与 CALLDATALOAD 那种"限制输入"假设不同。
         state.add_assumption(eq_borrow_chain_assumption(a, b))
+        # x86 `div r64` quotient_fits guard 的恒真 hint；不是 EVM DIV 语义。
+        state.add_assumption(x86_div64_quotient_fits_assumption(a, b))
         return state
 
     elif kind == "SDIV":
