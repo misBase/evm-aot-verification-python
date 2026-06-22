@@ -305,6 +305,15 @@ class OutputRefinementChecks:
         evm_byte = Select(evm_memory, evm_addr)
         x86_byte = Select(x86_memory, x86_addr)
         solver.add(index_in_range)
+        # SDIV/SMOD 结果经栈→MSTORE 流入 return memory 时，两侧除法子表达式 AST 不同会
+        # 让 byte 比较 bit-blast 而 unknown；注入已验证除法桥接（fail-closed）提速。
+        self._ctx.add_div_bridges(
+            solver,
+            evm_byte,
+            x86_byte,
+            And(path_condition, index_in_range),
+            ctx=ctx,
+        )
         solver.add(evm_byte != x86_byte)
 
         start_time = time.time()

@@ -5,7 +5,7 @@ x86-64指令语义建模。
 """
 
 import capstone
-from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem, Not, And, Or, Select
+from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem, Not, And, Or, Select, Implies
 from typing import List, Dict, Optional, Any, Tuple
 from .models import X86Block, X86Instruction, Register
 from .aot_profile import GO_HPC_EVM_PROFILE
@@ -1266,6 +1266,19 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
         quotient_fits = Extract(127, 64, q128) == BitVecVal(0, 64)
         divisor_non_zero = divisor != BitVecVal(0, 64)
         can_divide = divisor_non_zero & quotient_fits
+
+        # 恒真提速 hint（path-local，soundness 中性）：当 RDX=0（即 dividend 高 64 位为
+        # 0，AOT `div r64` 快路径总是 `mov rdx,0` 在前）且 divisor!=0 时，128-bit 商高
+        # 64 位必为 0，quotient_fits 恒真。直接用本指令的 q128 构造，AST 与公式中的
+        # quotient_fits 逐字一致，避免 Z3 bit-blast 商高位。SDIV/SMOD 等把 div 实参取负
+        # （0-x）的路径，原始操作数级的 EVM hint AST 对不上，故由 x86 侧就地挂上。
+        # terminal-paths 模式下该 assumption 由 _path_observation_mismatches 逐路径 guard。
+        state.add_assumption(
+            Implies(
+                And(old_rdx == BitVecVal(0, 64), divisor_non_zero),
+                quotient_fits,
+            )
+        )
 
         new_rax = If(can_divide, Extract(63, 0, q128), old_rax)
         new_rdx = If(can_divide, Extract(63, 0, r128), old_rdx)

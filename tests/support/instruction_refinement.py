@@ -17,15 +17,22 @@ from z3 import (
     Or,
     Select,
     Solver,
+    SolverFor,
     Store,
+    Then,
+    Z3_BV_SORT,
+    Z3_OP_AND,
     Z3_OP_CONCAT,
     Z3_OP_EXTRACT,
     Z3_OP_ITE,
+    Z3_OP_NOT,
+    eq as z3_eq,
     is_bv_value,
     simplify,
     unsat,
 )
 
+from common.div_bridge import verified_div_bridges
 from common.uint256 import Uint256
 from evm_ir.models import EvmOperator
 from evm_ir.semantics import EVMOperationSemantics, evm_operator_to_z3
@@ -40,6 +47,9 @@ from x86_64.summaries.registry import X86SummaryConfig
 _LIMB_STRIDE_BYTES = 8
 _UINT256_SLOT_BYTES = 4 * _LIMB_STRIDE_BYTES
 _MAX_SUPPORTED_ARITY = 17
+_PATH_ITE_ORACLE_TIMEOUT_MS = 1_000
+_PATH_ITE_MIN_BV_BITS = 64
+_PATH_AWARE_ITE_EVM_KINDS = {"SDIV", "SMOD"}
 _CALLENGINE_LIMB_ATTRS = {
     0x18: "callengine_memory_size_bytes",
     0x68: "callengine_callvalue",
@@ -150,20 +160,56 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
     if not mismatches:
         raise AssertionError(f"{case.name} micro-refinement has no observable checks")
 
-    solver = Solver()
-    solver.set(timeout=case.solver_timeout_ms)
-    for assumption in _collect_state_assumptions(assumption_states):
-        solver.add(assumption)
-    solver.add(Or(*mismatches))
-    result = solver.check()
+    assumptions = list(_collect_state_assumptions(assumption_states))
 
-    assert result == unsat, (
-        f"{case.name} micro-refinement failed: "
-        f"opcode={case.evm_kind}, base_addr=0x{case.base_addr:x}, "
-        f"execution_mode={case.x86_execution_mode}, "
-        f"compare_terminal_paths={case.x86_compare_terminal_paths}, "
-        f"x86_core_hex={case.x86_core_hex}, solver_result={result}"
-    )
+    # terminal-paths 模式逐项（逐路径）独立求解，而非一个大 Or(*mismatches) 一次 check。
+    # 二者对「整体 unsat」判定等价（Or 的 unsat ⟺ 每个 disjunct unsat），但合成大公式
+    # 会让 Z3 在 SDIV/SMOD 这类含多条慢 div 路径的 case 上选择困难而 unknown（实测大 Or
+    # 155s unknown，逐路径各自秒级~十几秒 unsat）。非 terminal-paths 模式只有少量 mismatch
+    # 项，逐项与单 Or 行为一致。
+    for mismatch in mismatches:
+        solver = _make_refinement_solver(case)
+        solver.set(timeout=case.solver_timeout_ms)
+        for assumption in assumptions:
+            solver.add(assumption)
+        solver.add(mismatch)
+        result = solver.check()
+        assert result == unsat, (
+            f"{case.name} micro-refinement failed: "
+            f"opcode={case.evm_kind}, base_addr=0x{case.base_addr:x}, "
+            f"execution_mode={case.x86_execution_mode}, "
+            f"compare_terminal_paths={case.x86_compare_terminal_paths}, "
+            f"x86_core_hex={case.x86_core_hex}, solver_result={result}"
+        )
+
+
+def _make_refinement_solver(case: InstructionRefinementCase):
+    """构造求解器。terminal-paths 模式用显式 tactic 链，否则用默认 Solver。
+
+    SDIV/SMOD 的取负+借位链+holiman 分段 ITE 公式，让 Z3 默认 (smt) 策略在纯
+    bit-vector 上选择不佳而 unknown（实测单路径 25s+ timeout）。显式
+    `simplify → propagate-values → simplify → bit-blast → sat` 先用常量传播/化简把
+    路径条件已固定的符号（如取负分支、IsZero/lt 判断）折掉，再 bit-blast 求解，
+    同一路径 0.x~数秒 unsat。该 tactic 只改求解策略、不改语义，unsat 结论可信；
+    与 verified_div_bridges 桥接协同（缺一不可：桥接消 div 实参 AST 差，tactic 消
+    取负/分段 ITE 的求解开销）。
+
+    NOTE 与生产路径的差异：这里比较的是**裸栈值** `evm_stack[i] != x86_val`，QF_AUFBV
+    单独搞不定 SMOD 的取负/ITE（实测 281s 仍有 fail），故需此 bit-blast tactic。生产
+    refinement（verification/）比较的是经 Store/Select 包裹的 memory/storage array 值，
+    QF_AUFBV 的数组理论会先把 Select(Store(...)) 化简，配合 _RefinementContext.add_div_bridges
+    注入同一桥接即可秒解（实测 SMOD 早退路径 1.3s），无需此 tactic。两侧差异源于比较表达式
+    形态不同，不是重复造轮子。
+    """
+    if case.x86_execution_mode == "cfg" and case.x86_compare_terminal_paths:
+        return Then(
+            "simplify",
+            "propagate-values",
+            "simplify",
+            "bit-blast",
+            "sat",
+        ).solver()
+    return Solver()
 
 
 def _normalize_refinement_bv(expr):
@@ -304,6 +350,161 @@ def _collect_state_assumptions(states):
             seen.add(key)
             out.append(assumption)
     return out
+
+
+class _PathIteOracle:
+    """用于判断 path condition 是否蕴含 ITE 选支的小型 fail-closed oracle。"""
+
+    def __init__(self, path_conjuncts):
+        self._solver = SolverFor("QF_AUFBV")
+        self._solver.set(timeout=_PATH_ITE_ORACLE_TIMEOUT_MS)
+        for conjunct in path_conjuncts:
+            self._solver.add(conjunct)
+        self._cache = {}
+
+    def proves_unsat(self, extra_constraint) -> bool:
+        key = extra_constraint.hash()
+        for cached_expr, cached_result in self._cache.get(key, ()):
+            if z3_eq(cached_expr, extra_constraint):
+                return cached_result
+
+        self._solver.push()
+        self._solver.add(extra_constraint)
+        result = self._solver.check() == unsat
+        self._solver.pop()
+
+        self._cache.setdefault(key, []).append((extra_constraint, result))
+        return result
+
+
+def _rewrite_stack_outputs_under_path(
+    evm_stack,
+    x86_stack,
+    condition,
+    path_assumptions,
+    base_assumptions,
+):
+    """在当前路径下裁掉不可达的大位宽 BV ITE 分支。
+
+    terminal-path 微测试比较的是裸栈表达式。SDIV/SMOD 的这些表达式里会保留
+    abs/sign/MOD 的深层 ITE，而生产路径的 array-shaped 检查通常会更早被
+    Store/Select 化简掉。这里的改写是 soundness 中性的：只有在当前路径条件
+    与已注入 assumptions 能证明另一支不可达时才选支；证明不了（unknown）就
+    保留原 AST。
+    """
+    path_conjuncts = _flatten_bool_conjuncts(
+        And(condition, *path_assumptions, *base_assumptions)
+    )
+    oracle = _PathIteOracle(path_conjuncts)
+    cache = {}
+    return (
+        tuple(
+            _rewrite_large_bv_ites_under_path(expr, path_conjuncts, oracle, cache)
+            for expr in evm_stack
+        ),
+        tuple(
+            _rewrite_large_bv_ites_under_path(expr, path_conjuncts, oracle, cache)
+            for expr in x86_stack
+        ),
+    )
+
+
+def _flatten_bool_conjuncts(expr):
+    if hasattr(expr, "decl") and expr.decl().kind() == Z3_OP_AND:
+        out = []
+        for child in expr.children():
+            out.extend(_flatten_bool_conjuncts(child))
+        return out
+    return [expr]
+
+
+def _negate_syntactic(expr):
+    try:
+        if expr.decl().kind() == Z3_OP_NOT and len(expr.children()) == 1:
+            return expr.children()[0]
+    except Exception:
+        pass
+    try:
+        return Not(expr)
+    except Exception:
+        return None
+
+
+def _bool_in_conjuncts(path_conjuncts, expr) -> bool:
+    return any(z3_eq(conjunct, expr) for conjunct in path_conjuncts)
+
+
+def _is_large_bv_expr(expr) -> bool:
+    try:
+        return (
+            expr.sort().kind() == Z3_BV_SORT
+            and expr.size() >= _PATH_ITE_MIN_BV_BITS
+        )
+    except Exception:
+        return False
+
+
+def _rewrite_large_bv_ites_under_path(expr, path_conjuncts, oracle, cache):
+    cache_key = expr.get_id()
+    if cache_key in cache:
+        return cache[cache_key]
+
+    try:
+        kind = expr.decl().kind()
+    except Exception:
+        cache[cache_key] = expr
+        return expr
+
+    if kind == Z3_OP_ITE and len(expr.children()) == 3:
+        cond, then_branch, else_branch = expr.children()
+        neg_cond = _negate_syntactic(cond)
+
+        if _bool_in_conjuncts(path_conjuncts, cond):
+            out = _rewrite_large_bv_ites_under_path(
+                then_branch, path_conjuncts, oracle, cache
+            )
+            cache[cache_key] = out
+            return out
+        if neg_cond is not None and _bool_in_conjuncts(path_conjuncts, neg_cond):
+            out = _rewrite_large_bv_ites_under_path(
+                else_branch, path_conjuncts, oracle, cache
+            )
+            cache[cache_key] = out
+            return out
+
+        if _is_large_bv_expr(expr):
+            if neg_cond is not None and oracle.proves_unsat(neg_cond):
+                out = _rewrite_large_bv_ites_under_path(
+                    then_branch, path_conjuncts, oracle, cache
+                )
+                cache[cache_key] = out
+                return out
+            if oracle.proves_unsat(cond):
+                out = _rewrite_large_bv_ites_under_path(
+                    else_branch, path_conjuncts, oracle, cache
+                )
+                cache[cache_key] = out
+                return out
+
+    children = expr.children()
+    if children:
+        rewritten_children = [
+            _rewrite_large_bv_ites_under_path(child, path_conjuncts, oracle, cache)
+            for child in children
+        ]
+        if any(
+            not z3_eq(old, new)
+            for old, new in zip(children, rewritten_children, strict=True)
+        ):
+            try:
+                out = expr.decl()(*rewritten_children)
+                cache[cache_key] = out
+                return out
+            except Exception:
+                pass
+
+    cache[cache_key] = expr
+    return expr
 
 
 def _build_evm_result(case: InstructionRefinementCase, operands: list[Uint256]):
@@ -683,14 +884,36 @@ def _path_observation_mismatches(
 
     for condition, gstate in zip(path_conditions, x86_global_states, strict=True):
         path_mismatches = []
+        path_assumptions = getattr(gstate.mstate, "assumptions", None) or []
+        base_assumptions = getattr(evm_state, "assumptions", None) or []
+        evm_stack_for_bridge = ()
+        x86_stack_for_bridge = ()
         if case.expected_stack_height is not None:
             x86_stack = _extract_x86_stack_outputs(
                 gstate.mstate,
                 case.arity,
                 case.expected_stack_height,
             )
+            if case.evm_kind in _PATH_AWARE_ITE_EVM_KINDS:
+                evm_stack_for_bridge, x86_stack_for_bridge = (
+                    _rewrite_stack_outputs_under_path(
+                        evm_stack,
+                        x86_stack,
+                        condition,
+                        path_assumptions,
+                        base_assumptions,
+                    )
+                )
+            else:
+                evm_stack_for_bridge = evm_stack
+                x86_stack_for_bridge = x86_stack
             path_mismatches.extend(
-                evm != x86 for evm, x86 in zip(evm_stack, x86_stack, strict=True)
+                evm != x86
+                for evm, x86 in zip(
+                    evm_stack_for_bridge,
+                    x86_stack_for_bridge,
+                    strict=True,
+                )
             )
         if case.expected_status_code is not None:
             path_mismatches.append(
@@ -713,8 +936,20 @@ def _path_observation_mismatches(
             # 否则某条路径的（限制输入空间的）assumption 若被无条件全局添加，会越界
             # 约束 sibling 路径、把其真实 mismatch 藏成假绿。对齐生产代码
             # x86_64/program.py:_path_observation 把 path assumptions And 进 condition。
-            path_assumptions = getattr(gstate.mstate, "assumptions", None) or []
-            mismatches.append(And(condition, *path_assumptions, Or(*path_mismatches)))
+            # SDIV/SMOD 等取负后再除的路径：EVM 与 x86 的除法子表达式数学相等但 AST 形式
+            # 不同（取负 limb 链微差），Z3 证两个 256-bit bvudiv 相等需 bit-blast 而 unknown。
+            # 在该路径下逐对生成 `evm_div == x86_div` 桥接（恒真、纯提速），让 solver 跳过
+            # bit-blast。每对桥接都先 fail-closed 验证「实参在 path 下可证恒等」才加入，
+            # 配对错误绝不假绿。
+            div_bridges = verified_div_bridges(
+                evm_stack_for_bridge,
+                x86_stack_for_bridge,
+                And(condition, *path_assumptions),
+                assumptions=base_assumptions,
+            )
+            mismatches.append(
+                And(condition, *path_assumptions, *div_bridges, Or(*path_mismatches))
+            )
 
     return mismatches
 

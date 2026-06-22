@@ -657,9 +657,20 @@ class StorageEquivalenceChecks:
             return None, 0.0
 
         key = BitVec(key_name, 256, ctx=ctx)
-        mismatch = Select(evm_array, key) != Select(x86_array, key)
+        evm_value = Select(evm_array, key)
+        x86_value = Select(x86_array, key)
+        mismatch = evm_value != x86_value
         if path_condition is not None:
             solver.add(path_condition)
+        # SDIV/SMOD 结果经 SSTORE 流入 storage 时，注入已验证除法桥接（fail-closed）提速；
+        # constraint 用 path_condition（merged-result 路径已含 assumptions），无则退化为 True。
+        self._ctx.add_div_bridges(
+            solver,
+            evm_value,
+            x86_value,
+            path_condition if path_condition is not None else BoolVal(True, ctx=ctx),
+            ctx=ctx,
+        )
         solver.add(mismatch)
 
         start_time = time.time()

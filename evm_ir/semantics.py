@@ -4,7 +4,7 @@ EVM IR语义建模。
 本模块使用Z3为EVM IR操作提供语义建模。
 """
 
-from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, URem, LShR, SignExt, ZeroExt, Lambda, Select
+from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, LShR, SignExt, ZeroExt, Lambda, Select
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from common.uint256 import Uint256
@@ -17,6 +17,10 @@ from common.arithmetic import (
     exp_semantics as _exp_semantics,
     mod_semantics as _mod_semantics,
     mulmod_semantics as _mulmod_semantics,
+    sdiv_semantics as _sdiv_semantics,
+    sdiv_speedup_assumptions as _sdiv_speedup_assumptions,
+    smod_semantics as _smod_semantics,
+    smod_speedup_assumptions as _smod_speedup_assumptions,
     x86_div64_quotient_fits_assumption,
 )
 from state.smt_state import SMTState, EVMStackState, EVMMemoryState
@@ -169,23 +173,19 @@ class EVMOperationSemantics:
         return _mod_semantics(self._to_bv256(a), self._to_bv256(b))
 
     def sdiv_semantics(self, a: BitVec, b: BitVec) -> BitVec:
-        """构建EVM SDIV操作的逻辑公式 (a sdiv b)。"""
-        a_bv = self._to_bv256(a)
-        b_bv = self._to_bv256(b)
-        # BitVec 的 / 运算符是有符号除法（bvsdiv）
-        return If(b_bv == BitVecVal(0, 256), BitVecVal(0, 256), a_bv / b_bv)
+        """构建EVM SDIV操作的逻辑公式 (a sdiv b)。
+
+        镜像 holiman 符号分段（复用已转正的 unsigned div_semantics），避免裸 bvsdiv
+        让 Z3 bit-blast 256-bit 有符号除法而超时。
+        """
+        return _sdiv_semantics(self._to_bv256(a), self._to_bv256(b))
 
     def smod_semantics(self, a: BitVec, b: BitVec) -> BitVec:
-        """构建EVM SMOD操作的逻辑公式。"""
-        a_bv = self._to_bv256(a)
-        b_bv = self._to_bv256(b)
-        zero = BitVecVal(0, 256)
-        # SMOD: sign(a) * (abs(a) mod abs(b))
-        a_abs = If(a_bv < zero, -a_bv, a_bv)
-        b_abs = If(b_bv < zero, -b_bv, b_bv)
-        rem_abs = URem(a_abs, b_abs)
-        signed_rem = If(a_bv < zero, -rem_abs, rem_abs)
-        return If(b_bv == zero, zero, signed_rem)
+        """构建EVM SMOD操作的逻辑公式。
+
+        镜像 holiman 符号分段（复用已转正的 unsigned mod_semantics）。
+        """
+        return _smod_semantics(self._to_bv256(a), self._to_bv256(b))
 
     def lt_semantics(self, a: BitVec, b: BitVec) -> BitVec:
         """构建EVM LT操作的逻辑公式 (a < b)。"""
@@ -559,6 +559,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.sdiv_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
+        # SDIV 内部对 |a|、|b| 跑 unsigned div；恒真提速 hint 须挂在绝对值上（见
+        # common/arithmetic.sdiv_speedup_assumptions）。soundness 中性，纯提速。
+        for assumption in _sdiv_speedup_assumptions(
+            op_semantics._to_bv256(a), op_semantics._to_bv256(b)
+        ):
+            state.add_assumption(assumption)
         return state
 
     elif kind == "MOD":
@@ -575,6 +581,11 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         b, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.smod_semantics(a, b)
         state.evm_stack = stack_after_pop2.push(result)
+        # 同 SDIV：恒真提速 hint 挂在 |a|、|b| 上（见 smod_speedup_assumptions）。
+        for assumption in _smod_speedup_assumptions(
+            op_semantics._to_bv256(a), op_semantics._to_bv256(b)
+        ):
+            state.add_assumption(assumption)
         return state
 
     elif kind == "EXP":

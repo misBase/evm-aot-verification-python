@@ -183,6 +183,94 @@ def mod_semantics(a, b):
     )
 
 
+def _is_negative(value):
+    """有符号 256-bit：符号位（bit 255）为 1 即为负。对齐 x86 `SHRQ 63` 取最高 limb 符号位。"""
+    return Extract(255, 255, value) == BitVecVal(1, 1)
+
+
+def _abs256(value):
+    """有符号绝对值：负数取 0-value，非负原样。
+
+    取负**用 limb 级带借位减法**（Uint256(0).sub_semantics(x)），而非 256-bit `0-value`。
+    原因：x86 codegen 的 compileZeroSubWithTmpReg 是 4 条 SUBQ/SBBQ（逐 limb 0-z 带借位
+    链），其除法实参就是这个 limb 形式。EVM 侧若用 `0-value`，z3 渲染成 (2^256-1)*value
+    乘法形式，与 x86 limb 形式 AST 不一致，导致 SDIV/SMOD 大数路径两侧 div 实参无法 unify、
+    Z3 被迫 bit-blast 256-bit 除法而 unknown。改 limb 级后两侧 `0-x` AST 同构，div 实参
+    直接对齐。
+
+    MIN_INT256(0x8000..0) 的 |value| 仍等于自身（两侧同样 wrap），被后续 unsigned div/mod
+    当作 2^255 处理——与 x86 及 holiman S256/Abs 一致（同构，不证 ≡ 数学真值）。
+    """
+    from common.uint256 import Uint256
+
+    x = Uint256.from_bv256(value)
+    zero = Uint256(
+        BitVecVal(0, 64), BitVecVal(0, 64), BitVecVal(0, 64), BitVecVal(0, 64)
+    )
+    negated = zero.sub_semantics(x).to_bv256()
+    return If(_is_negative(value), negated, value)
+
+
+def sdiv_semantics(a, b):
+    """EVM SDIV: 有符号 a / b，b==0时返回0。
+
+    镜像 holiman uint256 Int.SDiv（参照对象就是它，非黄皮书裸 bvsdiv）：
+      y==0 -> 0;  否则 sign = (sign(x)==sign(y)) ? +1 : -1，结果 = sign * (|x| / |y|)。
+    x86 codegen（compileEVMSDiv）是同一套符号分类树，内部调 unsigned DIV
+    （compileEVMDivWithReg）。复用 div_semantics 使两侧大数路径折成同一
+    _HOLIMAN_UDIV_UF，避免 Z3 bit-blast 256-bit bvsdiv 超时。
+    """
+    quotient_abs = div_semantics(_abs256(a), _abs256(b))
+    same_sign = _is_negative(a) == _is_negative(b)
+    return If(
+        b == _ZERO256,
+        _ZERO256,
+        If(same_sign, quotient_abs, _ZERO256 - quotient_abs),
+    )
+
+
+def smod_semantics(a, b):
+    """EVM SMOD: 有符号 a % b，b==0时返回0。
+
+    镜像 holiman uint256 Int.SMod（参照对象就是它）：
+      y==0 -> 0;  否则 neg = sign(x)<0，结果 = neg ? -(|x| % |y|) : (|x| % |y|)。
+    余数符号只取被除数 x 的符号。x86 codegen（compileEVMSMod）同构，内部调 unsigned
+    MOD（compileEVMModWithReg）；复用 mod_semantics 折同一 _HOLIMAN_UDIVREM_UF。
+    """
+    remainder_abs = mod_semantics(_abs256(a), _abs256(b))
+    return If(
+        b == _ZERO256,
+        _ZERO256,
+        If(_is_negative(a), _ZERO256 - remainder_abs, remainder_abs),
+    )
+
+
+def sdiv_speedup_assumptions(a, b):
+    """SDIV refinement 的恒真提速 hint（soundness 中性）。
+
+    SDIV 内部把 (a,b) 取绝对值后喂给 unsigned div_semantics，x86 codegen 同样在
+    |a|、|b| 上跑 unsigned DIV codegen。因此 DIV 的两条 ground hint（相等借位链桥接、
+    x86 `div r64` quotient_fits guard）应挂在 _abs256(a)、_abs256(b) 上，而非原始
+    (a,b)，否则对 SDIV 的 unsigned 子路径不起作用、solver 仍 bit-blast 64-bit 快路径
+    商而 unknown。两条都是对任意 256-bit 输入恒真的 lemma，挂 ITE 形式的绝对值同样恒真。
+    """
+    abs_a = _abs256(a)
+    abs_b = _abs256(b)
+    return [
+        eq_borrow_chain_assumption(abs_a, abs_b),
+        x86_div64_quotient_fits_assumption(abs_a, abs_b),
+    ]
+
+
+def smod_speedup_assumptions(a, b):
+    """SMOD refinement 的恒真提速 hint（soundness 中性）。
+
+    同 sdiv_speedup_assumptions，但 SMOD 内部走 unsigned mod_semantics（无 `div r64`
+    快路径商），故只需相等借位链桥接 hint。
+    """
+    return [eq_borrow_chain_assumption(_abs256(a), _abs256(b))]
+
+
 def exp_semantics(base, exponent):
     """EVM EXP: base^exponent，常见常量指数直接折叠，其余使用未解释函数。"""
     exponent_simplified = simplify(exponent)

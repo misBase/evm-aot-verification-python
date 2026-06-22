@@ -213,34 +213,44 @@ ARITHMETIC_0X00_CASES = [
         solver_timeout_ms=30_000,
     ),
     # IR: SDIV, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="SDIV",
-            evm_kind="SDIV",
-            arity=2,
-            x86_core_hex=X86_SDIV_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            x86_enable_go_bridge=True,
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(reason=PERF_XFAIL_REASON, strict=True),
+    # common/arithmetic.sdiv_semantics 镜像 holiman Int.SDiv 的符号分段：按 x、y 符号
+    # 分类，绝对值用 0-x（_abs256 用 limb 级带借位减法，对齐 x86 SUBQ/SBBQ），核心复用
+    # 已转正的 unsigned div_semantics。x86 codegen（compileEVMSDiv）同构（符号分类树内部调
+    # compileEVMDivWithReg）。慢路径靠 _verified_div_bridges 配对两侧 div + 求解器的
+    # simplify+bit-blast tactic（见 _make_refinement_solver）逐终止路径 UNSAT。
+    InstructionRefinementCase(
+        name="SDIV",
+        evm_kind="SDIV",
+        arity=2,
+        x86_core_hex=X86_SDIV_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        x86_enable_go_bridge=True,
+        x86_compare_terminal_paths=True,
+        expected_stack_height=1,
+        # 逐路径都是确定性 unsat（tactic 单路径 ≤十几秒）；timeout 留足余量，避免全量
+        # suite 满负载 CPU 争抢下个别路径 wall-clock 超时触发 unknown。
+        solver_timeout_ms=60_000,
     ),
     # IR: SMOD, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="SMOD",
-            evm_kind="SMOD",
-            arity=2,
-            x86_core_hex=X86_SMOD_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(1, 0),
-            x86_execution_mode="cfg",
-            x86_enable_go_bridge=True,
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(reason=PERF_XFAIL_REASON, strict=True),
+    # 同 SDIV：common/arithmetic.smod_semantics 镜像 holiman Int.SMod（余数符号取被除数
+    # x 符号，复用已转正的 unsigned mod_semantics），逐终止路径比较。SMOD 早退路径（如
+    # |x|<|y| → 结果=|x|）x86 不含 div，靠 _make_refinement_solver 的 simplify+bit-blast
+    # tactic 把取负/分段 ITE 折掉求解（默认 smt 策略会 unknown）。
+    InstructionRefinementCase(
+        name="SMOD",
+        evm_kind="SMOD",
+        arity=2,
+        x86_core_hex=X86_SMOD_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(1, 0),
+        x86_execution_mode="cfg",
+        x86_enable_go_bridge=True,
+        x86_compare_terminal_paths=True,
+        expected_stack_height=1,
+        # 同 SDIV：留足 timeout 余量，避免满负载抖动 unknown。
+        solver_timeout_ms=60_000,
     ),
     # IR: ADDMOD, STOP
     pytest.param(

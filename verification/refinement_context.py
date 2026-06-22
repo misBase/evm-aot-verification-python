@@ -16,6 +16,8 @@ from typing import Optional
 
 from z3 import SolverFor, set_option
 
+from common.div_bridge import verified_div_bridges
+
 from .refinement_tuning import _RefinementCheckTuning
 
 
@@ -131,6 +133,37 @@ class _RefinementContext:
     def reset_solver_with_budget(self, deadline: Optional[float]) -> bool:
         """重置共享求解器并为本次 check 设置剩余预算。"""
         return self.reset_solver_with_budget_for(self.solver, self.timeout_ms, deadline)
+
+    # --- SDIV/SMOD 除法桥接（refinement 提速，soundness 中性） ---
+
+    def add_div_bridges(
+        self,
+        solver,
+        evm_exprs,
+        x86_exprs,
+        constraint,
+        assumptions=(),
+        ctx=None,
+    ) -> None:
+        """把已验证的 EVM↔x86 除法桥接 add 到 solver（fail-closed，纯提速）。
+
+        SDIV/SMOD（先取负再除）的路径里，EVM 与 x86 对同一无符号除法的建模 AST 不同，
+        要证两个 256-bit bvudiv 相等会 bit-blast 而 unknown。这里逐对配对两侧除法子
+        表达式、先证实参在 constraint 下恒等，再注入 `evm_div == x86_div`（恒真）让
+        solver 跳过 bit-blast。验证 fail-closed：未证实参恒等的对绝不注入。
+
+        与单指令测试侧 (_path_observation_mismatches) 用同一 common.div_bridge 实现，
+        保证生产合约级验证与测试同源受益。
+        """
+        bridges = verified_div_bridges(
+            evm_exprs,
+            x86_exprs,
+            constraint,
+            assumptions=assumptions,
+            ctx=ctx,
+        )
+        for bridge in bridges:
+            solver.add(bridge)
 
     # --- 日志 ---
 

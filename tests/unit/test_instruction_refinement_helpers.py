@@ -83,6 +83,40 @@ def test_normalize_refinement_bv_rejects_non_contiguous_extracts():
     assert _normalize_refinement_bv(expr).eq(simplify(expr))
 
 
+def test_rewrite_stack_outputs_under_path_prunes_implied_large_bv_ite():
+    source = BitVec("path_rewrite_source", 256)
+    guard = Extract(7, 0, source) == BitVecVal(0, 8)
+    expr = If(guard, BitVecVal(1, 256), BitVecVal(2, 256))
+
+    evm_stack, x86_stack = refinement._rewrite_stack_outputs_under_path(
+        (expr,),
+        (expr,),
+        source == BitVecVal(0, 256),
+        (),
+        (),
+    )
+
+    assert evm_stack[0].eq(BitVecVal(1, 256))
+    assert x86_stack[0].eq(BitVecVal(1, 256))
+
+
+def test_rewrite_stack_outputs_under_path_keeps_unproved_large_bv_ite():
+    source = BitVec("path_rewrite_unproved_source", 256)
+    guard = source == BitVecVal(0, 256)
+    expr = If(guard, BitVecVal(1, 256), BitVecVal(2, 256))
+
+    evm_stack, x86_stack = refinement._rewrite_stack_outputs_under_path(
+        (expr,),
+        (expr,),
+        BoolVal(True),
+        (),
+        (),
+    )
+
+    assert evm_stack[0].eq(expr)
+    assert x86_stack[0].eq(expr)
+
+
 def test_instruction_refinement_evm_uses_symbolic_calldata_size_when_unfixed():
     state = SMTState()
     case = _minimal_case(calldata_size_bytes=None)
