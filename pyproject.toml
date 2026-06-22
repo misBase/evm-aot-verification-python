@@ -22,6 +22,7 @@ graphviz = ">=0.20.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7.0.0"
+pytest-xdist = "^3.8.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -38,5 +39,10 @@ addopts = [
     "--tb=short",
     "--strict-markers",
     "--disable-warnings",
+    # 默认串行(单进程、零启动开销,便于看 print 调试)。
+    # 并行:已装 pytest-xdist(进程级,Z3 Context 进程内不线程安全故用进程非线程)。
+    #   poetry run pytest -n auto --dist=loadscope   # 按文件整组分发,避免共享状态竞争
+    #   poetry run pytest -n 4 --dist=loadscope      # 固定 4 进程
+    # 单 case 调试看 print:poetry run pytest -n0 -s ...
 ]
 
