@@ -191,15 +191,9 @@ def _is_negative(value):
 def _abs256(value):
     """有符号绝对值：负数取 0-value，非负原样。
 
-    取负**用 limb 级带借位减法**（Uint256(0).sub_semantics(x)），而非 256-bit `0-value`。
-    原因：x86 codegen 的 compileZeroSubWithTmpReg 是 4 条 SUBQ/SBBQ（逐 limb 0-z 带借位
-    链），其除法实参就是这个 limb 形式。EVM 侧若用 `0-value`，z3 渲染成 (2^256-1)*value
-    乘法形式，与 x86 limb 形式 AST 不一致，导致 SDIV/SMOD 大数路径两侧 div 实参无法 unify、
-    Z3 被迫 bit-blast 256-bit 除法而 unknown。改 limb 级后两侧 `0-x` AST 同构，div 实参
-    直接对齐。
-
-    MIN_INT256(0x8000..0) 的 |value| 仍等于自身（两侧同样 wrap），被后续 unsigned div/mod
-    当作 2^255 处理——与 x86 及 holiman S256/Abs 一致（同构，不证 ≡ 数学真值）。
+    取负用 limb 级带借位减法而非 256-bit `0-value`（理由见 negated 处）。MIN_INT256
+    (0x8000..0) 的 |value| 仍等于自身（两侧同样 wrap），被后续 unsigned div/mod 当作
+    2^255 处理——与 x86 及 holiman S256/Abs 一致（同构，不证 ≡ 数学真值）。
     """
     from common.uint256 import Uint256
 
@@ -207,6 +201,9 @@ def _abs256(value):
     zero = Uint256(
         BitVecVal(0, 64), BitVecVal(0, 64), BitVecVal(0, 64), BitVecVal(0, 64)
     )
+    # limb 级 4 条 SUBQ/SBBQ 带借位链，对齐 x86 compileZeroSubWithTmpReg。若用 256-bit
+    # `0-value`，z3 渲染成 (2^256-1)*value 乘法形式，与 x86 limb 形式 AST 不一致，SDIV/SMOD
+    # 大数路径两侧 div 实参无法 unify、Z3 被迫 bit-blast 而 unknown。
     negated = zero.sub_semantics(x).to_bv256()
     return If(_is_negative(value), negated, value)
 
@@ -284,14 +281,42 @@ def exp_semantics(base, exponent):
     return exp_func(base, exponent)
 
 
+def _addmod_sum_low(a, b):
+    """返回 a+b 的低 256 位（对齐 x86 codegen 的 ADDQ/ADCQ 进位链 sum）。"""
+    return Extract(255, 0, ZeroExt(1, a) + ZeroExt(1, b))
+
+
 def addmod_semantics(a, b, mod):
-    """EVM ADDMOD: (a + b) % mod，mod==0时返回0。"""
+    """EVM ADDMOD: (a + b) % mod，mod==0时返回0。
+
+    分段镜像 go-hpc-evm 的 amd64 codegen（compileEVMAddMod）：不溢出路径复用已转正的
+    mod_semantics（与 x86 内联 Mod 同构），溢出路径用全宽 257-bit URem。两支都不改变
+    ADDMOD 真值，只换 AST 形态使之与 x86 codegen 同源。
+    """
     zero = BitVecVal(0, 256)
-    a_ext = ZeroExt(1, a)
-    b_ext = ZeroExt(1, b)
-    mod_ext = ZeroExt(1, mod)
-    res_ext = URem(a_ext + b_ext, mod_ext)
-    return If(mod == zero, zero, Extract(255, 0, res_ext))
+    sum_ext = ZeroExt(1, a) + ZeroExt(1, b)
+    carry = Extract(256, 256, sum_ext)
+    sum_low = Extract(255, 0, sum_ext)
+    overflow_result = Extract(255, 0, URem(sum_ext, ZeroExt(1, mod)))
+    body = If(
+        carry == BitVecVal(0, 1),
+        # 无溢出：sum_low == a+b，复用 holiman 镜像 Mod，与 x86 compileEVMModWithReg
+        # 逐分支对齐，各路径秒级 UNSAT。若此处也用裸 257-bit URem，refinement 会让 Z3
+        # bit-blast 257-bit 除法而超时。
+        mod_semantics(sum_low, mod),
+        # 溢出：x86 走 builtin addmod bridge，两侧同为 257-bit URem。
+        overflow_result,
+    )
+    return If(mod == zero, zero, body)
+
+
+def addmod_speedup_assumptions(a, b, mod):
+    """ADDMOD refinement 的恒真提速 hint（soundness 中性）。
+
+    不溢出路径内联跑 holiman Mod(sum_low, mod)，同独立 MOD 需相等借位链桥接。hint 挂在
+    (sum_low, mod) 上，因为内联 Mod 的被除数就是 sum_low（=a+b 低 256 位）。
+    """
+    return [eq_borrow_chain_assumption(_addmod_sum_low(a, b), mod)]
 
 
 def mulmod_semantics(a, b, mod):

@@ -813,6 +813,10 @@ class GoFunctionSemantics:
         mod, sp, mstate = self._pop_uint256(sp, mstate)
         result = arithmetic.addmod_semantics(a, b, mod)
         sp, mstate = self._push_uint256(sp, result, mstate)
+        # 与 EVM ADDMOD 语义保持同一来源：挂恒真的相等借位链桥接 hint（soundness 中性、
+        # 纯提速），用于 ADDMOD 不溢出路径内联 holiman Mod 的对齐。见 _handle_builtin_mod。
+        for assumption in arithmetic.addmod_speedup_assumptions(a, b, mod):
+            mstate.add_assumption(assumption)
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 

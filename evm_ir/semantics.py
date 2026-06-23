@@ -12,6 +12,7 @@ from common import uninterpreted
 from common.calldata import calldataload_no_overflow_assumption, calldataload_word
 from common.arithmetic import (
     addmod_semantics as _addmod_semantics,
+    addmod_speedup_assumptions as _addmod_speedup_assumptions,
     div_semantics as _div_semantics,
     eq_borrow_chain_assumption,
     exp_semantics as _exp_semantics,
@@ -683,6 +684,14 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         mod, stack_after_pop3 = stack_after_pop2.pop()
         result = op_semantics.addmod_semantics(a, b, mod)
         state.evm_stack = stack_after_pop3.push(result)
+        # ADDMOD 不溢出路径内联跑 holiman Mod(sum_low, mod)，挂相等借位链桥接 hint
+        # （恒真、soundness 中性），让 solver 对齐 x86 sub/sbb 借位链。见 DIV/MOD。
+        for assumption in _addmod_speedup_assumptions(
+            op_semantics._to_bv256(a),
+            op_semantics._to_bv256(b),
+            op_semantics._to_bv256(mod),
+        ):
+            state.add_assumption(assumption)
         return state
 
     elif kind == "MULMOD":

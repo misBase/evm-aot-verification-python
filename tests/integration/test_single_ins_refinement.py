@@ -126,7 +126,6 @@ X86_JUMP_CORE_HEX_SEQUENCE = "498b45704883f80b72234883e80b49894570498b45304883f8
 X86_JUMPI_CORE_HEX_SEQUENCE = "498b45704883f81072234883e81049894570498b45304883f8007222483dc17f0000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c349c7060100000049c746080000000049c746100000000049c746180000000048c7c0000000004901453048c7c000000000490b06490b4608490b4610490b46184885c0757f498b45704883f80072234883e80049894570498b45304883f8007222483d01800000732c4d8b75384901c6eb3441c685e00000000c49c7452800000000c341c685e00000000e49c745280000000090c341c685e00000000f49c7452800000000c341c685e00000000249c7452800000000c348c7c10000000049014d30eb00498b45704883f80172234883e80149894570498b45304883f8007222483d01800000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c341c685e00000000249c7452800000000c341c685e00000000249c7452800000000c3"
 X86_JUMPDEST_CORE_HEX_SEQUENCE = "498b45704883f80172234883e80149894570498b45304883f8007222483d01800000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c341c685e00000000249c7452800000000c341c685e00000000249c7452800000000c3"
 
-PERF_XFAIL_REASON = "Z3 cannot solve the full 256-bit arithmetic/shift formula within the timeout."
 BRANCHY_CFG_XFAIL_REASON = "Z3 returns unknown for this branchy stack-op CFG formula within the current timeout."
 DATA_COPY_LOOP_XFAIL_REASON = "current x86 CFG semantics does not yet prove the CALLDATA/CODE copy loop byte-0 path."
 
@@ -253,19 +252,23 @@ ARITHMETIC_0X00_CASES = [
         solver_timeout_ms=60_000,
     ),
     # IR: ADDMOD, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="ADDMOD",
-            evm_kind="ADDMOD",
-            arity=3,
-            x86_core_hex=X86_ADDMOD_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            evm_operand_indices=(2, 1, 0),
-            x86_execution_mode="cfg",
-            x86_enable_go_bridge=True,
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(reason=PERF_XFAIL_REASON, strict=True),
+    # EVM 侧分段镜像见 common/arithmetic.addmod_semantics。逐终止路径比较
+    # （x86_compare_terminal_paths）避免 merge 大 ITE，各路径无需 bit-blast 257-bit 除法
+    # 即可 UNSAT；相等借位链桥接 hint 由两侧语义自动挂上，同 MOD 范式。
+    InstructionRefinementCase(
+        name="ADDMOD",
+        evm_kind="ADDMOD",
+        arity=3,
+        x86_core_hex=X86_ADDMOD_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        evm_operand_indices=(2, 1, 0),
+        x86_execution_mode="cfg",
+        x86_enable_go_bridge=True,
+        x86_compare_terminal_paths=True,
+        expected_stack_height=1,
+        # 逐路径都是确定性 unsat；timeout 留足余量，避免全量 suite 满负载下个别路径
+        # 抖动触发 unknown（同 DIV/MOD）。
+        solver_timeout_ms=30_000,
     ),
     # IR: MULMOD, STOP
     InstructionRefinementCase(

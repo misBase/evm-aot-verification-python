@@ -47,9 +47,19 @@ from x86_64.summaries.registry import X86SummaryConfig
 _LIMB_STRIDE_BYTES = 8
 _UINT256_SLOT_BYTES = 4 * _LIMB_STRIDE_BYTES
 _MAX_SUPPORTED_ARITY = 17
-_PATH_ITE_ORACLE_TIMEOUT_MS = 1_000
+# ITE 裁剪 oracle 的单次判断预算。ADDMOD 的 `sum==mod` 早退路径里，证明 EVM 顶层
+# ITE 条件 `Or(mod.iszero, sum.eq(mod))` 在该 path 下恒真，需要 Z3 桥接 x86 借位链
+# 与 4-limb 相等，实测刚好 ~1.06s（略超 1s）。给到 5s 后该分支可裁成常量，path 求解
+# 从 ~7s 降到亚秒级（对齐独立 MOD）。oracle 仍 fail-closed：unknown/超时一律保留原 AST，
+# 提高预算只是更努力地尝试裁剪，soundness 中性。sat/unsat 都立即返回，不会空等。
+_PATH_ITE_ORACLE_TIMEOUT_MS = 5_000
 _PATH_ITE_MIN_BV_BITS = 64
-_PATH_AWARE_ITE_EVM_KINDS = {"SDIV", "SMOD"}
+# 这些 opcode 的 EVM 参照语义是深 ITE 树（SDIV/SMOD 的 abs/sign/MOD 分段；ADDMOD 的
+# mod==0 + carry 分支 + 内联 holiman Mod 分段）。逐 x86 终止路径比较时，大部分 ITE 分支
+# 在该路径下不可达，但裸比较会让 Z3 同时处理整棵树而 unknown。对这些 kind 启用
+# _rewrite_stack_outputs_under_path：在 path 条件下用 fail-closed oracle 裁掉可证不可达的
+# 大位宽 ITE 分支，只留该路径对应分支与 x86 对齐（soundness 中性，证不动就保留原 AST）。
+_PATH_AWARE_ITE_EVM_KINDS = {"SDIV", "SMOD", "ADDMOD"}
 _CALLENGINE_LIMB_ATTRS = {
     0x18: "callengine_memory_size_bytes",
     0x68: "callengine_callvalue",
