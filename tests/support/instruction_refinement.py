@@ -820,14 +820,22 @@ def _execute_x86_core_linear(case: InstructionRefinementCase, state: SMTState) -
 
 def _execute_x86_core_cfg(case: InstructionRefinementCase, state: SMTState) -> SMTState:
     program = X86Program.from_hex(case.x86_core_hex, base_addr=case.base_addr)
-    final_state, _ = program.to_z3(
+    # 走 to_z3_paths 而非 to_z3，是为了拿到 coverage 证书：to_z3 在所有终止路径都被
+    # depth 剪枝时会静默退化成 _empty_result（初始 state，EVM memory 全 0），让逐项检查
+    # 把「x86 根本没执行完」误判成真 mismatch（假 SAT）。这正是 CALLDATACOPY copy-loop
+    # 在 depth=120 下踩到的坑。这里 fail-closed：终止路径为空且 coverage 显示 depth-pruned
+    # 时直接报错（提示调大 x86_max_depth），绝不静默用退化 state 比较。
+    paths = program.to_z3_paths(
         state,
         max_depth=case.x86_max_depth,
         enable_go_bridge=case.x86_enable_go_bridge,
         enable_merge=False,
+        merge_state=True,
         summary_config=case.x86_summary_config,
     )
-    return final_state
+    if not paths.global_states:
+        _raise_no_terminal_paths(case, paths.coverage)
+    return paths.merged_state
 
 
 def _execute_x86_core_cfg_global_states(case: InstructionRefinementCase, state: SMTState):
@@ -841,8 +849,33 @@ def _execute_x86_core_cfg_global_states(case: InstructionRefinementCase, state: 
         summary_config=case.x86_summary_config,
     )
     if not paths.global_states:
-        raise ValueError(f"{case.name}: cfg execution produced no terminal paths")
+        _raise_no_terminal_paths(case, paths.coverage)
     return paths.global_states
+
+
+def _raise_no_terminal_paths(case: InstructionRefinementCase, coverage) -> None:
+    """终止路径为空时 fail-closed 报错，并区分 depth 剪枝与真不可达。
+
+    coverage 不完整且含 depth-pruned，说明唯一的终止路径在走到 ret 前就被
+    cfg_executor 的 depth 剪枝丢弃了（典型如 copy-loop 复制 N 字节需要 ~N 圈迭代，
+    x86_max_depth 给小了）。这种情况下若让上游静默退化成空 state 再比较，会产生
+    误导性的假 SAT/假 PASS，所以这里显式报错并提示调大 depth。
+    """
+    detail = ""
+    if coverage is not None:
+        coverage_details = dict(getattr(coverage, "details", ()) or ())
+        depth_pruned = coverage_details.get("depth_pruned_states", 0)
+        if not getattr(coverage, "complete", True) and depth_pruned:
+            detail = (
+                f" coverage incomplete (depth_pruned_states={depth_pruned}); "
+                f"x86_max_depth={case.x86_max_depth} likely too small for this "
+                f"copy/loop body — increase it"
+            )
+        elif getattr(coverage, "reason", None):
+            detail = f" coverage reason: {coverage.reason}"
+    raise ValueError(
+        f"{case.name}: cfg execution produced no terminal paths.{detail}"
+    )
 
 
 def _state_observation_mismatches(

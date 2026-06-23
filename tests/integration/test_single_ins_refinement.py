@@ -126,8 +126,6 @@ X86_JUMP_CORE_HEX_SEQUENCE = "498b45704883f80b72234883e80b49894570498b45304883f8
 X86_JUMPI_CORE_HEX_SEQUENCE = "498b45704883f81072234883e81049894570498b45304883f8007222483dc17f0000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c349c7060100000049c746080000000049c746100000000049c746180000000048c7c0000000004901453048c7c000000000490b06490b4608490b4610490b46184885c0757f498b45704883f80072234883e80049894570498b45304883f8007222483d01800000732c4d8b75384901c6eb3441c685e00000000c49c7452800000000c341c685e00000000e49c745280000000090c341c685e00000000f49c7452800000000c341c685e00000000249c7452800000000c348c7c10000000049014d30eb00498b45704883f80172234883e80149894570498b45304883f8007222483d01800000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c341c685e00000000249c7452800000000c341c685e00000000249c7452800000000c3"
 X86_JUMPDEST_CORE_HEX_SEQUENCE = "498b45704883f80172234883e80149894570498b45304883f8007222483d01800000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c341c685e00000000249c7452800000000c341c685e00000000249c7452800000000c3"
 
-DATA_COPY_LOOP_XFAIL_REASON = "current x86 CFG semantics does not yet prove the CALLDATA/CODE copy loop byte-0 path."
-
 SELF_ADDRESS = 0x111122223333444455556666777788889999AAAA
 ORIGIN_ADDRESS = 0x22223333444455556666777788889999AAAABBBB
 CALLER_ADDRESS = 0x3333444455556666777788889999AAAABBBBCCCC
@@ -795,25 +793,23 @@ CLOSURE_STATE_0X30_CASES = [
         expected_stack_height=1,
     ),
     # IR: CALLDATACOPY, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="CALLDATACOPY",
-            evm_kind="CALLDATACOPY",
-            arity=3,
-            x86_core_hex=X86_CALLDATACOPY_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            operand_values=(32, 0, 0),
-            initial_calldata_word_offsets=(0,),
-            calldata_size_bytes=32,
-            expected_stack_height=0,
-            memory_check_offsets=tuple(range(32)),
-            x86_execution_mode="cfg",
-            x86_max_depth=120,
-        ),
-        marks=pytest.mark.xfail(
-            reason=DATA_COPY_LOOP_XFAIL_REASON,
-            strict=True,
-        ),
+    # x86 codegen 是逐字节复制循环（每复制 1 字节走一圈循环）。length=32 需要 ~32
+    # 次迭代，depth=120 不足以让唯一那条复制完成的路径走到 ret，会被 cfg_executor 的
+    # depth 剪枝丢弃 → to_z3 退化成空 state → 假 SAT。depth=250 给够后逐字节比较 0.2s
+    # 全 unsat（EVM/x86 语义本就等价，非 Go codegen bug）。
+    InstructionRefinementCase(
+        name="CALLDATACOPY",
+        evm_kind="CALLDATACOPY",
+        arity=3,
+        x86_core_hex=X86_CALLDATACOPY_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        operand_values=(32, 0, 0),
+        initial_calldata_word_offsets=(0,),
+        calldata_size_bytes=32,
+        expected_stack_height=0,
+        memory_check_offsets=tuple(range(32)),
+        x86_execution_mode="cfg",
+        x86_max_depth=250,
     ),
     # IR: CODESIZE, STOP
     InstructionRefinementCase(
@@ -826,25 +822,21 @@ CLOSURE_STATE_0X30_CASES = [
         expected_stack_height=1,
     ),
     # IR: CODECOPY, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="CODECOPY",
-            evm_kind="CODECOPY",
-            arity=3,
-            x86_core_hex=X86_CODECOPY_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            operand_values=(32, 0, 0),
-            initial_code_word_offsets=(0,),
-            code_size_bytes=32,
-            expected_stack_height=0,
-            memory_check_offsets=tuple(range(32)),
-            x86_execution_mode="cfg",
-            x86_max_depth=120,
-        ),
-        marks=pytest.mark.xfail(
-            reason=DATA_COPY_LOOP_XFAIL_REASON,
-            strict=True,
-        ),
+    # 同 CALLDATACOPY：逐字节复制循环，length=32 需 depth≥250 才能让复制完成的
+    # 路径走到 ret，否则被 depth 剪枝丢弃成假 SAT。给够 depth 后 0.1s 全 unsat。
+    InstructionRefinementCase(
+        name="CODECOPY",
+        evm_kind="CODECOPY",
+        arity=3,
+        x86_core_hex=X86_CODECOPY_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        operand_values=(32, 0, 0),
+        initial_code_word_offsets=(0,),
+        code_size_bytes=32,
+        expected_stack_height=0,
+        memory_check_offsets=tuple(range(32)),
+        x86_execution_mode="cfg",
+        x86_max_depth=250,
     ),
     # IR: GASPRICE, STOP
     InstructionRefinementCase(
