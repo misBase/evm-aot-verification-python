@@ -422,52 +422,47 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         solver_timeout_ms=20_000,
     ),
     # IR: SHL, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="SHL",
-            evm_kind="SHL",
-            arity=2,
-            x86_core_hex=X86_SHL_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(
-            reason=BRANCHY_CFG_XFAIL_REASON,
-            strict=True,
-        ),
+    # x86 codegen（compileEVMShl）是分段移位（~10 条终止路径的分支密集 CFG），裸 merge
+    # 后比较让默认 Solver 在 256-bit 移位大 ITE 上 unknown（30s 不收敛）。改用逐终止路径
+    # 比较（x86_compare_terminal_paths），各路径秒级 UNSAT（同 DIV/MOD/BYTE 范式）。
+    InstructionRefinementCase(
+        name="SHL",
+        evm_kind="SHL",
+        arity=2,
+        x86_core_hex=X86_SHL_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        x86_execution_mode="cfg",
+        x86_compare_terminal_paths=True,
+        expected_stack_height=1,
+        # 逐路径确定性 unsat（实测最慢 ~0.6s）；timeout 留足余量防满负载抖动 unknown。
+        solver_timeout_ms=10_000,
     ),
     # IR: SHR, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="SHR",
-            evm_kind="SHR",
-            arity=2,
-            x86_core_hex=X86_SHR_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(
-            reason=BRANCHY_CFG_XFAIL_REASON,
-            strict=True,
-        ),
+    # 同 SHL：x86 分段逻辑右移（compileEVMShr），逐终止路径比较。
+    InstructionRefinementCase(
+        name="SHR",
+        evm_kind="SHR",
+        arity=2,
+        x86_core_hex=X86_SHR_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        x86_execution_mode="cfg",
+        x86_compare_terminal_paths=True,
+        expected_stack_height=1,
+        solver_timeout_ms=10_000,
     ),
     # IR: SAR, STOP
-    pytest.param(
-        InstructionRefinementCase(
-            name="SAR",
-            evm_kind="SAR",
-            arity=2,
-            x86_core_hex=X86_SAR_CORE_HEX_SEQUENCE,
-            base_addr=X86_CORE_BASE_ADDR,
-            x86_execution_mode="cfg",
-            solver_timeout_ms=1_000,
-        ),
-        marks=pytest.mark.xfail(
-            reason=BRANCHY_CFG_XFAIL_REASON,
-            strict=True,
-        ),
+    # 同 SHL：x86 分段算术右移（compileEVMSar）按符号位额外分流 fill=0/全 1，路径数翻倍
+    # （~20 条），逐终止路径比较，各路径秒级 unsat。
+    InstructionRefinementCase(
+        name="SAR",
+        evm_kind="SAR",
+        arity=2,
+        x86_core_hex=X86_SAR_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        x86_execution_mode="cfg",
+        x86_compare_terminal_paths=True,
+        expected_stack_height=1,
+        solver_timeout_ms=10_000,
     ),
 ]
 
