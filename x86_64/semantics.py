@@ -1111,6 +1111,24 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
     
     elif mnemonic == 'cmp':
         # CMP：比较并设置标志（不修改操作数）
+        if operands['is_memory'] and not operands['dest_reg']:
+            # CMP [base+offset], reg（CompileRegisterToMemory）：
+            # 内存是第一操作数（被减数），寄存器是第二操作数，语义为 (mem - reg)。
+            memory_size = operands.get('memory_size')
+            _require_64_bit_operand(memory_size, 'memory')
+            memory_offset, memory_domain = _effective_address()
+            lhs_val = _load_memory_by_size(memory_offset, memory_domain, memory_size)
+
+            if operands['src_reg']:
+                rhs_val = _read_register_by_size(operands['src_reg'], operands.get('src_size'))
+            elif operands['immediate'] is not None:
+                rhs_val = _imm_to_bv64(memory_size)
+            else:
+                raise ValueError(f"Unsupported CMP operand combination: {operands}")
+
+            _update_sub_like_flags(lhs_val, rhs_val, lhs_val - rhs_val)
+            return state
+
         if not operands['dest_reg']:
             raise ValueError(f"CMP instruction must have register operand: {operands}")
         

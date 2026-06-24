@@ -338,6 +338,72 @@ def test_sub_cmp_or_xor_memory_and_immediate_variants():
     assert is_true(simplify(out_xor.x86_registers.get_flag("ZF") == BitVecVal(1, 1)))
 
 
+def test_cmp_memory_to_register_form():
+    # cmp [mem], reg（CompileRegisterToMemory，内存在左、寄存器在右）：
+    # Go codegen 在 CALLDATALOAD / BLOBHASH 的操作数溢出到栈时生成此形态。
+    # 语义为 (mem - reg)，只设标志、不写回。
+
+    # mem == reg -> ZF=1, CF=0
+    st_eq = SMTState()
+    st_eq.x86_registers.set_register(Register.RAX, BitVecVal(5, 64))
+    st_eq.x86_registers.set_register(Register.RBX, BitVecVal(0x2C0, 64))
+    st_eq.x86_memory = st_eq.x86_memory.store_limb(0x2C0, BitVecVal(5, 64), domain=MemoryDomain.STACK)
+    out_eq = _exec_single("483903", st_eq)  # cmp qword ptr [rbx], rax
+    assert is_true(simplify(out_eq.x86_registers.get_flag("ZF") == BitVecVal(1, 1)))
+    assert is_true(simplify(out_eq.x86_registers.get_flag("CF") == BitVecVal(0, 1)))
+    # 内存值不应被改写（cmp 只设标志）
+    assert is_true(simplify(out_eq.x86_memory.load_limb(BitVecVal(0x2C0, 64),
+                                                        domain=MemoryDomain.STACK) == BitVecVal(5, 64)))
+
+    # mem < reg -> 借位 CF=1, ZF=0, 结果为负 SF=1。
+    # 这三项同时锁定操作数方向是 (mem - reg) 而非 (reg - mem)。
+    st_lt = SMTState()
+    st_lt.x86_registers.set_register(Register.RAX, BitVecVal(8, 64))
+    st_lt.x86_registers.set_register(Register.RBX, BitVecVal(0x2D0, 64))
+    st_lt.x86_memory = st_lt.x86_memory.store_limb(0x2D0, BitVecVal(5, 64), domain=MemoryDomain.STACK)
+    out_lt = _exec_single("483903", st_lt)  # cmp qword ptr [rbx], rax
+    assert is_true(simplify(out_lt.x86_registers.get_flag("CF") == BitVecVal(1, 1)))
+    assert is_true(simplify(out_lt.x86_registers.get_flag("ZF") == BitVecVal(0, 1)))
+    assert is_true(simplify(out_lt.x86_registers.get_flag("SF") == BitVecVal(1, 1)))
+
+
+def test_cmp_memory_to_immediate_form():
+    # cmp [mem], imm（CompileRegisterToConst 落到内存操作数）：内存是被减数，
+    # 立即数是减数，语义为 (mem - imm)，只设标志、不写回。
+    # Capstone 对 qword 形态预符号扩展立即数并报 memory_size=8，
+    # 故 _imm_to_bv64(8) 走 BitVecVal(immediate, 64)，负数得正确二补码。
+
+    # mem == imm -> ZF=1, CF=0
+    st_eq = SMTState()
+    st_eq.x86_registers.set_register(Register.RBX, BitVecVal(0x2C0, 64))
+    st_eq.x86_memory = st_eq.x86_memory.store_limb(0x2C0, BitVecVal(5, 64), domain=MemoryDomain.STACK)
+    out_eq = _exec_single("48833b05", st_eq)  # cmp qword ptr [rbx], 5
+    assert is_true(simplify(out_eq.x86_registers.get_flag("ZF") == BitVecVal(1, 1)))
+    assert is_true(simplify(out_eq.x86_registers.get_flag("CF") == BitVecVal(0, 1)))
+    # 内存值不应被改写（cmp 只设标志）
+    assert is_true(simplify(out_eq.x86_memory.load_limb(BitVecVal(0x2C0, 64),
+                                                        domain=MemoryDomain.STACK) == BitVecVal(5, 64)))
+
+    # mem > imm -> 无借位 CF=0, ZF=0, 结果为正 SF=0
+    st_gt = SMTState()
+    st_gt.x86_registers.set_register(Register.RBX, BitVecVal(0x2C8, 64))
+    st_gt.x86_memory = st_gt.x86_memory.store_limb(0x2C8, BitVecVal(8, 64), domain=MemoryDomain.STACK)
+    out_gt = _exec_single("48833b05", st_gt)  # cmp qword ptr [rbx], 5
+    assert is_true(simplify(out_gt.x86_registers.get_flag("CF") == BitVecVal(0, 1)))
+    assert is_true(simplify(out_gt.x86_registers.get_flag("ZF") == BitVecVal(0, 1)))
+    assert is_true(simplify(out_gt.x86_registers.get_flag("SF") == BitVecVal(0, 1)))
+
+    # mem < imm -> 借位 CF=1, ZF=0, 结果为负 SF=1。
+    # 这三项同时锁定操作数方向是 (mem - imm) 而非 (imm - mem)。
+    st_lt = SMTState()
+    st_lt.x86_registers.set_register(Register.RBX, BitVecVal(0x2D0, 64))
+    st_lt.x86_memory = st_lt.x86_memory.store_limb(0x2D0, BitVecVal(2, 64), domain=MemoryDomain.STACK)
+    out_lt = _exec_single("48833b05", st_lt)  # cmp qword ptr [rbx], 5
+    assert is_true(simplify(out_lt.x86_registers.get_flag("CF") == BitVecVal(1, 1)))
+    assert is_true(simplify(out_lt.x86_registers.get_flag("ZF") == BitVecVal(0, 1)))
+    assert is_true(simplify(out_lt.x86_registers.get_flag("SF") == BitVecVal(1, 1)))
+
+
 def test_setcc_register_and_memory():
     st_reg = SMTState()
     st_reg.x86_registers.set_register(Register.RAX, BitVecVal(0x12340000000000FF, 64))
