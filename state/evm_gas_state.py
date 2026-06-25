@@ -72,7 +72,11 @@ class EVMGasState:
         return new_state
 
     def is_out_of_gas(self) -> BoolRef:
-        """检查是否耗尽Gas。
+        """检查是否耗尽Gas（Gas == 0）。
+
+        Note: future-use。生产 OOG 判断现在走 cfg_executor 的 OOG 路径分叉
+        （ULT(gas, cost) 分叉出 termination_status=12 的终止路径），不依赖本方法的
+        「钳零后 == 0」判断。保留供将来更细的 OOG 状态查询；当前仅单测覆盖。
 
         Returns:
             BoolRef：如果Gas == 0则为True
@@ -135,7 +139,14 @@ def charge_memory_expansion_gas(state, requested_size_64):
         ⟹ memWords ≤ 0xFFFFFFFF ⟹ square < 2^64（高 64 位为 0），x86 128-bit
         mul/div 的低 64 位结果才与此定义式安全对齐。
     """
-    from z3 import BitVecVal, ZeroExt, Extract, UDiv, UGT, If, LShR
+    from z3 import BitVecVal, ZeroExt, Extract, UDiv, UGT, If, LShR, ULE
+
+    # success-path scope assumption（**关键**）:requested ≤ 0x1FFFFFFFE0。
+    # x86 memoryGasCost 在 newMemSize > 0x1FFFFFFFE0 时跳 GasUintOverflow/OOG、
+    # 不走 mul/div 成功路径；EVM 侧这里继续算 memWords²/512。若不约束，验证器会
+    # 拿「EVM 成功域」对「x86 OOG 域」比较 → 比较域不一致 → 假绿/误报。在所有
+    # 内存扩展 gas 入口（本函数是唯一 chokepoint）统一加此 scope 约束。
+    state.add_assumption(ULE(requested_size_64, BitVecVal(0x1FFFFFFFE0, 64)))
 
     thirty_one = BitVecVal(31, 64)
     # memWords = (requested + 31) >> 5
@@ -180,8 +191,14 @@ def charge_word_gas(state, word_len_64, word_gas_const):
 
     与 memoryGasCost 不同，word gas 基于「数据长度的 word 数」（SHA3 的 size /
     COPY 的 length），**不依赖也不更新 lastGasCost / memory size**——它是纯叠加。
-    在 success-path scope（word_len ≤ uint64、toWordSize 不溢出、words*const 不
-    溢出）下，x86 makeSafeMul 的 overflow 分支恒假被剪。
+
+    溢出健全性（**依赖调用顺序**）:本函数不单独加 scope assumption，因为所有
+    调用点（_charge_memory_and_word_gas / _charge_mcopy_gas）都**先**调用
+    charge_memory_expansion_gas，后者已加 `ULE(requested, 0x1FFFFFFFE0)`，而
+    word_len ≤ requested（offset≥0）⟹ word_len ≤ 0x1FFFFFFFE0 ⟹ words=
+    (word_len+31)>>5 ≤ 0xFFFFFFFF ⟹ words*word_gas_const（const≤6）< 2^64，
+    不溢出，x86 makeSafeMul 的 overflow 分支恒假被剪。**若将来单独调用本函数，
+    必须自行保证 word_len ≤ 0x1FFFFFFFE0。**
 
     Args:
         state: SMTState；就地扣减 evm_gas。

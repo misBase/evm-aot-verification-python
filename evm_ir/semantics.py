@@ -1511,6 +1511,9 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     elif kind == "INVALID":
         # INVALID: Marks the transaction as invalid / stops execution
         # INVALID is a terminal operation like STOP
+        # 派生 status=invalid(3)（见 aot_profile.status_codes）。必须设值，否则
+        # gas/OOG 模式下 INVALID 终止路径 status=None → status 检查被跳过（假绿）。
+        state.termination_status = 3  # invalid
         return state
 
     else:

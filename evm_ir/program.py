@@ -129,6 +129,7 @@ class EVMProgram:
                 'storage': state.evm_storage.Storage,
                 'transient_storage': state.evm_transient_storage.TransientStorage,
                 'gas': state.evm_gas.Gas,
+                'status': getattr(state, "termination_status", None),
             }
             return state, result
 
@@ -158,6 +159,7 @@ class EVMProgram:
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
             'gas': merged_state.evm_gas.Gas,
+            'status': getattr(merged_state, "termination_status", None),
         }
 
         return merged_state, result
@@ -221,6 +223,7 @@ class EVMProgram:
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             gas=state.evm_gas.Gas,
+            status=getattr(state, "termination_status", None),
         )
 
     def _merge_global_states(self, global_states: List[GlobalState]) -> SMTState:
@@ -339,6 +342,24 @@ class EVMProgram:
                 condition = gstate.get_constraints().as_bool()
                 expr = If(condition, gstate.mstate.evm_gas.Gas, expr)
             merged.evm_gas = EVMGasState(initial_gas=expr)
+
+        # 合并 EVM 派生 status（termination_status）。不同终止路径 status 不同
+        # （如 RETURN→0 vs REVERT→1）；必须像 gas 一样 If(condition,...) 链合并成
+        # 一个 8-bit BitVec，否则 merged.termination_status=None → status 检查被
+        # 静默跳过（false green）。仅当所有路径都有 status 时合并（缺一即 None，
+        # 让 checker fail-safe 跳过而非给出可能错误的合并值）。
+        from z3 import BitVecVal as _BVV
+        path_statuses = [getattr(g.mstate, "termination_status", None) for g in global_states]
+        if len(global_states) == 1:
+            merged.termination_status = path_statuses[0]
+        elif all(s is not None for s in path_statuses):
+            expr = _BVV(int(path_statuses[0]), 8)
+            for gstate, st in zip(reversed(global_states), reversed(path_statuses)):
+                condition = gstate.get_constraints().as_bool()
+                expr = If(condition, _BVV(int(st), 8), expr)
+            merged.termination_status = expr  # 8-bit BitVec（checker 需支持）
+        else:
+            merged.termination_status = None
 
         return merged
 

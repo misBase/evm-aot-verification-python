@@ -13,6 +13,7 @@ OBSERVATION_KEYS = frozenset({
     "storage",
     "transient_storage",
     "gas",
+    "status",
 })
 
 
@@ -32,6 +33,9 @@ class PathObservation:
     # callengine_gas_remaining）。默认 None：不带 gas 的旧 observation（如
     # 单测 dummy）会让 gas 一致性检查被跳过（checker 处 None 即不比较）。
     gas: Any = None
+    # status:该终止路径的 status code（EVM 侧 termination_status 派生 / x86 侧
+    # callengine_status_code）。默认 None：旧 observation 不比较 status（阶段 3）。
+    status: Any = None
 
     def __getitem__(self, key: str) -> Any:
         if key not in OBSERVATION_KEYS:
@@ -56,6 +60,7 @@ class PathObservation:
             "storage": self.storage,
             "transient_storage": self.transient_storage,
             "gas": self.gas,
+            "status": self.status,
         }
 
 

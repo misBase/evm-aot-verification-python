@@ -183,6 +183,12 @@ class SMTState:
         # assumption 越界约束路径（否则大程序多路径分析会出假 SAT）。
         self.gas_modeling_enabled: bool = False
 
+        # OOG 路径建模开关（阶段 3B）。仅当 check_oog（不注入 gas 恒足假设）时
+        # 置 True：此时 EVM block 入口在 gas < static_gas 时分叉一条 out-of-gas
+        # 终止路径（termination_status=12），镜像 x86 makeStaticUseGas 的 JCS。
+        # 默认 False：不改变现有路径（功能等价/check_gas 均不放开 OOG 分支）。
+        self.oog_modeling_enabled: bool = False
+
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
         self.stack_base = None
         self.stack_num_inputs = 0
@@ -267,6 +273,9 @@ class SMTState:
         )
         other.gas_modeling_enabled = getattr(
             self, 'gas_modeling_enabled', False,
+        )
+        other.oog_modeling_enabled = getattr(
+            self, 'oog_modeling_enabled', False,
         )
 
     def copy_callengine_side_channels_to(self, other: 'SMTState') -> None:

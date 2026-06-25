@@ -79,6 +79,8 @@ def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram) -> list[str]:
     for block in getattr(evm_program, "blocks", None) or []:
         for op in getattr(block, "operations", None) or []:
             kind = (getattr(op, "kind", "") or "").upper()
+            # LOG0..LOG4 都有内存扩展 + 每 topic/byte 的动态 gas，尚未在 EVM 侧
+            # 建模，故用 startswith("LOG") 统一 fail-closed 拒绝（覆盖全部 LOGn）。
             if kind.startswith("LOG") or kind in _DYNAMIC_GAS_UNSUPPORTED_KINDS:
                 pc = getattr(op, "pc", None)
                 if pc is None:
@@ -127,18 +129,22 @@ class ProgramEquivalenceChecker:
     """验证EVM和x86程序之间的等价性。"""
 
     def __init__(self, timeout_ms: int = 60000, verbose: bool = False,
-                 check_gas: bool = False):
+                 check_gas: bool = False, check_oog: bool = False):
         """初始化程序等价性检查器。
 
         Args:
             timeout_ms: SMT求解器超时（毫秒）
             verbose: 启用详细输出
-            check_gas: 是否启用 gas 终值一致性检查（阶段 0，仅静态 gas）。
-                默认 False；含动态 gas 指令的程序需到阶段 1 才支持。
+            check_gas: 是否启用 gas 终值一致性检查（阶段 0/1，gas 充足路径终值）。
+            check_oog: 是否启用 OOG 路径一致性检查（阶段 3B）。True 时不注入 gas
+                恒足假设、放开 EVM 侧 OOG 分叉，验 out-of-gas 路径的 status code
+                两侧一致。隐含需要 status 检查（故一并开启 check_gas 的检查通道）。
         """
         self.refinement_checker = RefinementChecker(
-            timeout_ms=timeout_ms, verbose=verbose, check_gas=check_gas
+            timeout_ms=timeout_ms, verbose=verbose,
+            check_gas=check_gas or check_oog,
         )
+        self.check_oog = check_oog
         self.verbose = verbose
         self.check_gas = check_gas
 
@@ -190,9 +196,12 @@ class ProgramEquivalenceChecker:
         if path_pair_workers <= 0:
             raise ValueError("path_pair_workers must be a positive integer")
 
-        # gas 一致性阶段 0：只支持静态 gas。遇到动态 gas opcode 必须 fail-closed，
-        # 避免 EVM/x86 两侧都尚未建模动态扣减时出现假绿。
-        if self.check_gas:
+        # 遇到未建模动态 gas opcode 必须 fail-closed，避免 EVM/x86 两侧都尚未
+        # 建模动态扣减/OOG 时出现假绿。check_oog 同样要走此 guard：底层已开启
+        # gas/status 检查（RefinementChecker(check_gas=check_gas or check_oog)），
+        # 而 EVM 侧只分叉了 block static gas 的 OOG，未建模 EXP/SSTORE/CALL/LOG
+        # 等的动态 OOG；若不拒绝，OOG 一致性会被放大到未支持指令而假绿/误报。
+        if self.check_gas or self.check_oog:
             unsupported_dynamic_gas = _find_unsupported_dynamic_gas_ops(evm_program)
             if unsupported_dynamic_gas:
                 sample = ", ".join(unsupported_dynamic_gas[:8])
@@ -204,11 +213,29 @@ class ProgramEquivalenceChecker:
                     f"modeled yet for stage 0: {sample}",
                 )
 
-        # gas 一致性阶段 0：仅在显式启用 gas 检查时注入「gas 恒足」前提
-        # （UGE(G, bound)），让两侧 out-of-gas 分支恒假被剪，使 gas 终值等式
-        # 比较成立。bound 由静态 gas 之和 × max_iteration 给出可证上界。
-        if self.check_gas:
+        # 阶段 3B（OOG 路径一致性）:放开 EVM 侧 OOG 分叉，**不**注入恒足假设
+        # （否则 OOG 恒假被剪）。EVM/x86 各自产生 OOG 终止路径，由 terminal-path
+        # pair 检查验 status code（含 out_of_gas=12）两侧一致。
+        if self.check_oog:
+            initial_state.gas_modeling_enabled = True
+            initial_state.oog_modeling_enabled = True
+        # gas 一致性（阶段 0/1）:仅在 gas 检查且非 OOG 模式时注入「gas 恒足」前提
+        # （UGE(G, bound)），让两侧 out-of-gas 分支恒假被剪，验 gas 充足路径终值。
+        elif self.check_gas:
             _inject_gas_sufficiency_assumption(evm_program, initial_state)
+
+        # gas/OOG 检查强制走 path_observations 模式（修复 scope assumption 全局
+        # 泄漏）:动态 gas 的 success-path scope assumption（如 ULE(requested,
+        # 0x1FFFFFFFE0)）是 **path-local** 的——merged-result 模式会把所有路径的
+        # assumption 无条件 And 成全局 extra_condition，越界约束 sibling 路径
+        # （failure_path_assumption_global_leak 病理 → 假绿）。path_observations
+        # 模式下 _path_observation 把 assumption And 进**各路径自己的** condition，
+        # 不泄漏。多内存操作 + 多路径的真实程序需要这个隔离。
+        if (self.check_gas or self.check_oog) and not path_observations:
+            path_observations = True
+            if self.verbose:
+                print("    ├─ gas/OOG check: forcing path_observations=True "
+                      "(avoid scope-assumption global leak)")
 
         if self.verbose:
             print(f"\n=== Program-Level Verification (Alive2-style) ===")

@@ -231,6 +231,10 @@ class SymbolicExecutor:
         if node is None:
             return []
 
+        # 强制终止 state（阶段 3B OOG 分叉）已是终止路径，不执行 block ops。
+        if getattr(global_state, "forced_terminal", False):
+            return []
+
         block = node.block
         mstate = global_state.mstate
 
@@ -244,6 +248,31 @@ class SymbolicExecutor:
         # 仅 gas_modeling_enabled（symbolic_gas）时扣减：否则功能等价验证下
         # evm_gas 应保持平凡常量，不让 PathObservation 的 gas 键变成循环程序里
         # 极深的 If-chain（拖慢 path translate / 引入无谓复杂度）。
+        # OOG 路径分叉（阶段 3B，仅 oog_modeling_enabled）。镜像 x86
+        # makeStaticUseGas 的 `CMP staticGas; JCS oog`:gas < static_gas 时分叉一条
+        # out-of-gas 终止路径（termination_status=12），不执行 block ops；继续路径
+        # 带 gas >= static_gas 约束。default-off，不影响功能等价/check_gas 路径。
+        oog_states: List[GlobalState] = []
+        if (getattr(current_mstate, "oog_modeling_enabled", False)
+                and getattr(block, "static_gas", 0)):
+            import copy
+            from z3 import ULT, UGE, BitVecVal
+            static_amt = BitVecVal(block.static_gas, 64)
+            gas_before = current_mstate.evm_gas.Gas
+            # OOG 终止 state：gas < static_gas。
+            oog_world = copy.deepcopy(global_state.world_state)
+            oog_world.constraints.add(ULT(gas_before, static_amt))
+            oog_mstate = current_mstate.copy()
+            oog_mstate.termination_status = 12  # out_of_gas
+            oog_gs = GlobalState(mstate=oog_mstate, world_state=oog_world, node=node)
+            oog_gs.loop_time = global_state.loop_time.copy()
+            oog_gs.forced_terminal = True  # 终止路径，主循环收集、不再执行
+            oog_states.append(oog_gs)
+            # OOG state 直接进 work_list，由主循环 _is_terminal_state 收集。
+            self.work_list.append(oog_gs)
+            # 继续路径：gas >= static_gas（约束加到当前 world_state）。
+            global_state.world_state.constraints.add(UGE(gas_before, static_amt))
+
         if getattr(current_mstate, "gas_modeling_enabled", False) and getattr(block, "static_gas", 0):
             current_mstate.evm_gas = current_mstate.evm_gas.consume_static(block.static_gas)
 
@@ -698,6 +727,10 @@ class SymbolicExecutor:
         Returns:
             如果是终止状态则返回 True
         """
+        # 强制终止（阶段 3B OOG 分叉路径）优先：不依赖 block 控制流类型。
+        if getattr(global_state, "forced_terminal", False):
+            return True
+
         node = global_state.node
         if node is None or not node.block.operations:
             return False

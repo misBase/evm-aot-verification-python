@@ -187,6 +187,10 @@ class GlobalState:
         self.node = node
         self.loop_time = {}
 
+        # 强制终止标志（阶段 3B OOG 路径）。为 True 时该 state 被当作终止路径
+        # 收集、不再执行 block ops（用于 gas < cost 分叉出的 out-of-gas 终止）。
+        self.forced_terminal: bool = False
+
 
         # 执行深度（用于循环检测）
         self.depth = 0

@@ -199,6 +199,19 @@ class OutputRefinementChecks:
             )
             if not verified:
                 return False, msg
+            # status code 终态等价（阶段 3）。status 缺省（None）时跳过。
+            verified, msg = self._gas._check_status_equivalence_with_solver(
+                solver,
+                evm_result.get('status'),
+                x86_result.get('status'),
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
         return True, None
 
     def check_observables_with_solver(

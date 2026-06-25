@@ -28,6 +28,7 @@ OBSERVATION_KEYS = {
     "storage",
     "transient_storage",
     "gas",
+    "status",
 }
 
 

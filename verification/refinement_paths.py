@@ -49,6 +49,7 @@ _PATH_RESULT_KEYS = (
     "storage",
     "transient_storage",
     "gas",
+    "status",
 )
 
 
@@ -325,6 +326,19 @@ class PathRefinementChecks:
                 solver,
                 evm_result.get("gas"),
                 x86_result.get("gas"),
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
+            # status code 终态等价（阶段 3），同样必须在 fallback 路径追加。
+            verified, msg = self._gas._check_status_equivalence_with_solver(
+                solver,
+                evm_result.get("status"),
+                x86_result.get("status"),
                 deadline,
                 path_condition,
                 context,

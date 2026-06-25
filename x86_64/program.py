@@ -248,6 +248,7 @@ class X86Program:
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
             'gas': merged_state.callengine_gas_remaining,
+            'status': merged_state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
         }
 
@@ -400,6 +401,7 @@ class X86Program:
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             gas=state.callengine_gas_remaining,
+            status=state.callengine_status_code,
         )
 
     def _get_instructions(self) -> List[X86Instruction]:
@@ -434,6 +436,7 @@ class X86Program:
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
             'gas': state.callengine_gas_remaining,
+            'status': state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
         }
         return state, result
@@ -578,6 +581,7 @@ class X86Program:
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
             'gas': state.callengine_gas_remaining,
+            'status': state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
         }
 
