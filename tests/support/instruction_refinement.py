@@ -115,6 +115,8 @@ class InstructionRefinementCase:
     x86_summary_config: X86SummaryConfig | None = None
     x86_max_depth: int = 50
     solver_timeout_ms: int = 10_000
+    # gas 终值一致性比较：EVM 侧 evm_gas.Gas vs x86 侧 callengine_gas_remaining。
+    compare_gas: bool = False
 
 
 def assert_instruction_refines(case: InstructionRefinementCase) -> None:
@@ -893,6 +895,10 @@ def _state_observation_mismatches(
         mismatches.append(
             x86_state.callengine_status_code != BitVecVal(case.expected_status_code, 8)
         )
+    if case.compare_gas:
+        mismatches.append(
+            evm_state.evm_gas.Gas != x86_state.callengine_gas_remaining
+        )
     if case.compare_return_metadata:
         mismatches.extend(
             (
@@ -961,6 +967,12 @@ def _path_observation_mismatches(
         if case.expected_status_code is not None:
             path_mismatches.append(
                 gstate.mstate.callengine_status_code != BitVecVal(case.expected_status_code, 8)
+            )
+        if case.compare_gas:
+            # gas 终值等价：EVM evm_gas.Gas vs x86 callengine_gas_remaining。
+            # 进 path_mismatches → 后续与本路径 condition∧assumptions 做 guard。
+            path_mismatches.append(
+                evm_state.evm_gas.Gas != gstate.mstate.callengine_gas_remaining
             )
         if case.compare_return_metadata:
             path_mismatches.extend(

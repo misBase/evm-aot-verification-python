@@ -33,10 +33,12 @@ class OutputRefinementChecks:
         ctx: _RefinementContext,
         storage: StorageEquivalenceChecks,
         memory: MemoryContentChecks,
+        gas=None,
     ):
         self._ctx = ctx
         self._storage = storage
         self._memory = memory
+        self._gas = gas
 
     def check_refinement(
         self,
@@ -174,6 +176,21 @@ class OutputRefinementChecks:
                 solver,
                 evm_ts,
                 x86_ts,
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
+
+        # gas 终值等价（阶段 0）。gas 缺省（None）时 checker 内部跳过。
+        if self._gas is not None:
+            verified, msg = self._gas._check_gas_equivalence_with_solver(
+                solver,
+                evm_result.get('gas'),
+                x86_result.get('gas'),
                 deadline,
                 path_condition,
                 context,

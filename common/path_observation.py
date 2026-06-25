@@ -12,6 +12,7 @@ OBSERVATION_KEYS = frozenset({
     "has_return_data",
     "storage",
     "transient_storage",
+    "gas",
 })
 
 
@@ -27,6 +28,10 @@ class PathObservation:
     has_return_data: Any
     storage: Any
     transient_storage: Any
+    # gas:该终止路径的剩余 gas（EVM 侧 evm_gas.Gas / x86 侧
+    # callengine_gas_remaining）。默认 None：不带 gas 的旧 observation（如
+    # 单测 dummy）会让 gas 一致性检查被跳过（checker 处 None 即不比较）。
+    gas: Any = None
 
     def __getitem__(self, key: str) -> Any:
         if key not in OBSERVATION_KEYS:
@@ -50,6 +55,7 @@ class PathObservation:
             "has_return_data": self.has_return_data,
             "storage": self.storage,
             "transient_storage": self.transient_storage,
+            "gas": self.gas,
         }
 
 

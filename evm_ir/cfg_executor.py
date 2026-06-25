@@ -237,6 +237,16 @@ class SymbolicExecutor:
         # 执行块中的所有操作
         current_mstate = mstate.copy()
 
+        # block 入口扣减静态 gas（镜像 go-hpc-evm makeStaticUseGas:
+        # 每个 block 入口一次性扣 Blk.StaticGas）。在 gas 恒足前提下
+        # （由 program_verifier 注入的 UGE(G, bound) 假设保证），不触发
+        # out-of-gas，与 x86 侧 SUBQ staticGas;MOVQ->[R13+0x70] 同步一致。
+        # 仅 gas_modeling_enabled（symbolic_gas）时扣减：否则功能等价验证下
+        # evm_gas 应保持平凡常量，不让 PathObservation 的 gas 键变成循环程序里
+        # 极深的 If-chain（拖慢 path translate / 引入无谓复杂度）。
+        if getattr(current_mstate, "gas_modeling_enabled", False) and getattr(block, "static_gas", 0):
+            current_mstate.evm_gas = current_mstate.evm_gas.consume_static(block.static_gas)
+
         # 过滤出实际执行的操作（跳过标记）
         ops = [op for op in block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
         

@@ -31,18 +31,116 @@ def _collect_assumptions(*states):
     return out
 
 
+# 循环上界系数：cfg_executor 的 max_iteration 硬上界（超过即被特殊处理），
+# 故任一 block 最多被经过这么多次。用作 gas 恒足 bound 的保守乘子。
+_GAS_BOUND_MAX_ITERATION = 500
+
+
+# 已建模动态 gas 的 opcode（逐阶段转正后从 unsupported 移除）：
+#   阶段 1：MSTORE, RETURN, MLOAD, MSTORE8（内存扩展动态 gas）
+#           SHA3/KECCAK256（内存扩展 + word gas，_charge_memory_and_word_gas）
+# 其余仍 fail-closed 拒绝 gas 检查，直到对应阶段建模。
+_DYNAMIC_GAS_UNSUPPORTED_KINDS = frozenset({
+    # Data-dependent opcode gas.
+    "EXP",
+    # CALLDATACOPY/CODECOPY/RETURNDATACOPY/MCOPY/REVERT 已建模（内存扩展 + copy
+    # word gas / REVERT 仅内存）。EXTCODECOPY 额外有冷热账户访问 gas（host），待后续。
+    "EXTCODECOPY",
+    # State / account access gas depends on warm/cold state and current values.
+    "SLOAD",
+    "SSTORE",
+    "BALANCE",
+    "EXTCODESIZE",
+    "EXTCODEHASH",
+    "SELFDESTRUCT",
+    # CALL/CREATE 系列:gas 含 EIP-150 63/64 转发、value stipend、内存扩展、
+    # CREATE 的 InitCodeWordGas、以及 host cost(Go runtime 职责，UF 信任边界)。
+    # returnGas 常量链(dealWithAddGas/SubGas)在 host 调用前后相消——在「host gas
+    # 当 UF」前提下，returnGas 链无法被非空独立验证（这是 A 强度的固有边界）。
+    # EVM 侧尚未建模 CREATE 内存扩展 + InitCodeWordGas，故全部 fail-closed 拒绝，
+    # 待后续阶段（含 host gas-delta UF 设计）再纳入。
+    "CALL",
+    "CALLCODE",
+    "DELEGATECALL",
+    "STATICCALL",
+    "CREATE",
+    "CREATE2",
+})
+
+
+def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram) -> list[str]:
+    """Return dynamic-gas operators that stage-0 gas checking must reject.
+
+    Stage 0 proves only static block gas.  Returning a non-empty list is a
+    fail-closed guard against false greens when both sides currently omit the
+    same dynamic gas side effect.
+    """
+    unsupported: list[str] = []
+    for block in getattr(evm_program, "blocks", None) or []:
+        for op in getattr(block, "operations", None) or []:
+            kind = (getattr(op, "kind", "") or "").upper()
+            if kind.startswith("LOG") or kind in _DYNAMIC_GAS_UNSUPPORTED_KINDS:
+                pc = getattr(op, "pc", None)
+                if pc is None:
+                    unsupported.append(kind)
+                else:
+                    unsupported.append(f"{kind}@pc=0x{pc:x}")
+    return unsupported
+
+
+def _inject_gas_sufficiency_assumption(evm_program: EVMProgram, initial_state: SMTState) -> None:
+    """注入「gas 恒足」前提 UGE(G, bound)，让 out-of-gas 分支恒假被剪。
+
+    阶段 0 只比较 gas 终值（不验 OOG 行为），需保证两侧都不触发 out-of-gas，
+    否则 EVM 侧 consume_static 钳零会与 x86 的 OOG 跳转语义分叉。
+
+    bound = (∑ block.static_gas) × max_iteration 是程序实际可扣 static gas 的
+    **可证上界**（每个 block 最多经过 max_iteration 次），不是魔法常量。
+    - ∑static_gas == 0（无静态 gas）→ 不注入（无需约束）。
+    - bound 接近/超过 2^64（会 wrap）→ **fail-closed 不注入**：宁可不剪 OOG 分支
+      （检查更严，可能 SAT/unknown），也不注入错误的 wrap 约束。
+    """
+    from z3 import BitVecVal, UGE
+
+    blocks = getattr(evm_program, "blocks", None)
+    if not blocks:
+        # 程序未暴露 blocks（如测试 stub）→ 无法算 bound，不注入假设。
+        return
+    total_static = sum(getattr(b, "static_gas", 0) or 0 for b in blocks)
+    if total_static <= 0:
+        return
+
+    bound = total_static * _GAS_BOUND_MAX_ITERATION
+    if bound >= (1 << 64):
+        # 上界超出 64-bit gas 表示范围 → 无法给出健全的 bound，fail-closed。
+        return
+
+    gas_symbol = initial_state.evm_gas.Gas
+    assumption = UGE(gas_symbol, BitVecVal(bound, 64))
+
+    if initial_state.assumptions is None:
+        initial_state.assumptions = []
+    initial_state.assumptions.append(assumption)
+
+
 class ProgramEquivalenceChecker:
     """验证EVM和x86程序之间的等价性。"""
 
-    def __init__(self, timeout_ms: int = 60000, verbose: bool = False):
+    def __init__(self, timeout_ms: int = 60000, verbose: bool = False,
+                 check_gas: bool = False):
         """初始化程序等价性检查器。
 
         Args:
             timeout_ms: SMT求解器超时（毫秒）
             verbose: 启用详细输出
+            check_gas: 是否启用 gas 终值一致性检查（阶段 0，仅静态 gas）。
+                默认 False；含动态 gas 指令的程序需到阶段 1 才支持。
         """
-        self.refinement_checker = RefinementChecker(timeout_ms=timeout_ms, verbose=verbose)
+        self.refinement_checker = RefinementChecker(
+            timeout_ms=timeout_ms, verbose=verbose, check_gas=check_gas
+        )
         self.verbose = verbose
+        self.check_gas = check_gas
 
     def verify_program_pair(self,
                            evm_program: EVMProgram,
@@ -91,6 +189,26 @@ class ProgramEquivalenceChecker:
             raise ValueError("stack_check_timeout_ms must be a positive integer")
         if path_pair_workers <= 0:
             raise ValueError("path_pair_workers must be a positive integer")
+
+        # gas 一致性阶段 0：只支持静态 gas。遇到动态 gas opcode 必须 fail-closed，
+        # 避免 EVM/x86 两侧都尚未建模动态扣减时出现假绿。
+        if self.check_gas:
+            unsupported_dynamic_gas = _find_unsupported_dynamic_gas_ops(evm_program)
+            if unsupported_dynamic_gas:
+                sample = ", ".join(unsupported_dynamic_gas[:8])
+                if len(unsupported_dynamic_gas) > 8:
+                    sample += f", ... (+{len(unsupported_dynamic_gas) - 8} more)"
+                return (
+                    False,
+                    "✗ GAS CHECK UNSUPPORTED: dynamic gas operators are not "
+                    f"modeled yet for stage 0: {sample}",
+                )
+
+        # gas 一致性阶段 0：仅在显式启用 gas 检查时注入「gas 恒足」前提
+        # （UGE(G, bound)），让两侧 out-of-gas 分支恒假被剪，使 gas 终值等式
+        # 比较成立。bound 由静态 gas 之和 × max_iteration 给出可证上界。
+        if self.check_gas:
+            _inject_gas_sufficiency_assumption(evm_program, initial_state)
 
         if self.verbose:
             print(f"\n=== Program-Level Verification (Alive2-style) ===")

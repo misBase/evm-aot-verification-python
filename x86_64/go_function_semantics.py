@@ -843,17 +843,25 @@ class GoFunctionSemantics:
            建模为一个可按地址读写的无限 Z3 Array，因此不会显式验证 buffer 扩容、
            长度变化或扩容后的基址重定位。
 
-        因此，这里不做栈 pop/push，也不修改 SMT 状态中的内存元数据。
+        这里同步更新 memory size side-channel [R13+0x18]。
 
-        TODO:
-        后续如果要更精确地贴近 go-hpc-evm AOT，需要补充对 callEngine 中
-        growNumber、memoryElement0Address、memorySliceLen 等字段的建模，
-        并在 memory_grow 后同步更新这些可观察状态，以验证内存扩容相关语义。
+        **gas 建模分支（gas_modeling_enabled）**:growNumber（[R13+0x108] =
+        callengine_builtin_arg0）已经是 rounded byte size（native code 在
+        makeStoreCheck/RETURN 把 memWords<<5 写入 [R13+0x108]，Go
+        dealWithMemoryGrow 直接 targetMemSize := growNumber），故直接用，不 <<5。
+        内存扩展动态 gas 的 expansion branch（newMemSize > mem.Len()）依赖这个值。
+
+        **功能等价分支（默认，gas off）**:保留历史 `<<5` 行为——既有功能等价
+        验证（含 SHA3 等经此 builtin 的程序）依赖它写入 [R13+0x18] 的值与 x86
+        下游读取一致；贸然改成 byte size 会破坏既有 return-data/memory observable。
+        gas 建模是新增维度，不应改变功能等价路径的此行为。
         """
         from z3 import BitVecVal
 
-        new_page_count = mstate.callengine_builtin_arg0
-        new_size_bytes = new_page_count << BitVecVal(5, 64)
+        if getattr(mstate, "gas_modeling_enabled", False):
+            new_size_bytes = mstate.callengine_builtin_arg0
+        else:
+            new_size_bytes = mstate.callengine_builtin_arg0 << BitVecVal(5, 64)
 
         # 保持 x86_memory 中的 callEngine 元数据同步，避免慢路径读到旧值。
         self._sync_callengine_u64_field(

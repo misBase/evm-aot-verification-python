@@ -48,6 +48,7 @@ _PATH_RESULT_KEYS = (
     "has_return_data",
     "storage",
     "transient_storage",
+    "gas",
 )
 
 
@@ -89,11 +90,13 @@ class PathRefinementChecks:
         outputs: OutputRefinementChecks,
         storage: StorageEquivalenceChecks,
         memory: MemoryContentChecks,
+        gas=None,
     ):
         self._ctx = ctx
         self._outputs = outputs
         self._storage = storage
         self._memory = memory
+        self._gas = gas
 
     def check_refinement_paths(
         self,
@@ -305,6 +308,23 @@ class PathRefinementChecks:
                 solver,
                 evm_ts,
                 x86_ts,
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
+
+        # gas 终值等价（阶段 0）。这条路径在 aggregate fallback 成功后是唯一被
+        # 调到的状态 observable 检查（不再走 _check_state_observables_with_solver），
+        # 故 gas 检查必须也在这里追加，否则 fallback 路径会静默漏检 gas。
+        if self._gas is not None:
+            verified, msg = self._gas._check_gas_equivalence_with_solver(
+                solver,
+                evm_result.get("gas"),
+                x86_result.get("gas"),
                 deadline,
                 path_condition,
                 context,

@@ -128,6 +128,7 @@ class EVMProgram:
                 'has_return_data': BoolVal(False),
                 'storage': state.evm_storage.Storage,
                 'transient_storage': state.evm_transient_storage.TransientStorage,
+                'gas': state.evm_gas.Gas,
             }
             return state, result
 
@@ -156,6 +157,7 @@ class EVMProgram:
             'has_return_data': has_return_data,
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
+            'gas': merged_state.evm_gas.Gas,
         }
 
         return merged_state, result
@@ -218,6 +220,7 @@ class EVMProgram:
             has_return_data=state.return_length != BitVecVal(0, 64),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            gas=state.evm_gas.Gas,
         )
 
     def _merge_global_states(self, global_states: List[GlobalState]) -> SMTState:
@@ -294,7 +297,6 @@ class EVMProgram:
         # 显式 .copy() 避免共享同一 X86MemoryState 实例
         merged.x86_memory = global_states[0].mstate.x86_memory.copy()
         merged.x86_registers = global_states[0].mstate.x86_registers
-        merged.evm_gas = global_states[0].mstate.evm_gas
         # 保留 create_initial_state() 注入的调试元数据。
         # 这些字段是路径不变量，后续 fixed-slot 栈检查会使用。
         merged.stack_base = global_states[0].mstate.stack_base
@@ -322,6 +324,21 @@ class EVMProgram:
                 condition = gstate.get_constraints().as_bool()
                 expr = If(condition, gstate.mstate.evm_transient_storage.TransientStorage, expr)
             merged.evm_transient_storage = EVMTransientStorageState(storage_array=expr)
+
+        # 合并 EVM gas（不同路径经过的 block 不同 → static gas 扣减不同）。
+        # 必须像 SP/storage 一样做 If(condition,...) 链合并;否则 multi-path
+        # 程序会拿第一条路径的 gas 去比 x86 已 side-channel 合并的 gas，造成
+        # 假绿/假 SAT。
+        from state.smt_state import EVMGasState
+        if len(global_states) == 1:
+            merged.evm_gas = global_states[0].mstate.evm_gas
+        else:
+            first_gas = global_states[0].mstate.evm_gas.Gas
+            expr = first_gas
+            for gstate in reversed(global_states):
+                condition = gstate.get_constraints().as_bool()
+                expr = If(condition, gstate.mstate.evm_gas.Gas, expr)
+            merged.evm_gas = EVMGasState(initial_gas=expr)
 
         return merged
 
