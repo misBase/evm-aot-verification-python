@@ -76,40 +76,39 @@ class GasEquivalenceChecks:
 
         prefix = self._ctx.context_prefix(context)
 
-        # 共享 solver 时用 ctx 的预算重置;并行 worker 传入私有 solver，
-        # 由 caller 负责其生命周期，这里只 push/pop 局部断言。
-        use_shared = solver is self._ctx.solver
-        if use_shared:
-            if not self._ctx.reset_solver_with_budget_for(
-                solver, self._ctx.timeout_ms, deadline
-            ):
-                msg = self._ctx.timeout_message()
-                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                return False, msg
+        # **必须 reset solver（不论共享/私有）**。并行 worker 的私有 solver 在同一
+        # check_observables 调用里被前序 memory/storage 子检查累积了断言，且这些
+        # 断言合起来常已是 UNSAT（memory 等价查询本就是「找不到反例 → unsat」）。
+        # 若这里只 push/pop 而不 reset，gas 查询就叠加在一个已 UNSAT 的基底上 →
+        # 恒 UNSAT → gas 不一致被假绿（曾导致并行 path_observations 模式严重 bug）。
+        # storage 检查一直是无条件 reset 的；gas/status 对齐同一范式。reset 已清空
+        # 全部断言，故下面不再需要 push/pop。
+        if not self._ctx.reset_solver_with_budget_for(
+            solver, self._ctx.timeout_ms, deadline
+        ):
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
 
-        solver.push()
-        try:
-            if path_condition is not None:
-                solver.add(path_condition)
-            # 动态 gas（内存扩展二次项）两侧都含 128-bit UDiv：x86 是 `div r64`
-            # 建模的 UDiv(Concat(RDX,RAX), ZeroExt(64,divisor))，EVM 是
-            # UDiv(ZeroExt(64,square), 512)。两者 AST 不同，直接比较会 bit-blast
-            # 而 unknown。注入已验证除法桥接（fail-closed，soundness 中性）让 Z3
-            # 跳过 bit-blast。constraint 用 path_condition（含 scope assumption，
-            # 保证 memWords 实参在两侧可证相等）。
-            bridge_constraint = path_condition if path_condition is not None else BoolVal(True)
-            self._ctx.add_div_bridges(
-                solver,
-                evm_gas,
-                x86_gas,
-                bridge_constraint,
-                ctx=ctx,
-            )
-            # 反例查询：存在一组输入使两侧 gas 终值不同？
-            solver.add(evm_gas != x86_gas)
-            result = solver.check()
-        finally:
-            solver.pop()
+        if path_condition is not None:
+            solver.add(path_condition)
+        # 动态 gas（内存扩展二次项）两侧都含 128-bit UDiv：x86 是 `div r64`
+        # 建模的 UDiv(Concat(RDX,RAX), ZeroExt(64,divisor))，EVM 是
+        # UDiv(ZeroExt(64,square), 512)。两者 AST 不同，直接比较会 bit-blast
+        # 而 unknown。注入已验证除法桥接（fail-closed，soundness 中性）让 Z3
+        # 跳过 bit-blast。constraint 用 path_condition（含 scope assumption，
+        # 保证 memWords 实参在两侧可证相等）。
+        bridge_constraint = path_condition if path_condition is not None else BoolVal(True)
+        self._ctx.add_div_bridges(
+            solver,
+            evm_gas,
+            x86_gas,
+            bridge_constraint,
+            ctx=ctx,
+        )
+        # 反例查询：存在一组输入使两侧 gas 终值不同？
+        solver.add(evm_gas != x86_gas)
+        result = solver.check()
 
         self._ctx.emit_solver_log(
             logs,
@@ -157,14 +156,15 @@ class GasEquivalenceChecks:
             return False, msg
 
         prefix = self._ctx.context_prefix(context)
-        use_shared = solver is self._ctx.solver
-        if use_shared:
-            if not self._ctx.reset_solver_with_budget_for(
-                solver, self._ctx.timeout_ms, deadline
-            ):
-                msg = self._ctx.timeout_message()
-                self._ctx.emit_solver_log(logs, f"    └─ {msg}")
-                return False, msg
+        # **必须无条件 reset**（同 _check_gas_equivalence_with_solver 的理由）:并行
+        # worker 私有 solver 已被前序子检查累积成 UNSAT 基底，若不 reset 则 status
+        # 查询恒 UNSAT → status 不一致被假绿。reset 已清空断言，下面不再 push/pop。
+        if not self._ctx.reset_solver_with_budget_for(
+            solver, self._ctx.timeout_ms, deadline
+        ):
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
 
         # EVM 派生 status:单路径是具体 int；merged-result 多路径合并后是 8-bit
         # BitVec（If(condition, BVV(status,8), ...) 链）。两者都与 x86 8-bit
@@ -185,14 +185,10 @@ class GasEquivalenceChecks:
             # 混用会触发 z3 跨 context 错误。
             evm_status_bv = BitVecVal(int(evm_status), x86_status.size(), ctx=x86_status.ctx)
 
-        solver.push()
-        try:
-            if path_condition is not None:
-                solver.add(path_condition)
-            solver.add(evm_status_bv != x86_status)
-            result = solver.check()
-        finally:
-            solver.pop()
+        if path_condition is not None:
+            solver.add(path_condition)
+        solver.add(evm_status_bv != x86_status)
+        result = solver.check()
 
         self._ctx.emit_solver_log(
             logs,

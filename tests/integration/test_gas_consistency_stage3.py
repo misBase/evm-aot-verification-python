@@ -141,8 +141,11 @@ def test_merged_status_is_not_none_for_multipath():
 
 
 def test_check_oog_rejects_unmodeled_dynamic_gas():
-    """Fix#3:check_oog 也要走 unsupported-dynamic-gas guard（含 EXP/SSTORE/CALL/
-    LOG 等），否则 OOG 一致性被放大到未建模指令 → 假绿/误报。"""
+    """Fix#3:check_oog 也要走 unsupported-dynamic-gas guard，否则 OOG 一致性被
+    放大到未建模指令 → 假绿/误报。
+
+    注意:EXP/SLOAD/CALL 等已转 host-gas UF 兜底、移出拒绝集；CREATE 仍 fail-closed
+    （x86 可见内存扩展 + InitCodeWordGas 未对齐），用它验证 guard 仍生效。"""
     from evm_ir.json_parser import CompilerEVMResult
     from evm_ir.models import EVMBlock, EvmOperator
     block = EVMBlock(pc=0, stack_depth=0, min_depth=0, max_depth=1024,
@@ -150,7 +153,7 @@ def test_check_oog_rejects_unmodeled_dynamic_gas():
                      is_stop=False)
     block.operations = [
         EvmOperator(kind=k, pc=i, block=block)
-        for i, k in enumerate(["PUSH1", "EXP", "STOP"])
+        for i, k in enumerate(["CREATE", "STOP"])
     ]
     evm = EVMProgram(CompilerEVMResult([block]))
     verified, message = ProgramEquivalenceChecker(check_oog=True).verify_program_pair(
@@ -187,3 +190,61 @@ def test_evm_derived_status_matches_aot_profile_codes():
     assert codes["stopped"] == 2
     assert codes["invalid"] == 3
     assert codes["out_of_gas"] == 12
+
+
+# --- Branch-review fixes（合并前修复，防再退化）---
+
+def test_check_oog_rejects_host_dynamic_gas_ops():
+    """Fix #2:check_oog 模式下，host 动态 gas 指令（SLOAD/EXP/CALL 等）的
+    **host 动态 OOG 分叉尚未建模**（host UF 只两侧钳零、继续执行，不分叉 OOG
+    终止路径）。EVM 仅对 block 静态 gas 分叉 OOG，故这些指令的 host 动态 OOG
+    一致性根本没验证；放行 = 假绿。check_oog 必须把 HOST_GAS_UF_KINDS 也纳入
+    unsupported guard，fail-closed 拒绝。
+
+    用 gas_sload（PUSH 7 → SLOAD → STOP）触发:修复前返回 VERIFIED（假绿），
+    修复后必须被 guard 拒绝。"""
+    evm, x86 = _load_pair("gas_sload")
+    verified, message = ProgramEquivalenceChecker(
+        timeout_ms=120000, check_oog=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        stack_check=None,
+    )
+    assert not verified, (
+        "check_oog must reject SLOAD (host dynamic-gas OOG not modeled), "
+        f"got VERIFIED: {message}"
+    )
+    assert "dynamic gas operators are not modeled yet" in message
+
+
+def test_check_gas_still_allows_host_dynamic_gas_ops():
+    """对照 Fix #2:check_gas（阶段 0，非 OOG）下 host 指令仍应放行（gas 恒足前提
+    剪 OOG，host UF 相消即可）。确保 #2 的 OOG 拒绝不误伤 check_gas 通道。"""
+    evm, x86 = _load_pair("gas_sload")
+    verified, message = ProgramEquivalenceChecker(
+        timeout_ms=180000, check_gas=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        stack_check=None,
+    )
+    assert verified, f"check_gas should still verify gas_sload, got: {message}"
+
+
+def test_check_oog_requires_symbolic_gas():
+    """Fix #4:check_oog 只设开关、不校验初始 gas 是否符号化。传默认
+    create_initial_state()（gas 固定 1e9）会让 ULT(1e9, static_gas) 恒假、
+    所有 OOG 分叉被剪，OOG 一致性根本没验却返回 VERIFIED（假绿）。
+
+    check_oog 必须 fail-closed 要求 symbolic gas。"""
+    evm, x86 = _load_add_with_push()
+    verified, message = ProgramEquivalenceChecker(
+        timeout_ms=120000, check_oog=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(),  # 默认非符号 gas
+        stack_check=None, path_observations=True,
+    )
+    assert not verified, (
+        "check_oog with concrete (non-symbolic) gas must fail-closed, "
+        f"got VERIFIED: {message}"
+    )
+    assert "symbolic gas" in message.lower()

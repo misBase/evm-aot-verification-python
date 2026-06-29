@@ -48,6 +48,37 @@ class TestMemoryGrowBuiltin:
         got = simplify(state.callengine_memory_size_bytes)
         assert got.eq(BitVecVal(32 << 5, 64)), f"gas-off keeps legacy <<5; got {got}"
 
+    def test_memory_grow_does_not_shrink(self):
+        """Fix #3:gas 分支必须镜像 Go dealWithMemoryGrow 的 `if targetMemSize >
+        memLen` 守卫——只在扩容时更新 memory size，不能让它**变小**。
+
+        旧实现无条件覆盖 callengine_memory_size_bytes = growNumber，从 160 执行
+        grow(32) 会让模型变成 32（内存反而缩小）；后续内存访问会重复扣费，甚至
+        fee = newTotal - lastGasCost 出现减法下溢。EVM 侧 charge_memory_expansion_gas
+        用 If(rounded>old, rounded, old) 单调不减，x86 侧必须对齐。"""
+        state = SMTState.create_initial_state(symbolic_gas=True)
+        sem = GoFunctionSemantics(GO_HPC_EVM_PROFILE)
+
+        # 当前内存 160 bytes，growNumber=32（target < memLen）。
+        state.callengine_memory_size_bytes = BitVecVal(160, 64)
+        state.callengine_builtin_arg0 = BitVecVal(32, 64)
+        state = sem._handle_builtin_memory_grow(sp=0, mstate=state)
+
+        got = simplify(state.callengine_memory_size_bytes)
+        assert got.eq(BitVecVal(160, 64)), (
+            f"memory must not shrink: target(32) <= memLen(160) keeps 160, got {got}"
+        )
+
+    def test_memory_grow_still_expands_when_larger(self):
+        """对照 Fix #3:target > memLen 时仍正常扩容（守卫不挡合法扩容）。"""
+        state = SMTState.create_initial_state(symbolic_gas=True)
+        sem = GoFunctionSemantics(GO_HPC_EVM_PROFILE)
+        state.callengine_memory_size_bytes = BitVecVal(160, 64)
+        state.callengine_builtin_arg0 = BitVecVal(320, 64)  # target > memLen
+        state = sem._handle_builtin_memory_grow(sp=0, mstate=state)
+        got = simplify(state.callengine_memory_size_bytes)
+        assert got.eq(BitVecVal(320, 64)), f"expected expand to 320, got {got}"
+
 
 def _find_udiv_sizes(expr):
     """递归收集表达式里所有 UDiv(bvudiv) 节点的位宽。"""

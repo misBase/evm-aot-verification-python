@@ -1,0 +1,76 @@
+{
+  "control_frames": [
+    {
+      "is_jump_target": false,
+      "is_stop": true,
+      "max_depth": 1017,
+      "min_depth": 0,
+      "operations": [
+        {
+          "kind": "TAG",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 2
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 4
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 6
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 8
+        },
+        {
+          "immediate": "1",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 10
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 12
+        },
+        {
+          "immediate": "121",
+          "kind": "CALLCODE",
+          "param": 3,
+          "pc": 14
+        },
+        {
+          "kind": "STOP",
+          "pc": 15
+        },
+        {
+          "kind": "STOP",
+          "pc": 16
+        }
+      ],
+      "pc": 0,
+      "stack_depth": 1,
+      "static_gas": 121
+    }
+  ]
+}

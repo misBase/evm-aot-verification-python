@@ -180,6 +180,44 @@ def charge_memory_expansion_gas(state, requested_size_64):
 _SHA3_WORD_GAS = 6   # params.Sha3WordGas
 _COPY_GAS = 3        # params.CopyGas
 
+# LOG 协议常量（params/protocol_params.go）
+_LOG_GAS = 375        # params.LogGas（每条 LOG 一次）
+_LOG_TOPIC_GAS = 375  # params.LogTopicGas（每个 topic）
+_LOG_DATA_GAS = 8     # params.LogDataGas（**每字节**，注意不是每 word）
+
+
+def charge_log_gas(state, n_topics, size_64):
+    """LOG 的常量 + data gas，镜像 go-hpc-evm gasLog / memoryLogGas codegen。
+
+    Go gasLog（gas_table.go:215，x86 memoryLogGas codegen 全程可见）:
+        gas  = memoryGasCost(memSize)          # 内存扩展（调用方先扣，见 _charge_log_gas）
+        gas += LogGas                          # 375，常量
+        gas += n * LogTopicGas                 # n*375，常量
+        gas += requestedSize * LogDataGas      # **每字节** 8，size=stack.Back(1)
+
+    与 SHA3/COPY 的 word gas 关键区别:LOG data gas 按**字节**计费（size*8），
+    不是按 word（toWordSize），故不能复用 charge_word_gas。
+
+    内存扩展部分由调用方（_charge_log_gas）单独调 charge_memory_expansion_gas，
+    本函数只负责 LogGas + n*TopicGas + size*DataGas 三段叠加。
+
+    溢出健全性（**依赖调用顺序**）:本函数不单独加 scope assumption。调用点
+    _charge_log_gas 先调 charge_memory_expansion_gas，后者对 requested=offset+size
+    加 `ULE(requested, 0x1FFFFFFFE0)`，而 size ≤ requested ⟹ size ≤ 0x1FFFFFFFE0
+    ⟹ size*LogDataGas(8) < 2^64 不溢出，x86 makeSafeMul overflow 分支恒假被剪。
+
+    Args:
+        state: SMTState；就地扣减 evm_gas。
+        n_topics: LOG 的 topic 数（int，0..4）。
+        size_64: 64-bit BitVec，LOG 数据字节长度（栈 Back(1)）。
+    """
+    from z3 import BitVecVal
+
+    flat = BitVecVal(_LOG_GAS + n_topics * _LOG_TOPIC_GAS, 64)
+    data_fee = size_64 * BitVecVal(_LOG_DATA_GAS, 64)
+    state.evm_gas = state.evm_gas.consume_dynamic(flat + data_fee)
+    return state
+
 
 def charge_word_gas(state, word_len_64, word_gas_const):
     """额外扣减「按 word 计费」的动态 gas（SHA3 / COPY 系列）。

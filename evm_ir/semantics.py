@@ -177,6 +177,64 @@ def _charge_mcopy_gas(state, dst_offset_bv, src_offset_bv, length_bv):
     return state
 
 
+def _return_gas_for(op) -> int:
+    """CALL/CREATE 系列的 returnGas = Blk.StaticGas - op.Immediate（块内 CALL 之后的
+    静态 gas）。**与 go-hpc-evm 同式**:dealWithAddGas/SubGas 用 o.Blk.StaticGas -
+    o.Immediate.Uint64()（impl_amd64.go）。immediate 是 CALL 之前的累计静态 gas（前缀
+    和），故 rg ≥ 0 自然成立。
+
+    缺字段（测试 stub / immediate 非 int）或 rg<0（malformed IR）时返回 0:这**不是
+    无害降级**——若真实 returnGas≠0 而这里返回 0，host 调用点 EVM gas（无 +returnGas）
+    与 x86 gas（有 +returnGas）实参不同 ⟹ host UF 不相消 ⟹ 该 CALL **fail-closed SAT**
+    （安全、不假绿，但会漏报）。即:保守值只会让验证更严，绝不放松。
+    """
+    block = getattr(op, "block", None)
+    static_gas = getattr(block, "static_gas", None) if block is not None else None
+    immediate = getattr(op, "immediate", None)
+    if not isinstance(static_gas, int) or not isinstance(immediate, int):
+        return 0
+    rg = static_gas - immediate
+    if rg < 0:
+        # immediate 是块内 CALL 之前的累计静态 gas（前缀和），正常 ≤ static_gas。
+        # rg<0 说明 IR 异常;返回 0（fail-closed，与 x86 加减不对齐 → SAT 而非假绿），
+        # 但记一条 warning 以便定位损坏的 IR。
+        import logging
+        logging.getLogger(__name__).warning(
+            "CALL/CREATE returnGas < 0 (static_gas=%d, immediate=%d) at pc=%s; "
+            "treating as 0 (fail-closed)",
+            static_gas, immediate, getattr(op, "pc", None),
+        )
+        return 0
+    return rg
+
+
+def _charge_log_gas(state, offset_bv, size_bv, n_topics):
+    """LOG 动态 gas（A 类，x86 memoryLogGas codegen 全程可见）。
+
+    镜像 Go gasLog:内存扩展(offset+size) + LogGas(375) + n*LogTopicGas(375)
+    + size*LogDataGas(8，**每字节**)。size==0 时内存不扩、data gas=0。
+    success-path scope:offset/size 高 192 位为 0，offset+size 不溢出。
+    仅 gas_modeling_enabled 时生效。
+    """
+    if not getattr(state, "gas_modeling_enabled", False):
+        return state
+    from state.evm_gas_state import charge_memory_expansion_gas, charge_log_gas
+
+    if offset_bv.size() == 256:
+        state.add_assumption(Extract(255, 64, offset_bv) == BitVecVal(0, 192))
+    if size_bv.size() == 256:
+        state.add_assumption(Extract(255, 64, size_bv) == BitVecVal(0, 192))
+    offset_64 = _truncate_to_64(offset_bv)
+    size_64 = _truncate_to_64(size_bv)
+
+    end = offset_64 + size_64
+    state.add_assumption(UGE(end, offset_64))  # scope: 不溢出
+    requested = If(size_64 == BitVecVal(0, 64), BitVecVal(0, 64), end)
+    charge_memory_expansion_gas(state, requested)
+    charge_log_gas(state, n_topics, size_64)
+    return state
+
+
 def _go_getdata_byte(byte_array,
                      start_64: BitVecRef,
                      source_size_64: BitVecRef,
@@ -717,6 +775,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         exponent, stack_after_pop2 = stack_after_pop1.pop()
         result = op_semantics.exp_semantics(base, exponent)
         state.evm_stack = stack_after_pop2.push(result)
+        # EXP gas 是 B 类（builtin runtime dealWithExp，x86
+        # checkMemoryAndCalcDynamicGasEXPEip158 仅 TODO，机器码不可见）。用
+        # host-gas UF 兜底:gas 依赖 exponent（aotGasExpEIP158 按 expByteLen），
+        # 故 UF 参数取 exponent。x86 侧 EXP builtin 调用点扣同名 UF 相消。
+        from state.host_gas import charge_host_gas_uf
+        charge_host_gas_uf(state, "EXP", [exponent])
         return state
 
     elif kind == "LT":
@@ -914,6 +978,10 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         key, stack_after_pop = state.evm_stack.pop()
         val = state.evm_storage.sload(key)
         state.evm_stack = stack_after_pop.push(val)
+        # SLOAD gas（B 类，host runtime 冷热账户，x86 不可见）→ UF 兜底。
+        # gas 依赖 slot key（冷热取决于该 slot 是否已访问）。
+        from state.host_gas import charge_host_gas_uf
+        charge_host_gas_uf(state, "SLOAD", [key])
         return state
 
     elif kind == "SSTORE":
@@ -922,6 +990,10 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         val, stack_after_pop2 = stack_after_pop1.pop()
         state.evm_storage = state.evm_storage.sstore(key, val)
         state.evm_stack = stack_after_pop2
+        # SSTORE gas（B 类，host runtime 冷热 + 退款，x86 不可见）→ UF 兜底。
+        # gas 依赖 key 与待写 value。
+        from state.host_gas import charge_host_gas_uf
+        charge_host_gas_uf(state, "SSTORE", [key, val])
         return state
 
     elif kind == "CALLDATASIZE":
@@ -1179,6 +1251,9 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         addr_bv, stack1 = state.evm_stack.pop()
         result = uninterpreted.balance_semantics(addr_bv)
         state.evm_stack = stack1.push(result)
+        # BALANCE gas（B 类，host 冷热账户访问，x86 不可见）→ UF 兜底，依赖 addr。
+        from state.host_gas import charge_host_gas_uf
+        charge_host_gas_uf(state, "BALANCE", [addr_bv])
         return state
 
     elif kind == "SELFBALANCE":
@@ -1190,6 +1265,9 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         addr_bv, stack1 = state.evm_stack.pop()
         result = uninterpreted.ext_code_size_semantics(addr_bv)
         state.evm_stack = stack1.push(result)
+        # EXTCODESIZE gas（B 类，host 冷热账户，x86 不可见）→ UF 兜底，依赖 addr。
+        from state.host_gas import charge_host_gas_uf
+        charge_host_gas_uf(state, "EXTCODESIZE", [addr_bv])
         return state
 
     elif kind == "EXTCODECOPY":
@@ -1207,12 +1285,21 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             effect_tag=f"extcodecopy_idx_{op.pc}",
         )
         state.evm_stack = stack4
+        # EXTCODECOPY gas:x86 有可见的内存扩展 + copy word gas（checkMemoryAndCalc
+        # DynamicGasExtCodeCopy），但还有 host 冷热账户访问 gas（不可见）。可见部分
+        # 尚未在 EVM 侧建模（与 CODECOPY 不同，EXTCODECOPY 多了账户访问），故整体
+        # 用 UF 兜底，依赖 addr 与 size。在 guard 中保持 fail-closed 直到可见部分对齐。
+        from state.host_gas import charge_host_gas_uf
+        charge_host_gas_uf(state, "EXTCODECOPY", [addr_bv, size_bv])
         return state
 
     elif kind == "EXTCODEHASH":
         addr_bv, stack1 = state.evm_stack.pop()
         result = uninterpreted.ext_code_hash_semantics(addr_bv)
         state.evm_stack = stack1.push(result)
+        # EXTCODEHASH gas（B 类，host 冷热账户，x86 不可见）→ UF 兜底，依赖 addr。
+        from state.host_gas import charge_host_gas_uf
+        charge_host_gas_uf(state, "EXTCODEHASH", [addr_bv])
         return state
 
     elif kind == "BLOCKHASH":
@@ -1233,8 +1320,16 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
 
     elif kind == "SELFDESTRUCT":
-        _, stack1 = state.evm_stack.pop()
+        beneficiary_bv, stack1 = state.evm_stack.pop()
         state.evm_stack = stack1
+        # SELFDESTRUCT 是终止指令。x86 codegen 在 host 调用后
+        # compileExitFromNativeCode(evmNativeCallStatusCodeStopped) → status=2。
+        # 必须设值，否则 gas/OOG 模式下 status 检查因 EVM 侧无 status 而 fail-closed。
+        state.termination_status = 2  # stopped（对齐 x86 SELFDESTRUCT 退出码）
+        # SELFDESTRUCT gas（B 类，host 冷热 + 账户创建，x86 不可见）→ UF 兜底，
+        # 依赖受益人地址。
+        from state.host_gas import charge_host_gas_uf
+        charge_host_gas_uf(state, "SELFDESTRUCT", [beneficiary_bv])
         return state
 
     elif kind == "CREATE":
@@ -1245,6 +1340,13 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             value_bv, offset_bv, size_bv, state.evm_memory.Memory, effect_id=op.pc
         )
         state.evm_stack = stack3.push(result)
+        # CREATE gas（B 类）→ host UF + returnGas 链镜像。注意 x86 还有可见的内存
+        # 扩展 + InitCodeWordGas 尚未在 EVM 侧建模，故 CREATE 仍 guard fail-closed
+        # （不会假绿）。returnGas 链先对齐，待内存扩展对齐后即可移出 guard。
+        from state.host_gas import charge_host_gas_uf_with_return_gas
+        charge_host_gas_uf_with_return_gas(
+            state, "CREATE", [value_bv, offset_bv, size_bv], _return_gas_for(op)
+        )
         return state
 
     elif kind == "CREATE2":
@@ -1256,6 +1358,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             value_bv, offset_bv, size_bv, salt_bv, state.evm_memory.Memory, effect_id=op.pc
         )
         state.evm_stack = stack4.push(result)
+        # CREATE2 gas（B 类）→ host UF + returnGas 链镜像。同 CREATE，可见内存扩展 +
+        # InitCodeWordGas 尚未对齐，guard 保持 fail-closed。
+        from state.host_gas import charge_host_gas_uf_with_return_gas
+        charge_host_gas_uf_with_return_gas(
+            state, "CREATE2", [value_bv, offset_bv, size_bv, salt_bv], _return_gas_for(op)
+        )
         return state
 
     elif kind == "CALL":
@@ -1289,6 +1397,15 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             should_copy=should_copy,
         )
         state.evm_stack = stack7.push(result)
+        # CALL gas（B 类）→ host UF 兜底，并镜像 x86 dealWithAddGas/SubGas returnGas
+        # 链（returnGas = Blk.StaticGas - op.Immediate），让 host 调用点两侧 gas 实参
+        # 一致、UF 相消（否则 returnGas≠0 时假 SAT）。UF 依赖 7 个栈参数。
+        from state.host_gas import charge_host_gas_uf_with_return_gas
+        _rg = _return_gas_for(op)
+        charge_host_gas_uf_with_return_gas(state, "CALL", [
+            gas_bv, addr_bv, value_bv, args_offset_bv, args_size_bv,
+            ret_offset_bv, ret_size_bv,
+        ], _rg)
         return state
 
     elif kind == "CALLCODE":
@@ -1322,6 +1439,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             should_copy=should_copy,
         )
         state.evm_stack = stack7.push(result)
+        # CALLCODE gas（B 类）→ host UF + returnGas 链镜像（同 CALL）。
+        from state.host_gas import charge_host_gas_uf_with_return_gas
+        charge_host_gas_uf_with_return_gas(state, "CALLCODE", [
+            gas_bv, addr_bv, value_bv, args_offset_bv, args_size_bv,
+            ret_offset_bv, ret_size_bv,
+        ], _return_gas_for(op))
         return state
 
     elif kind == "DELEGATECALL":
@@ -1354,6 +1477,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             should_copy=should_copy,
         )
         state.evm_stack = stack6.push(result)
+        # DELEGATECALL gas（B 类）→ host UF + returnGas 链镜像。6 个栈参数（无 value）。
+        from state.host_gas import charge_host_gas_uf_with_return_gas
+        charge_host_gas_uf_with_return_gas(state, "DELEGATECALL", [
+            gas_bv, addr_bv, args_offset_bv, args_size_bv,
+            ret_offset_bv, ret_size_bv,
+        ], _return_gas_for(op))
         return state
 
     elif kind == "STATICCALL":
@@ -1380,6 +1509,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             effect_id=op.pc,
         )
         state.evm_stack = stack6.push(result)
+        # STATICCALL gas（B 类）→ host UF + returnGas 链镜像。6 个栈参数（无 value）。
+        from state.host_gas import charge_host_gas_uf_with_return_gas
+        charge_host_gas_uf_with_return_gas(state, "STATICCALL", [
+            gas_bv, addr_bv, args_offset_bv, args_size_bv,
+            ret_offset_bv, ret_size_bv,
+        ], _return_gas_for(op))
         return state
 
     elif kind == "TLOAD":
@@ -1493,14 +1628,19 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # LOG指令：从栈中弹出参数并记录事件
         # immediate 字段表示主题数量 (0-4)
         # LOG[n] 弹出 (2+n) 个值: offset, size, topic1...topicn
-        # TODO: 占位实现：只弹出值，不实际记录事件日志
+        # TODO: 占位实现：只弹出值，不实际记录事件日志（gas 已建模）
 
         # 获取主题数量
         num_topics = op.immediate if op.immediate is not None else 0
 
-        # 弹出 offset 和 size（栈顶两个）
-        _, state.evm_stack = state.evm_stack.pop()
-        _, state.evm_stack = state.evm_stack.pop()
+        # 弹出 offset 和 size（栈顶两个）。Go gasLog 用 Back(0)=offset、
+        # Back(1)=size 算内存扩展 + data gas（A 类，x86 memoryLogGas 全程可见）。
+        offset_bv, state.evm_stack = state.evm_stack.pop()
+        size_bv, state.evm_stack = state.evm_stack.pop()
+
+        # LOG 动态 gas（仅 gas_modeling_enabled 时生效）。在弹出 topics 前扣，
+        # 与 x86 checkMemoryAndCalcDynamicGasLog 在 host 调用前算 gas 对齐。
+        _charge_log_gas(state, offset_bv, size_bv, num_topics)
 
         # 弹出所有主题
         for _ in range(num_topics):

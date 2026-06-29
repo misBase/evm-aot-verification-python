@@ -157,3 +157,110 @@ def test_stage1d_memory_dynamic_gas_consistency(name):
         evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
     )
     assert verified, f"{name} memory gas consistency should hold, got: {msg}"
+
+
+# --- A 类 LOG gas（内存扩展 + LogGas + n*TopicGas + size*DataGas，x86 全程可见）---
+
+def test_log_gas_consistency_passes():
+    """LOG1 动态 gas:EVM _charge_log_gas == x86 memoryLogGas codegen 链。
+
+    A 类真证明:LogGas(375)+TopicGas(375)+size*DataGas(8) + 内存扩展，全部在
+    x86 checkMemoryAndCalcDynamicGasLog/memoryLogGas 机器码可见。"""
+    evm, x86 = _load_pair("gas_log1")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=180000, check_gas=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+    )
+    assert verified, f"LOG gas consistency should hold, got: {msg}"
+
+
+def test_log_tampered_data_gas_caught(monkeypatch):
+    """防假绿:篡改 LOG **每字节** data gas(8→99) → gas 检查必须 SAT。"""
+    import state.evm_gas_state as gas_state
+    monkeypatch.setattr(gas_state, "_LOG_DATA_GAS", 99)
+
+    evm, x86 = _load_pair("gas_log1")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=180000, check_gas=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+    )
+    assert not verified, "tampered LOG data gas must be caught (false green otherwise)"
+    assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
+
+
+def test_log_tampered_flat_gas_caught(monkeypatch):
+    """防假绿:篡改 LOG 常量 gas(LogGas 375→111) → gas 检查必须 SAT。"""
+    import state.evm_gas_state as gas_state
+    monkeypatch.setattr(gas_state, "_LOG_GAS", 111)
+
+    evm, x86 = _load_pair("gas_log1")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=180000, check_gas=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+    )
+    assert not verified, "tampered LogGas must be caught (false green otherwise)"
+    assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
+
+
+def test_log_tampered_topic_gas_caught(monkeypatch):
+    """防假绿:篡改 LOG 每 topic gas(TopicGas 375→111) → gas 检查必须 SAT。
+
+    gas_log1 是 LOG1（1 个 topic），独立验证 n*TopicGas 项;_LOG_TOPIC_GAS 与
+    _LOG_GAS 同为 375，单独篡改 TopicGas 可抓出把两者混淆/常量折叠的 bug。"""
+    import state.evm_gas_state as gas_state
+    monkeypatch.setattr(gas_state, "_LOG_TOPIC_GAS", 111)
+
+    evm, x86 = _load_pair("gas_log1")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=180000, check_gas=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+    )
+    assert not verified, "tampered LogTopicGas must be caught (false green otherwise)"
+    assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
+
+
+def test_log_gas_check_off_unaffected():
+    """check_gas 默认关时,LOG 功能等价不受 gas 建模影响(回归保护)。"""
+    evm, x86 = _load_pair("gas_log1")
+    verified, msg = ProgramEquivalenceChecker(timeout_ms=180000).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(), stack_check=None
+    )
+    assert verified, f"functional equivalence should hold with gas off: {msg}"
+
+
+# --- 并行 path_observations 模式回归（worker 私有 solver 未 reset → gas 假绿 bug）---
+
+def test_memory_gas_parallel_pathobs_passes():
+    """阶段1 内存扩展 gas 在并行 path_observations 模式下正确通过。"""
+    evm, x86 = _load_pair("gas_mload")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=180000, check_gas=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        stack_check=None, path_observations=True, path_pair_workers=2,
+    )
+    assert verified, f"MLOAD gas should verify in parallel mode, got: {msg}"
+
+
+def test_memory_gas_parallel_pathobs_tamper_caught(monkeypatch):
+    """**核心回归**:篡改内存 gas 常量后，并行 path_observations 模式**必须** SAT。
+
+    曾有 bug:worker 私有 solver 在 gas 检查处不 reset，继承前序 memory 检查的累积
+    UNSAT 断言 → gas 查询 vacuous UNSAT → 假绿。此测试覆盖既有 stage1 路径（非仅
+    B 类 host UF），确保根因修复对所有 gas 检查生效。"""
+    import state.evm_gas_state as gas_state
+    monkeypatch.setattr(gas_state, "_MEMORY_GAS", 9)
+
+    evm, x86 = _load_pair("gas_mload")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=180000, check_gas=True
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        stack_check=None, path_observations=True, path_pair_workers=2,
+    )
+    assert not verified, "parallel-mode memory-gas mismatch must be caught (false green bug)"
+    assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
