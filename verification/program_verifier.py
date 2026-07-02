@@ -82,8 +82,8 @@ class ProgramEquivalenceChecker:
             summary_config: x86 summary 插件配置；None 表示不启用 summary
             x86_reachability_timeout_ms: path_observations=True 时 x86 CFG
                 executor 每次 reachability pruning 的局部 timeout；None 表示不设 cap
-            max_depth: x86 符号执行的最大搜索深度；None 表示使用
-                x86_program.to_z3/to_z3_paths 的默认值。大合约需要更深搜索时
+            max_depth: EVM 与 x86 符号执行的最大搜索深度；None 表示使用
+                两侧 to_z3/to_z3_paths 的默认值。大合约需要更深搜索时
                 （避免触发 coverage-incomplete）应显式传入更大的值，而不是
                 依赖全局默认值。
 
@@ -124,7 +124,13 @@ class ProgramEquivalenceChecker:
             print("    ├─ Level 2: CFG-level path merging")
 
         evm_start = time.time()
-        evm_state, evm_result = evm_program.to_z3(initial_state)
+        evm_to_z3_kwargs = {}
+        if max_depth is not None:
+            evm_to_z3_kwargs["max_depth"] = max_depth
+        evm_state, evm_result = evm_program.to_z3(
+            initial_state,
+            **evm_to_z3_kwargs,
+        )
         evm_build_time = time.time() - evm_start
 
         if self.verbose:
@@ -293,9 +299,13 @@ class ProgramEquivalenceChecker:
         evm_start = time.time()
         # stack_check 是调试辅助检查；只有它需要 merged terminal state。
         # 纯 observable 精化只消费 observations，避免不必要的 Array 合并。
+        evm_to_z3_paths_kwargs = {}
+        if max_depth is not None:
+            evm_to_z3_paths_kwargs["max_depth"] = max_depth
         evm_paths = evm_program.to_z3_paths(
             initial_state,
             merge_state=stack_check is not None,
+            **evm_to_z3_paths_kwargs,
         )
         evm_build_time = time.time() - evm_start
         evm_state = evm_paths.merged_state

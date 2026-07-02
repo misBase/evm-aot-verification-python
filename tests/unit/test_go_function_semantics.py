@@ -74,6 +74,23 @@ def _compute_stack_addr(r14_base: int, sp: int) -> int:
     return r14_base + sp * LIMB_SIZE_BYTES
 
 
+def _assert_callengine_stack_pointer(state: SMTState, expected_sp: int) -> None:
+    expected = BitVecVal(expected_sp & ((1 << 64) - 1), 64)
+    sp_offset = GO_HPC_EVM_PROFILE.offsets["stack_pointer"]
+    sp_from_memory = state.x86_memory.load_64bit(
+        BitVecVal(R13_BASE + sp_offset, 64),
+        domain=MemoryDomain.CALLENGINE,
+    )
+
+    solver = Solver()
+    solver.add(state.callengine_stack_pointer_limbs != expected)
+    assert solver.check() == unsat
+
+    solver = Solver()
+    solver.add(sp_from_memory != expected)
+    assert solver.check() == unsat
+
+
 class TestPopPush:
     """测试底层 pop/push 操作。"""
 
@@ -787,8 +804,10 @@ class TestLog:
         # 栈从底到顶：[topic1, topic0, mSize, mStart, n_topics]。
         state, sp = _make_state_with_stack([0xAAAA, 0xBBBB, 8, 0, 2])
 
-        # 不应该抛出 GoFunctionSemanticsError。
-        sem.apply(4, 17, sp, state, evm_immediate=2)
+        state = sem.apply(4, 17, sp, state, evm_immediate=2)
+
+        expected_sp = sp - (3 + 2) * LIMBS_PER_UINT256
+        _assert_callengine_stack_pointer(state, expected_sp)
 
     def test_evm_immediate_matches_low64_when_topic_count_high_limbs_are_dirty(self):
         """LOG 的 topic 数遵循 Go Uint64() 语义，只比较低 64 位。"""
@@ -800,7 +819,10 @@ class TestLog:
             [0xAAAA, 0xBBBB, 0xCCCC, 8, 0, dirty_high_limb_topic_count]
         )
 
-        sem.apply(4, 17, sp, state, evm_immediate=3)
+        state = sem.apply(4, 17, sp, state, evm_immediate=3)
+
+        expected_sp = sp - (3 + 3) * LIMBS_PER_UINT256
+        _assert_callengine_stack_pointer(state, expected_sp)
 
     def test_evm_immediate_mismatching_stack_value_raises(self):
         """evm_immediate 与 x86 栈上实际的 n_topics 不一致时必须 fail-closed 报错，
