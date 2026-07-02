@@ -57,22 +57,35 @@ EVM_KIND_TO_HOST_FUNC_NAME = {
 
 
 @dataclass(frozen=True)
+class CallSiteInfo:
+    """EVM host-call metadata matched to one x86 host bridge site."""
+
+    pc: int
+    kind: str
+    immediate: int | None = None
+
+
+@dataclass(frozen=True)
 class CallSiteMapping:
-    """Maps x86 host-bridge block addresses to the corresponding EVM pc."""
+    """Maps x86 host-bridge block addresses to corresponding EVM host sites."""
 
-    x86_ret_block_to_evm_pc: Dict[int, int]
+    x86_ret_block_to_evm_site: Dict[int, CallSiteInfo]
 
-    def get_evm_pc(self, x86_ret_block_addr: int) -> int:
-        """Return the mapped EVM pc for a given x86 host bridge site."""
+    def get_evm_site(self, x86_ret_block_addr: int) -> CallSiteInfo:
+        """Return the matched EVM host-call site for a x86 bridge block."""
         try:
-            return self.x86_ret_block_to_evm_pc[x86_ret_block_addr]
+            return self.x86_ret_block_to_evm_site[x86_ret_block_addr]
         except KeyError as exc:
             raise KeyError(
                 f"missing EVM call-site mapping for x86 ret block 0x{x86_ret_block_addr:x}"
             ) from exc
 
+    def get_evm_pc(self, x86_ret_block_addr: int) -> int:
+        """Return the mapped EVM pc for a given x86 host bridge site."""
+        return self.get_evm_site(x86_ret_block_addr).pc
+
     def __len__(self) -> int:
-        return len(self.x86_ret_block_to_evm_pc)
+        return len(self.x86_ret_block_to_evm_site)
 
 
 def build_call_site_mapping(evm_program: EVMProgram, x86_program: X86Program) -> CallSiteMapping:
@@ -86,8 +99,11 @@ def build_call_site_mapping(evm_program: EVMProgram, x86_program: X86Program) ->
             f"EVM has {len(evm_sites)} host ops, x86 has {len(x86_sites)} host bridge sites"
         )
 
-    mapping: Dict[int, int] = {}
-    for (evm_pc, evm_kind), (x86_addr, x86_func_name) in zip(evm_sites, x86_sites):
+    mapping: Dict[int, CallSiteInfo] = {}
+    for (evm_pc, evm_kind, evm_immediate), (x86_addr, x86_func_name) in zip(
+        evm_sites,
+        x86_sites,
+    ):
         expected_func_name = EVM_KIND_TO_HOST_FUNC_NAME.get(evm_kind)
         if expected_func_name is None:
             raise ValueError(f"unsupported EVM host op kind for call-site mapping: {evm_kind}")
@@ -97,16 +113,18 @@ def build_call_site_mapping(evm_program: EVMProgram, x86_program: X86Program) ->
                 f"EVM pc 0x{evm_pc:x} kind {evm_kind} expects x86 host func '{expected_func_name}', "
                 f"but x86 block 0x{x86_addr:x} uses '{x86_func_name}'"
             )
-        mapping[x86_addr] = evm_pc
+        mapping[x86_addr] = CallSiteInfo(evm_pc, evm_kind, evm_immediate)
     return CallSiteMapping(mapping)
 
 
-def _enumerate_evm_host_sites(evm_program: EVMProgram) -> List[Tuple[int, str]]:
-    sites: List[Tuple[int, str]] = []
+def _enumerate_evm_host_sites(
+    evm_program: EVMProgram,
+) -> List[Tuple[int, str, int | None]]:
+    sites: List[Tuple[int, str, int | None]] = []
     for block in evm_program.blocks:
         for op in block.operations:
             if op.kind in EVM_HOST_OP_KINDS:
-                sites.append((op.pc, op.kind))
+                sites.append((op.pc, op.kind, op.immediate))
     return sites
 
 

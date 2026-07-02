@@ -24,7 +24,10 @@ class X86SearchStrategy(ABC):
 
         Args:
             work_list: 工作列表（由外部维护）
-            max_depth: 最大执行深度
+            max_depth: 最大执行深度。循环/回边检测尚未实现，这是唯一的终止
+                兜底；大合约需更深搜索时应通过
+                ``ProgramEquivalenceChecker.verify_program_pair(max_depth=...)``
+                传入，不要调大这里的全局默认值。
         """
         self.work_list = work_list
         self.max_depth = max_depth
@@ -120,7 +123,12 @@ class X86ExtensionStrategy(X86SearchStrategy):
     参考 evm_ir 的策略扩展机制。
     """
 
-    def __init__(self, super_strategy: X86SearchStrategy, work_list: List[X86GlobalState], max_depth: int = 100):
+    def __init__(
+        self,
+        super_strategy: X86SearchStrategy,
+        work_list: List[X86GlobalState],
+        max_depth: int = 100,
+    ):
         """初始化扩展策略。
 
         Args:

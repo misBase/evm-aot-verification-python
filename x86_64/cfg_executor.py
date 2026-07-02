@@ -5,7 +5,7 @@ x86-64 符号执行引擎（参考 evm_ir）。
 """
 
 import logging
-from typing import Any, List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Optional, Tuple, Set, TYPE_CHECKING
 from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat, is_false
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,9 @@ from .disassembler import parse_operands
 from .summaries.base import X86Summary, X86SummaryRuntime
 from common.path_observation import PathCoverageCertificate
 from state.smt_state import SMTState, PointerTag
+
+if TYPE_CHECKING:
+    from verification.call_site_mapping import CallSiteMapping
 
 
 class X86SymbolicExecutor:
@@ -43,7 +46,7 @@ class X86SymbolicExecutor:
                  enable_go_bridge: bool = True,
                  enable_merge: bool = True,
                  reachability_timeout_ms: Optional[int] = 50,
-                 call_site_mapping: Optional[Any] = None,
+                 call_site_mapping: Optional["CallSiteMapping"] = None,
                  aot_profile: Optional[X86AOTProfile] = None,
                  summary_runtime: Optional[X86SummaryRuntime] = None):
         """初始化符号执行引擎。
@@ -51,7 +54,8 @@ class X86SymbolicExecutor:
         Args:
             blocks: 所有 x86-64 块列表
             strategy_cls: 搜索策略类
-            max_depth: 最大执行深度
+            max_depth: 最大执行深度；见 X86SearchStrategy.__init__ 的说明，
+                这是当前唯一的终止兜底（循环检测尚未实现）
             use_reachability_check: 是否使用可达性检查
             enable_go_bridge: 是否启用 ret -> GO_HOST -> returnAddress 建模
             enable_merge: 是否启用合流点合并优化
@@ -1161,9 +1165,20 @@ class X86SymbolicExecutor:
                 go_sem = GoFunctionSemantics(self.aot_profile)
                 try:
                     evm_pc = None
-                    if status_code == self.aot_profile.status_codes["call_go_host_function"] and self.call_site_mapping is not None:
-                        evm_pc = self.call_site_mapping.get_evm_pc(block.start_addr)
-                    mstate = go_sem.apply(status_code, func_index, sp, mstate, evm_pc=evm_pc)
+                    evm_immediate = None
+                    host_status = self.aot_profile.status_codes["call_go_host_function"]
+                    if status_code == host_status and self.call_site_mapping is not None:
+                        evm_site = self.call_site_mapping.get_evm_site(block.start_addr)
+                        evm_pc = evm_site.pc
+                        evm_immediate = evm_site.immediate
+                    mstate = go_sem.apply(
+                        status_code,
+                        func_index,
+                        sp,
+                        mstate,
+                        evm_pc=evm_pc,
+                        evm_immediate=evm_immediate,
+                    )
                     # 更新 global_state 的 mstate，确保后续恢复分支使用更新后的状态
                     global_state.mstate = mstate
                 except GoFunctionSemanticsError as e:

@@ -1563,7 +1563,11 @@ class TestStrategies:
         assert len(final_states) >= 1
 
     def test_bounded_loops_strategy(self):
-        """测试有界循环策略。"""
+        """测试有界循环策略。
+
+        该策略只丢弃循环头超限的状态，不阻止 DFS 继续展开循环体；真正限深靠
+        max_depth，故这里必须显式传小值，否则默认 100000 会把循环体展开上万次。
+        """
         from x86_64.cfg_strategies import X86BoundedLoopsStrategy, X86DFSStrategy
 
         # 创建循环
@@ -1573,6 +1577,7 @@ class TestStrategies:
 
         executor = X86SymbolicExecutor(
             blocks,
+            max_depth=50,
             strategy_cls=lambda wl, md: X86BoundedLoopsStrategy(
                 X86DFSStrategy(wl, md), wl, md, loop_bound=2
             )
@@ -1713,7 +1718,7 @@ class TestComplexScenarios:
 
         # 执行符号执行，动态构建CFG
         state = self.create_initial_state()
-        executor = X86SymbolicExecutor(blocks, max_depth=10000, use_reachability_check=False)
+        executor = X86SymbolicExecutor(blocks, max_depth=100, use_reachability_check=False)
         # 从机器码起始入口执行，避免跳过前导控制流（含 Go bridge 站点）
         final_states = executor.execute(state, entry_addr=0x0)
         assert len(final_states) >= 1

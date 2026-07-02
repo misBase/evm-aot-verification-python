@@ -2,12 +2,16 @@ from pathlib import Path
 
 import pytest
 from z3 import (
+    And,
     BitVec,
     BitVecSort,
     BitVecVal,
+    If,
     K,
     Solver,
     Store,
+    ULE,
+    ULT,
     Z3_OP_UNINTERPRETED,
     sat,
     unsat,
@@ -158,6 +162,31 @@ def test_calldataload_word_returns_zero_past_end_and_on_overflow():
     _assert_bv_eq(overflow, 0, 256)
 
 
+def test_symbolic_calldataload_byte_guard_implies_no_wrap():
+    """旧的 compact guard 已经等价于显式 no-wrap + in-bounds guard。"""
+    calldatasize = BitVec("calldataload_guard_size", 64)
+    offset = BitVec("calldataload_guard_offset", 64)
+    uint64_limit = (1 << 64) - 1
+    effective_start = If(ULT(calldatasize, offset), calldatasize, offset)
+    remaining = calldatasize - effective_start
+
+    for i in range(32):
+        i_bv = BitVecVal(i, 64)
+        compact_guard = ULT(i_bv, remaining)
+        explicit_guard = And(
+            ULE(offset, BitVecVal(uint64_limit - i, 64)),
+            ULT(offset + i_bv, calldatasize),
+        )
+
+        solver = Solver()
+        solver.add(compact_guard != explicit_guard)
+        assert solver.check() == unsat
+
+        solver = Solver()
+        solver.add(compact_guard, effective_start + i_bv != offset + i_bv)
+        assert solver.check() == unsat
+
+
 def test_perf_erc20_calldataload_matcher_discovers_five_summaries():
     hex_code = Path("tests/data/perf_erc20_lite.hex").read_text()
     blocks = identify_basic_blocks(disassemble_hex(hex_code, 0))
@@ -264,7 +293,9 @@ def test_x86_summary_runtime_rejects_unknown_builtin_summary_kind():
         )
 
 
-def test_matcher_guards_dynamic_low_offsets_for_wrap_soundness():
+def test_matcher_flags_dynamic_low_offsets_as_requiring_concrete_offset():
+    """discovery 阶段的字段标记；apply 阶段实际拒绝行为见
+    test_apply_rejects_dynamic_low_offset_that_cannot_be_proven_safe。"""
     hex_code = Path("tests/data/muti_block_08.hex").read_text()
     blocks = identify_basic_blocks(disassemble_hex(hex_code, 0))
 
@@ -395,6 +426,38 @@ def test_apply_calldataload_summary_records_no_overflow_assumption():
     solver.add(*new_state.assumptions)
     solver.add(high_limb != BitVecVal(0, 64))
     assert solver.check() == unsat
+
+
+def test_apply_rejects_dynamic_low_offset_that_cannot_be_proven_safe():
+    """require_concrete_offset=True 的 summary 若运行时 offset 无法化简为安全
+    的具体值，apply 阶段必须拒绝，否则真实 x64 ``offset+32`` 回绕会走错
+    fast/partial path，而 Z3 model 完全不知情（soundness gap）。"""
+    state = SMTState()
+    state.callengine_input_size_bytes = BitVecVal(32, 64)
+    state.x86_registers.set_register(Register.R14, BitVecVal(0x1000, 64))
+    symbolic_low_limb = BitVec("calldataload_summary_low_limb", 64)
+    state.x86_registers.set_register(Register.RAX, symbolic_low_limb)
+
+    summary = CallDataLoadSummary(
+        entry_addr=0x10,
+        exit_addr=0x20,
+        zero_addr=0x30,
+        partial_addr=0x40,
+        entry_instruction_index=0,
+        result_stack_offset=-32,
+        offset_limb_locs=(
+            RegisterLimbLocation(Register.RAX),
+            ConstLimbLocation(0),
+            ConstLimbLocation(0),
+            ConstLimbLocation(0),
+        ),
+        clobber_registers=(),
+        internal_block_addrs=(),
+        require_concrete_offset=True,
+    )
+
+    with pytest.raises(CallDataLoadSummaryMatchError):
+        apply_calldataload_summary(summary, state, fresh_prefix="test_summary")
 
 
 def test_calldataload_summary_plugin_mode_validation():

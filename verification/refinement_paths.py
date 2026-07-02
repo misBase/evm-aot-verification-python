@@ -682,7 +682,22 @@ class PathRefinementChecks:
         if result == unsat:
             return True, None
         if result == sat:
-            return False, f"✗ COUNTEREXAMPLE: {label} terminal paths do not cover all inputs"
+            detail = ""
+            if coverage is not None and not coverage.complete:
+                detail_parts = []
+                if coverage.reason:
+                    detail_parts.append(f"coverage certificate incomplete: {coverage.reason}")
+                if coverage.details:
+                    details = ", ".join(
+                        f"{key}={value}" for key, value in coverage.details
+                    )
+                    detail_parts.append(f"details: {details}")
+                if detail_parts:
+                    detail = " (" + "; ".join(detail_parts) + ")"
+            return False, (
+                f"✗ COUNTEREXAMPLE: {label} terminal paths do not cover all inputs"
+                f"{detail}"
+            )
         return False, self._ctx.unknown_message()
 
     def _check_path_pair_may_be_feasible(

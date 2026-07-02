@@ -199,6 +199,43 @@ def test_path_coverage_is_checked_under_precondition():
     assert verified, message
 
 
+def test_path_coverage_failure_reports_incomplete_certificate_reason():
+    state = SMTState.create_initial_state()
+    selector = BitVec("coverage_failure_selector", 1)
+    observations = [
+        PathObservation(
+            condition=selector == BitVecVal(0, 1),
+            offset=BitVecVal(0, 64),
+            length=BitVecVal(0, 64),
+            memory=state.x86_memory.evm_mem,
+            base_addr=BitVecVal(0, 64),
+            has_return_data=BoolVal(False),
+            storage=state.evm_storage.Storage,
+            transient_storage=state.evm_transient_storage.TransientStorage,
+        )
+    ]
+    coverage = PathCoverageCertificate(
+        complete=False,
+        reason="depth-pruned state count: 1",
+        source="x86-symbolic-executor",
+        details=(("terminal_paths", 1), ("depth_pruned_states", 1)),
+    )
+
+    checker = RefinementChecker(timeout_ms=1000)
+    verified, message = checker._paths._check_path_coverage(
+        observations,
+        "x86",
+        deadline=None,
+        coverage=coverage,
+    )
+
+    assert not verified
+    assert message is not None
+    assert "x86 terminal paths do not cover all inputs" in message
+    assert "depth-pruned state count: 1" in message
+    assert "depth_pruned_states=1" in message
+
+
 def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monkeypatch):
     checker = RefinementChecker(timeout_ms=1000)
     cancelled_worker_started = threading.Event()

@@ -55,7 +55,8 @@ class ProgramEquivalenceChecker:
                            enable_merge: bool = True,
                            skip_feasibility: bool = False,
                            summary_config: Optional[X86SummaryConfig] = None,
-                           x86_reachability_timeout_ms: Optional[int] = 50) -> Tuple[bool, Optional[str]]:
+                           x86_reachability_timeout_ms: Optional[int] = 50,
+                           max_depth: Optional[int] = None) -> Tuple[bool, Optional[str]]:
         """验证EVM程序和x86程序在语义上等价。
 
         默认使用旧的 merged-result 检查路径，保持原有 Alive2 风格的
@@ -81,6 +82,10 @@ class ProgramEquivalenceChecker:
             summary_config: x86 summary 插件配置；None 表示不启用 summary
             x86_reachability_timeout_ms: path_observations=True 时 x86 CFG
                 executor 每次 reachability pruning 的局部 timeout；None 表示不设 cap
+            max_depth: x86 符号执行的最大搜索深度；None 表示使用
+                x86_program.to_z3/to_z3_paths 的默认值。大合约需要更深搜索时
+                （避免触发 coverage-incomplete）应显式传入更大的值，而不是
+                依赖全局默认值。
 
         Returns:
             (verified, message)，如果程序等价则verified为True
@@ -109,6 +114,7 @@ class ProgramEquivalenceChecker:
                 skip_feasibility=skip_feasibility,
                 summary_config=summary_config,
                 x86_reachability_timeout_ms=x86_reachability_timeout_ms,
+                max_depth=max_depth,
             )
 
         # 步骤1：公式构建 - EVM（两级路径感知）
@@ -137,11 +143,15 @@ class ProgramEquivalenceChecker:
 
         x86_start = time.time()
         call_site_mapping = build_call_site_mapping(evm_program, x86_program)
+        x86_to_z3_kwargs = {}
+        if max_depth is not None:
+            x86_to_z3_kwargs["max_depth"] = max_depth
         x86_state, x86_result = x86_program.to_z3(
             initial_state,
             call_site_mapping=call_site_mapping,
             enable_merge=enable_merge,
             summary_config=summary_config,
+            **x86_to_z3_kwargs,
         )
         x86_build_time = time.time() - x86_start
 
@@ -268,6 +278,7 @@ class ProgramEquivalenceChecker:
         skip_feasibility: bool = False,
         summary_config: Optional[X86SummaryConfig] = None,
         x86_reachability_timeout_ms: Optional[int] = 50,
+        max_depth: Optional[int] = None,
     ) -> Tuple[bool, Optional[str]]:
         """用终止路径 observations 直接验证程序等价。
 
@@ -300,6 +311,9 @@ class ProgramEquivalenceChecker:
         call_site_mapping = build_call_site_mapping(evm_program, x86_program)
         # x86 path 构建同样保留 terminal observations；reachability pruning
         # 只影响路径枚举剪枝，不改变后续 refinement 的证明方式。
+        x86_to_z3_paths_kwargs = {}
+        if max_depth is not None:
+            x86_to_z3_paths_kwargs["max_depth"] = max_depth
         x86_paths = x86_program.to_z3_paths(
             initial_state,
             call_site_mapping=call_site_mapping,
@@ -307,6 +321,7 @@ class ProgramEquivalenceChecker:
             enable_merge=enable_merge,
             summary_config=summary_config,
             reachability_timeout_ms=x86_reachability_timeout_ms,
+            **x86_to_z3_paths_kwargs,
         )
         x86_build_time = time.time() - x86_start
         x86_state = x86_paths.merged_state

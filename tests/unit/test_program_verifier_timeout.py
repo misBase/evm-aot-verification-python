@@ -71,6 +71,73 @@ class _DummyX86Program:
         )
 
 
+def test_verify_program_pair_forwards_max_depth_to_x86_to_z3(monkeypatch):
+    """verify_program_pair 的 max_depth 必须能透传到 x86_program.to_z3，
+    否则默认值回退成保守值后，大合约验证无法通过显式传参绕开
+    coverage-incomplete。"""
+    checker = ProgramEquivalenceChecker(timeout_ms=123, verbose=False)
+    initial_state = SMTState.create_initial_state()
+    evm_program = _DummyEVMProgram()
+    x86_program = _DummyX86Program()
+    captured = {}
+
+    def _capturing_to_z3(state, call_site_mapping=None, **kwargs):
+        captured["max_depth"] = kwargs.get("max_depth")
+        return x86_program.__class__.to_z3(x86_program, state, call_site_mapping=call_site_mapping, **kwargs)
+
+    monkeypatch.setattr(x86_program, "to_z3", _capturing_to_z3)
+    monkeypatch.setattr(program_verifier_module, "build_call_site_mapping", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        checker.refinement_checker,
+        "check_refinement",
+        lambda _evm_result, _x86_result, **_kwargs: (True, "ok"),
+    )
+
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        max_depth=12345,
+    )
+
+    assert verified
+    assert captured["max_depth"] == 12345
+
+
+def test_verify_program_pair_forwards_max_depth_to_x86_to_z3_paths(monkeypatch):
+    """path_observations=True 分支同样必须透传 max_depth 到 to_z3_paths。"""
+    checker = ProgramEquivalenceChecker(timeout_ms=123, verbose=False)
+    initial_state = SMTState.create_initial_state()
+    evm_program = _DummyEVMProgram()
+    x86_program = _DummyX86Program()
+    captured = {}
+
+    def _capturing_to_z3_paths(state, call_site_mapping=None, merge_state=False, **kwargs):
+        captured["max_depth"] = kwargs.get("max_depth")
+        return x86_program.__class__.to_z3_paths(
+            x86_program, state, call_site_mapping=call_site_mapping, merge_state=merge_state, **kwargs
+        )
+
+    monkeypatch.setattr(x86_program, "to_z3_paths", _capturing_to_z3_paths)
+    monkeypatch.setattr(program_verifier_module, "build_call_site_mapping", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        checker.refinement_checker,
+        "check_refinement_paths",
+        lambda _evm_results, _x86_results, **_kwargs: (True, "ok"),
+    )
+
+    verified, msg = checker.verify_program_pair(
+        evm_program,
+        x86_program,
+        initial_state,
+        path_observations=True,
+        max_depth=54321,
+    )
+
+    assert verified
+    assert captured["max_depth"] == 54321
+
+
 def test_verify_program_pair_uses_independent_stack_check_budget(monkeypatch):
     checker = ProgramEquivalenceChecker(timeout_ms=123, verbose=False)
     initial_state = SMTState.create_initial_state()

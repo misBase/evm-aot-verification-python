@@ -51,8 +51,11 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
     # 排序块起始地址
     sorted_starts = sorted(block_starts)
 
-    # 创建块
+    # 创建块。这里按地址有序的 block_starts 和 instructions 做线性切片；
+    # 旧实现对每个 block 都重新扫描全量 instructions，大合约上会退化得很厉害。
     blocks = []
+    insn_index = 0
+    instruction_count = len(instructions)
     for i, start_addr in enumerate(sorted_starts):
         # 查找结束地址（下一个块起始或程序结束）
         if i + 1 < len(sorted_starts):
@@ -64,9 +67,13 @@ def identify_basic_blocks(instructions: List[X86Instruction]) -> List[X86Block]:
 
         # 收集此块中的指令
         block_instructions = []
-        for insn in instructions:
-            if start_addr <= insn.addr < end_addr:
-                block_instructions.append(insn)
+        while insn_index < instruction_count and instructions[insn_index].addr < start_addr:
+            insn_index += 1
+        scan_index = insn_index
+        while scan_index < instruction_count and instructions[scan_index].addr < end_addr:
+            block_instructions.append(instructions[scan_index])
+            scan_index += 1
+        insn_index = scan_index
 
         if block_instructions:
             # is_jump_target 语义：除入口块外的所有块

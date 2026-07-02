@@ -218,8 +218,15 @@ class GoFunctionSemantics:
         )
         return mstate
 
-    def apply(self, status_code: int, func_index: Optional[int],
-              sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
+    def apply(
+        self,
+        status_code: int,
+        func_index: Optional[int],
+        sp: int,
+        mstate: SMTState,
+        evm_pc: Optional[int] = None,
+        evm_immediate: Optional[int] = None,
+    ) -> SMTState:
         """分发并应用Go函数的语义效果。
 
         Args:
@@ -243,7 +250,13 @@ class GoFunctionSemantics:
             )
 
         if status_code == self.aot_profile.status_codes["call_go_host_function"]:
-            result = self._dispatch_host_function(func_index, sp, mstate, evm_pc=evm_pc)
+            result = self._dispatch_host_function(
+                func_index,
+                sp,
+                mstate,
+                evm_pc=evm_pc,
+                evm_immediate=evm_immediate,
+            )
             self._clear_caller_saved_pointer_tags(result)
             return result
         elif status_code == self.aot_profile.status_codes["call_builtin_function"]:
@@ -261,7 +274,8 @@ class GoFunctionSemantics:
 
     def _dispatch_host_function(self, func_index: Optional[int],
                                 sp: int, mstate: SMTState,
-                                evm_pc: Optional[int] = None) -> SMTState:
+                                evm_pc: Optional[int] = None,
+                                evm_immediate: Optional[int] = None) -> SMTState:
         """分发host函数调用。
 
         go-hpc-evm 的 host func_index 采用固定 ABI，
@@ -298,6 +312,9 @@ class GoFunctionSemantics:
         if scoped_handler is not None:
             return scoped_handler(sp, mstate, evm_pc)
 
+        if func_name == "log":
+            return self._handle_log(sp, mstate, evm_immediate=evm_immediate)
+
         handler = {
             "sload": self._handle_sload,
             "sstore": self._handle_sstore,
@@ -308,7 +325,6 @@ class GoFunctionSemantics:
             "extCodeHash": self._handle_ext_code_hash,
             "blockHash": self._handle_block_hash,
             "selfDestruct": self._handle_self_destruct,
-            "log": self._handle_log,
             "tload": self._handle_tload,
             "tstore": self._handle_tstore,
         }.get(func_name)
@@ -466,7 +482,12 @@ class GoFunctionSemantics:
         mstate = self._update_sp_in_memory(sp, mstate)
         return mstate
 
-    def _handle_log(self, sp: int, mstate: SMTState) -> SMTState:
+    def _handle_log(
+        self,
+        sp: int,
+        mstate: SMTState,
+        evm_immediate: Optional[int] = None,
+    ) -> SMTState:
         """LOG: 先弹出 n_topics、mStart、mSize，再弹出 n_topics 个 topic。
 
         Go 的 host.Log() 语义大致为：
@@ -487,11 +508,38 @@ class GoFunctionSemantics:
         _mstart, sp, mstate = self._pop_uint256(sp, mstate)
         _msize, sp, mstate = self._pop_uint256(sp, mstate)
 
-        # 确定需要额外弹出的 topic 数量
-        # AOT 编译器压入的是常量 N（0-4），这里可以直接提取
-        n_topics_simplified = simplify(n_topics_bv)
-        if is_bv_value(n_topics_simplified):
-            n = n_topics_simplified.as_long()
+        # AOT 编译器只把 LOG topic 数写入低 64-bit limb，Go host.Log()
+        # 也通过 Uint64() 读取它；高 limb 可能保留旧栈内容，不能参与比较。
+        n_topics_low64 = self._truncate_to_64(n_topics_bv)
+        n_topics_simplified = simplify(n_topics_low64)
+        n_topics_from_stack = (
+            n_topics_simplified.as_long() if is_bv_value(n_topics_simplified) else None
+        )
+
+        if evm_immediate is not None:
+            # call-site mapping 顺序错配时，EVM 侧声称的 immediate 可能对应
+            # 到错误的 x86 bridge site；两边都能确定时必须一致，否则说明
+            # EVM↔x86 host-site 顺序匹配出了问题，fail-closed 报错而不是
+            # 静默按 evm_immediate 弹出错误数量的栈元素、破坏 sp。
+            if evm_immediate < 0 or evm_immediate > 4:
+                raise GoFunctionSemanticsError(
+                    f"LOG: invalid evm_immediate topic count {evm_immediate}; "
+                    "expected LOG0..LOG4"
+                )
+            if n_topics_from_stack is None:
+                raise GoFunctionSemanticsError(
+                    "LOG: x86 stack n_topics low64 is symbolic while evm_immediate "
+                    f"claims {evm_immediate}; cannot prove call-site mapping consistency"
+                )
+            if n_topics_from_stack != evm_immediate:
+                raise GoFunctionSemanticsError(
+                    "LOG: evm_immediate topic count "
+                    f"({evm_immediate}) disagrees with x86 stack n_topics "
+                    f"({n_topics_from_stack}); likely call-site mapping mismatch"
+                )
+            n = evm_immediate
+        elif n_topics_from_stack is not None:
+            n = n_topics_from_stack
             if n > 4:
                 n = 4  # EVM 最多 4 个 topic
         else:

@@ -5,7 +5,7 @@ GoFunctionSemantics 单元测试。
 """
 
 import pytest
-from z3 import BitVecVal, Solver, sat, unsat, simplify
+from z3 import BitVec, BitVecVal, Solver, sat, unsat, simplify
 
 from state.smt_state import SMTState, EVMStorageState, MemoryDomain, PointerTag
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
@@ -773,3 +773,70 @@ class TestSha3Memory:
         )
 
         assert hash_value.decl().name() == "sha3_slice"
+
+
+class TestLog:
+    """测试 LOG host 函数处理器的 topic 数量确定逻辑。"""
+
+    def test_evm_immediate_matching_stack_value_pops_matching_topics(self):
+        """evm_immediate 与 x86 栈上的 n_topics 一致时，正常按该数量弹出 topic
+        并把新 sp 写回内存（不抛错）。"""
+        profile = _make_profile_with_host({17: "log"})
+        sem = GoFunctionSemantics(profile)
+
+        # 栈从底到顶：[topic1, topic0, mSize, mStart, n_topics]。
+        state, sp = _make_state_with_stack([0xAAAA, 0xBBBB, 8, 0, 2])
+
+        # 不应该抛出 GoFunctionSemanticsError。
+        sem.apply(4, 17, sp, state, evm_immediate=2)
+
+    def test_evm_immediate_matches_low64_when_topic_count_high_limbs_are_dirty(self):
+        """LOG 的 topic 数遵循 Go Uint64() 语义，只比较低 64 位。"""
+        profile = _make_profile_with_host({17: "log"})
+        sem = GoFunctionSemantics(profile)
+
+        dirty_high_limb_topic_count = (1 << 160) | 3
+        state, sp = _make_state_with_stack(
+            [0xAAAA, 0xBBBB, 0xCCCC, 8, 0, dirty_high_limb_topic_count]
+        )
+
+        sem.apply(4, 17, sp, state, evm_immediate=3)
+
+    def test_evm_immediate_mismatching_stack_value_raises(self):
+        """evm_immediate 与 x86 栈上实际的 n_topics 不一致时必须 fail-closed 报错，
+        而不是静默信任 evm_immediate 多/少弹栈元素——否则 call-site-mapping
+        顺序错配会导致 sp 语义被静默破坏。"""
+        profile = _make_profile_with_host({17: "log"})
+        sem = GoFunctionSemantics(profile)
+
+        # x86 侧栈上编码的是 LOG0（n_topics=0），但 evm_immediate 声称是 LOG2。
+        state, sp = _make_state_with_stack([8, 0, 0])
+
+        with pytest.raises(GoFunctionSemanticsError):
+            sem.apply(4, 17, sp, state, evm_immediate=2)
+
+    def test_evm_immediate_with_symbolic_stack_value_raises(self):
+        """有 evm_immediate 时，x86 栈上的 n_topics 也必须可化简为同一常量。"""
+        profile = _make_profile_with_host({17: "log"})
+        sem = GoFunctionSemantics(profile)
+        state, sp = _make_state_with_stack([8, 0, 0])
+        symbolic_n_topics = BitVec("log_symbolic_n_topics", 256)
+        state.x86_memory = state.x86_memory.store_256bit(
+            BitVecVal(R14_BASE - 0x20, 64),
+            symbolic_n_topics,
+            domain=MemoryDomain.STACK,
+        )
+
+        with pytest.raises(GoFunctionSemanticsError, match="symbolic"):
+            sem.apply(4, 17, sp, state, evm_immediate=2)
+
+    def test_evm_immediate_out_of_log_range_raises_even_if_stack_matches(self):
+        """LOG topic 数只能是 0..4；双方一致给出非法值也必须 fail-closed。"""
+        profile = _make_profile_with_host({17: "log"})
+        sem = GoFunctionSemantics(profile)
+
+        # 栈从底到顶：[topic4, topic3, topic2, topic1, topic0, mSize, mStart, n_topics=5]。
+        state, sp = _make_state_with_stack([0xAAAA, 0xBBBB, 0xCCCC, 0xDDDD, 0xEEEE, 8, 0, 5])
+
+        with pytest.raises(GoFunctionSemanticsError, match="invalid evm_immediate"):
+            sem.apply(4, 17, sp, state, evm_immediate=5)
