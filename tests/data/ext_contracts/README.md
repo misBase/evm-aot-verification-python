@@ -25,6 +25,7 @@
 | `aave_v3_pool` | `Pool` | `src/contracts/protocol/pool/Pool.sol` | `^0.8.10` | `0.8.29` | 17396 | 736 | 1090035 | 省略,>3 MB |
 | `uniswap_permit2` | `Permit2` | `src/src/Permit2.sol` | `0.8.17` | `0.8.17` | 9152 | 397 | 432710 | 省略,>3 MB |
 | `uniswap_v4_pool_manager` | `PoolManager` | `src/src/PoolManager.sol` | `0.8.26` | `0.8.26` | 24009 | 913 | 974350 | 省略,>3 MB |
+| `dabe_manager` | `DABEManager` | `src/DABEManager.sol` | `^0.8.0` | `0.8.25`(原始字节码) | 17801 | 960 | 877727 | 省略,>3 MB |
 
 ## 循环情况
 
@@ -44,6 +45,7 @@
 | `aave_v3_pool` | 9 | 6 | 用户可见的、对储备、资产和用户配置 bit 位的动态定界循环。 | 用储备数量、资产数组长度及相关 calldata/状态维度的显式界限来验证。完整的无界 pool 验证预期无法通过单纯的 CFG 展开终止。 |
 | `uniswap_permit2` | 7 | 2 | 对 calldata 数组进行的批量 permit/签名哈希循环。 | 验证定界的批量大小,或对 ABI 数组遍历和 permit 哈希构造做摘要。 |
 | `uniswap_v4_pool_manager` | 1 | 3 | swap/tick 遍历循环,外加编译后 IR 中编译器生成的循环形辅助逻辑。 | 验证定界的 swap/tick 跨越场景。完整的无界 swap 路径验证需要领域特定的循环不变式或摘要。 |
+| `dabe_manager` | 19 | 未统计(见下方说明) | 用户可见的、对机构属性、用户属性、token 列表等 mapping/动态数组的遍历循环,外加返回动态类型(`string`/`bytes`/数组/结构体)时编译器生成的 ABI 编码复制循环。 | **全合约与单 selector 验证均已知无法在合理时间内跑完**,对应的两个测试都标了 `@pytest.mark.skip`。诊断发现即使固定 4 字节 selector,当前 checker 的 reachability 剪枝也无法排除其他函数分支,符号执行会游荡进无关函数的 ABI 复制循环;这是 checker 本身的预存在限制,而非该合约独有的问题,只是在这个更大的 dispatcher(15+ 外部函数)上被放大到不可忽略。 |
 
 代表性的编译后 EVM IR 环路头:
 

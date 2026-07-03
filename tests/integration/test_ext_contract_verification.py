@@ -87,3 +87,26 @@ def test_verify_ext_compound_cerc20_decimals_selector():
 
     assert verified, f"CErc20 decimals() fixture check failed: {msg}"
     assert x86_program.last_summary_stats["calldataload"]["hits"] >= 1
+
+
+@pytest.mark.skip(reason="固定 selector 的 reachability 剪枝对此合约无效，仍会游荡进其他函数的循环，暂时禁用")
+def test_verify_ext_dabe_manager_system_admin_selector():
+    """验证 DABEManager.systemAdmin()。"""
+    evm_program, x86_program = _load_ext_contract_pair("dabe_manager", "DABEManager")
+    initial_state = _selector_state(0xA239E33D, calldata_size=4)  # systemAdmin()
+
+    verified, msg = _verify_contract(evm_program, x86_program, initial_state)
+
+    assert verified, f"DABEManager systemAdmin() fixture check failed: {msg}"
+    assert x86_program.last_summary_stats["calldataload"]["hits"] >= 1
+
+
+@pytest.mark.skip(reason="含 15+ 处循环，全合约验证跑不完，暂时禁用")
+def test_verify_ext_dabe_manager_whole_contract():
+    """全合约符号验证：DABEManager 循环过多，预期无法在超时内跑完。"""
+    evm_program, x86_program = _load_ext_contract_pair("dabe_manager", "DABEManager")
+    initial_state = _whole_contract_state()
+
+    verified, msg = _verify_contract(evm_program, x86_program, initial_state)
+
+    assert verified, f"DABEManager whole-contract fixture check failed: {msg}"
