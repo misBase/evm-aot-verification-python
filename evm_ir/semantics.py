@@ -1,12 +1,13 @@
-"""
+﻿"""
 EVM IR语义建模。
 
 本模块使用Z3为EVM IR操作提供语义建模。
 """
 
-from z3 import BitVec, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, LShR, SignExt, ZeroExt, Lambda, Select
+from z3 import BitVec, BitVecNumRef, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, URem, LShR, SignExt, ZeroExt, Lambda, Select, simplify
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
+from evm_ir.status_code import EvmStatusCode
 from common.uint256 import Uint256
 from common import uninterpreted
 from common.calldata import calldataload_no_overflow_assumption, calldataload_word
@@ -495,6 +496,39 @@ class EVMIRSemantics:
         """初始化EVM IR语义模型。"""
         self.op_semantics = EVMOperationSemantics()
 
+def _bv_to_int(value: "BitVecRef") -> "Optional[int]":
+    """If the BitVec is concrete, return its integer value; otherwise, return None."""
+    if isinstance(value, BitVecNumRef):
+        return value.as_long()
+    from z3 import simplify
+    simplified = simplify(value)
+    if isinstance(simplified, BitVecNumRef):
+        return simplified.as_long()
+    return None
+
+
+def _is_valid_jump_destination(state: "SMTState", dest_bv: "BitVecRef") -> "Optional[bool]":
+    """Return True if dest is a concrete JUMPDEST within the code bounds.
+    Returns None if we cannot determine validity concretely."""
+    dest_int = _bv_to_int(dest_bv)
+    if dest_int is None:
+        return None
+
+    code_size_int = _bv_to_int(state.callengine_code_size_bytes)
+    if code_size_int is None:
+        return None
+
+    if dest_int >= code_size_int or dest_int < 0:
+        return False
+
+    code_byte = Select(state.code, BitVecVal(dest_int, 64))
+    code_byte_int = _bv_to_int(code_byte)
+    if code_byte_int is None:
+        return None
+
+    return code_byte_int == 0x5B
+
+
 def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     """将EVM操作符转换为Z3公式，更新状态。
     
@@ -512,7 +546,10 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     op_semantics = EVMOperationSemantics()
     
     if kind == "TAG":
-        # TAG对语义是无操作（仅标记块入口）
+        if op.block is not None and op.block.is_jump_target:
+            if state.valid_jump_targets is None:
+                state.valid_jump_targets = set()
+            state.valid_jump_targets.add(op.pc)
         return state
     
     elif kind == "BLOCKEND":
@@ -788,6 +825,11 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # SSTORE: Pop key and value, store in storage
         key, stack_after_pop1 = state.evm_stack.pop()
         val, stack_after_pop2 = stack_after_pop1.pop()
+        if state.read_only:
+            state.error_code = BitVecVal(EvmStatusCode.WRITE_PROTECTION, 8)
+            state.error_string = "Write protection violation"
+            state.evm_stack = stack_after_pop2
+            return state
         state.evm_storage = state.evm_storage.sstore(key, val)
         state.evm_stack = stack_after_pop2
         return state
@@ -894,6 +936,17 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         mem_offset_bv, stack_after_pop1 = state.evm_stack.pop()
         data_offset_bv, stack_after_pop2 = stack_after_pop1.pop()
         length_bv, stack_after_pop3 = stack_after_pop2.pop()
+
+        # 越界检查：当 data_offset + length > return_data_size 时返回错误
+        doff = simplify(data_offset_bv, blast_select_store=True)
+        dlen = simplify(length_bv, blast_select_store=True)
+        dsize = state.callengine_return_data_size_bytes
+        if isinstance(doff, BitVecNumRef) and isinstance(dlen, BitVecNumRef) and isinstance(dsize, BitVecNumRef):
+            if doff.as_long() + dlen.as_long() > dsize.as_long():
+                state.error_code = BitVecVal(EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8)
+                state.error_string = "Return data out of bounds"
+                state.evm_stack = stack_after_pop3
+                return state
 
         data_offset_64 = _uint256_to_u64_with_overflow_max(data_offset_bv)
 
@@ -1267,24 +1320,44 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # 更新栈（两个值都已弹出）
         state.evm_stack = stack_after_pop2
         
+        state.error_code = BitVecVal(EvmStatusCode.RETURNED, 8)
+        state.error_string = "stop token"
         return state
     
     elif kind == "JUMPI":
         # JUMPI: dest, cond = pop, pop
-        # 在当前 IR 中，如果 is_static 且有 immediate，则 dest 已被折叠，只需弹出 cond
         if op.is_static and op.immediate is not None:
-            _, state.evm_stack = state.evm_stack.pop()
+            cond_bv, state.evm_stack = state.evm_stack.pop()
+            cond_int = _bv_to_int(cond_bv)
+            if cond_int is not None and cond_int != 0:
+                is_valid = _is_valid_jump_destination(state, BitVecVal(op.immediate, 256))
+                if is_valid is False:
+                    state.error_code = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
+                    state.error_string = "Invalid jump destination"
         else:
-            # 动态跳转：弹出 dest 和 cond
-            _, state.evm_stack = state.evm_stack.pop()
-            _, state.evm_stack = state.evm_stack.pop()
+            cond_bv, stack_after_pop1 = state.evm_stack.pop()
+            dest_bv, state.evm_stack = stack_after_pop1.pop()
+            cond_int = _bv_to_int(cond_bv)
+            if cond_int is not None and cond_int != 0:
+                is_valid = _is_valid_jump_destination(state, dest_bv)
+                if is_valid is False:
+                    state.error_code = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
+                    state.error_string = "Invalid jump destination"
         return state
 
     elif kind == "JUMP":
         # JUMP: dest = pop
-        # 如果 is_static 且有 immediate，则 dest 已被折叠，无需弹出
-        if not (op.is_static and op.immediate is not None):
-            _, state.evm_stack = state.evm_stack.pop()
+        if op.is_static and op.immediate is not None:
+            is_valid = _is_valid_jump_destination(state, BitVecVal(op.immediate, 256))
+            if is_valid is False:
+                state.error_code = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
+                state.error_string = "Invalid jump destination"
+        else:
+            dest_bv, state.evm_stack = state.evm_stack.pop()
+            is_valid = _is_valid_jump_destination(state, dest_bv)
+            if is_valid is False:
+                state.error_code = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
+                state.error_string = "Invalid jump destination"
         return state
 
     elif kind == "REVERT":
@@ -1311,10 +1384,14 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         state.return_offset = return_offset_64
         state.return_length = return_length_64
         state.evm_stack = stack_after_pop2
+        state.error_code = BitVecVal(EvmStatusCode.REVERTED, 8)
+        state.error_string = "Execution reverted"
         return state
 
     elif kind == "STOP":
         # STOP: 对状态无堆栈影响
+        state.error_code = BitVecVal(EvmStatusCode.STOPPED, 8)
+        state.error_string = "stop token"
         return state
 
     elif kind == "LOG":
@@ -1338,7 +1415,8 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
 
     elif kind == "INVALID":
         # INVALID: Marks the transaction as invalid / stops execution
-        # INVALID is a terminal operation like STOP
+        state.error_code = BitVecVal(EvmStatusCode.INVALID, 8)
+        state.error_string = "Invalid opcode"
         return state
 
     else:
@@ -1393,6 +1471,8 @@ def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, 
     path1_state = state.copy()
     path1_state.return_offset = BitVecVal(0, 64)
     path1_state.return_length = BitVecVal(0, 64)
+    path1_state.error_code = BitVecVal(EvmStatusCode.STACK_UNDERFLOW, 8)
+    path1_state.error_string = "Stack underflow"
     # 注意：在实际实现中，我们可能会设置特定的错误状态码。
     # 当前抽象只保留“是否暴露非空 return data”这一外部可观察效果。
     
@@ -1400,6 +1480,8 @@ def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, 
     path2_state = state.copy()
     path2_state.return_offset = BitVecVal(0, 64)
     path2_state.return_length = BitVecVal(0, 64)
+    path2_state.error_code = BitVecVal(EvmStatusCode.STACK_REACHED_LIMIT, 8)
+    path2_state.error_string = "Stack reached limit" 
     
     # 执行路径3：min_depth <= SP <= max_depth -> 正常执行
     path3_state = state.copy()
@@ -1447,6 +1529,14 @@ def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, 
     # 注意：内存合并更复杂，我们需要合并整个Array
     # 目前，我们使用path3的内存（正常路径），因为错误路径不修改内存
     # 在更复杂的实现中，我们可能需要逐元素合并Arrays
+    # 合并 error_code 和 error_string
+    merged_state.error_code = If(
+        path1_condition, path1_state.error_code,
+        If(path2_condition, path2_state.error_code, path3_state.error_code)
+    )
+    # error_string 不做符号合并，保持 path3 的值（正常路径）
+    merged_state.error_string = path3_state.error_string
+
     merged_state.evm_memory = path3_state.evm_memory
     
     # 合并栈

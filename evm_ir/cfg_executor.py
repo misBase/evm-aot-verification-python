@@ -6,6 +6,7 @@
 
 from typing import List, Dict, Optional, Tuple, TYPE_CHECKING, Any
 from z3 import BitVecVal, Not
+from evm_ir.status_code import EvmStatusCode
 
 if TYPE_CHECKING:
     from .models import EvmOperator
@@ -237,6 +238,48 @@ class SymbolicExecutor:
         # 执行块中的所有操作
         current_mstate = mstate.copy()
 
+
+        # TAG stack depth check: create error paths + constrain normal path
+        if block.min_depth > 0 or block.max_depth < 1024:
+            sp = current_mstate.evm_stack.SP
+            from z3 import And, IntVal
+            import copy
+            min_int = IntVal(block.min_depth)
+            max_int = IntVal(block.max_depth)
+
+            is_underflow = sp < min_int
+            is_overflow = sp > max_int
+
+            # Path 1: stack underflow -> terminal error state
+            underflow_state = current_mstate.copy()
+            underflow_state.error_code = BitVecVal(EvmStatusCode.STACK_UNDERFLOW, 8)
+            underflow_state.return_length = BitVecVal(0, 64)
+            underflow_state.return_offset = BitVecVal(0, 64)
+            underflow_world = copy.deepcopy(global_state.world_state)
+            underflow_world.constraints.add(is_underflow)
+            self.final_states.append(GlobalState(
+                mstate=underflow_state,
+                world_state=underflow_world,
+                node=node,
+            ))
+
+            # Path 2: stack overflow -> terminal error state
+            overflow_state = current_mstate.copy()
+            overflow_state.error_code = BitVecVal(EvmStatusCode.STACK_REACHED_LIMIT, 8)
+            overflow_state.return_length = BitVecVal(0, 64)
+            overflow_state.return_offset = BitVecVal(0, 64)
+            overflow_world = copy.deepcopy(global_state.world_state)
+            overflow_world.constraints.add(is_overflow)
+            self.final_states.append(GlobalState(
+                mstate=overflow_state,
+                world_state=overflow_world,
+                node=node,
+            ))
+
+            # Normal path: add constraint that neither error condition holds
+            normal_cond = And(Not(is_underflow), Not(is_overflow))
+            global_state.world_state.constraints.add(normal_cond)
+        
         # 过滤出实际执行的操作（跳过标记）
         ops = [op for op in block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
         

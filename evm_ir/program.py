@@ -128,6 +128,7 @@ class EVMProgram:
                 'has_return_data': BoolVal(False),
                 'storage': state.evm_storage.Storage,
                 'transient_storage': state.evm_transient_storage.TransientStorage,
+                'status_code': state.error_code,
             }
             return state, result
 
@@ -156,6 +157,7 @@ class EVMProgram:
             'has_return_data': has_return_data,
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
+            'status_code': merged_state.error_code,
         }
 
         return merged_state, result
@@ -218,6 +220,7 @@ class EVMProgram:
             has_return_data=state.return_length != BitVecVal(0, 64),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=state.error_code,
         )
 
     def _merge_global_states(self, global_states: List[GlobalState]) -> SMTState:
@@ -322,6 +325,14 @@ class EVMProgram:
                 condition = gstate.get_constraints().as_bool()
                 expr = If(condition, gstate.mstate.evm_transient_storage.TransientStorage, expr)
             merged.evm_transient_storage = EVMTransientStorageState(storage_array=expr)
+
+        # 合并 error_code
+        expr = BitVecVal(0, 8)  # default 0 = RETURNED
+        for gstate in reversed(global_states):
+            condition = gstate.get_constraints().as_bool()
+            expr = If(condition, gstate.mstate.error_code, expr)
+        merged.error_code = expr
+
 
         return merged
 

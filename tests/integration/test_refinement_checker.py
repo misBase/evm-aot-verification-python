@@ -305,7 +305,6 @@ def test_verify_three_block_program_pair():
         f"should produce equivalent return results. Error: {msg}"
     )
 
-@pytest.mark.skip(reason="里面包含栈溢出的问题，TAG指令当前未建模好，导致两边结果不一致，待错误码建模完善后再启用")
 def test_jumpi_2block_err_program_pair():
     """验证 jumpi_2block_err.json 与 jumpi_2block_err.hex 的 JUMPI return 结果一致性。
 

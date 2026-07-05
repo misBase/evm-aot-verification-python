@@ -247,6 +247,7 @@ class X86Program:
             'has_return_data': has_return_data,
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
+            'status_code': merged_state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
         }
 
@@ -398,6 +399,7 @@ class X86Program:
             has_return_data=state.return_length != BitVecVal(0, 64),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=state.callengine_status_code,
         )
 
     def _get_instructions(self) -> List[X86Instruction]:
@@ -431,6 +433,7 @@ class X86Program:
             'has_return_data': BoolVal(False),
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
+            'status_code': state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
         }
         return state, result
@@ -574,6 +577,7 @@ class X86Program:
             'has_return_data': has_return_data,
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
+            'status_code': state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
         }
 

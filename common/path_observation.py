@@ -12,6 +12,7 @@ OBSERVATION_KEYS = frozenset({
     "has_return_data",
     "storage",
     "transient_storage",
+    "status_code",
 })
 
 
@@ -27,6 +28,7 @@ class PathObservation:
     has_return_data: Any
     storage: Any
     transient_storage: Any
+    status_code: Any = field(default=None)
 
     def __getitem__(self, key: str) -> Any:
         if key not in OBSERVATION_KEYS:
@@ -50,6 +52,7 @@ class PathObservation:
             "has_return_data": self.has_return_data,
             "storage": self.storage,
             "transient_storage": self.transient_storage,
+            "status_code": self.status_code,
         }
 
 

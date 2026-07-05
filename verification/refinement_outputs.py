@@ -219,6 +219,38 @@ class OutputRefinementChecks:
         )
         path_condition = path_condition if path_condition is not None else BoolVal(True, ctx=ctx)
 
+        # --- termination status code consistency check ---
+        evm_status = evm_result.get('status_code', BitVecVal(0, 8, ctx=ctx))
+        x86_status = x86_result.get('status_code', BitVecVal(0, 8, ctx=ctx))
+
+        if not self._ctx.reset_solver_with_budget_for(solver, self._ctx.timeout_ms, deadline):
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        solver.add(path_condition)
+        solver.add(evm_status != x86_status)
+
+        start_time = time.time()
+        status_result = solver.check()
+        solve_time = time.time() - start_time
+
+        prefix = f"{context}: " if context else ""
+        self._ctx.emit_solver_log(
+            logs,
+            f"    ├─ {prefix}Status code check: {solve_time:.3f}s, result={status_result}",
+        )
+
+        if status_result == sat:
+            msg = "✗ COUNTEREXAMPLE: termination status codes differ"
+            if context:
+                msg = f"{msg} ({context})"
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        if status_result != unsat:
+            msg = self._ctx.unknown_message_for_solver(solver, self._ctx.timeout_ms)
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+
         # return metadata 是所有 memory 检查策略的共同前置条件，统一先证明一次。
         verified, msg = self._check_return_metadata_with_solver(
             solver,

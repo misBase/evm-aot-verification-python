@@ -4,6 +4,7 @@
 from common.uint256 import Uint256
 from evm_ir.semantics import EVMIRSemantics, EVMOperationSemantics, evm_operator_to_z3
 from evm_ir.models import EvmOperator
+from evm_ir.status_code import get_status_code_from_error
 from x86_64.semantics import X86SemanticsModel
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
 from x86_64.models import Register, X86Instruction
@@ -418,6 +419,69 @@ def test_revert_opcode_stack_order():
     solver.add(state.return_offset == BitVecVal(64, 64))
     solver.add(state.return_length == BitVecVal(32, 64))
     assert solver.check() == sat, "REVERT: offset/length stack order wrong"
+
+
+def test_revert_sets_error_string():
+    """测试 REVERT 会设置错误字符串。"""
+    op = EvmOperator(kind="REVERT", pc=0)
+    state = SMTState()
+    state.evm_stack = state.evm_stack.push(BitVecVal(32, 256))
+    state.evm_stack = state.evm_stack.push(BitVecVal(64, 256))
+    state = evm_operator_to_z3(op, state)
+
+    assert state.error_string == "Execution reverted"
+    assert get_status_code_from_error(state.error_string) == 1
+
+
+def test_invalid_sets_error_string():
+    """测试 INVALID 会设置错误字符串。"""
+    op = EvmOperator(kind="INVALID", pc=0)
+    state = SMTState()
+    state = evm_operator_to_z3(op, state)
+
+    assert state.error_string == "Invalid opcode"
+    assert get_status_code_from_error(state.error_string) == 3
+
+
+def test_returndatacopy_out_of_bounds_sets_error_string():
+    """测试 RETURNDATACOPY 越界时设置错误字符串。"""
+    op = EvmOperator(kind="RETURNDATACOPY", pc=0)
+    state = SMTState()
+    state.callengine_return_data_size_bytes = BitVecVal(8, 64)
+    state.evm_stack = state.evm_stack.push(BitVecVal(4, 256))   # length
+    state.evm_stack = state.evm_stack.push(BitVecVal(10, 256))  # returnDataOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))   # memOffset
+    state = evm_operator_to_z3(op, state)
+
+    assert state.error_string == "Return data out of bounds"
+    assert get_status_code_from_error(state.error_string) == 7
+
+
+def test_sstore_read_only_sets_write_protection_error():
+    """测试 SSTORE 在只读模式下设置写保护错误字符串。"""
+    op = EvmOperator(kind="SSTORE", pc=0)
+    state = SMTState()
+    state.read_only = True
+    state.evm_stack = state.evm_stack.push(BitVecVal(0x1234, 256))
+    state.evm_stack = state.evm_stack.push(BitVecVal(0xAA, 256))
+    state = evm_operator_to_z3(op, state)
+
+    assert state.error_string == "Write protection violation"
+    assert get_status_code_from_error(state.error_string) == 6
+
+
+def test_jump_sets_invalid_jump_error_when_destination_is_not_jumpdest():
+    """测试 JUMP 在目标地址不是 JUMPDEST 时设置错误字符串。"""
+    op = EvmOperator(kind="JUMP", pc=0)
+    state = SMTState()
+    state.callengine_code_size_bytes = BitVecVal(2, 64)
+    state.code = Store(state.code, BitVecVal(0, 64), BitVecVal(0x00, 8))
+    state.code = Store(state.code, BitVecVal(1, 64), BitVecVal(0x00, 8))
+    state.evm_stack = state.evm_stack.push(BitVecVal(1, 256))
+    state = evm_operator_to_z3(op, state)
+
+    assert state.error_string == "Invalid jump destination"
+    assert get_status_code_from_error(state.error_string) == 8
 
 
 def _make_x86_ret_state(status_code: int, stack_values, sp: int = 0,
