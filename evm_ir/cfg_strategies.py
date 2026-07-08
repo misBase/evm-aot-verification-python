@@ -25,6 +25,9 @@ class SearchStrategy(ABC):
         """
         self.work_list = work_list
         self.max_depth = max_depth
+        # 超深状态剪枝计数：供 executor 的 path_coverage_certificate() 做
+        # fail-closed 判定，对齐 x86 侧 X86SearchStrategy。
+        self.depth_pruned_count = 0
 
     @abstractmethod
     def get_strategic_global_state(self) -> Optional[GlobalState]:
@@ -61,6 +64,7 @@ class SearchStrategy(ABC):
 
             # 检查深度限制
             if global_state.depth >= self.max_depth:
+                self.depth_pruned_count += 1
                 return self.__next__()  # 跳过超深度状态
 
             return global_state

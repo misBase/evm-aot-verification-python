@@ -1,0 +1,196 @@
+"""Select-over-Store 链的保守解析与 R15 平移下推（循环归纳 R 目标化简器）。
+
+背景：x86 内存模型把 64-bit 写展开成 8 个字节 Store；一轮段执行后的
+栈窗口读数嵌着上百层 Store 链。Z3 默认 rewriter 不做符号地址的 store
+forwarding（只处理数值地址），直接把 R 保持目标交给求解器会 unknown。
+
+本模块在 Python 层做**保守**的别名判定与改写——只有可证明时才动手：
+
+- 地址线性化为（非常量项多重集, 常量和 mod 2^64）；
+- 同基（非常量部分完全相同）⇒ 常量差直接判等/判异；
+- 异基 ⇒ 可能别名 ⇒ 放弃改写（fail-closed，留给求解器）。
+
+改写是语义保持的（等价变换），因此对证明目标与前提都可用。
+"""
+
+from typing import Dict, List, Optional, Tuple
+
+from z3 import (
+    BitVecVal,
+    Select,
+    Store,
+    is_app,
+    is_bv,
+    is_bv_value,
+    is_quantifier,
+    is_select,
+    is_store,
+    simplify,
+)
+
+# 线性化地址的规范键：((term_sexpr, count), ...) 排序元组
+_AddrKey = Tuple[Tuple[str, int], ...]
+
+
+def linearize_address(addr) -> Optional[Tuple[_AddrKey, int]]:
+    """把位向量地址拆成（非常量项多重集, 常量和）。
+
+    先做 z3 simplify：折叠常量算术（如 ``(8-4)*8``）、归一化
+    ``Extract(Concat(0,a)+Concat(0,b))`` 形态、融合 Concat-of-Extracts——
+    否则同一地址的不同书写形态会被误判异基。乘法/拼接等仍视为原子项。
+    返回 None 表示非 BV。
+    """
+    if not is_bv(addr):
+        return None
+    addr = simplify(addr)
+    width = addr.size()
+    mask = (1 << width) - 1
+    const = 0
+    terms: Dict[str, Tuple[object, int]] = {}
+    stack = [addr]
+    while stack:
+        node = stack.pop()
+        if is_bv_value(node):
+            const = (const + node.as_long()) & mask
+        elif is_app(node) and node.decl().name() == "bvadd":
+            stack.extend(node.children())
+        else:
+            key = node.sexpr()
+            prev = terms.get(key)
+            terms[key] = (node, (prev[1] + 1) if prev else 1)
+    addr_key = tuple(sorted((k, v[1]) for k, v in terms.items()))
+    return addr_key, const
+
+
+def resolve_select_over_store(select_expr, max_chain: int = 4096):
+    """解析 Select(Store(...), addr)：沿链下钻，可判等返回存值，可判异
+    继续下钻，判不了返回 None（不改写）。
+
+    链底若是非 Store 数组（K/常量数组/自由数组/Lambda），返回对链底的
+    Select（链被整体剥离，也是收益）。
+    """
+    if not is_select(select_expr):
+        return None
+    lin = linearize_address(select_expr.arg(1))
+    if lin is None:
+        return None
+    sel_key, sel_const = lin
+
+    node = select_expr.arg(0)
+    depth = 0
+    changed = False
+    while is_store(node):
+        depth += 1
+        if depth > max_chain:
+            return None
+        st_lin = linearize_address(node.arg(1))
+        if st_lin is None:
+            return None
+        st_key, st_const = st_lin
+        if st_key == sel_key:
+            if st_const == sel_const:
+                return node.arg(2)  # 命中：读到这次写的值
+            node = node.arg(0)      # 可证不别名：跳过这层
+            changed = True
+            continue
+        return None                 # 异基：可能别名，放弃
+    if not changed:
+        return None
+    return Select(node, select_expr.arg(1))
+
+
+def forward_selects(expr, _cache: Optional[Dict[int, object]] = None):
+    """自底向上改写表达式中所有可解析的 Select-over-Store。
+
+    量词/Lambda 节点保守跳过（不深入改写其体）。
+    """
+    if _cache is None:
+        _cache = {}
+    key = expr.get_id()
+    hit = _cache.get(key)
+    if hit is not None:
+        return hit
+
+    if is_quantifier(expr):
+        _cache[key] = expr
+        return expr
+
+    result = expr
+    if is_app(expr):
+        children = [forward_selects(c, _cache) for c in expr.children()]
+        if any(c is not o for c, o in zip(children, expr.children())):
+            result = expr.decl()(*children)
+        if is_select(result):
+            resolved = resolve_select_over_store(result)
+            if resolved is not None:
+                result = forward_selects(resolved, _cache)
+    _cache[key] = result
+    return result
+
+
+def _subtract_base_term(addr, base_term) -> Optional[object]:
+    """从地址的 bvadd 线性组合中移除一次 base_term；不含则返回 None。"""
+    if not is_bv(addr):
+        return None
+    addr = simplify(addr)
+    width = addr.size()
+    base_key = simplify(base_term).sexpr()
+    const = 0
+    rest: List[object] = []
+    removed = False
+    stack = [addr]
+    while stack:
+        node = stack.pop()
+        if is_bv_value(node):
+            const = (const + node.as_long()) & ((1 << width) - 1)
+        elif is_app(node) and node.decl().name() == "bvadd":
+            stack.extend(node.children())
+        elif not removed and node.sexpr() == base_key:
+            removed = True
+        else:
+            rest.append(node)
+    if not removed:
+        return None
+    result = BitVecVal(const, width)
+    for term in rest:
+        result = result + term
+    return result
+
+
+def unshift_store_chain(array_expr, base_term, base_array) -> Optional[object]:
+    """把 Store 链从绝对地址空间（base_term + offset）下推到 offset 空间。
+
+    要求链上每个 Store 地址都线性含 base_term（系数 1），链底等于
+    构造时的平移视图（其展开即 base_array）。返回 offset 空间的
+    Store 链（根为 base_array）；任一环节不满足返回 None（fail-closed）。
+
+    语义依据：x ↦ base+x 是 mod 2^64 双射，
+    view(Store(A, base+t, v)) = Store(view(A), t, v)。
+    """
+    stores: List[Tuple[object, object]] = []
+    node = array_expr
+    while is_store(node):
+        offset = _subtract_base_term(node.arg(1), base_term)
+        if offset is None:
+            return None
+        stores.append((offset, node.arg(2)))
+        node = node.arg(0)
+
+    # 链底必须是我们构造的平移 Lambda（Lambda a. base_array[a - base]）
+    # 或 base_array 自身。宽松判定：quantifier(lambda) 且 body 是对
+    # base_array 的 Select。
+    if node.get_id() == base_array.get_id():
+        root = base_array
+    elif is_quantifier(node) and node.is_lambda():
+        body = node.body()
+        if is_select(body) and body.arg(0).get_id() == base_array.get_id():
+            root = base_array
+        else:
+            return None
+    else:
+        return None
+
+    result = root
+    for offset, value in reversed(stores):
+        result = Store(result, offset, value)
+    return result

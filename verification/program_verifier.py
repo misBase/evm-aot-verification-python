@@ -15,6 +15,29 @@ from .call_site_mapping import build_call_site_mapping
 from state.smt_state import SMTState
 
 
+def _merged_coverage_failure(evm_result: dict, x86_result: dict) -> Optional[str]:
+    """merged 模式的 fail-closed coverage 检查。
+
+    merged 语义把所有终止路径折叠进一个 If 表达式；被剪掉的路径会让合并
+    结果只代表幸存路径的语义——这不只是覆盖缺口，而是可能假绿。因此任一
+    侧证书缺失或 incomplete 时验证必须失败（path_observations 模式有 SMT
+    coverage 兜底，merged 模式没有）。
+    """
+    for label, result in (("EVM", evm_result), ("x86", x86_result)):
+        coverage = result.get('coverage')
+        if coverage is None:
+            return (
+                f"✗ COVERAGE UNKNOWN: {label} merged semantics carries no "
+                "path coverage certificate"
+            )
+        if not coverage.complete:
+            return (
+                f"✗ COVERAGE INCOMPLETE: {label} merged semantics may have "
+                f"dropped paths ({coverage.reason})"
+            )
+    return None
+
+
 def _collect_assumptions(*states):
     """Collect dedup'd SMTState.assumptions from a list of states (skip None)."""
     seen = set()
@@ -182,6 +205,13 @@ class ProgramEquivalenceChecker:
             keys = ", ".join(x86_result.keys())
             print(f"    └─ x86 result: dict with keys: ({keys})")
 
+        # merged 模式 fail-closed：被剪路径让合并语义失真，必须显式失败。
+        coverage_failure = _merged_coverage_failure(evm_result, x86_result)
+        if coverage_failure is not None:
+            if self.verbose:
+                print(f"\n[4] Coverage check failed: {coverage_failure}")
+            return False, coverage_failure
+
         # 步骤4：等价性检查
         if self.verbose:
             print("\n[4] Checking program equivalence with Z3...")
@@ -250,6 +280,37 @@ class ProgramEquivalenceChecker:
             )
 
         return verified, message
+
+    def _loop_guard_note(self, evm_program: EVMProgram,
+                         x86_program: X86Program) -> Optional[str]:
+        """coverage 失败时的循环守卫附注（§6 降级路径的可行动信息）。
+
+        失败容忍：守卫分析自身出错不能掩盖原始失败消息。
+        """
+        try:
+            from x86_64.loop_templates import make_tier2_matcher
+            from .loop_pairing import analyze_program_pair
+
+            x86_blocks = getattr(x86_program, "blocks", None) or []
+            if not x86_blocks or not evm_program.blocks:
+                return None
+            by_addr = {b.start_addr: b for b in x86_blocks}
+            report = analyze_program_pair(
+                evm_program.blocks,
+                x86_blocks,
+                tier2_matcher=make_tier2_matcher(by_addr),
+            )
+            lines = [
+                "  loop guard: "
+                f"{len(report.evm_analysis.loops)} EVM natural loop(s), "
+                f"{len(report.x86_analysis.loops)} x86 natural loop(s), "
+                f"{len(report.pairs)} Tier-1 pair(s) available for induction"
+            ]
+            for reason in report.reasons():
+                lines.append(f"  loop guard: {reason}")
+            return "\n".join(lines)
+        except Exception as exc:  # pragma: no cover - 诊断附注不阻塞主流程
+            return f"  loop guard: analysis unavailable ({exc})"
 
     def _estimate_formula_size(self, result: dict) -> str:
         """估算公式大小（表达式数量）。"""
@@ -416,6 +477,13 @@ class ProgramEquivalenceChecker:
             )
 
         if not verified:
+            # §6 prove-or-honestly-degrade：coverage 失败通常意味着符号
+            # bound 循环——附上循环守卫报告，让降级结论可行动（哪些
+            # natural loop、是否可配对、归纳引擎是否适用）。
+            if message and "do not cover" in message:
+                loop_note = self._loop_guard_note(evm_program, x86_program)
+                if loop_note:
+                    message = f"{message}\n{loop_note}"
             return verified, message
 
         if stack_check is None:

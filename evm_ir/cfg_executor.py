@@ -17,6 +17,7 @@ from .models import EVMBlock
 from .cfg_structures import DynamicCFG, EdgeType
 from .cfg_state import GlobalState
 from .cfg_strategies import DFSStrategy
+from common.path_observation import PathCoverageCertificate
 from state.smt_state import SMTState
 
 
@@ -37,7 +38,8 @@ class SymbolicExecutor:
                  blocks: List[EVMBlock],
                  strategy_cls: type = DFSStrategy,
                  max_depth: int = 100,
-                 use_reachability_check: bool = False):
+                 use_reachability_check: bool = False,
+                 stop_pcs: Optional[set] = None):
         """初始化符号执行引擎。
 
         Args:
@@ -45,6 +47,8 @@ class SymbolicExecutor:
             strategy_cls: 搜索策略类
             max_depth: 最大执行深度
             use_reachability_check: 是否使用可达性检查
+            stop_pcs: cutpoint 集合。到达这些 pc 的非入口状态不再执行，
+                收进 ``cut_states``——供循环归纳引擎在 cutpoint 处截断段执行。
         """
         # todo: max_depth > max_iteration * blocks in loop body
         #       max_depth only used in test, will be deleted
@@ -73,9 +77,52 @@ class SymbolicExecutor:
         # 统计信息
         self.total_states = 0
         self.pruned_states = 0
+        self.coverage_incomplete_reasons: List[str] = []
 
         # 终止状态列表
         self.final_states: List[GlobalState] = []
+
+        # cutpoint 截断
+        self.stop_pcs = stop_pcs or set()
+        self.cut_states: List[GlobalState] = []
+
+    def _mark_coverage_incomplete(self, reason: str) -> None:
+        if reason not in self.coverage_incomplete_reasons:
+            self.coverage_incomplete_reasons.append(reason)
+
+    def path_coverage_certificate(self) -> PathCoverageCertificate:
+        """返回终止路径覆盖性的 fail-closed 证书。
+
+        对齐 x86 侧 ``X86SymbolicExecutor.path_coverage_certificate()``：
+        证书只声明 executor 已探索所有未被证明不可达的建模控制流后继，
+        不证明指令语义本身的正确性。可达性剪枝（UNSAT 路径）不影响
+        完整性，只进 details。
+        """
+        depth_pruned = getattr(self.strategy, "depth_pruned_count", 0)
+        reasons = list(self.coverage_incomplete_reasons)
+        if depth_pruned:
+            reasons.append(f"depth-pruned state count: {depth_pruned}")
+        if self.work_list:
+            reasons.append(f"work-list not drained: {len(self.work_list)} state(s)")
+
+        details = (
+            ("terminal_paths", len(self.final_states)),
+            ("total_states", self.total_states),
+            ("unsat_pruned_states", self.pruned_states),
+            ("depth_pruned_states", depth_pruned),
+        )
+        if reasons:
+            return PathCoverageCertificate(
+                complete=False,
+                reason="; ".join(reasons),
+                source="evm-symbolic-executor",
+                details=details,
+            )
+        return PathCoverageCertificate.by_construction(
+            "EVM CFG executor explored all modeled successors",
+            source="evm-symbolic-executor",
+            details=details,
+        )
 
     def manage_cfg(self, opcode: str, new_states: List[GlobalState],
                    from_pc: int,
@@ -194,6 +241,16 @@ class SymbolicExecutor:
 
         # 主执行循环
         for global_state in self.strategy:
+            # cutpoint 截断：到达 stop pc 的状态不再展开。判别"非入口状态
+            # 对象"（允许从 cutpoint 自身作为入口启动段执行）；不能用
+            # depth>0——fallthrough 后继不增 depth，直落进 cutpoint 的
+            # 状态会带着 depth=0 漏过截断、穿透 cutpoint 继续执行。
+            if (self.stop_pcs and global_state is not initial_global_state
+                    and global_state.node
+                    and global_state.node.pc in self.stop_pcs):
+                self.cut_states.append(global_state)
+                continue
+
             # 循环检测调用
             self._detect_and_handle_loops(global_state)
 
@@ -465,6 +522,39 @@ class SymbolicExecutor:
 
         analysis = analyze_jump_target(target_value)
 
+        if not analysis.is_static and last_op.immediate_set:
+            # resolved_multi JUMP 且目标值是纯符号（如循环归纳 havoc 后的
+            # caller-frame 返回地址）：按 IR 保证（resolveSymbolicJumps 已证
+            # 目标 ∈ immediate_set）对每个候选目标分叉，路径带 value==target
+            # 约束。x86 侧编译产物（CMPQ+JEQ 比较链）对同一符号值自然分叉，
+            # 两侧对齐。
+            from z3 import BitVecVal
+            fork_states = []
+            from .cfg_structures import EdgeType as _EdgeType
+            for target_pc in dict.fromkeys(last_op.immediate_set):
+                target_block = self.blocks_by_pc.get(target_pc)
+                if target_block is None:
+                    raise LogicError(
+                        "missing_jump_target",
+                        f"resolved_multi JUMP at pc={last_op.pc} targets "
+                        f"pc={target_pc}, but target block not found",
+                    )
+                target_node = self.cfg.get_or_create_node(target_pc)
+                fork_world_state = copy.deepcopy(global_state.world_state)
+                fork_world_state.constraints.add(
+                    target_value == BitVecVal(target_pc, 256)
+                )
+                fork_state = GlobalState(
+                    mstate=mstate.copy(),
+                    world_state=fork_world_state,
+                    node=target_node,
+                )
+                fork_state.depth = global_state.depth + 1
+                fork_state.loop_time = global_state.loop_time.copy()
+                fork_state.edge_type_hint = _EdgeType.UNCONDITIONAL
+                fork_states.append(fork_state)
+            return fork_states
+
         if not analysis.is_static:
             # 真正的动态跳转，不支持
             raise UnsupportedJumpError(
@@ -674,8 +764,12 @@ class SymbolicExecutor:
             fallthrough_state.edge_type_hint = EdgeType.CONDITIONAL_FALSE
             new_states.append(fallthrough_state)
         else:
-            # 没有下一个块，当前状态是终止状态
-            pass
+            # 没有下一个块：JUMPI 的 fallthrough 分支越过末块被丢弃。
+            # 该路径不会进入 final_states（块的控制流操作是 JUMPI 而非终止
+            # 指令），fail-closed 记入证书。
+            self._mark_coverage_incomplete(
+                f"JUMPI fallthrough past last block dropped at pc={block.pc}"
+            )
 
         return new_states
 
@@ -695,7 +789,11 @@ class SymbolicExecutor:
         # 找到下一个块
         current_idx = self.blocks.index(block)
         if current_idx + 1 >= len(self.blocks):
-            # 没有下一个块，返回空列表
+            # 没有下一个块：该状态既不产生后继也不会进入 final_states
+            # （块无终止指令），fail-closed 记入证书。
+            self._mark_coverage_incomplete(
+                f"fallthrough past last block dropped at pc={block.pc}"
+            )
             return []
 
         next_pc = self.blocks[current_idx + 1].pc

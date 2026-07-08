@@ -214,8 +214,11 @@ class X86Program:
         self._record_summary_stats(summary_runtime)
 
         if not final_global_states:
-            # 没有终止状态，返回默认结果
-            return self._empty_result(state)
+            # 没有终止状态，返回默认结果；证书必须来自 executor（可能因
+            # 剪枝而 incomplete），不能用 _empty_result 的 by-construction。
+            empty_state, empty_result = self._empty_result(state)
+            empty_result['coverage'] = executor.path_coverage_certificate()
+            return empty_state, empty_result
 
         # 合并所有终止状态
         # 使用 If 表达式按路径条件合并
@@ -249,6 +252,8 @@ class X86Program:
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
             'status_code': merged_state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
+            # merged 模式 fail-closed：被剪路径通过证书暴露给 program_verifier。
+            'coverage': executor.path_coverage_certificate(),
         }
 
         return merged_state, result
@@ -435,6 +440,11 @@ class X86Program:
             'transient_storage': state.evm_transient_storage.TransientStorage,
             'status_code': state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
+            'coverage': PathCoverageCertificate.by_construction(
+                "empty x86 program has one unconditional terminal result",
+                source="x86-program",
+                details=(("terminal_paths", 1),),
+            ),
         }
         return state, result
 
@@ -579,6 +589,11 @@ class X86Program:
             'transient_storage': state.evm_transient_storage.TransientStorage,
             'status_code': state.callengine_status_code,
             'summary_stats': self.last_summary_stats,
+            'coverage': PathCoverageCertificate.by_construction(
+                "sequential x86 fallback has one unconditional terminal result",
+                source="x86-program",
+                details=(("terminal_paths", 1),),
+            ),
         }
 
         return state, result

@@ -25,9 +25,8 @@ class EvmOperator:
     immediate: Optional[int] = None  # 立即值（用于PUSH操作）
     param: Optional[int] = None  # 参数（用于PUSH、DUP、SWAP）
     is_static: bool = False  # 跳转是否为静态
-    # 多目标跳转的候选目标集合（Go: EvmOperator.ImmediateSet）。
-    # 跳转目标来自多个调用点的不同 return address 时由符号跳转解析器填充，
-    # x86 侧对应 impl_amd64.go compileEVMJUMP 里逐个 CMPQ 的比较链。
+    # resolved_multi JUMP 的静态目标集合（Go 侧 resolveSymbolicJumps 产物，
+    # 主要是函数返回跳；与 immediate/is_static 互斥）。None 表示无此字段。
     immediate_set: Optional[List[int]] = None
     block: Optional['EVMBlock'] = None  # 对包含块的引用
     
@@ -82,6 +81,8 @@ class EvmOperator:
             result['param'] = self.param
         if self.is_static:
             result['is_static'] = self.is_static
+        if self.immediate_set is not None:
+            result['immediate_set'] = self.immediate_set
         return result
     
     def to_z3(self, state: 'SMTState') -> 'SMTState':

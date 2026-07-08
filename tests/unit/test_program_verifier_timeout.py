@@ -3,7 +3,11 @@
 
 from z3 import BitVecVal, BoolVal
 
-from common.path_observation import PathObservation, PathSemantics
+from common.path_observation import (
+    PathCoverageCertificate,
+    PathObservation,
+    PathSemantics,
+)
 import verification.program_verifier as program_verifier_module
 from state.smt_state import SMTState
 from verification.program_verifier import ProgramEquivalenceChecker
@@ -19,6 +23,7 @@ class _DummyEVMProgram:
             'has_return_data': BoolVal(False),
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
+            'coverage': PathCoverageCertificate.by_construction("dummy evm"),
             'status_code': BitVecVal(0, 8),
         }
 
@@ -52,6 +57,7 @@ class _DummyX86Program:
             'has_return_data': BoolVal(False),
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
+            'coverage': PathCoverageCertificate.by_construction("dummy x86"),
             'status_code': BitVecVal(0, 8),
         }
 

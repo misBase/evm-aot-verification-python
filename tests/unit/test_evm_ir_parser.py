@@ -4,6 +4,34 @@
 import os
 
 from evm_ir.json_parser import load_ir_from_json
+from evm_ir.models import EvmOperator
+
+
+def test_operator_parses_immediate_set():
+    """resolved_multi JUMP 携带 immediate_set（十进制字符串列表）。
+
+    P1 前置：loop pairing 守卫必须能用它区分 resolved_multi 与真正的
+    dynamic_unresolved 跳转。
+    """
+    op = EvmOperator.from_json({
+        "kind": "JUMP",
+        "pc": 973,
+        "immediate_set": ["974", "1024"],
+    })
+
+    assert op.immediate_set == [974, 1024]
+    assert op.immediate is None
+    assert not op.is_static
+
+    # round-trip
+    assert op.to_json()["immediate_set"] == [974, 1024]
+
+
+def test_operator_without_immediate_set_defaults_to_none():
+    op = EvmOperator.from_json({"kind": "JUMP", "pc": 1, "immediate": "7", "is_static": True})
+
+    assert op.immediate_set is None
+    assert "immediate_set" not in op.to_json()
 
 
 def test_json_parsing():

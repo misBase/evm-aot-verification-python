@@ -48,7 +48,8 @@ class X86SymbolicExecutor:
                  reachability_timeout_ms: Optional[int] = 50,
                  call_site_mapping: Optional["CallSiteMapping"] = None,
                  aot_profile: Optional[X86AOTProfile] = None,
-                 summary_runtime: Optional[X86SummaryRuntime] = None):
+                 summary_runtime: Optional[X86SummaryRuntime] = None,
+                 stop_addrs: Optional[set] = None):
         """初始化符号执行引擎。
 
         Args:
@@ -108,6 +109,11 @@ class X86SymbolicExecutor:
 
         # 终止状态列表
         self.final_states: List[X86GlobalState] = []
+
+        # cutpoint 截断：到达这些地址的非入口状态不再执行，收进
+        # cut_states——供循环归纳引擎在 cutpoint 处截断段执行。
+        self.stop_addrs = stop_addrs or set()
+        self.cut_states: List[X86GlobalState] = []
 
         # 每个 CallGoFunction-ret 站点对应一个独立 GO_HOST 外部节点
         self._go_host_addr_by_ret_block: Dict[int, int] = {}
@@ -521,6 +527,15 @@ class X86SymbolicExecutor:
 
         # 主执行循环
         for global_state in self.strategy:
+            # cutpoint 截断（在 merge 处理之前：cut 状态不应滞留 merge buffer）。
+            # 判别"非入口状态对象"而非 depth>0——fallthrough/go-bridge 恢复
+            # 不增 depth，直落进 cutpoint 的状态会漏过截断、穿透继续执行。
+            if (self.stop_addrs and global_state is not initial_global_state
+                    and global_state.node
+                    and global_state.node.address in self.stop_addrs):
+                self.cut_states.append(global_state)
+                continue
+
             # 合流点合并检测
             if self.enable_merge:
                 addr = global_state.node.address if global_state.node else None

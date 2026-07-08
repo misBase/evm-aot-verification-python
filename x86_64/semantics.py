@@ -1088,8 +1088,15 @@ def x86_instruction_to_z3(insn: X86Instruction, state: SMTState) -> SMTState:
 
         result = reg_val - rhs_val
         _write_register_by_size(dest_reg, result, dest_size)
-        if operands['immediate'] is not None:
+        if operands['immediate'] is not None or operands['is_memory']:
+            # 指针 − 立即数/数据：provenance 不变（对齐 add 的 memory 分支）
             _set_register_pointer_tag(dest_reg, dest_size, dest_tag)
+        elif operands['src_reg']:
+            # 指针 − 普通整数寄存器：仍是同域指针（MCOPY 的 sub rax, rdx
+            # 反向步进模式）；指针 − 指针 = 偏移量，正确地清 tag。
+            src_tag = _get_register_pointer_tag(operands['src_reg'])
+            if dest_tag != PointerTag.NONE and src_tag == PointerTag.NONE:
+                _set_register_pointer_tag(dest_reg, dest_size, dest_tag)
         _update_sub_like_flags(reg_val, rhs_val, result)
 
         return state

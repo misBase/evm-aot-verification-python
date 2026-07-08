@@ -12,7 +12,11 @@ from .models import EVMBlock
 from .semantics import EVMIRSemantics
 from .json_parser import CompilerEVMResult
 from .cfg import SymbolicExecutor, DFSStrategy, BFSStrategy, GlobalState
-from common.path_observation import PathObservation, PathSemantics
+from common.path_observation import (
+    PathCoverageCertificate,
+    PathObservation,
+    PathSemantics,
+)
 from state.smt_state import SMTState
 
 
@@ -77,15 +81,16 @@ class EVMProgram:
         strategy_cls: type = DFSStrategy,
         max_depth: int = 100,
         use_reachability_check: bool = True,
-    ) -> List[GlobalState]:
-        """Execute the EVM CFG and return terminal global states."""
+    ) -> Tuple[List[GlobalState], PathCoverageCertificate]:
+        """Execute the EVM CFG, return terminal states and coverage certificate."""
         executor = SymbolicExecutor(
             blocks=self.blocks,
             strategy_cls=strategy_cls,
             max_depth=max_depth,
             use_reachability_check=use_reachability_check,
         )
-        return executor.execute(state)
+        final_states = executor.execute(state)
+        return final_states, executor.path_coverage_certificate()
 
     def to_z3(self, state: SMTState,
              strategy_cls: type = DFSStrategy,
@@ -111,7 +116,7 @@ class EVMProgram:
             - final_state: 程序执行后的最终SMT状态（从所有路径合并）
             - result_dict: 包含合并返回值的字典（offset, length, memory, has_return_data）
         """
-        final_global_states = self._execute_paths(
+        final_global_states, coverage = self._execute_paths(
             state,
             strategy_cls=strategy_cls,
             max_depth=max_depth,
@@ -128,6 +133,7 @@ class EVMProgram:
                 'has_return_data': BoolVal(False),
                 'storage': state.evm_storage.Storage,
                 'transient_storage': state.evm_transient_storage.TransientStorage,
+                'coverage': coverage,
                 'status_code': state.error_code,
             }
             return state, result
@@ -157,6 +163,9 @@ class EVMProgram:
             'has_return_data': has_return_data,
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
+            # merged 模式下被剪路径不再静默消失：证书随结果暴露，
+            # program_verifier 据此 fail-closed。
+            'coverage': coverage,
             'status_code': merged_state.error_code,
         }
 
@@ -175,7 +184,7 @@ class EVMProgram:
         Unlike ``to_z3()``, this keeps terminal paths separate and only builds a
         merged state when explicitly requested for debug-only stack checks.
         """
-        final_global_states = self._execute_paths(
+        final_global_states, coverage = self._execute_paths(
             state,
             strategy_cls=strategy_cls,
             max_depth=max_depth,
@@ -194,6 +203,7 @@ class EVMProgram:
             global_states=final_global_states,
             observations=observations,
             merged_state=merged_state,
+            coverage=coverage,
         )
 
     def _path_observation(self, gstate: GlobalState) -> PathObservation:
