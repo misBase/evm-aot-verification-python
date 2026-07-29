@@ -418,7 +418,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
     checker = RefinementChecker(timeout_ms=1000)
     direct_calls = []
     aggregate_calls = []
-    storage_only_calls = []
+    status_storage_calls = []
 
     def fake_direct_memory(
         _solver,
@@ -437,7 +437,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
         aggregate_calls.append((label, len(x86_results), ctx is not None))
         return True
 
-    def fake_storage_only(
+    def fake_status_storage(
         _solver,
         _evm_result,
         _x86_result,
@@ -447,8 +447,8 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
         logs=None,
         ctx=None,
     ):
-        storage_only_calls.append((context, ctx is not None))
-        return True, "storage ok"
+        status_storage_calls.append((context, ctx is not None))
+        return True, "status+storage ok"
 
     monkeypatch.setattr(
         checker._paths._outputs,
@@ -463,7 +463,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
     monkeypatch.setattr(
         checker._paths,
         "_check_path_pair_status_storage_transient_with_solver",
-        fake_storage_only,
+        fake_status_storage,
     )
 
     checked_pair_count, pair_count, failure = checker._paths._check_path_pairs_parallel(
@@ -479,7 +479,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
     assert pair_count == 2
     assert direct_calls == ["path pair evm[0], x86[0]"]
     assert aggregate_calls == [("evm[0]", 2, True)]
-    assert storage_only_calls == [
+    assert status_storage_calls == [
         ("path pair evm[0], x86[0]", True),
         ("path pair evm[0], x86[1]", True),
     ]
