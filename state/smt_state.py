@@ -5,7 +5,8 @@
 将栈、内存和寄存器建模为符号变量。
 """
 
-from typing import Optional, Set
+from dataclasses import dataclass
+from typing import Any, List, Optional, Set
 
 from z3 import BitVec, BitVecVal, Array, BitVecSort
 
@@ -22,9 +23,25 @@ from state.x86_state import (
     X86RegisterState,
 )
 
+@dataclass
+class PendingErrorBranch:
+    """一条待分裂的错误路径，由 opcode 语义函数产生、executor 立即消费。
+
+    ``terminal_state`` 必须是**错误发生瞬间**的快照而非 opcode 的 post-state：
+    x86 的错误 exit 发生在副作用之前（如 RETURNDATACOPY 是 exit-before-copy，
+    impl_amd64.go:3149），用 post-state 会让 observable 与 x86 侧不一致。
+
+    ``status_code`` 用 int 标注，避免 state 包反向依赖 evm_ir 造成循环导入。
+    """
+    condition: Any
+    status_code: int
+    terminal_state: 'SMTState'
+
+
 # 为了向后兼容，重新导出所有子类
 __all__ = [
     'SMTState',
+    'PendingErrorBranch',
     'EVMStackState',
     'EVMMemoryState',
     'EVMStorageState',
@@ -115,8 +132,11 @@ class SMTState:
         self.return_length: BitVec = BitVecVal(0, 64)  # 返回长度（64位），0 表示当前抽象下不暴露非空 return data
         self.error_string: Optional[str] = None      # EVM 执行错误或回滚原因字符串
         self.error_code: BitVec = BitVecVal(0, 8)     # EVM 执行状态码，0=RETURNED，与 callengine_status_code 对齐
-        self.read_only: bool = False                 # todo: 可能无用,只用于跨合约调用
         self.valid_jump_targets: Optional[Set[int]] = None  # TAG is_jump_target=True 的 PC 集合
+
+        # 待分裂的错误路径队列。opcode 只 append，executor 必须在同一步内消费
+        # 并清空（copy() 会 fail-closed 拦截未消费的残留）。
+        self.pending_errors: List[PendingErrorBranch] = []
 
         # callEngine 字段的显式 side-channel。
         # x86 指令执行器识别到 mov [r13+KNOWN_OFFSET], ... 时同步更新这些字段，
@@ -213,14 +233,31 @@ class SMTState:
         Returns:
             未初始化字段的SMTState实例
         """
-        return cls.__new__(cls)
+        state = cls.__new__(cls)
+        # 唯一在这里初始化的字段：空队列必须是真列表而非缺失属性，
+        # 否则消费方到处都要写 getattr 兜底。
+        state.pending_errors = []
+        return state
 
     def copy(self) -> 'SMTState':
         """创建状态的副本。
 
+        Raises:
+            LogicError: 存在未消费的 ``pending_errors``。静默重置会让整条错误
+                路径无声消失，所以这里 fail-closed。
+
         Returns:
             新SMTState实例
         """
+        if getattr(self, 'pending_errors', None):
+            from utils.exceptions import LogicError
+            codes = [branch.status_code for branch in self.pending_errors]
+            raise LogicError(
+                "unconsumed_pending_errors",
+                f"copy() called with {len(self.pending_errors)} unconsumed error "
+                f"branch(es) (status codes: {codes})",
+                "直接调用 evm_operator_to_z3 的代码需要自行消费 pending_errors",
+            )
         new_state = SMTState._create_empty()
         new_state.evm_stack = self.evm_stack.copy()
         new_state.evm_memory = self.evm_memory.copy()
@@ -232,9 +269,9 @@ class SMTState:
         new_state.return_offset = getattr(self, 'return_offset', BitVecVal(0, 64))
         new_state.return_length = getattr(self, 'return_length', BitVecVal(0, 64))
         new_state.error_string = getattr(self, 'error_string', None)
-        new_state.read_only = getattr(self, 'read_only', False)
         new_state.valid_jump_targets = getattr(self, 'valid_jump_targets', None)
         new_state.error_code = getattr(self, 'error_code', BitVecVal(0, 8))
+        new_state.pending_errors = []   # 源队列已确认为空
         self.copy_callengine_side_channels_to(new_state)
         new_state.pc = self.pc
 

@@ -6,12 +6,13 @@ x86-64指令语义建模。
 
 import capstone
 from z3 import BitVec, BitVecVal, Concat, Extract, If, ZeroExt, LShR, UDiv, URem, Not, And, Or, Select, Implies
-from typing import List, Dict, Optional, Any, Tuple
+from typing import List, Dict, Optional, Any, Set, Tuple
 from .models import X86Block, X86Instruction, Register
 from .aot_profile import GO_HPC_EVM_PROFILE
 from .disassembler import disassemble_hex, parse_operands
 from common.uint256 import Uint256
 from state.smt_state import SMTState, MemoryDomain, MemoryDomainError, PointerTag
+from utils.exceptions import UnsupportedCallEngineAccessError
 
 
 def _classify_domain(base_reg) -> Optional[MemoryDomain]:
@@ -74,6 +75,22 @@ _CALLENGINE_FIELD_MAP = {
     (_CALLENGINE_OFFSETS["arch_grow_number"],               8): "callengine_builtin_arg0",
 }
 
+def _sizes_by_offset(field_map: Dict[Tuple[int, int], str]) -> Dict[int, Set[int]]:
+    """把 ``(offset, size_bytes) -> attr`` 反转成 ``offset -> {已建模的宽度}``。
+
+    注意 ``field_map`` 的**键本身就是元组**，所以直接遍历它就能解包出两个分量，
+    不需要 ``.items()``。写入侧据此 fail-closed：offset 命中但宽度不在集合里，
+    说明 codegen 形态超出建模假设。
+    """
+    sizes: Dict[int, Set[int]] = {}
+    for offset, size_bytes in field_map:
+        sizes.setdefault(offset, set()).add(size_bytes)
+    return sizes
+
+
+_CALLENGINE_SIZES_BY_OFFSET = _sizes_by_offset(_CALLENGINE_FIELD_MAP)
+
+
 _POINTER_TAG_BY_CALLENGINE_OFFSET = {
     _CALLENGINE_OFFSETS["memory_base"]: PointerTag.EVM_PTR,
     _CALLENGINE_OFFSETS["stack_base"]: PointerTag.STACK_PTR,
@@ -114,6 +131,11 @@ def _maybe_update_callengine_field(state: SMTState, operands: dict, size_bytes: 
     适用于任何写内存的指令（mov/add/or/xor/shl/shr/not/setcc 等）。
 
     识别条件：base_reg == R13、无 index、offset 是 Python int、(offset, size) 命中表。
+
+    fail-closed：offset 命中已建模字段但宽度不符时抛异常。静默跳过会让
+    side-channel 停留在陈旧值，而读取侧走的正是它——4 字节写 [r13+0xE0] 时内存
+    已是 STOPPED(2)、side-channel 仍是 RETURNED(0)，方向朝假绿。
+    未建模的 offset 仍然静默忽略。
     """
     if operands.get('base_reg') != Register.R13:
         return
@@ -125,6 +147,12 @@ def _maybe_update_callengine_field(state: SMTState, operands: dict, size_bytes: 
     key = (off, size_bytes)
     attr = _CALLENGINE_FIELD_MAP.get(key)
     if attr is None:
+        modeled_sizes = _CALLENGINE_SIZES_BY_OFFSET.get(off)
+        if modeled_sizes is not None:
+            raise UnsupportedCallEngineAccessError(
+                off, size_bytes, modeled_sizes,
+                "callEngine side-channel write width is not modeled",
+            )
         return
     # 根据 size 取合适宽度的 slice
     if size_bytes == 1:
@@ -138,7 +166,11 @@ def _maybe_update_callengine_field(state: SMTState, operands: dict, size_bytes: 
 
 def _maybe_read_callengine_field(state: SMTState, operands: dict,
                                  size_bytes: Optional[int]) -> Optional["BitVec"]:
-    """识别读取 [r13+KNOWN_OFFSET] 的指令，若命中则直接走 side-channel 快路径。"""
+    """识别读取 [r13+KNOWN_OFFSET] 的指令，若命中则直接走 side-channel 快路径。
+
+    这里对宽度不符不 fail-closed：回退到 x86_memory 读取本身语义正确，只是慢一点。
+    写入侧 fail-closed 之后，已建模 offset 上 side-channel 与 memory 恒等。
+    """
     if operands.get('base_reg') != Register.R13:
         return None
     if operands.get('index_reg') is not None:

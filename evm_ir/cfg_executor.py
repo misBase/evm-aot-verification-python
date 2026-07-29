@@ -8,7 +8,7 @@ import copy
 
 from typing import List, Dict, Optional, Tuple, TYPE_CHECKING, Any
 from z3 import And, BitVecVal, BoolVal, IntVal, Not, is_false, is_true, simplify
-from evm_ir.status_code import EvmStatusCode
+from evm_ir.status_code import EvmStatusCode, set_terminal_status
 
 if TYPE_CHECKING:
     from .models import EvmOperator
@@ -359,7 +359,11 @@ class SymbolicExecutor:
         if ctrl_op is None:
             # 没有控制流操作，顺序执行所有指令
             for op in ops:
-                current_mstate = op.to_z3(current_mstate)
+                current_mstate = self._execute_op_with_outcome(
+                    global_state, current_mstate, op, node,
+                )
+                if current_mstate is None:
+                    return []   # 错误条件恒真，本路径已全部变成错误终态
             global_state.mstate = current_mstate
             return self._handle_fallthrough(global_state, current_mstate, block)
 
@@ -368,7 +372,11 @@ class SymbolicExecutor:
         main_ops = ops[:ctrl_idx]
 
         for op in main_ops:
-            current_mstate = op.to_z3(current_mstate)
+            current_mstate = self._execute_op_with_outcome(
+                global_state, current_mstate, op, node,
+            )
+            if current_mstate is None:
+                return []
 
         # 处理跳转或终止
         if ctrl_kind == "JUMP":
@@ -379,8 +387,13 @@ class SymbolicExecutor:
             else:
                 target_value = None
 
-            # 执行跳转指令（更新堆栈）
-            final_mstate = ctrl_op.to_z3(current_mstate)
+            # 目标非法时 INVALID_JUMP 在这里就分裂成终止路径，
+            # _handle_jump 只会看到合法目标的正常路径。
+            final_mstate = self._execute_op_with_outcome(
+                global_state, current_mstate, ctrl_op, node,
+            )
+            if final_mstate is None:
+                return []
             global_state.mstate = final_mstate
 
             # 传递提取的目标值给处理器
@@ -399,7 +412,11 @@ class SymbolicExecutor:
                 target_value = None
 
             # 执行 JUMPI 指令（更新堆栈，弹出条件）
-            final_mstate = ctrl_op.to_z3(current_mstate)
+            final_mstate = self._execute_op_with_outcome(
+                global_state, current_mstate, ctrl_op, node,
+            )
+            if final_mstate is None:
+                return []
             global_state.mstate = final_mstate
 
             # 传递提取的值给处理器
@@ -407,9 +424,28 @@ class SymbolicExecutor:
 
         else:
             # 终止指令（STOP/RETURN/REVERT/SELFDESTRUCT）
-            current_mstate = ctrl_op.to_z3(current_mstate)
+            current_mstate = self._execute_op_with_outcome(
+                global_state, current_mstate, ctrl_op, node,
+            )
+            if current_mstate is None:
+                return []
             global_state.mstate = current_mstate
             return []
+
+    @staticmethod
+    def _branch_is_excluded(world_state, condition) -> bool:
+        """在当前路径约束下，分支条件是否已不可满足。
+
+        用于区分"分支已被先前的约束排除"与"IR/CFG 真的不一致"：JUMPI 目标非法时
+        正常路径已带 ¬taken，但符号 condition 让 jump_condition 自身 simplify
+        不出 False，仅凭它会把 taken 误当成可行。
+        """
+        combined = simplify(And(world_state.constraints.as_bool(), condition))
+        if is_false(combined):
+            return True
+        probe = copy.copy(world_state)
+        probe.constraints.add(condition)
+        return not probe.constraints.is_possible()
 
     @staticmethod
     def _path_is_impossible(world_state) -> bool:
@@ -420,13 +456,15 @@ class SymbolicExecutor:
         """
         return is_false(simplify(world_state.constraints.as_bool()))
 
-    def _append_tag_depth_error_state(self,
-                                      global_state: GlobalState,
-                                      mstate: SMTState,
-                                      node,
-                                      condition,
-                                      status_code: EvmStatusCode) -> None:
-        """为 TAG 栈深度守卫的一个错误分支追加终止状态。
+    def _append_error_terminal_state(self,
+                                     global_state: GlobalState,
+                                     error_mstate: SMTState,
+                                     node,
+                                     condition,
+                                     status_code: EvmStatusCode) -> None:
+        """追加一条错误终止路径。
+
+        ``error_mstate`` 必须已归属于这条错误路径（调用方负责快照/复制）。
 
         只丢弃可证不可满足的路径（simplify 折成字面 False，或开启可达性检查后判 UNSAT）：
         留着它们只会撑大 final_states，放大下游 path-pair 的笛卡尔积。
@@ -434,10 +472,7 @@ class SymbolicExecutor:
         if is_false(condition):
             return
 
-        # 必须先复制：两个错误分支共用调用方的 current_mstate，
-        # 直接改会让 underflow 污染 overflow，并把错误码漏给正常路径。
-        error_mstate = mstate.copy()
-        error_mstate.error_code = BitVecVal(status_code, 8)
+        set_terminal_status(error_mstate, status_code)
         error_mstate.return_offset = BitVecVal(0, 64)
         error_mstate.return_length = BitVecVal(0, 64)
 
@@ -461,6 +496,91 @@ class SymbolicExecutor:
         error_state.depth = global_state.depth
         error_state.loop_time = global_state.loop_time.copy()
         self.final_states.append(error_state)
+
+    def _append_tag_depth_error_state(self,
+                                      global_state: GlobalState,
+                                      mstate: SMTState,
+                                      node,
+                                      condition,
+                                      status_code: EvmStatusCode) -> None:
+        """为 TAG 栈深度守卫的一个错误分支追加终止状态。
+
+        必须先复制：两个错误分支共用调用方的 current_mstate，
+        直接改会让 underflow 污染 overflow，并把错误码漏给正常路径。
+        """
+        if is_false(condition):
+            return
+        self._append_error_terminal_state(
+            global_state, mstate.copy(), node, condition, status_code,
+        )
+
+    def _execute_op_with_outcome(self,
+                                 global_state: GlobalState,
+                                 mstate: SMTState,
+                                 op: 'EvmOperator',
+                                 node) -> Optional[SMTState]:
+        """执行一条 opcode，并把它产生的错误分支立即分裂成终止路径。
+
+        这是**所有** opcode 执行的唯一入口——漏掉一个执行点，那里的错误分支就会
+        静默消失（copy() 的检查拦不住"执行完直接丢弃 pending_errors"）。
+
+        多个错误分支按 append 顺序互斥化，对齐 codegen 的检查先后：
+
+            effective_error_i = error_i ∧ ¬error_0 ∧ ... ∧ ¬error_{i-1}
+            normal_cond       = ¬error_0 ∧ ... ∧ ¬error_n
+
+        Returns:
+            正常路径的后继状态；``None`` 表示错误条件恒真、本路径已被完全吸收，
+            调用方应当停止执行并返回空后继列表。
+        """
+        if mstate.pending_errors:
+            from utils.exceptions import LogicError
+            raise LogicError(
+                "unconsumed_pending_errors",
+                f"op {op.kind} at pc={op.pc} received a state with "
+                f"{len(mstate.pending_errors)} unconsumed error branch(es)",
+            )
+
+        new_mstate = op.to_z3(mstate)
+
+        pending = list(new_mstate.pending_errors)
+        new_mstate.pending_errors = []   # 状态要交给后继，队列必须先消费干净
+        if not pending:
+            return new_mstate
+
+        negations = []
+        seen_snapshots: List[int] = []
+        for branch in pending:
+            # 每个分支必须独占自己的快照：_append_error_terminal_state 直接在上面
+            # 写状态码，共用一个对象会让后一个分支覆盖前一个（前者已进 final_states，
+            # 改的是同一个引用），且不会有任何报错。
+            if id(branch.terminal_state) in seen_snapshots:
+                from utils.exceptions import LogicError
+                raise LogicError(
+                    "shared_error_snapshot",
+                    f"op {op.kind} at pc={op.pc} reused one terminal_state across "
+                    f"multiple error branches",
+                )
+            seen_snapshots.append(id(branch.terminal_state))
+
+            effective = branch.condition
+            if negations:
+                effective = And(effective, *negations)
+            effective = simplify(effective)
+            self._append_error_terminal_state(
+                global_state, branch.terminal_state, node, effective, branch.status_code,
+            )
+            negations.append(Not(branch.condition))
+
+        normal_cond = simplify(And(*negations)) if len(negations) > 1 else simplify(negations[0])
+
+        # 先加约束再 return：少了这条约束，以 STOP/RETURN 结尾的块会在错误区域上
+        # 留下一条可满足的假正常终止路径（与 TAG 守卫同一个坑）。
+        if not is_true(normal_cond):
+            global_state.world_state.constraints.add(normal_cond)
+        if is_false(normal_cond):
+            return None
+        return new_mstate
 
     def _handle_jump(self, global_state: GlobalState, mstate: SMTState, block: EVMBlock,
                      ctrl_op: Optional['EvmOperator'] = None,
@@ -662,28 +782,32 @@ class SymbolicExecutor:
                 target_pc = last_op.immediate
                 target_block = self.blocks_by_pc.get(target_pc)
 
-                if target_block is None:
+                if target_block is None and not self._branch_is_excluded(
+                    global_state.world_state, jump_condition
+                ):
                     raise LogicError(
                         "missing_jump_target",
                         f"Static JUMPI at pc={last_op.pc} targets pc={target_pc}, but target block not found"
                     )
 
-                target_node = self.cfg.get_or_create_node(target_pc)
+                # 目标非法且 taken 已被排除：INVALID_JUMP 终态已分裂出去，只留 fallthrough。
+                if target_block is not None:
+                    target_node = self.cfg.get_or_create_node(target_pc)
 
-                # 深拷贝状态（JUMPI 分支必须深拷贝，参考 Mythril）
-                jump_world_state = copy.deepcopy(global_state.world_state)
-                jump_world_state.constraints.add(jump_condition)
+                    # 深拷贝状态（JUMPI 分支必须深拷贝，参考 Mythril）
+                    jump_world_state = copy.deepcopy(global_state.world_state)
+                    jump_world_state.constraints.add(jump_condition)
 
-                jump_state = GlobalState(
-                    mstate=mstate.copy(),
-                    world_state=jump_world_state,
-                    node=target_node
-                )
-                jump_state.depth = global_state.depth + 1
-                jump_state.loop_time = global_state.loop_time.copy()
-                # 静态跳转目标，使用 CONDITIONAL_TRUE
-                jump_state.edge_type_hint = EdgeType.CONDITIONAL_TRUE
-                new_states.append(jump_state)
+                    jump_state = GlobalState(
+                        mstate=mstate.copy(),
+                        world_state=jump_world_state,
+                        node=target_node
+                    )
+                    jump_state.depth = global_state.depth + 1
+                    jump_state.loop_time = global_state.loop_time.copy()
+                    # 静态跳转目标，使用 CONDITIONAL_TRUE
+                    jump_state.edge_type_hint = EdgeType.CONDITIONAL_TRUE
+                    new_states.append(jump_state)
             else:
                 # 尝试解析目标值
                 if target_value is None:
@@ -709,19 +833,24 @@ class SymbolicExecutor:
                 
                 # 为每个解析出的目标创建跳转分支
                 for i, (target_pc, target_condition) in enumerate(analysis.targets):
+                    # 组合条件：jump_condition AND target_condition（如果有）
+                    combined_jump_condition = jump_condition
+                    if target_condition is not None:
+                        combined_jump_condition = And(jump_condition, target_condition)
+
                     target_block = self.blocks_by_pc.get(target_pc)
                     if target_block is None:
+                        # 同静态分支：目标非法时这条分支已被 ¬taken 排除。
+                        if self._branch_is_excluded(
+                            global_state.world_state, combined_jump_condition
+                        ):
+                            continue
                         raise LogicError(
                             "missing_jump_target",
                             f"Resolved JUMPI at pc={last_op.pc} targets pc={target_pc}, but target block not found"
                         )
 
                     target_node = self.cfg.get_or_create_node(target_pc)
-
-                    # 组合条件：jump_condition AND target_condition（如果有）
-                    combined_jump_condition = jump_condition
-                    if target_condition is not None:
-                        combined_jump_condition = And(jump_condition, target_condition)
 
                     jump_world_state = copy.deepcopy(global_state.world_state)
                     jump_world_state.constraints.add(combined_jump_condition)

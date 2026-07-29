@@ -1080,9 +1080,13 @@ class X86SymbolicExecutor:
         """从block中提取status_code立即数。
 
         匹配: mov byte [r13+0xE0], <imm>
+
+        逆序遍历取**最后一次**写入，与真实指令语义一致。当前 codegen 每个 exit
+        block 只写一次（compileExitFromNativeCode 写完立刻 RET），所以顺序无关；
+        逆序只是让静态解析与执行语义对齐，避免将来多次写入时静默取错。
         """
         status_offset = self.aot_profile.offsets["status_code"]
-        for insn in block.instructions:
+        for insn in reversed(block.instructions):
             if self._is_mov_to_r13_offset(insn, status_offset):
                 return self._get_immediate_from_mov(insn)
         return None

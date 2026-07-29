@@ -76,6 +76,34 @@ class UnsupportedLoopError(VerificationError):
         super().__init__(error_msg)
 
 
+class UnsupportedCallEngineAccessError(VerificationError):
+    """机器码对 callEngine 已知字段的访问形态超出建模假设时引发。
+
+    与 LogicError 的区别：不是 IR/CFG 结构不一致，而是 x86 指令形态（写入宽度）
+    与 side-channel 建模假设不符。静默跳过会让后续读取拿到陈旧值，方向朝假绿。
+    """
+    def __init__(self, offset: int, size_bytes, expected_sizes, message: str = ""):
+        """初始化UnsupportedCallEngineAccessError。
+
+        Args:
+            offset: callEngine 字段偏移（例如 0xE0）
+            size_bytes: 实际访问宽度（字节）
+            expected_sizes: 该偏移已建模的宽度集合
+            message: 附加错误消息
+        """
+        self.offset = offset
+        self.size_bytes = size_bytes
+        self.expected_sizes = expected_sizes
+        expected = ", ".join(str(s) for s in sorted(expected_sizes))
+        error_msg = (
+            f"Unsupported callEngine access at [r13+{offset:#x}]: "
+            f"size={size_bytes} bytes, modeled size(s)={{{expected}}}"
+        )
+        if message:
+            error_msg += f". {message}"
+        super().__init__(error_msg)
+
+
 class UnsupportedJumpError(VerificationError):
     """遇到不支持的跳转类型时引发的异常。
 

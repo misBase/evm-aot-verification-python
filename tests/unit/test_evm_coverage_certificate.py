@@ -16,14 +16,14 @@ from evm_ir.program import EVMProgram
 from state.smt_state import SMTState
 
 
-def _make_block(pc, ops, is_stop=False):
+def _make_block(pc, ops, is_stop=False, is_jump_target=False):
     block = EVMBlock(
         pc=pc,
         stack_depth=0,
         min_depth=0,
         max_depth=1024,
         static_gas=0,
-        is_jump_target=False,
+        is_jump_target=is_jump_target,
         is_inner_block=False,
         is_stop=is_stop,
         operations=ops,
@@ -41,7 +41,11 @@ def _stop_program() -> EVMProgram:
 def _self_loop_program() -> EVMProgram:
     """block 0 静态 JUMP 回自身：符号执行只能靠 depth 剪枝终止。"""
     jump = EvmOperator(kind="JUMP", pc=0, immediate=0, is_static=True)
-    return EVMProgram(CompilerEVMResult(blocks=[_make_block(0, [jump])]))
+    # 块 0 是自身 JUMP 的落点，真实 IR 里必然是 JUMPDEST；否则跳转目标校验会
+    # 直接判定 INVALID_JUMP，程序根本不会循环（跟 Go codegen 的 isValidJumpDest 一致）。
+    return EVMProgram(
+        CompilerEVMResult(blocks=[_make_block(0, [jump], is_jump_target=True)])
+    )
 
 
 def _tag_only_program() -> EVMProgram:

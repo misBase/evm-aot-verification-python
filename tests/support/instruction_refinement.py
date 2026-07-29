@@ -36,6 +36,7 @@ from common.div_bridge import verified_div_bridges
 from common.uint256 import Uint256
 from evm_ir.models import EvmOperator
 from evm_ir.semantics import EVMOperationSemantics, evm_operator_to_z3
+from state.evm_memory_state import EVMMemoryState
 from state.evm_stack_state import EVMStackState
 from state.smt_state import MemoryDomain, PointerTag, SMTState
 from x86_64.disassembler import disassemble_hex
@@ -537,12 +538,75 @@ def _build_evm_result(case: InstructionRefinementCase, operands: list[Uint256]):
     return EVMOperationSemantics().operation_semantics(op, inputs)
 
 
-def _build_evm_final_state(
+def _consume_pending_errors(state: SMTState) -> SMTState:
+    """把 opcode 产生的错误分支合并回单个 state（单指令桩专用）。
+
+    单指令桩没有 CFG executor 来分裂终止状态，但也不能直接丢弃 pending_errors
+    ——那样错误路径会静默消失。这里按错误条件做 ITE 合并，语义与
+    ``EVMProgram._merge_global_states`` 一致：错误分支用错误瞬间的快照，
+    正常分支用 post-state；条件恒真/恒假时自动退化成单分支。
+    """
+    pending = list(state.pending_errors)
+    state.pending_errors = []
+    if not pending:
+        return state
+
+    from state.smt_state import EVMStorageState, EVMTransientStorageState
+    from evm_ir.status_code import set_terminal_status
+
+    merged = state
+    negations = []
+    for branch in pending:
+        cond = branch.condition
+        if negations:
+            cond = simplify(And(cond, *negations))
+        negations.append(Not(branch.condition))
+
+        error_state = branch.terminal_state
+        set_terminal_status(error_state, branch.status_code)
+        error_state.return_offset = BitVecVal(0, 64)
+        error_state.return_length = BitVecVal(0, 64)
+
+        combined = SMTState._create_empty()
+        combined.__dict__.update(merged.__dict__)
+        combined.pending_errors = []
+        combined.error_code = If(cond, error_state.error_code, merged.error_code)
+        combined.return_offset = If(cond, error_state.return_offset, merged.return_offset)
+        combined.return_length = If(cond, error_state.return_length, merged.return_length)
+        combined.evm_memory = EVMMemoryState(
+            memory_array=If(cond, error_state.evm_memory.Memory, merged.evm_memory.Memory),
+            msize=If(cond, error_state.evm_memory.MSize, merged.evm_memory.MSize),
+        )
+        combined.evm_stack = EVMStackState(
+            stack_array=If(cond, error_state.evm_stack.Stack, merged.evm_stack.Stack),
+            sp=If(cond, error_state.evm_stack.SP, merged.evm_stack.SP),
+        )
+        combined.evm_storage = EVMStorageState(
+            storage_array=If(cond, error_state.evm_storage.Storage, merged.evm_storage.Storage),
+        )
+        combined.evm_transient_storage = EVMTransientStorageState(
+            storage_array=If(
+                cond,
+                error_state.evm_transient_storage.TransientStorage,
+                merged.evm_transient_storage.TransientStorage,
+            ),
+        )
+        merged = combined
+
+    return merged
+
+
+def _build_evm_initial_state(
     case: InstructionRefinementCase,
     operands: list[Uint256],
     memory_words: list[Uint256],
     readonly_words: dict[str, list[Uint256]],
 ) -> SMTState:
+    """构造 EVM 侧的初始状态（操作数已压栈，环境已就位）。
+
+    单独暴露，便于测试用同一批符号操作数跑整个 EVMProgram——例如需要
+    ``<op>; STOP`` 才能与含 STOP 的 x86 core 对齐时。
+    """
     state = SMTState()
     state.evm_stack = EVMStackState(sp=IntVal(0))
     # EVM 侧直接把操作数压入符号栈，再交给 opcode 语义执行。
@@ -557,8 +621,17 @@ def _build_evm_final_state(
     _initialize_evm_context_values(state, case)
     if case.evm_valid_jump_targets is not None:
         state.valid_jump_targets = set(case.evm_valid_jump_targets)
+    return state
 
-    return evm_operator_to_z3(_evm_operator(case), state)
+
+def _build_evm_final_state(
+    case: InstructionRefinementCase,
+    operands: list[Uint256],
+    memory_words: list[Uint256],
+    readonly_words: dict[str, list[Uint256]],
+) -> SMTState:
+    state = _build_evm_initial_state(case, operands, memory_words, readonly_words)
+    return _consume_pending_errors(evm_operator_to_z3(_evm_operator(case), state))
 
 
 def _extract_evm_stack_outputs(final_state: SMTState, expected_stack_height: int):

@@ -7,7 +7,7 @@ EVM IR语义建模。
 from z3 import BitVec, BitVecNumRef, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Not, Or, UDiv, URem, LShR, SignExt, ZeroExt, Lambda, Select, is_false, is_true, simplify
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
-from evm_ir.status_code import EvmStatusCode
+from evm_ir.status_code import EvmStatusCode, set_terminal_status
 from common.uint256 import Uint256
 from common import uninterpreted
 from common.calldata import calldataload_no_overflow_assumption, calldataload_word
@@ -25,7 +25,7 @@ from common.arithmetic import (
     smod_speedup_assumptions as _smod_speedup_assumptions,
     x86_div64_quotient_fits_assumption,
 )
-from state.smt_state import SMTState, EVMStackState, EVMMemoryState
+from state.smt_state import SMTState, EVMStackState, EVMMemoryState, PendingErrorBranch
 
 # RETURN指令的常量
 MAX_RETURN_DATA_SIZE = 256  # 最大返回数据大小（字节）（256字节 = 2048位）
@@ -497,20 +497,25 @@ class EVMIRSemantics:
         self.op_semantics = EVMOperationSemantics()
 
 def _jump_target_candidates(op: EvmOperator, state: "SMTState") -> "Optional[List[int]]":
-    """返回本次跳转的合法落地集合，对齐 amd64 codegen（impl_amd64.go compileEVMJUMP）。
+    """返回本次跳转的合法落地集合，对齐 codegen（impl_amd64.go compileEVMJUMP）。
 
-    - ImmediateSet 非空：即 codegen 逐个 CMPQ 的候选。元素已由 IR 层符号跳转解析器保证在
-      targetBlocks 内（symbolic_jump_resolver.go:565），无需再与 valid_jump_targets 取交集。
-    - 否则取 valid_jump_targets（is_jump_target=True 的块 PC），对应 codegen 的 c.jumpTable，
-      覆盖静态 Immediate 形态。
+    三种返回值：
 
-    真动态跳转不在此建模，由 cfg_executor 以 UnsupportedJumpError 拒绝。
-    返回 None 表示 valid_jump_targets 未预填充（调用方不施加校验），故返回集合恒非空。
+    - **候选列表**：ImmediateSet 即 codegen 逐个 CMPQ 的候选（IR 层已保证元素在
+      targetBlocks 内，symbolic_jump_resolver.go:565）；否则取 valid_jump_targets，
+      对应 c.jumpTable，覆盖静态 Immediate 形态。
+    - **空列表**：一个 JUMPDEST 都没有，比较链为空直接落到 exit(InvalidJump)，
+      任何 taken 跳转都非法。
+    - **None**：valid_jump_targets 未预填充，调用方不施加校验。
+
+    ``op.immediate_set`` 用 truthiness 对齐 codegen 的 ``len(o.ImmediateSet) > 0``
+    （impl_amd64.go:3443/3482）——空 ImmediateSet 在 Go 里走 else 分支，不是
+    "零候选全部非法"。真动态跳转由 cfg_executor 以 UnsupportedJumpError 拒绝。
     """
     if op.immediate_set:
         return list(op.immediate_set)
 
-    if state.valid_jump_targets:
+    if state.valid_jump_targets is not None:
         return sorted(state.valid_jump_targets)
 
     return None
@@ -522,17 +527,18 @@ def _apply_jump_destination_check(
     dest_bv: "BitVecRef",
     taken_cond: "Optional[Any]" = None,
 ) -> None:
-    """把 "dest 不是合法跳转目标 -> INVALID_JUMP" 写进 state.error_code。
+    """把 "dest 非法 -> INVALID_JUMP" 追加成一条待分裂的错误路径。
 
-    候选恒小于 2^64，``dest == target`` 已蕴含 codegen 的 compileLocIsUint64 范围检查。
-    ``taken_cond`` 用于 JUMPI：未跳转路径 codegen 直接 fallthrough，不走目标比较链。
+    这是 INVALID_JUMP 的唯一来源：executor 把它分裂成独立终止状态，非法目标走不到
+    ``_handle_jump``，那里的 missing_jump_target 异常因此只是 CFG 内部一致性保护。
 
-    局限：
-
-    - 只打错误码，不产生终止状态。非法目标在 cfg_executor 里没有对应后继块，该路径被
-      丢弃而非建模成 INVALID_JUMP 终态，故全程序验证下这里近乎 no-op；实际生效的是
-      单指令 refinement 测试。
-    - valid_jump_targets 未预填充时（SMTState 默认 None）静默跳过校验，非 fail-closed。
+    - 候选恒小于 2^64，``dest == target`` 已蕴含 codegen 的 compileLocIsUint64 检查。
+    - ``taken_cond`` 用于 JUMPI：未跳转路径 codegen 直接 fallthrough，不走比较链。
+    - 必须在 dest 弹栈之后调用（对齐 popUint256 在比较链之前），否则错误快照的
+      栈状态与 x86 的 exit 时刻不一致。
+    - 局限：``valid_jump_targets`` 未预填充时校验**静默跳过**，非 fail-closed
+      （见 ``_jump_target_candidates`` 的 None 分支）。全程序路径由
+      SymbolicExecutor.__init__ 填全集，单指令测试用 evm_valid_jump_targets。
     """
     targets = _jump_target_candidates(op, state)
     if targets is None:
@@ -547,13 +553,13 @@ def _apply_jump_destination_check(
     if is_true(is_valid):
         return
 
-    invalid_jump = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
-    if is_false(is_valid):
-        state.error_code = invalid_jump
-        state.error_string = "Invalid jump destination"
-        return
-
-    state.error_code = If(is_valid, state.error_code, invalid_jump)
+    state.pending_errors.append(
+        PendingErrorBranch(
+            condition=Not(is_valid),
+            status_code=EvmStatusCode.INVALID_JUMP,
+            terminal_state=state.copy(),
+        )
+    )
 
 
 def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
@@ -850,13 +856,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
 
     elif kind == "SSTORE":
         # SSTORE: Pop key and value, store in storage
+        #
+        # 没有写保护检查：AOT 的 SSTORE 退出到 Go host，写保护以 Go error 返回
+        # （engine_evm.go:652 直接 return err，不回写 native status），
+        # 状态码 6 在 AOT 运行时不是可观察量，codegen 也从不发射它。
         key, stack_after_pop1 = state.evm_stack.pop()
         val, stack_after_pop2 = stack_after_pop1.pop()
-        if state.read_only:
-            state.error_code = BitVecVal(EvmStatusCode.WRITE_PROTECTION, 8)
-            state.error_string = "Write protection violation"
-            state.evm_stack = stack_after_pop2
-            return state
         state.evm_storage = state.evm_storage.sstore(key, val)
         state.evm_stack = stack_after_pop2
         return state
@@ -964,16 +969,39 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         data_offset_bv, stack_after_pop2 = stack_after_pop1.pop()
         length_bv, stack_after_pop3 = stack_after_pop2.pop()
 
-        # 越界检查：当 data_offset + length > return_data_size 时返回错误
-        doff = simplify(data_offset_bv, blast_select_store=True)
-        dlen = simplify(length_bv, blast_select_store=True)
-        dsize = state.callengine_return_data_size_bytes
-        if isinstance(doff, BitVecNumRef) and isinstance(dlen, BitVecNumRef) and isinstance(dsize, BitVecNumRef):
-            if doff.as_long() + dlen.as_long() > dsize.as_long():
-                state.error_code = BitVecVal(EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8)
-                state.error_string = "Return data out of bounds"
-                state.evm_stack = stack_after_pop3
-                return state
+        # 三次 popUint256 在越界检查之前（impl_amd64.go:3128-3130），先把弹栈结果
+        # 写回去，快照才能带上已弹栈的状态。
+        state.evm_stack = stack_after_pop3
+
+        # 镜像 compileEVMRETURNDATACOPY（impl_amd64.go:3143-3178）的三条错误分支，
+        # 它们都跳到同一个 errPoint 发射 exit(ReturnDataOutOfBounds)：
+        #   1. compileLocIsUint64(d1..d4) 失败 —— dataOffset 高 192 位非零
+        #   2. ADDQ + ADCQ 0 + TESTQ/JNE   —— dataOffset.z0 + length.z0 的 64 位进位
+        #   3. CMPQ reg2, tmpReg + JCS     —— returnDataSize < end（无符号）
+        # codegen 只取 length 低 64 位（compileLoadValueToRegister(l1, reg1)），
+        # 不检查 length 是否 uint64——不要补 IsUint64(length)。
+        # blast_select_store 折叠栈上的 Store/Select 链，具体输入才能化简成字面
+        # True/False，否则"必然越界"识别不出来，会白留一条不可满足的正常路径。
+        d_low = simplify(Extract(63, 0, data_offset_bv), blast_select_store=True)
+        l_low = simplify(Extract(63, 0, length_bv), blast_select_store=True)
+        d_hi = simplify(Extract(255, 64, data_offset_bv), blast_select_store=True)
+        end = d_low + l_low
+        d_hi_nonzero = d_hi != BitVecVal(0, 192)
+        carry = ULT(end, d_low)   # 64-bit 无符号回绕即进位
+        size_too_small = ULT(state.callengine_return_data_size_bytes, end)
+        oob_cond = simplify(Or(d_hi_nonzero, carry, size_too_small))
+
+        if not is_false(oob_cond):
+            # 快照：已弹栈、未写内存，对齐 x86 的 exit-before-copy 时刻。
+            state.pending_errors.append(
+                PendingErrorBranch(
+                    condition=oob_cond,
+                    status_code=EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS,
+                    terminal_state=state.copy(),
+                )
+            )
+        if is_true(oob_cond):
+            return state   # 必然越界，没有正常路径
 
         data_offset_64 = _uint256_to_u64_with_overflow_max(data_offset_bv)
 
@@ -987,7 +1015,6 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             return_data_byte,
             effect_tag=f"returndatacopy_idx_{op.pc}",
         )
-        state.evm_stack = stack_after_pop3
         return state
 
     elif kind == "CALLVALUE":
@@ -1347,8 +1374,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # 更新栈（两个值都已弹出）
         state.evm_stack = stack_after_pop2
         
-        state.error_code = BitVecVal(EvmStatusCode.RETURNED, 8)
-        state.error_string = "stop token"
+        set_terminal_status(state, EvmStatusCode.RETURNED)
         return state
     
     elif kind == "JUMPI":
@@ -1400,14 +1426,12 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         state.return_offset = return_offset_64
         state.return_length = return_length_64
         state.evm_stack = stack_after_pop2
-        state.error_code = BitVecVal(EvmStatusCode.REVERTED, 8)
-        state.error_string = "Execution reverted"
+        set_terminal_status(state, EvmStatusCode.REVERTED)
         return state
 
     elif kind == "STOP":
         # STOP: 对状态无堆栈影响
-        state.error_code = BitVecVal(EvmStatusCode.STOPPED, 8)
-        state.error_string = "stop token"
+        set_terminal_status(state, EvmStatusCode.STOPPED)
         return state
 
     elif kind == "LOG":
@@ -1431,8 +1455,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
 
     elif kind == "INVALID":
         # INVALID: Marks the transaction as invalid / stops execution
-        state.error_code = BitVecVal(EvmStatusCode.INVALID, 8)
-        state.error_string = "Invalid opcode"
+        set_terminal_status(state, EvmStatusCode.INVALID)
         return state
 
     else:
@@ -1441,135 +1464,3 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
 
         # 抛出错误，因为未知操作不应该出现
         raise ValueError(f"Unknown operation: {kind}")
-
-
-def execute_block_with_tag(block: EVMBlock, state: SMTState) -> Tuple[SMTState, Dict[str, Any]]:
-    """使用基于TAG的路径分割执行块（级别1：块级合并）。
-    
-    TAG指令创建3条路径：
-    - 路径1：SP < min_depth -> 错误路径（返回错误状态码）
-    - 路径2：SP > max_depth -> 错误路径（返回错误状态码）
-    - 路径3：min_depth <= SP <= max_depth -> 正常执行路径
-    
-    这3条路径使用Z3 If表达式合并。
-    
-    Args:
-        block: 要执行的EVM块
-        state: 初始SMT状态
-        
-    Returns:
-        (merged_state, result_dict)元组，其中：
-        - merged_state: 包含所有3条路径合并结果的状态
-        - result_dict: 包含合并返回值的字典（offset, length, memory, has_return_data）
-    """
-    from z3 import IntVal
-    
-    # 获取栈指针作为Int（SP在EVMStackState中是Int类型）
-    sp = state.evm_stack.SP
-    
-    # 将min_depth和max_depth转换为Int以便比较
-    min_depth_int = IntVal(block.min_depth)
-    max_depth_int = IntVal(block.max_depth)
-    
-    # 构建路径条件
-    # 路径1：SP < min_depth -> 错误
-    path1_condition = sp < min_depth_int
-    
-    # 路径2：SP > max_depth -> 错误
-    path2_condition = sp > max_depth_int
-    
-    # 路径3：min_depth <= SP <= max_depth -> 正常
-    path3_condition = And(sp >= min_depth_int, sp <= max_depth_int)
-    
-    # 执行路径1：SP < min_depth -> 错误路径
-    # 错误路径返回错误状态码（当前抽象下不暴露非空 return data）
-    from z3 import BitVecVal
-    path1_state = state.copy()
-    path1_state.return_offset = BitVecVal(0, 64)
-    path1_state.return_length = BitVecVal(0, 64)
-    path1_state.error_code = BitVecVal(EvmStatusCode.STACK_UNDERFLOW, 8)
-    path1_state.error_string = "Stack underflow"
-    # 注意：在实际实现中，我们可能会设置特定的错误状态码。
-    # 当前抽象只保留“是否暴露非空 return data”这一外部可观察效果。
-    
-    # 执行路径2：SP > max_depth -> 错误路径
-    path2_state = state.copy()
-    path2_state.return_offset = BitVecVal(0, 64)
-    path2_state.return_length = BitVecVal(0, 64)
-    path2_state.error_code = BitVecVal(EvmStatusCode.STACK_REACHED_LIMIT, 8)
-    path2_state.error_string = "Stack reached limit" 
-    
-    # 执行路径3：min_depth <= SP <= max_depth -> 正常执行
-    path3_state = state.copy()
-    
-    # 执行块中的所有操作（跳过TAG和BLOCKEND）
-    for op in block.operations:
-        kind = op.kind.upper()
-        if kind == "TAG":
-            # TAG在块级别处理，这里跳过
-            continue
-        elif kind == "BLOCKEND":
-            # BLOCKEND是标记，跳过
-            continue
-        else:
-            # 执行操作
-            path3_state = op.to_z3(path3_state)
-    
-    # 使用If表达式合并3条路径
-    # 结构：If(path1_cond, path1_result, If(path2_cond, path2_result, path3_result))
-    merged_state = state.copy()
-    
-    # 合并return_offset
-    merged_state.return_offset = If(
-        path1_condition,
-        path1_state.return_offset,
-        If(
-            path2_condition,
-            path2_state.return_offset,
-            path3_state.return_offset
-        )
-    )
-    
-    # 合并return_length
-    merged_state.return_length = If(
-        path1_condition,
-        path1_state.return_length,
-        If(
-            path2_condition,
-            path2_state.return_length,
-            path3_state.return_length
-        )
-    )
-    
-    # 合并内存（EVM内存Array）
-    # 注意：内存合并更复杂，我们需要合并整个Array
-    # 目前，我们使用path3的内存（正常路径），因为错误路径不修改内存
-    # 在更复杂的实现中，我们可能需要逐元素合并Arrays
-    # 合并 error_code 和 error_string
-    merged_state.error_code = If(
-        path1_condition, path1_state.error_code,
-        If(path2_condition, path2_state.error_code, path3_state.error_code)
-    )
-    # error_string 不做符号合并，保持 path3 的值（正常路径）
-    merged_state.error_string = path3_state.error_string
-
-    merged_state.evm_memory = path3_state.evm_memory
-    
-    # 合并栈
-    # 类似于内存，我们使用path3的栈进行正常执行
-    # 错误路径不会有意义地修改栈
-    merged_state.evm_stack = path3_state.evm_stack
-    
-    # 构建结果字典
-    from z3 import BitVecVal
-    has_return_data = merged_state.return_length != BitVecVal(0, 64)
-    
-    result = {
-        'offset': merged_state.return_offset,
-        'length': merged_state.return_length,
-        'memory': merged_state.evm_memory.Memory,
-        'base_addr': None,  # EVM内存使用直接偏移量
-        'has_return_data': has_return_data
-    }
-    
-    return merged_state, result

@@ -37,10 +37,10 @@ from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register
 
 
-def _evm_block(pc, ops):
+def _evm_block(pc, ops, is_jump_target=False):
     block = EVMBlock(
         pc=pc, stack_depth=0, min_depth=0, max_depth=1024, static_gas=0,
-        is_jump_target=False, is_inner_block=False, is_stop=False,
+        is_jump_target=is_jump_target, is_inner_block=False, is_stop=False,
         operations=ops,
     )
     for op in ops:
@@ -49,7 +49,7 @@ def _evm_block(pc, ops):
 
 
 def _make_evm_loop_blocks():
-    header = _evm_block(0, [
+    header = _evm_block(0, is_jump_target=True, ops=[
         EvmOperator(kind="TAG", pc=0),
         EvmOperator(kind="DUP", pc=1, param=1),
         EvmOperator(kind="ISZERO", pc=2),
@@ -62,7 +62,7 @@ def _make_evm_loop_blocks():
         EvmOperator(kind="SUB", pc=23),
         EvmOperator(kind="JUMP", pc=24, immediate=0, is_static=True),
     ])
-    exit_block = _evm_block(30, [
+    exit_block = _evm_block(30, is_jump_target=True, ops=[
         EvmOperator(kind="TAG", pc=30),
         EvmOperator(kind="STOP", pc=31),
     ])

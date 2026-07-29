@@ -6,7 +6,12 @@ Status Code 定义模块。
 """
 
 from enum import IntEnum
-from typing import Dict, Optional
+from typing import Dict, TYPE_CHECKING
+
+from z3 import BitVecVal
+
+if TYPE_CHECKING:
+    from state.smt_state import SMTState
 
 
 class EvmStatusCode(IntEnum):
@@ -65,49 +70,18 @@ STATUS_CODE_MESSAGES: Dict[EvmStatusCode, str] = {
 }
 
 
-ERROR_MESSAGE_TO_STATUS_CODE: Dict[str, EvmStatusCode] = {
-    message: code for code, message in STATUS_CODE_MESSAGES.items()
-}
-
-
 def get_status_message(code: EvmStatusCode) -> str:
     """获取状态码对应的错误消息。"""
     return STATUS_CODE_MESSAGES.get(code, "Unknown status code")
 
 
-def get_status_code_from_error(error_message: Optional[str]) -> Optional[EvmStatusCode]:
-    """根据错误消息获取对应的状态码。"""
-    if error_message is None:
-        return None
-    return ERROR_MESSAGE_TO_STATUS_CODE.get(error_message)
+def set_terminal_status(state: "SMTState", code: EvmStatusCode) -> None:
+    """把终止状态码写进 state，``error_string`` 由状态码单向投影得出。
 
+    这是两者的**唯一**写入点。各写各的会漂（历史上 STOP 曾写成 RETURNED 的
+    字面量），做成投影关系后结构上不可能再漂。
 
-def is_error_status(code: EvmStatusCode) -> bool:
-    """判断是否为错误状态码。"""
-    return code in (
-        EvmStatusCode.INVALID,
-        EvmStatusCode.WRITE_PROTECTION,
-        EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS,
-        EvmStatusCode.INVALID_JUMP,
-        EvmStatusCode.INVALID_RETSUB,
-        EvmStatusCode.RETURN_STACK_EXCEEDED,
-        EvmStatusCode.INVALID_SUBROUTINE_ENTRY,
-        EvmStatusCode.OUT_OF_GAS,
-        EvmStatusCode.GAS_UINT_OVERFLOW,
-        EvmStatusCode.STACK_UNDERFLOW,
-        EvmStatusCode.STACK_REACHED_LIMIT,
-        EvmStatusCode.MAX_INIT_CODE_SIZE_EXCEEDED,
-    )
-
-
-def is_termination_status(code: EvmStatusCode) -> bool:
-    """判断是否为终止执行的状态码。"""
-    return code in (
-        EvmStatusCode.RETURNED,
-        EvmStatusCode.REVERTED,
-        EvmStatusCode.STOPPED,
-        EvmStatusCode.INVALID,
-        EvmStatusCode.OUT_OF_GAS,
-        EvmStatusCode.STACK_UNDERFLOW,
-        EvmStatusCode.STACK_REACHED_LIMIT,
-    )
+    ``error_code`` 是权威值（参与 refinement 比较），``error_string`` 只用于诊断。
+    """
+    state.error_code = BitVecVal(int(code), 8)
+    state.error_string = get_status_message(code)

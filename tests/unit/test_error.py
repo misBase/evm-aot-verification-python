@@ -5,13 +5,23 @@ EVM IR and x86-64 final states, and cross-validates that the error/status
 codes are consistent across both sides.
 """
 
+from dataclasses import replace
+
+import pytest
+
 from common.uint256 import Uint256
+from evm_ir.json_parser import CompilerEVMResult
+from evm_ir.models import EVMBlock, EvmOperator
+from evm_ir.program import EVMProgram
+from evm_ir.semantics import evm_operator_to_z3
 from evm_ir.status_code import EvmStatusCode
+from state.smt_state import SMTState
 from tests.integration.test_single_ins_refinement import (
     X86_CONTROL_FLOW_GAS_CONTEXT,
     X86_CORE_BASE_ADDR,
     X86_INVALID_CORE_HEX_SEQUENCE,
     X86_RETURN_CORE_HEX_SEQUENCE,
+    X86_RETURNDATACOPY_CORE_HEX_SEQUENCE,
     X86_STOP_CORE_HEX_SEQUENCE,
     X86_REVERT_CORE_HEX_SEQUENCE,
     X86_STATUS_CODES,
@@ -19,12 +29,13 @@ from tests.integration.test_single_ins_refinement import (
 from tests.support.instruction_refinement import (
     InstructionRefinementCase,
     _build_evm_final_state,
+    _build_evm_initial_state,
     _build_x86_final_state,
     _operands,
     _symbolic_memory_words,
     _symbolic_readonly_words,
 )
-from z3 import BitVecVal, Solver, unsat
+from z3 import And, BitVec, BitVecVal, Not, Solver, is_true, sat, simplify, unsat
 # ---- Helper: construct concrete code words from bytecode hex ----
 def _code_words_from_hex(code_hex: str, num_words: int = 1) -> list[Uint256]:
     """Parse a hex string into num_words Uint256 values (big-endian, zero-padded)."""
@@ -710,3 +721,388 @@ def test_missing_max_depth_defaults_to_go_initial_value():
     final_states = _run_executor(block, IntVal(3))
     assert set(_states_by_status(final_states)) == {_status_key(EvmStatusCode.STOPPED)}
 
+
+
+# ---------------------------------------------------------------------------
+# 错误终态的端到端对齐
+#
+# 这些用例证明"错误终态机制本身正确"（两侧都真正产生同一状态码），而不只是
+# "checker 能拒绝不一致"——后者已有覆盖：test_refinement_return_data.py 的
+# merged 入口 + test_program_path_semantics.py 的串行/并行/aggregate fallback。
+#
+# gas-safe test domain：RETURNDATACOPY 的机器码在 OOB 检查之前先跑
+# checkMemoryAndCalcDynamicGasReturnDataCopy，所以一律用具体小 length、具体安全
+# memOffset、固定充足 gas，只让 dataOffset 变化，避免撞进本轮不建模的 gas 分支。
+# ---------------------------------------------------------------------------
+
+def _returndatacopy_oob_case(name: str, operand_values: tuple[int, int, int],
+                             return_data_size_bytes: int) -> InstructionRefinementCase:
+    """operand_values 按压栈顺序给出 (length, dataOffset, memOffset)。"""
+    return InstructionRefinementCase(
+        name=name,
+        evm_kind="RETURNDATACOPY",
+        arity=3,
+        x86_core_hex=X86_RETURNDATACOPY_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        operand_values=operand_values,
+        return_data_size_bytes=return_data_size_bytes,
+        expected_status_code=X86_STATUS_CODES["return_data_out_of_bounds"],
+        x86_execution_mode="cfg",
+        x86_max_depth=120,
+    )
+
+
+def _both_sides(case: InstructionRefinementCase):
+    operands = _operands(case)
+    memory_words = _symbolic_memory_words(case)
+    readonly_words = _symbolic_readonly_words(case)
+    return (
+        _build_evm_final_state(case, operands, memory_words, readonly_words),
+        _build_x86_final_state(case, operands, memory_words, readonly_words),
+    )
+
+
+def test_returndatacopy_out_of_bounds_status_matches_x86():
+    """dataOffset+length 超出 returnDataSize：两侧都得 RETURN_DATA_OUT_OF_BOUNDS。"""
+    evm_state, x86_state = _both_sides(
+        _returndatacopy_oob_case("RETURNDATACOPY_OOB", (4, 10, 0), 8)
+    )
+
+    solver = Solver()
+    solver.add(evm_state.error_code != BitVecVal(
+        EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8))
+    assert solver.check() == unsat, "EVM 侧应恒为 RETURN_DATA_OUT_OF_BOUNDS"
+
+    solver = Solver()
+    solver.add(x86_state.callengine_status_code != BitVecVal(
+        EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8))
+    assert solver.check() == unsat, "x86 侧应恒为 RETURN_DATA_OUT_OF_BOUNDS"
+
+    # 真正的精化断言：两侧状态码对所有输入相等。
+    solver = Solver()
+    solver.add(evm_state.error_code != x86_state.callengine_status_code)
+    assert solver.check() == unsat, "两侧终止状态码必须一致"
+
+
+def test_returndatacopy_data_offset_overflow_status_matches_x86():
+    """dataOffset 超出 uint64 —— compileLocIsUint64 那一支，两侧都得 7。"""
+    evm_state, x86_state = _both_sides(
+        _returndatacopy_oob_case("RETURNDATACOPY_HI", (0, 1 << 64, 0), 8)
+    )
+
+    solver = Solver()
+    solver.add(evm_state.error_code != x86_state.callengine_status_code)
+    assert solver.check() == unsat, "dataOffset 溢出时两侧状态码必须一致"
+
+    solver = Solver()
+    solver.add(evm_state.error_code != BitVecVal(
+        EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8))
+    assert solver.check() == unsat
+
+
+def test_returndatacopy_in_bounds_x86_reaches_stop_exit():
+    """安全输入下 x86 绕过 OOB stub，走到 core 末尾的 STOP exit。
+
+    只断言 x86 一侧：单指令桩的 EVM 只执行 RETURNDATACOPY，安全输入下停在
+    RETURNED(0)，与 x86 的 STOPPED 本就不该相等。双边全输入证明见
+    test_returndatacopy_symbolic_offset_status_matches_x86_end_to_end。
+    """
+    case = _returndatacopy_oob_case("RETURNDATACOPY_SAFE", (4, 1, 0), 8)
+    case = replace(case, expected_status_code=X86_STATUS_CODES["stopped"])
+    _, x86_state = _both_sides(case)
+
+    solver = Solver()
+    solver.add(x86_state.callengine_status_code != BitVecVal(
+        EvmStatusCode.STOPPED, 8))
+    assert solver.check() == unsat, "安全输入下 x86 应走到 STOP exit"
+
+
+def test_returndatacopy_oob_then_stop_keeps_error_status():
+    """同 block 短路：OOB 之后的 STOP 不得执行，状态码保持 7（旧实现给 STOPPED）。"""
+    rdc = EvmOperator(kind="RETURNDATACOPY", pc=0)
+    stop = EvmOperator(kind="STOP", pc=1)
+    block = EVMBlock(
+        pc=0, stack_depth=3, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=False, is_inner_block=False, is_stop=True,
+        operations=[rdc, stop],
+    )
+    rdc.block = block
+    stop.block = block
+
+    state = SMTState.create_initial_state()
+    state.callengine_return_data_size_bytes = BitVecVal(8, 64)
+    for value in (4, 10, 0):   # length, dataOffset, memOffset
+        state.evm_stack = state.evm_stack.push(BitVecVal(value, 256))
+
+    paths = EVMProgram(CompilerEVMResult(blocks=[block])).to_z3_paths(state)
+
+    assert len(paths.observations) == 1
+    assert is_true(simplify(
+        paths.observations[0].status_code
+        == BitVecVal(EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8)
+    )), "OOB 之后的 STOP 覆盖了错误码"
+
+
+def test_returndatacopy_symbolic_offset_splits_exclusive_covering_paths():
+    """符号 dataOffset：正常路径与 OOB 路径并存，条件互斥且覆盖全输入。"""
+    rdc = EvmOperator(kind="RETURNDATACOPY", pc=0)
+    stop = EvmOperator(kind="STOP", pc=1)
+    block = EVMBlock(
+        pc=0, stack_depth=3, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=False, is_inner_block=False, is_stop=True,
+        operations=[rdc, stop],
+    )
+    rdc.block = block
+    stop.block = block
+
+    data_offset = BitVec("e2e_data_offset", 256)
+    state = SMTState.create_initial_state()
+    state.callengine_return_data_size_bytes = BitVecVal(8, 64)
+    state.evm_stack = state.evm_stack.push(BitVecVal(4, 256))    # length
+    state.evm_stack = state.evm_stack.push(data_offset)          # dataOffset
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))    # memOffset
+
+    paths = EVMProgram(CompilerEVMResult(blocks=[block])).to_z3_paths(state)
+    assert len(paths.observations) == 2, "应当分裂成正常路径与 OOB 路径"
+
+    by_status = {}
+    for obs in paths.observations:
+        by_status[str(simplify(obs.status_code))] = obs.condition
+    assert set(by_status) == {
+        str(BitVecVal(EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8)),
+        str(BitVecVal(EvmStatusCode.STOPPED, 8)),
+    }, f"意外的状态码集合: {set(by_status)}"
+
+    conditions = list(by_status.values())
+    overlap = Solver()
+    overlap.add(And(*conditions))
+    assert overlap.check() == unsat, "两条路径条件必须互斥"
+
+    gap = Solver()
+    gap.add(And(*[Not(c) for c in conditions]))
+    assert gap.check() == unsat, "两条路径条件必须覆盖全部输入"
+
+
+def test_static_invalid_jump_produces_terminal_status_not_exception():
+    """全程序静态非法跳转得到 INVALID_JUMP 终态，而不是 LogicError（这类程序原本验不了）。"""
+    jump = EvmOperator(kind="JUMP", pc=4, immediate=10, is_static=True)
+    entry = EVMBlock(
+        pc=0, stack_depth=0, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=False, is_inner_block=False, is_stop=False,
+        operations=[jump],
+    )
+    stop = EvmOperator(kind="STOP", pc=7)
+    target = EVMBlock(
+        pc=6, stack_depth=0, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=True, is_inner_block=False, is_stop=True,
+        operations=[stop],
+    )
+    jump.block = entry
+    stop.block = target
+
+    paths = EVMProgram(CompilerEVMResult(blocks=[entry, target])).to_z3_paths(
+        SMTState.create_initial_state()
+    )
+
+    assert len(paths.observations) == 1
+    assert is_true(simplify(
+        paths.observations[0].status_code == BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
+    ))
+
+
+def test_program_without_jumpdest_makes_every_jump_invalid():
+    """一个 JUMPDEST 都没有的程序：任何跳转都是 INVALID_JUMP（对齐空 jumpTable）。"""
+    jump = EvmOperator(kind="JUMP", pc=4, immediate=6, is_static=True)
+    entry = EVMBlock(
+        pc=0, stack_depth=0, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=False, is_inner_block=False, is_stop=False,
+        operations=[jump],
+    )
+    stop = EvmOperator(kind="STOP", pc=7)
+    # 注意 is_jump_target=False：目标块存在，但不是 JUMPDEST。
+    target = EVMBlock(
+        pc=6, stack_depth=0, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=False, is_inner_block=False, is_stop=True,
+        operations=[stop],
+    )
+    jump.block = entry
+    stop.block = target
+
+    paths = EVMProgram(CompilerEVMResult(blocks=[entry, target])).to_z3_paths(
+        SMTState.create_initial_state()
+    )
+
+    assert len(paths.observations) == 1
+    assert is_true(simplify(
+        paths.observations[0].status_code == BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
+    ))
+
+
+def test_mutated_status_immediate_is_detected():
+    """负向故障注入：只改 STOP core hex 里的 status 立即数，必须被抓到。
+
+    比拿两个不同程序对比更精准：只改变 status 这一个 observable。
+    """
+    original = X86_STOP_CORE_HEX_SEQUENCE
+    # compileExitFromNativeCode 的 `mov byte [r13+0xe0], 2`（STOPPED）
+    marker = "41c685e000000002"
+    assert original.count(marker) >= 1
+    # 改**第一处**：它后面紧跟 RET，是执行真正到达的 exit。core 末尾还有一处
+    # 同样的写入（块末尾的隐式 STOP），那里是到不了的死代码，改它不会有效果。
+    head, _, tail = original.partition(marker)
+    mutated = head + "41c685e000000000" + tail
+
+    assert len(mutated) == len(original)
+    assert sum(a != b for a, b in zip(mutated, original)) == 1, "只应有一个字符不同"
+
+    def status_of(core_hex: str):
+        case = InstructionRefinementCase(
+            name="STOP_MUTATION",
+            evm_kind="STOP",
+            arity=0,
+            x86_core_hex=core_hex,
+            base_addr=X86_CORE_BASE_ADDR,
+            expected_stack_height=0,
+            x86_execution_mode="cfg",
+            x86_callengine_limb_values=X86_CONTROL_FLOW_GAS_CONTEXT,
+        )
+        operands = _operands(case)
+        return _build_x86_final_state(
+            case, operands, _symbolic_memory_words(case), _symbolic_readonly_words(case)
+        ).callengine_status_code
+
+    evm_stopped = BitVecVal(EvmStatusCode.STOPPED, 8)
+
+    clean = Solver()
+    clean.add(status_of(original) != evm_stopped)
+    assert clean.check() == unsat, "未篡改的 hex 应与 EVM 的 STOPPED 一致"
+
+    tampered = Solver()
+    tampered.add(status_of(mutated) != evm_stopped)
+    assert tampered.check() == sat, "篡改后的 status 必须被检出与 EVM 不一致"
+
+
+def test_returndatacopy_symbolic_offset_status_matches_x86_end_to_end():
+    """符号 dataOffset 下两侧状态码对**所有输入**相等。
+
+    EVM 侧必须跑 ``RETURNDATACOPY; STOP`` 而非单 opcode：x86 core 在 OOB 检查后
+    还有 STOP exit，单 opcode 在安全输入下停在 RETURNED(0)，比较会得到假反例。
+    """
+    case = InstructionRefinementCase(
+        name="RDC_SYMBOLIC",
+        evm_kind="RETURNDATACOPY",
+        arity=3,
+        x86_core_hex=X86_RETURNDATACOPY_CORE_HEX_SEQUENCE,
+        base_addr=X86_CORE_BASE_ADDR,
+        # gas-safe：length / memOffset 固定，只让 dataOffset 符号化。
+        operand_values=(4, None, 0),
+        initial_return_data_word_offsets=(0,),
+        return_data_size_bytes=8,
+        x86_execution_mode="cfg",
+        x86_max_depth=120,
+    )
+    operands = _operands(case)
+    memory_words = _symbolic_memory_words(case)
+    readonly_words = _symbolic_readonly_words(case)
+
+    x86_state = _build_x86_final_state(case, operands, memory_words, readonly_words)
+
+    rdc = EvmOperator(kind="RETURNDATACOPY", pc=0)
+    stop = EvmOperator(kind="STOP", pc=1)
+    block = EVMBlock(
+        pc=0, stack_depth=3, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=False, is_inner_block=False, is_stop=True,
+        operations=[rdc, stop],
+    )
+    rdc.block = block
+    stop.block = block
+    paths = EVMProgram(CompilerEVMResult(blocks=[block])).to_z3_paths(
+        _build_evm_initial_state(case, operands, memory_words, readonly_words)
+    )
+
+    statuses = {str(simplify(obs.status_code)) for obs in paths.observations}
+    assert statuses == {
+        str(BitVecVal(EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8)),
+        str(BitVecVal(EvmStatusCode.STOPPED, 8)),
+    }, f"应当分裂出 OOB 与正常两条路径，实际: {statuses}"
+
+    for index, obs in enumerate(paths.observations):
+        solver = Solver()
+        solver.add(obs.condition)
+        solver.add(obs.status_code != x86_state.callengine_status_code)
+        assert solver.check() == unsat, (
+            f"EVM path[{index}] (status={simplify(obs.status_code)}) "
+            f"与 x86 状态码存在反例"
+        )
+
+
+def test_symbolic_condition_invalid_jumpi_splits_instead_of_raising():
+    """符号 condition 的非法 JUMPI：分裂成 INVALID_JUMP 与 fallthrough 两条终态。
+
+    taken 的可行性必须结合路径约束判定：jump_condition 自身 simplify 不出 False，
+    只看它会走进目标块查找并抛 missing_jump_target。
+    """
+    jumpi = EvmOperator(kind="JUMPI", pc=4, immediate=10, is_static=True)
+    entry = EVMBlock(
+        pc=0, stack_depth=1, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=False, is_inner_block=False, is_stop=False,
+        operations=[jumpi],
+    )
+    fallthrough_stop = EvmOperator(kind="STOP", pc=5)
+    fallthrough = EVMBlock(
+        pc=5, stack_depth=0, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=False, is_inner_block=False, is_stop=True,
+        operations=[fallthrough_stop],
+    )
+    # 另有合法 JUMPDEST，避免落进"空 jumpTable ⇒ 一切非法"的特例。
+    legal_stop = EvmOperator(kind="STOP", pc=7)
+    legal_target = EVMBlock(
+        pc=6, stack_depth=0, min_depth=0, max_depth=1024, static_gas=0,
+        is_jump_target=True, is_inner_block=False, is_stop=True,
+        operations=[legal_stop],
+    )
+    for op, blk in ((jumpi, entry), (fallthrough_stop, fallthrough), (legal_stop, legal_target)):
+        op.block = blk
+
+    state = SMTState.create_initial_state()
+    state.evm_stack = state.evm_stack.push(BitVec("jumpi_cond", 256))
+
+    paths = EVMProgram(
+        CompilerEVMResult(blocks=[entry, fallthrough, legal_target])
+    ).to_z3_paths(state)
+
+    by_status = {str(simplify(obs.status_code)): obs.condition
+                 for obs in paths.observations}
+    assert set(by_status) == {
+        str(BitVecVal(EvmStatusCode.INVALID_JUMP, 8)),
+        str(BitVecVal(EvmStatusCode.STOPPED, 8)),
+    }, f"意外的状态码集合: {set(by_status)}"
+
+    conditions = list(by_status.values())
+    overlap = Solver()
+    overlap.add(And(*conditions))
+    assert overlap.check() == unsat, "taken 与 fallthrough 路径条件必须互斥"
+
+    gap = Solver()
+    gap.add(And(*[Not(c) for c in conditions]))
+    assert gap.check() == unsat, "两条路径条件必须覆盖全部输入"
+
+
+def test_copy_with_unconsumed_pending_error_fails_closed():
+    """soundness guard：带未消费错误分支的 state 不得被复制（静默重置会让错误路径消失）。"""
+    from utils.exceptions import LogicError
+
+    state = SMTState()
+    state.callengine_return_data_size_bytes = BitVecVal(8, 64)
+    for value in (4, 10, 0):   # length, dataOffset, memOffset —— 必然越界
+        state.evm_stack = state.evm_stack.push(BitVecVal(value, 256))
+    state = evm_operator_to_z3(EvmOperator(kind="RETURNDATACOPY", pc=0), state)
+    assert state.pending_errors, "前置条件：该输入应当产生错误分支"
+
+    with pytest.raises(LogicError) as excinfo:
+        state.copy()
+    assert excinfo.value.error_code == "unconsumed_pending_errors"
+
+    # 消费之后可以正常复制。
+    state.pending_errors = []
+    assert state.copy() is not None

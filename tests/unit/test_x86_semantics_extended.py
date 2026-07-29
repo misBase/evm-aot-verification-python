@@ -7,6 +7,7 @@ from z3 import BitVecVal, simplify, is_true
 from state.smt_state import SMTState, MemoryDomain
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register
+from utils.exceptions import UnsupportedCallEngineAccessError
 
 
 def _exec_single(hex_code: str, state: SMTState) -> SMTState:
@@ -466,3 +467,38 @@ def test_setcc_memory_only_writes_one_byte():
     out = _exec_single("0f9500", st)  # setne byte ptr [rax], ZF=1 => 0
     assert is_true(simplify(out.x86_memory.load_byte(BitVecVal(0x350, 64), domain=MemoryDomain.STACK) == BitVecVal(0, 8)))
     assert is_true(simplify(out.x86_memory.load_byte(BitVecVal(0x351, 64), domain=MemoryDomain.STACK) == BitVecVal(0xBB, 8)))
+
+
+# ---- callEngine side-channel 写入宽度 fail-closed ----
+#
+# compileExitFromNativeCode (impl_amd64.go:388) 用 MOVB 写 [r13+0xE0]。若 codegen
+# 改用其它宽度，静默跳过更新会让 ret 语义读到陈旧的 RETURNED(0)——方向朝假绿。
+
+def _state_with_callengine_base(base: int = 0x10000) -> SMTState:
+    st = SMTState()
+    st.x86_registers.set_register(Register.R13, BitVecVal(base, 64))
+    st.x86_registers.set_register(Register.R14, BitVecVal(0x20000, 64))
+    st.x86_registers.set_register(Register.R15, BitVecVal(0x30000, 64))
+    return st
+
+
+def test_status_code_byte_write_updates_side_channel():
+    """MOVB [r13+0xE0], 2 —— 建模内的宽度，side-channel 正常更新。"""
+    out = _exec_single("41c685e000000002", _state_with_callengine_base())
+    assert is_true(simplify(out.callengine_status_code == BitVecVal(2, 8)))
+
+
+def test_status_code_dword_write_is_fail_closed():
+    """MOVL [r13+0xE0], 2 —— 未建模宽度必须抛错，不能静默保留旧值。"""
+    with pytest.raises(UnsupportedCallEngineAccessError) as excinfo:
+        _exec_single("41c785e000000002000000", _state_with_callengine_base())
+    assert excinfo.value.offset == 0xE0
+    assert excinfo.value.size_bytes == 4
+
+
+def test_unmodeled_callengine_offset_is_still_ignored():
+    """未建模的 offset 不受影响：仍然只写内存，不抛错。"""
+    # mov qword ptr [r13+0x200], 7 —— 0x200 不在 side-channel 表里
+    out = _exec_single("49c78500020000 07000000".replace(" ", ""),
+                       _state_with_callengine_base())
+    assert is_true(simplify(out.callengine_status_code == BitVecVal(0, 8)))

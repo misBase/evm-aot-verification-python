@@ -4,13 +4,13 @@
 from common.uint256 import Uint256
 from evm_ir.semantics import EVMIRSemantics, EVMOperationSemantics, evm_operator_to_z3
 from evm_ir.models import EvmOperator
-from evm_ir.status_code import EvmStatusCode, get_status_code_from_error
+from evm_ir.status_code import EvmStatusCode, get_status_message, set_terminal_status
 from x86_64.semantics import X86SemanticsModel
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
 from x86_64.models import Register, X86Instruction
 from verification.refinement_checker import RefinementChecker
 from state.smt_state import SMTState, EVMMemoryState, MemoryDomain
-from z3 import And, BitVec, BitVecVal, Select, Store, simplify, is_true, Solver, sat, unsat
+from z3 import And, BitVec, BitVecVal, Not, Select, Store, simplify, is_bv, is_true, Solver, sat, unsat
 
 # x86-64 ADD操作十六进制序列（来自AOT编译器输出）
 X86_ADD_HEX_SEQUENCE = "498b46c0490346e0498b4ec849134ee8498b56d0491356f0498b5ed849135ef8498946c049894ec8498956d049895ed8"
@@ -421,65 +421,165 @@ def test_revert_opcode_stack_order():
     assert solver.check() == sat, "REVERT: offset/length stack order wrong"
 
 
-def test_revert_sets_error_string():
-    """测试 REVERT 会设置错误字符串。"""
+def test_revert_sets_reverted_status():
+    """REVERT 的权威结果是 error_code，不是字符串。"""
     op = EvmOperator(kind="REVERT", pc=0)
     state = SMTState()
     state.evm_stack = state.evm_stack.push(BitVecVal(32, 256))
     state.evm_stack = state.evm_stack.push(BitVecVal(64, 256))
     state = evm_operator_to_z3(op, state)
 
-    assert state.error_string == "Execution reverted"
-    assert get_status_code_from_error(state.error_string) == 1
+    assert is_true(simplify(state.error_code == BitVecVal(EvmStatusCode.REVERTED, 8)))
 
 
-def test_invalid_sets_error_string():
-    """测试 INVALID 会设置错误字符串。"""
+def test_invalid_sets_invalid_status():
+    """INVALID 的权威结果是 error_code，不是字符串。"""
     op = EvmOperator(kind="INVALID", pc=0)
     state = SMTState()
     state = evm_operator_to_z3(op, state)
 
-    assert state.error_string == "Invalid opcode"
-    assert get_status_code_from_error(state.error_string) == 3
+    assert is_true(simplify(state.error_code == BitVecVal(EvmStatusCode.INVALID, 8)))
 
 
-def test_returndatacopy_out_of_bounds_sets_error_string():
-    """测试 RETURNDATACOPY 越界时设置错误字符串。"""
-    op = EvmOperator(kind="RETURNDATACOPY", pc=0)
+def test_set_terminal_status_projects_string_from_code():
+    """error_string 是 error_code 的投影。
+
+    这是唯一该断言字符串的地方：验证投影关系本身没有失效。
+    """
+    for code in (
+        EvmStatusCode.RETURNED,
+        EvmStatusCode.REVERTED,
+        EvmStatusCode.STOPPED,
+        EvmStatusCode.INVALID,
+        EvmStatusCode.INVALID_JUMP,
+        EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS,
+        EvmStatusCode.STACK_UNDERFLOW,
+    ):
+        state = SMTState()
+        set_terminal_status(state, code)
+        assert is_true(simplify(state.error_code == BitVecVal(code, 8)))
+        assert state.error_string == get_status_message(code)
+
+    # STOP 曾经写成 RETURNED 的字面量 "stop token"，守住它不再回来。
+    stopped = SMTState()
+    set_terminal_status(stopped, EvmStatusCode.STOPPED)
+    assert stopped.error_string == "execution stopped"
+
+
+def _returndatacopy_state(data_offset, length, return_data_size: int) -> SMTState:
+    """按 EVM 栈序压入 RETURNDATACOPY 的三个参数并执行。"""
     state = SMTState()
-    state.callengine_return_data_size_bytes = BitVecVal(8, 64)
-    state.evm_stack = state.evm_stack.push(BitVecVal(4, 256))   # length
-    state.evm_stack = state.evm_stack.push(BitVecVal(10, 256))  # returnDataOffset
-    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))   # memOffset
-    state = evm_operator_to_z3(op, state)
-
-    assert state.error_string == "Return data out of bounds"
-    assert get_status_code_from_error(state.error_string) == 7
+    state.callengine_return_data_size_bytes = BitVecVal(return_data_size, 64)
+    for value in (length, data_offset, 0):   # length, returnDataOffset, memOffset
+        state.evm_stack = state.evm_stack.push(
+            value if is_bv(value) else BitVecVal(value, 256)
+        )
+    return evm_operator_to_z3(EvmOperator(kind="RETURNDATACOPY", pc=0), state)
 
 
-def test_sstore_read_only_sets_write_protection_error():
-    """测试 SSTORE 在只读模式下设置写保护错误字符串。"""
+def _sole_error_branch(state: SMTState):
+    assert len(state.pending_errors) == 1, (
+        f"expected exactly one pending error branch, got {len(state.pending_errors)}"
+    )
+    return state.pending_errors[0]
+
+
+# RETURNDATACOPY 的三条错误分支镜像 compileEVMRETURNDATACOPY
+# (impl_amd64.go:3143-3178)，都发射 evmNativeCallStatusCodeReturnDataOutOfBounds。
+
+def test_returndatacopy_size_too_small_is_out_of_bounds():
+    """returnDataSize < dataOffset + length —— CMPQ/JCS 那一支。"""
+    state = _returndatacopy_state(10, 4, 8)
+    branch = _sole_error_branch(state)
+    assert branch.status_code == EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS
+    assert is_true(simplify(branch.condition)), "具体越界输入应当化简成恒真"
+
+
+def test_returndatacopy_in_bounds_has_no_error_branch():
+    """安全输入不应产生错误分支。"""
+    state = _returndatacopy_state(1, 4, 8)
+    assert state.pending_errors == []
+
+
+def test_returndatacopy_data_offset_above_uint64_is_out_of_bounds():
+    """dataOffset 高 192 位非零 —— compileLocIsUint64 那一支。
+
+    注意 x86 只检查 dataOffset 是否 uint64，不检查 length（codegen 只加载 l1）。
+    """
+    state = _returndatacopy_state(BitVecVal(1 << 64, 256), 0, 8)
+    assert is_true(simplify(_sole_error_branch(state).condition))
+
+
+def test_returndatacopy_64bit_carry_is_out_of_bounds():
+    """dataOffset.z0 + length.z0 的 64 位进位 —— ADDQ+ADCQ+TESTQ/JNE 那一支。"""
+    state = _returndatacopy_state(BitVecVal((1 << 64) - 1, 256), 2, 8)
+    assert is_true(simplify(_sole_error_branch(state).condition))
+
+
+def test_returndatacopy_symbolic_offset_splits_paths():
+    """符号 dataOffset 必须分裂出可满足的越界路径。
+
+    旧实现只在三个操作数都具体时才判越界，符号 offset 直接走正常 copy。
+    """
+    data_offset = BitVec("rdc_data_offset", 256)
+    state = _returndatacopy_state(data_offset, 4, 8)
+    condition = _sole_error_branch(state).condition
+
+    oob = Solver()
+    oob.add(condition, data_offset == BitVecVal(10, 256))
+    assert oob.check() == sat, "dataOffset=10, length=4, size=8 必须判越界"
+
+    safe = Solver()
+    safe.add(condition, data_offset == BitVecVal(1, 256))
+    assert safe.check() == unsat, "dataOffset=1, length=4, size=8 不应判越界"
+
+
+def test_returndatacopy_error_snapshot_is_taken_before_memory_write():
+    """错误终态必须是"已弹栈、未写内存"的快照，对齐 x86 的 exit-before-copy。
+
+    取 post-state 会让错误路径带上本不该发生的内存写入，与 x86 侧不一致。
+    """
+    data_offset = BitVec("rdc_snapshot_offset", 256)
+    state = _returndatacopy_state(data_offset, 4, 8)
+    snapshot = _sole_error_branch(state).terminal_state
+
+    # 未写内存：快照的 memory 与全 0 初值一致。
+    probe = BitVec("probe_addr", 64)
+    solver = Solver()
+    solver.add(Select(snapshot.evm_memory.Memory, probe) != BitVecVal(0, 8))
+    assert solver.check() == unsat, "错误快照不应包含任何内存写入"
+
+    # 已弹栈：三个操作数都已弹出，SP 回到初始值。
+    assert is_true(simplify(snapshot.evm_stack.SP == state.evm_stack.SP))
+
+
+def test_sstore_never_produces_native_write_protection_status():
+    """AOT 的 SSTORE 不产生 native status 6。
+
+    写保护在 Go host 函数里以 error 返回（engine_evm.go:652），codegen 从不
+    发射 WRITE_PROTECTION；守住照解释器抄的 read_only 分支不再回来。
+    """
     op = EvmOperator(kind="SSTORE", pc=0)
     state = SMTState()
-    state.read_only = True
     state.evm_stack = state.evm_stack.push(BitVecVal(0x1234, 256))
     state.evm_stack = state.evm_stack.push(BitVecVal(0xAA, 256))
     state = evm_operator_to_z3(op, state)
 
-    assert state.error_string == "Write protection violation"
-    assert get_status_code_from_error(state.error_string) == 6
+    assert state.pending_errors == []
+    assert is_true(simplify(state.error_code == BitVecVal(EvmStatusCode.RETURNED, 8)))
 
 
 def test_jump_sets_invalid_jump_error_when_destination_is_not_jumpdest():
-    """测试 JUMP 在目标不属于合法跳转目标集合时设置错误字符串。"""
+    """目标不在合法集合内时产生一条恒真的 INVALID_JUMP 错误分支。"""
     op = EvmOperator(kind="JUMP", pc=0)
     state = SMTState()
     state.valid_jump_targets = {6}
     state.evm_stack = state.evm_stack.push(BitVecVal(1, 256))
     state = evm_operator_to_z3(op, state)
 
-    assert state.error_string == "Invalid jump destination"
-    assert get_status_code_from_error(state.error_string) == 8
+    branch = _sole_error_branch(state)
+    assert branch.status_code == EvmStatusCode.INVALID_JUMP
+    assert is_true(simplify(branch.condition)), "dest=1 不在 {6} 内，错误条件应恒真"
 
 
 def test_jump_to_valid_target_leaves_error_code_untouched():
@@ -490,7 +590,7 @@ def test_jump_to_valid_target_leaves_error_code_untouched():
     state.evm_stack = state.evm_stack.push(BitVecVal(6, 256))
     state = evm_operator_to_z3(op, state)
 
-    assert state.error_string is None
+    assert state.pending_errors == []
     assert is_true(simplify(state.error_code == BitVecVal(EvmStatusCode.RETURNED, 8)))
 
 
@@ -501,25 +601,41 @@ def test_jump_without_target_set_stays_silent():
     state.evm_stack = state.evm_stack.push(BitVecVal(1, 256))
     state = evm_operator_to_z3(op, state)
 
-    assert state.error_string is None
+    assert state.pending_errors == []
+
+
+def test_jump_with_empty_jumpdest_set_is_always_invalid():
+    """一个 JUMPDEST 都没有时任何跳转都非法。
+
+    对齐 codegen：c.jumpTable 为空 ⇒ 比较链为空 ⇒ 直接 exit(InvalidJump)。
+    """
+    op = EvmOperator(kind="JUMP", pc=0)
+    state = SMTState()
+    state.valid_jump_targets = set()
+    state.evm_stack = state.evm_stack.push(BitVec("any_dest", 256))
+    state = evm_operator_to_z3(op, state)
+
+    branch = _sole_error_branch(state)
+    assert branch.status_code == EvmStatusCode.INVALID_JUMP
+    assert is_true(simplify(branch.condition)), "无 JUMPDEST 时错误条件应恒真"
 
 
 def test_jump_with_immediate_set_uses_candidate_targets():
-    """多目标跳转按 immediate_set 判定：符号 dest 得到 ITE 形式的 error_code。"""
+    """多目标跳转按 immediate_set 判定：符号 dest 得到符号化的错误条件。"""
     op = EvmOperator(kind="JUMP", pc=0, immediate_set=[6, 20])
     state = SMTState()
     dest = BitVec("dest", 256)
     state.evm_stack = state.evm_stack.push(dest)
     state = evm_operator_to_z3(op, state)
 
+    condition = _sole_error_branch(state).condition
+
     solver = Solver()
-    solver.add(dest == BitVecVal(20, 256))
-    solver.add(state.error_code != BitVecVal(EvmStatusCode.RETURNED, 8))
+    solver.add(dest == BitVecVal(20, 256), condition)
     assert solver.check() == unsat, "dest 命中 immediate_set 时不应报 INVALID_JUMP"
 
     solver = Solver()
-    solver.add(dest == BitVecVal(7, 256))
-    solver.add(state.error_code != BitVecVal(EvmStatusCode.INVALID_JUMP, 8))
+    solver.add(dest == BitVecVal(7, 256), Not(condition))
     assert solver.check() == unsat, "dest 未命中 immediate_set 时应报 INVALID_JUMP"
 
 
@@ -533,14 +649,14 @@ def test_jumpi_not_taken_does_not_report_invalid_jump():
     state.evm_stack = state.evm_stack.push(cond)
     state = evm_operator_to_z3(op, state)
 
+    condition = _sole_error_branch(state).condition
+
     solver = Solver()
-    solver.add(cond == BitVecVal(0, 256))
-    solver.add(state.error_code != BitVecVal(EvmStatusCode.RETURNED, 8))
+    solver.add(cond == BitVecVal(0, 256), condition)
     assert solver.check() == unsat, "cond=0 未跳转，不应报 INVALID_JUMP"
 
     solver = Solver()
-    solver.add(cond == BitVecVal(1, 256))
-    solver.add(state.error_code != BitVecVal(EvmStatusCode.INVALID_JUMP, 8))
+    solver.add(cond == BitVecVal(1, 256), Not(condition))
     assert solver.check() == unsat, "cond!=0 且 dest=99 不在集合内，应报 INVALID_JUMP"
 
 

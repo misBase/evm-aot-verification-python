@@ -478,7 +478,13 @@ class TestDynamicJumpHandling:
     """测试动态跳转处理。"""
 
     def test_dynamic_jump_raises_error(self):
-        """测试动态跳转应该抛出错误。"""
+        """测试动态跳转应该抛出错误。
+
+        程序里必须至少有一个 JUMPDEST：跳转目标校验先于动态跳转分析。若
+        jumpTable 为空（一个 JUMPDEST 都没有），任何跳转都是可判定的
+        INVALID_JUMP 终态，根本走不到"动态跳转不支持"这条路径——这与
+        codegen 的 isValidJumpDest 行为一致。
+        """
         from evm_ir.models import EVMBlock, EvmOperator
         from utils.exceptions import UnsupportedJumpError
 
@@ -501,7 +507,18 @@ class TestDynamicJumpHandling:
                         is_static=False
                     )
                 ]
-            )
+            ),
+            EVMBlock(
+                pc=6,
+                stack_depth=0,
+                min_depth=0,
+                max_depth=1024,
+                static_gas=0,
+                is_jump_target=True,
+                is_inner_block=False,
+                is_stop=True,
+                operations=[EvmOperator(kind="STOP", pc=6)],
+            ),
         ]
 
         executor = SymbolicExecutor(blocks)
