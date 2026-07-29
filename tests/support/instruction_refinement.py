@@ -104,6 +104,9 @@ class InstructionRefinementCase:
     code_size_bytes: int | None = None
     return_data_size_bytes: int | None = None
     evm_context_values: tuple[tuple[str, int], ...] = ()
+    # 合法跳转目标（JUMPDEST 的 PC）全集，供 JUMP/JUMPI 目标校验使用。
+    # 全程序验证时由 SymbolicExecutor 预填充；单指令 case 没有块上下文，需在此显式给出。
+    evm_valid_jump_targets: tuple[int, ...] | None = None
     x86_callengine_limb_values: tuple[tuple[int, int], ...] = ()
     x86_stack_byte_values: tuple[tuple[int, int], ...] = ()
     memory_check_offsets: tuple[int, ...] = ()
@@ -552,6 +555,8 @@ def _build_evm_final_state(
         )
     _initialize_evm_readonly_sources(state, case, readonly_words)
     _initialize_evm_context_values(state, case)
+    if case.evm_valid_jump_targets is not None:
+        state.valid_jump_targets = set(case.evm_valid_jump_targets)
 
     return evm_operator_to_z3(_evm_operator(case), state)
 

@@ -349,7 +349,7 @@ class ProgramEquivalenceChecker:
             print("\n[3] Extracting path observations...")
             observation_keys = (
                 "condition, offset, length, memory, base_addr, "
-                "has_return_data, storage, transient_storage"
+                "has_return_data, storage, transient_storage, status_code"
             )
             print(f"    ├─ EVM observation keys: {observation_keys}")
             print(f"    └─ x86 observation keys: {observation_keys}")

@@ -8,6 +8,7 @@ from common.path_observation import PathCoverageCertificate, PathObservation
 from evm_ir.json_parser import CompilerEVMResult
 from evm_ir.models import EVMBlock, EvmOperator
 from evm_ir.program import EVMProgram
+from evm_ir.status_code import EvmStatusCode
 from state.smt_state import SMTState
 from verification.refinement_checker import RefinementChecker, _PathPairChunkCheckResult
 from x86_64.cfg import identify_basic_blocks
@@ -15,7 +16,7 @@ from x86_64.cfg_executor import X86SymbolicExecutor
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import X86Block, X86Instruction
 from x86_64.program import X86Program
-from z3 import BitVec, BitVecVal, BoolVal
+from z3 import BitVec, BitVecVal, BoolVal, Context
 
 
 OBSERVATION_KEYS = {
@@ -27,6 +28,7 @@ OBSERVATION_KEYS = {
     "has_return_data",
     "storage",
     "transient_storage",
+    "status_code",
 }
 
 
@@ -125,6 +127,7 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         ),
         PathObservation(
             condition=selector == BitVecVal(1, 1),
@@ -135,6 +138,7 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         ),
     ]
     x86_observations = [
@@ -147,6 +151,7 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         )
     ]
 
@@ -159,6 +164,97 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
 
     assert verified, message
     assert "2/2 feasible pair(s)" in message
+
+
+def _status_observation(state, *, x86: bool, status_code: int) -> PathObservation:
+    """零长度返回、两侧 observable 完全相同，只有 status code 可变。"""
+    return PathObservation(
+        condition=BoolVal(True),
+        offset=BitVecVal(0, 64),
+        length=BitVecVal(0, 64),
+        memory=state.x86_memory.evm_mem if x86 else state.evm_memory.Memory,
+        base_addr=BitVecVal(0, 64) if x86 else None,
+        has_return_data=BoolVal(False),
+        storage=state.evm_storage.Storage,
+        transient_storage=state.evm_transient_storage.TransientStorage,
+        status_code=BitVecVal(status_code, 8),
+    )
+
+
+def test_status_mismatch_survives_aggregate_return_memory_fallback(monkeypatch):
+    """零长度返回让 aggregate return/memory fallback 必然成功；
+
+    status code 不一致仍必须报失败，不能被 fallback 吞掉。
+    """
+    state = SMTState.create_initial_state()
+    evm_observations = [
+        _status_observation(state, x86=False, status_code=EvmStatusCode.REVERTED)
+    ]
+    x86_observations = [
+        _status_observation(state, x86=True, status_code=EvmStatusCode.STOPPED)
+    ]
+
+    checker = RefinementChecker(timeout_ms=5000)
+    aggregate_results = []
+    original_aggregate = checker._paths._check_evm_path_return_memory_against_x86_union
+
+    def spying_aggregate(*args, **kwargs):
+        result = original_aggregate(*args, **kwargs)
+        aggregate_results.append(result)
+        return result
+
+    monkeypatch.setattr(
+        checker._paths,
+        "_check_evm_path_return_memory_against_x86_union",
+        spying_aggregate,
+    )
+
+    verified, message = checker.check_refinement_paths(
+        evm_observations,
+        x86_observations,
+    )
+
+    # fallback 必须真的被触发且成功，否则这个测试没有覆盖到假绿分支。
+    assert aggregate_results == [True]
+    assert not verified
+    assert "termination status codes differ" in message
+
+
+def test_status_mismatch_detected_in_parallel_path_pairs():
+    """并行 worker 必须把 status_code 翻译到私有 Context 并真正比较。"""
+    state = SMTState.create_initial_state()
+    evm_observations = [
+        _status_observation(state, x86=False, status_code=EvmStatusCode.REVERTED)
+    ]
+    x86_observations = [
+        _status_observation(state, x86=True, status_code=EvmStatusCode.STOPPED)
+    ]
+
+    checker = RefinementChecker(timeout_ms=5000)
+    verified, message = checker.check_refinement_paths(
+        evm_observations,
+        x86_observations,
+        path_pair_workers=2,
+    )
+
+    assert not verified
+    # 必须是"状态码不同"，而不是"status_code 缺失"：后者说明翻译白名单又漏了键。
+    assert "termination status codes differ" in message
+
+
+def test_translate_path_result_preserves_status_code():
+    state = SMTState.create_initial_state()
+    observation = _status_observation(
+        state, x86=False, status_code=EvmStatusCode.REVERTED
+    )
+
+    worker_ctx = Context()
+    translated = RefinementChecker(timeout_ms=1000)._paths._translate_path_result(
+        observation, worker_ctx
+    )
+
+    assert "status_code" in translated
+    assert translated["status_code"].ctx is worker_ctx
 
 
 def test_path_coverage_is_checked_under_precondition():
@@ -174,6 +270,7 @@ def test_path_coverage_is_checked_under_precondition():
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         )
     ]
     x86_observations = [
@@ -186,6 +283,7 @@ def test_path_coverage_is_checked_under_precondition():
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         )
     ]
 
@@ -212,6 +310,7 @@ def test_path_coverage_failure_reports_incomplete_certificate_reason():
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         )
     ]
     coverage = PathCoverageCertificate(
@@ -288,6 +387,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         )
     ]
     x86_observations = [
@@ -300,6 +400,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         ),
         PathObservation(
             condition=BoolVal(True),
@@ -310,6 +411,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
             has_return_data=BoolVal(False),
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
+            status_code=BitVecVal(0, 8),
         ),
     ]
 
@@ -360,7 +462,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
     )
     monkeypatch.setattr(
         checker._paths,
-        "_check_path_pair_storage_transient_with_solver",
+        "_check_path_pair_status_storage_transient_with_solver",
         fake_storage_only,
     )
 

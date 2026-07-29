@@ -11,6 +11,7 @@ from z3 import (
     Select,
     UGE,
     ULT,
+    is_bv,
     sat,
     unsat,
 )
@@ -25,6 +26,11 @@ from .refinement_storage import StorageEquivalenceChecks
 
 if TYPE_CHECKING:
     from state.smt_state import SMTState
+
+
+# EVM error_code 与 x86 callengine_status_code 都建模成 8-bit（Go 的
+# evmNativeCallStatusCode 虽是 uint32，取值都 < 256，codegen 写单字节）。
+_STATUS_CODE_BITS = 8
 
 
 class OutputRefinementChecks:
@@ -65,6 +71,88 @@ class OutputRefinementChecks:
             evm_result, x86_result, deadline,
             path_condition=assumptions,
         )
+
+    @staticmethod
+    def _status_code_operand_problem(evm_status, x86_status) -> Optional[str]:
+        """检查两侧 status_code 是否可直接比较；可比较时返回 None。"""
+        missing = [
+            side
+            for side, value in (("EVM", evm_status), ("x86", x86_status))
+            if value is None
+        ]
+        if missing:
+            return f"status_code missing on {'/'.join(missing)} side"
+
+        for side, value in (("EVM", evm_status), ("x86", x86_status)):
+            if not is_bv(value):
+                return f"{side} status_code is not a BitVec (got {type(value).__name__})"
+            if value.size() != _STATUS_CODE_BITS:
+                return (
+                    f"{side} status_code width is {value.size()}, "
+                    f"expected {_STATUS_CODE_BITS}"
+                )
+
+        if evm_status.ctx is not x86_status.ctx:
+            return "EVM/x86 status_code belong to different Z3 contexts"
+        return None
+
+    def _check_status_code_with_solver(
+        self,
+        solver,
+        evm_result: dict,
+        x86_result: dict,
+        deadline: Optional[float],
+        path_condition,
+        context: str,
+        logs: Optional[list[str]],
+        ctx,
+    ) -> Tuple[bool, Optional[str]]:
+        """证明两侧终止状态码在 path_condition 下恒等。
+
+        操作数不合法时 fail-closed：退化成缺省值互相比较会让漏传 status_code 的
+        producer（如 worker 翻译白名单漏键）静默通过；而把 None 交给 Z3，
+        ``None != BitVecRef`` 会被 Python 求值成 True 变成假反例。
+        """
+        evm_status = evm_result.get('status_code')
+        x86_status = x86_result.get('status_code')
+
+        problem = self._status_code_operand_problem(evm_status, x86_status)
+        if problem is not None:
+            msg = f"✗ cannot verify termination status: {problem}"
+            if context:
+                msg = f"{msg} ({context})"
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+
+        if not self._ctx.reset_solver_with_budget_for(solver, self._ctx.timeout_ms, deadline):
+            msg = self._ctx.timeout_message()
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        solver.add(path_condition)
+        solver.add(evm_status != x86_status)
+
+        start_time = time.time()
+        status_result = solver.check()
+        solve_time = time.time() - start_time
+
+        prefix = f"{context}: " if context else ""
+        self._ctx.emit_solver_log(
+            logs,
+            f"    ├─ {prefix}Status code check: {solve_time:.3f}s, result={status_result}",
+        )
+
+        if status_result == sat:
+            msg = "✗ COUNTEREXAMPLE: termination status codes differ"
+            if context:
+                msg = f"{msg} ({context})"
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+        if status_result != unsat:
+            msg = self._ctx.unknown_message_for_solver(solver, self._ctx.timeout_ms)
+            self._ctx.emit_solver_log(logs, f"    └─ {msg}")
+            return False, msg
+
+        return True, None
 
     def _check_return_metadata_with_solver(
         self,
@@ -218,6 +306,20 @@ class OutputRefinementChecks:
             x86_length != BitVecVal(0, 64, ctx=ctx),
         )
         path_condition = path_condition if path_condition is not None else BoolVal(True, ctx=ctx)
+
+        # 终止状态码一致性：必须在所有 observable 检查之前先证明一次。
+        verified, msg = self._check_status_code_with_solver(
+            solver,
+            evm_result,
+            x86_result,
+            deadline,
+            path_condition,
+            context,
+            logs,
+            ctx,
+        )
+        if not verified:
+            return False, msg
 
         # return metadata 是所有 memory 检查策略的共同前置条件，统一先证明一次。
         verified, msg = self._check_return_metadata_with_solver(

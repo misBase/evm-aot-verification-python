@@ -5,9 +5,9 @@
 将栈、内存和寄存器建模为符号变量。
 """
 
-from typing import Optional
+from typing import Optional, Set
 
-from z3 import BitVec, Array, BitVecSort
+from z3 import BitVec, BitVecVal, Array, BitVecSort
 
 from state.evm_stack_state import EVMStackState
 from state.evm_memory_state import EVMMemoryState
@@ -111,9 +111,12 @@ class SMTState:
         # 存储偏移量和长度而不是提取Array
         # 这允许直接内存比较，没有max_bytes限制
         # 当前抽象下，0 长度表示“不暴露非空 return data”
-        from z3 import BitVecVal
         self.return_offset: BitVec = BitVecVal(0, 64)  # 返回偏移量（64位）
         self.return_length: BitVec = BitVecVal(0, 64)  # 返回长度（64位），0 表示当前抽象下不暴露非空 return data
+        self.error_string: Optional[str] = None      # EVM 执行错误或回滚原因字符串
+        self.error_code: BitVec = BitVecVal(0, 8)     # EVM 执行状态码，0=RETURNED，与 callengine_status_code 对齐
+        self.read_only: bool = False                 # todo: 可能无用,只用于跨合约调用
+        self.valid_jump_targets: Optional[Set[int]] = None  # TAG is_jump_target=True 的 PC 集合
 
         # callEngine 字段的显式 side-channel。
         # x86 指令执行器识别到 mov [r13+KNOWN_OFFSET], ... 时同步更新这些字段，
@@ -226,8 +229,12 @@ class SMTState:
         new_state.evm_gas = self.evm_gas.copy()
         new_state.x86_memory = self.x86_memory.copy()
         new_state.x86_registers = self.x86_registers.copy()
-        new_state.return_offset = self.return_offset
-        new_state.return_length = self.return_length
+        new_state.return_offset = getattr(self, 'return_offset', BitVecVal(0, 64))
+        new_state.return_length = getattr(self, 'return_length', BitVecVal(0, 64))
+        new_state.error_string = getattr(self, 'error_string', None)
+        new_state.read_only = getattr(self, 'read_only', False)
+        new_state.valid_jump_targets = getattr(self, 'valid_jump_targets', None)
+        new_state.error_code = getattr(self, 'error_code', BitVecVal(0, 8))
         self.copy_callengine_side_channels_to(new_state)
         new_state.pc = self.pc
 
