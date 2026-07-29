@@ -48,6 +48,8 @@ _PATH_RESULT_KEYS = (
     "has_return_data",
     "storage",
     "transient_storage",
+    # worker 私有 Context 只翻译这里列出的键，漏键会让 status 比较静默失效。
+    "status_code",
 )
 
 
@@ -208,9 +210,9 @@ class PathRefinementChecks:
                 checked_pair_count += 1
                 context = f"path pair evm[{evm_index}], x86[{x86_index}]"
                 if evm_index in aggregate_memory_verified_evm_paths:
-                    # 该 EVM path 的 return/memory 已由 aggregate fallback 证明；
-                    # 剩余 pair 只需继续检查 storage / transient storage。
-                    verified, msg = self._check_path_pair_storage_transient(
+                    # return/memory 已由 aggregate fallback 证明；status 与 storage
+                    # 不在它的覆盖范围内，剩余 pair 仍要逐对检查。
+                    verified, msg = self._check_path_pair_status_storage_transient(
                         evm_result,
                         x86_result,
                         deadline,
@@ -239,7 +241,7 @@ class PathRefinementChecks:
                                 f"    ├─ EVM path evm[{evm_index}] aggregate "
                                 "x86 return/memory fallback succeeded"
                             )
-                        verified, msg = self._check_path_pair_storage_transient(
+                        verified, msg = self._check_path_pair_status_storage_transient(
                             evm_result,
                             x86_result,
                             deadline,
@@ -251,7 +253,7 @@ class PathRefinementChecks:
                     return checked_pair_count, pair_count, msg
         return checked_pair_count, pair_count, None
 
-    def _check_path_pair_storage_transient(
+    def _check_path_pair_status_storage_transient(
         self,
         evm_result,
         x86_result,
@@ -259,7 +261,7 @@ class PathRefinementChecks:
         path_condition,
         context: str,
     ) -> tuple[bool, Optional[str]]:
-        return self._check_path_pair_storage_transient_with_solver(
+        return self._check_path_pair_status_storage_transient_with_solver(
             self._ctx.solver,
             evm_result,
             x86_result,
@@ -270,7 +272,7 @@ class PathRefinementChecks:
             ctx=None,
         )
 
-    def _check_path_pair_storage_transient_with_solver(
+    def _check_path_pair_status_storage_transient_with_solver(
         self,
         solver,
         evm_result,
@@ -281,7 +283,26 @@ class PathRefinementChecks:
         logs: Optional[list[str]] = None,
         ctx=None,
     ) -> tuple[bool, Optional[str]]:
-        """只检查 path pair 的 storage / transient storage observable。"""
+        """检查 path pair 的 status code + storage / transient storage observable。
+
+        aggregate return/memory fallback 命中后由这条分支接管所有后续 pair，而它
+        只证 return-presence/length/memory。status 必须在这里独立证一遍，否则
+        「pairwise 因 status 失败 → aggregate 成功 → 失败被吞掉」就是假绿
+        （return 长度为 0 时 aggregate 必然成功）。
+        """
+        verified, msg = self._outputs._check_status_code_with_solver(
+            solver,
+            evm_result,
+            x86_result,
+            deadline,
+            path_condition,
+            context,
+            logs,
+            ctx,
+        )
+        if not verified:
+            return False, msg
+
         evm_storage = evm_result.get("storage")
         x86_storage = x86_result.get("storage")
         if evm_storage is not None and x86_storage is not None:
@@ -314,7 +335,7 @@ class PathRefinementChecks:
             if not verified:
                 return False, msg
 
-        return True, "Storage and transient storage equivalent"
+        return True, "Status code, storage and transient storage equivalent"
 
     def _check_evm_path_return_memory_against_x86_union(
         self,
@@ -559,8 +580,8 @@ class PathRefinementChecks:
                 checked_pair_count += 1
                 context = f"path pair {label}"
                 if aggregate_memory_verified:
-                    # aggregate fallback 已覆盖 return/memory 后，后续 pair 只查状态 observable。
-                    verified, msg = self._check_path_pair_storage_transient_with_solver(
+                    # aggregate fallback 覆盖 return/memory 后，status 与 storage 仍要逐对查。
+                    verified, msg = self._check_path_pair_status_storage_transient_with_solver(
                         solver,
                         evm_result,
                         x86_result,
@@ -597,7 +618,7 @@ class PathRefinementChecks:
                             f"    ├─ EVM path evm[{evm_index}] aggregate "
                             "x86 return/memory fallback succeeded",
                         )
-                        verified, msg = self._check_path_pair_storage_transient_with_solver(
+                        verified, msg = self._check_path_pair_status_storage_transient_with_solver(
                             solver,
                             evm_result,
                             x86_result,

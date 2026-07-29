@@ -19,6 +19,7 @@ class _DummyEVMProgram:
             'has_return_data': BoolVal(False),
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
+            'status_code': BitVecVal(0, 8),
         }
 
     def to_z3_paths(self, state, merge_state=False, **_kwargs):
@@ -34,6 +35,7 @@ class _DummyEVMProgram:
                     has_return_data=BoolVal(False),
                     storage=state.evm_storage.Storage,
                     transient_storage=state.evm_transient_storage.TransientStorage,
+                    status_code=BitVecVal(0, 8),
                 )
             ],
             merged_state=state if merge_state else None,
@@ -50,6 +52,7 @@ class _DummyX86Program:
             'has_return_data': BoolVal(False),
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
+            'status_code': BitVecVal(0, 8),
         }
 
     def to_z3_paths(self, state, call_site_mapping=None, merge_state=False, **_kwargs):
@@ -65,6 +68,7 @@ class _DummyX86Program:
                     has_return_data=BoolVal(False),
                     storage=state.evm_storage.Storage,
                     transient_storage=state.evm_transient_storage.TransientStorage,
+                    status_code=BitVecVal(0, 8),
                 )
             ],
             merged_state=state if merge_state else None,

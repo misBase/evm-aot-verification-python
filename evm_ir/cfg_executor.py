@@ -4,8 +4,10 @@
 定义 SymbolicExecutor 类，实现 worklist 驱动的符号执行。
 """
 
+import copy
+
 from typing import List, Dict, Optional, Tuple, TYPE_CHECKING, Any
-from z3 import BitVecVal, Not
+from z3 import And, BitVecVal, BoolVal, IntVal, Not, is_false, is_true, simplify
 from evm_ir.status_code import EvmStatusCode
 
 if TYPE_CHECKING:
@@ -222,7 +224,10 @@ class SymbolicExecutor:
 
             # 如果是终止状态，保存
             if self._is_terminal_state(global_state):
-                self.final_states.append(global_state)
+                if self._path_is_impossible(global_state.world_state):
+                    self.pruned_states += 1
+                else:
+                    self.final_states.append(global_state)
 
         return self.final_states
 
@@ -245,48 +250,43 @@ class SymbolicExecutor:
         # 执行块中的所有操作
         current_mstate = mstate.copy()
 
-
-        # TAG stack depth check: create error paths + constrain normal path
-        if block.min_depth > 0 or block.max_depth < 1024:
+        # TAG 栈深度守卫，镜像 impl_amd64.go compileEVMTag(tag *ir.Block)：
+        # 两个检查无条件发射、无 1024 阈值，sp 在 Go 侧以字节计（×32），这里以栈项计。
+        # 无 TAG 即无检查；"条件恒不成立就不建路径"由 simplify + is_false 剪枝承担。
+        if any(op.kind.upper() == "TAG" for op in block.operations):
             sp = current_mstate.evm_stack.SP
-            from z3 import And, IntVal
-            import copy
-            min_int = IntVal(block.min_depth)
-            max_int = IntVal(block.max_depth)
 
-            is_underflow = sp < min_int
-            is_overflow = sp > max_int
+            # Go 是无符号比较，MinDepth==0 时恒假 —— 跳过是等价变换。
+            # （Z3 Int 有符号，负 SP 会被误判；负 SP 靠本守卫维持不可达，
+            #   SP 若改 BitVec 或引入符号入口 SP，这里要补无符号语义。）
+            if block.min_depth > 0:
+                is_underflow = simplify(sp < IntVal(block.min_depth))
+            else:
+                is_underflow = BoolVal(False)
 
-            # Path 1: stack underflow -> terminal error state
-            underflow_state = current_mstate.copy()
-            underflow_state.error_code = BitVecVal(EvmStatusCode.STACK_UNDERFLOW, 8)
-            underflow_state.return_length = BitVecVal(0, 64)
-            underflow_state.return_offset = BitVecVal(0, 64)
-            underflow_world = copy.deepcopy(global_state.world_state)
-            underflow_world.constraints.add(is_underflow)
-            self.final_states.append(GlobalState(
-                mstate=underflow_state,
-                world_state=underflow_world,
-                node=node,
-            ))
+            # MaxDepth < 0（ir.InvalidMax）时恒真，对应 Go 的无条件 exit。
+            # Not(is_underflow) 保持 Go 的检查顺序，否则 min>max 的块会产生两条
+            # 条件重叠、状态码冲突的终态。
+            is_overflow = simplify(And(Not(is_underflow), sp > IntVal(block.max_depth)))
 
-            # Path 2: stack overflow -> terminal error state
-            overflow_state = current_mstate.copy()
-            overflow_state.error_code = BitVecVal(EvmStatusCode.STACK_REACHED_LIMIT, 8)
-            overflow_state.return_length = BitVecVal(0, 64)
-            overflow_state.return_offset = BitVecVal(0, 64)
-            overflow_world = copy.deepcopy(global_state.world_state)
-            overflow_world.constraints.add(is_overflow)
-            self.final_states.append(GlobalState(
-                mstate=overflow_state,
-                world_state=overflow_world,
-                node=node,
-            ))
+            self._append_tag_depth_error_state(
+                global_state, current_mstate, node,
+                is_underflow, EvmStatusCode.STACK_UNDERFLOW,
+            )
+            self._append_tag_depth_error_state(
+                global_state, current_mstate, node,
+                is_overflow, EvmStatusCode.STACK_REACHED_LIMIT,
+            )
 
-            # Normal path: add constraint that neither error condition holds
-            normal_cond = And(Not(is_underflow), Not(is_overflow))
-            global_state.world_state.constraints.add(normal_cond)
-        
+            # 先加约束再 return：_is_terminal_state 只看块的控制流指令，与返回值无关，
+            # 少了这条约束，以 RETURN/STOP 结尾的块会留下一条可满足的假正常终止路径。
+            normal_cond = simplify(And(Not(is_underflow), Not(is_overflow)))
+            if not is_true(normal_cond):
+                global_state.world_state.constraints.add(normal_cond)
+            if is_false(normal_cond):
+                # 本块不可能被正常进入，停止执行与后继传播。
+                return []
+
         # 过滤出实际执行的操作（跳过标记）
         ops = [op for op in block.operations if op.kind.upper() not in ["TAG", "BLOCKEND"]]
         
@@ -353,6 +353,57 @@ class SymbolicExecutor:
             current_mstate = ctrl_op.to_z3(current_mstate)
             global_state.mstate = current_mstate
             return []
+
+    @staticmethod
+    def _path_is_impossible(world_state) -> bool:
+        """路径条件被化简成字面 False —— 该终态永远走不到。
+
+        终态一旦进 final_states 就会参与下游 path-pair 的笛卡尔积，所以在入口统一剪掉。
+        典型来源：TAG 守卫判定本块必然报错后写进的 False 约束（见 execute_state）。
+        """
+        return is_false(simplify(world_state.constraints.as_bool()))
+
+    def _append_tag_depth_error_state(self,
+                                      global_state: GlobalState,
+                                      mstate: SMTState,
+                                      node,
+                                      condition,
+                                      status_code: EvmStatusCode) -> None:
+        """为 TAG 栈深度守卫的一个错误分支追加终止状态。
+
+        只丢弃可证不可满足的路径（simplify 折成字面 False，或开启可达性检查后判 UNSAT）：
+        留着它们只会撑大 final_states，放大下游 path-pair 的笛卡尔积。
+        """
+        if is_false(condition):
+            return
+
+        # 必须先复制：两个错误分支共用调用方的 current_mstate，
+        # 直接改会让 underflow 污染 overflow，并把错误码漏给正常路径。
+        error_mstate = mstate.copy()
+        error_mstate.error_code = BitVecVal(status_code, 8)
+        error_mstate.return_offset = BitVecVal(0, 64)
+        error_mstate.return_length = BitVecVal(0, 64)
+
+        # 浅拷贝够用：Constraints.__copy__ 会新建列表，Z3 表达式不可变，且终态不再被写。
+        error_world = copy.copy(global_state.world_state)
+        error_world.constraints.add(condition)
+
+        if self._path_is_impossible(error_world):
+            self.pruned_states += 1
+            return
+
+        if self.use_reachability_check and not error_world.constraints.is_possible():
+            self.pruned_states += 1
+            return
+
+        error_state = GlobalState(
+            mstate=error_mstate,
+            world_state=error_world,
+            node=node,
+        )
+        error_state.depth = global_state.depth
+        error_state.loop_time = global_state.loop_time.copy()
+        self.final_states.append(error_state)
 
     def _handle_jump(self, global_state: GlobalState, mstate: SMTState, block: EVMBlock,
                      ctrl_op: Optional['EvmOperator'] = None,

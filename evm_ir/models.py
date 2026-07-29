@@ -11,6 +11,11 @@ if TYPE_CHECKING:
     from state.smt_state import SMTState
 
 
+# Go 侧 Block.MaxDepth 的初值（ir/evm_ir.go:169），缺键时必须对齐它：
+# 退化成 0 会让栈深度守卫把任何非空栈判成 overflow，验证静默空跑。
+GO_MAX_INT64 = 2 ** 63 - 1
+
+
 @dataclass
 class EvmOperator:
     """表示IR中的EVM操作。"""
@@ -124,7 +129,7 @@ class EVMBlock:
             pc=data.get('pc', 0),
             stack_depth=data.get('stack_depth', 0),
             min_depth=data.get('min_depth', 0),
-            max_depth=data.get('max_depth', 0),
+            max_depth=data.get('max_depth', GO_MAX_INT64),
             static_gas=data.get('static_gas', 0),
             is_jump_target=data.get('is_jump_target', False),
             is_inner_block=data.get('is_inner_block', False),

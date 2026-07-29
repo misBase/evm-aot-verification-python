@@ -434,7 +434,7 @@ def test_jumpi_cond_zero_no_error():
 
 def test_tag_stack_underflow_program_level():
     """Program-level: TAG with sp=0 < min_depth=2 -> STACK_UNDERFLOW (14)."""
-    from evm_ir.models import EVMBlock
+    from evm_ir.models import EVMBlock, EvmOperator
     from evm_ir.program import EVMProgram
     from evm_ir.json_parser import CompilerEVMResult
     from state.smt_state import SMTState
@@ -446,6 +446,8 @@ def test_tag_stack_underflow_program_level():
         static_gas=0, is_jump_target=False, is_inner_block=False,
         is_stop=False,
     )
+    # 守卫只在块含 TAG 时施加。
+    block.operations = [EvmOperator(kind="TAG", pc=0, block=block)]
     program = EVMProgram(CompilerEVMResult(blocks=[block]))
 
     state = SMTState()
@@ -464,7 +466,7 @@ def test_tag_stack_underflow_program_level():
 
 def test_tag_stack_reached_limit_program_level():
     """Program-level: TAG with sp=5 > max_depth=3 -> STACK_REACHED_LIMIT (15)."""
-    from evm_ir.models import EVMBlock
+    from evm_ir.models import EVMBlock, EvmOperator
     from evm_ir.program import EVMProgram
     from evm_ir.json_parser import CompilerEVMResult
     from state.smt_state import SMTState
@@ -476,6 +478,7 @@ def test_tag_stack_reached_limit_program_level():
         static_gas=0, is_jump_target=False, is_inner_block=False,
         is_stop=False,
     )
+    block.operations = [EvmOperator(kind="TAG", pc=0, block=block)]
     program = EVMProgram(CompilerEVMResult(blocks=[block]))
 
     state = SMTState()
@@ -490,4 +493,220 @@ def test_tag_stack_reached_limit_program_level():
         f"TAG with sp=5 > max_depth=3 should be STACK_REACHED_LIMIT (15), "
         f"solver returned {result}"
     )
+
+
+# ---- TAG 栈深度守卫：不可满足错误路径必须被剪掉，可满足的一条都不能少 ----
+
+def _stop_block(*, min_depth: int, max_depth: int, with_tag: bool = True):
+    """构造一个 `TAG; STOP` 块：正常路径也是终止路径，三个区域都可观察。"""
+    from evm_ir.models import EVMBlock, EvmOperator
+
+    block = EVMBlock(
+        pc=0, stack_depth=0, min_depth=min_depth, max_depth=max_depth,
+        static_gas=0, is_jump_target=False, is_inner_block=False,
+        is_stop=True,
+    )
+    block.operations = [EvmOperator(kind="TAG", pc=0, block=block)] if with_tag else []
+    block.operations.append(EvmOperator(kind="STOP", pc=1, block=block))
+    return block
+
+
+def _states_by_status(final_states):
+    by_code = {}
+    for gstate in final_states:
+        by_code.setdefault(str(gstate.mstate.error_code), []).append(gstate)
+    return by_code
+
+
+def _status_key(code) -> str:
+    return str(BitVecVal(code, 8))
+
+
+def _run_executor(block, sp):
+    from evm_ir.cfg_executor import SymbolicExecutor
+    from state.evm_stack_state import EVMStackState
+    from state.smt_state import SMTState
+
+    state = SMTState()
+    state.evm_stack = EVMStackState(sp=sp)
+    executor = SymbolicExecutor([block], max_depth=50, use_reachability_check=False)
+    return executor.execute(state, entry_pc=block.pc)
+
+
+def test_tag_depth_guard_prunes_unsatisfiable_error_paths():
+    """具体 SP 落在 [min_depth, max_depth] 内时，不应残留任何深度错误终态。"""
+    from z3 import IntVal
+
+    final_states = _run_executor(_stop_block(min_depth=0, max_depth=1022), IntVal(0))
+
+    error_codes = [str(gstate.mstate.error_code) for gstate in final_states]
+    assert error_codes == [str(BitVecVal(EvmStatusCode.STOPPED, 8))], (
+        f"具体 SP=0 只应留下正常 STOP 终态，实际得到 {error_codes}"
+    )
+
+
+def test_tag_depth_guard_keeps_all_symbolic_regions():
+    """符号 SP 时三个区域都可满足，剪枝不能删掉其中任何一条。"""
+    from z3 import And, Int, Not, Solver, sat
+
+    sp = Int("tag_guard_sp")
+    final_states = _run_executor(_stop_block(min_depth=2, max_depth=1000), sp)
+
+    by_code = _states_by_status(final_states)
+
+    expected_regions = {
+        _status_key(EvmStatusCode.STACK_UNDERFLOW): sp < 2,
+        _status_key(EvmStatusCode.STACK_REACHED_LIMIT): sp > 1000,
+        _status_key(EvmStatusCode.STOPPED): And(sp >= 2, sp <= 1000),
+    }
+
+    assert set(by_code) == set(expected_regions), (
+        f"符号 SP 下三个区域都应保留，实际得到 {sorted(by_code)}"
+    )
+
+    for code, region in expected_regions.items():
+        gstates = by_code[code]
+        assert len(gstates) == 1
+        condition = gstates[0].get_constraints().as_bool()
+
+        # 路径条件必须蕴含它所属的区域（不会越界到别的区域）。
+        solver = Solver()
+        solver.add(And(condition, Not(region)))
+        assert solver.check() != sat, f"status {code} 的路径条件超出了它的 SP 区域"
+
+        # 且这条路径本身可满足（没有被误剪成空集）。
+        solver = Solver()
+        solver.add(condition)
+        assert solver.check() == sat, f"status {code} 的路径条件不可满足"
+
+
+def test_tag_depth_guard_drops_impossible_normal_terminal():
+    """本块必然 underflow 时，不能残留一条条件恒 False 的正常终态。
+
+    execute() 的终态判定只看块的控制流指令，所以以 STOP/RETURN 结尾的块即使
+    正常路径已被证伪，仍会走到追加终态那一步。
+    """
+    from z3 import IntVal
+
+    final_states = _run_executor(_stop_block(min_depth=2, max_depth=1024), IntVal(0))
+
+    by_code = _states_by_status(final_states)
+    assert set(by_code) == {_status_key(EvmStatusCode.STACK_UNDERFLOW)}, (
+        f"SP=0 < min_depth=2 只应留下 underflow 终态，实际得到 {sorted(by_code)}"
+    )
+
+
+def test_no_final_state_has_literally_false_condition():
+    """全局不变量：final_states 里不存在条件恒 False 的终态。"""
+    from z3 import IntVal, is_false, simplify
+
+    from evm_ir.cfg_executor import SymbolicExecutor
+    from evm_ir.json_parser import load_ir_from_json
+    from state.evm_stack_state import EVMStackState
+    from state.smt_state import SMTState
+
+    blocks = load_ir_from_json("tests/data/muti_block_08.json").blocks
+    state = SMTState()
+    state.evm_stack = EVMStackState(sp=IntVal(0))
+    final_states = SymbolicExecutor(blocks, max_depth=400).execute(
+        state, entry_pc=blocks[0].pc
+    )
+
+    impossible = [
+        gstate for gstate in final_states
+        if is_false(simplify(gstate.get_constraints().as_bool()))
+    ]
+    assert not impossible, f"{len(impossible)}/{len(final_states)} 条终态恒不可满足"
+
+
+def test_tag_depth_guard_models_overflow_at_max_depth_1024():
+    """max_depth==1024 的块 Go 照样发射 overflow 检查（tests/data 里有 26 个）。"""
+    from z3 import And, Int, Not, Solver, sat
+
+    sp = Int("tag_guard_sp_1024")
+    final_states = _run_executor(_stop_block(min_depth=0, max_depth=1024), sp)
+    by_code = _states_by_status(final_states)
+
+    limit_key = _status_key(EvmStatusCode.STACK_REACHED_LIMIT)
+    assert limit_key in by_code, (
+        f"max_depth==1024 必须建模 overflow 路径，实际得到 {sorted(by_code)}"
+    )
+    # min_depth==0：Go 的无符号 sp < 0 恒假，不应产生 underflow 路径。
+    assert _status_key(EvmStatusCode.STACK_UNDERFLOW) not in by_code
+
+    condition = by_code[limit_key][0].get_constraints().as_bool()
+    solver = Solver()
+    solver.add(And(condition, Not(sp > 1024)))
+    assert solver.check() != sat
+
+
+def test_tag_depth_guard_underflow_takes_priority_over_overflow():
+    """min_depth > max_depth 时 Go 先命中 underflow；两条错误路径不能重叠。"""
+    from z3 import And, Int, Not, Or, Solver, sat
+
+    sp = Int("tag_guard_sp_conflict")
+    final_states = _run_executor(_stop_block(min_depth=5, max_depth=3), sp)
+    by_code = _states_by_status(final_states)
+
+    underflow_key = _status_key(EvmStatusCode.STACK_UNDERFLOW)
+    limit_key = _status_key(EvmStatusCode.STACK_REACHED_LIMIT)
+    assert {underflow_key, limit_key} <= set(by_code)
+
+    underflow_cond = by_code[underflow_key][0].get_constraints().as_bool()
+    limit_cond = by_code[limit_key][0].get_constraints().as_bool()
+
+    # 正常路径条件 `sp>=5 且 sp<5` 是 UNSAT 但 simplify 折不成字面 False，
+    # 状态可能仍在 final_states 里——只要恒不可满足就不影响任何判定。
+    for key, gstates in by_code.items():
+        if key in (underflow_key, limit_key):
+            continue
+        for gstate in gstates:
+            solver = Solver()
+            solver.add(gstate.get_constraints().as_bool())
+            assert solver.check() != sat, f"min>max 的块不应存在可满足的 status {key} 路径"
+
+    # 互斥：同一个输入不能既是 underflow 又是 stack-limit（否则两条终态状态码冲突）。
+    solver = Solver()
+    solver.add(And(underflow_cond, limit_cond))
+    assert solver.check() != sat, "underflow 与 overflow 路径条件重叠"
+
+    # 覆盖：两条错误路径合起来覆盖所有 SP（正常路径恒不可满足）。
+    solver = Solver()
+    solver.add(Not(Or(underflow_cond, limit_cond)))
+    assert solver.check() != sat, "两条错误路径没有覆盖全部 SP"
+
+    # 优先级：sp=4 落在 underflow（4<5），不能落在 overflow（虽然 4>3）。
+    solver = Solver()
+    solver.add(And(limit_cond, sp == 4))
+    assert solver.check() != sat, "sp=4 应优先判 underflow，Go 的检查顺序丢了"
+
+
+def test_block_without_tag_has_no_depth_guard():
+    """Go 只在 TAG 算子处发射深度检查；无 TAG 的块不应凭空产生错误路径。"""
+    from z3 import Int
+
+    sp = Int("tag_guard_sp_no_tag")
+    final_states = _run_executor(
+        _stop_block(min_depth=2, max_depth=3, with_tag=False), sp
+    )
+
+    assert set(_states_by_status(final_states)) == {_status_key(EvmStatusCode.STOPPED)}
+
+
+def test_missing_max_depth_defaults_to_go_initial_value():
+    """max_depth 缺键对齐 Go 初值；退化成 0 会把任何非空栈判成 overflow。"""
+    from evm_ir.models import GO_MAX_INT64, EVMBlock
+
+    block = EVMBlock.from_json({
+        'pc': 0,
+        'min_depth': 0,
+        'operations': [{'kind': 'TAG', 'pc': 0}, {'kind': 'STOP', 'pc': 1}],
+    })
+
+    assert block.max_depth == GO_MAX_INT64
+
+    from z3 import IntVal
+
+    final_states = _run_executor(block, IntVal(3))
+    assert set(_states_by_status(final_states)) == {_status_key(EvmStatusCode.STOPPED)}
 

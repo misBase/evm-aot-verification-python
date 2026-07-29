@@ -28,7 +28,8 @@ class PathObservation:
     has_return_data: Any
     storage: Any
     transient_storage: Any
-    status_code: Any = field(default=None)
+    # 必填：给默认值会让漏传的 producer 一路静默到 refinement 检查里变成假绿。
+    status_code: Any
 
     def __getitem__(self, key: str) -> Any:
         if key not in OBSERVATION_KEYS:
