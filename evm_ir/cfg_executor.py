@@ -52,6 +52,10 @@ class SymbolicExecutor:
         self.max_depth = max_depth
         self.use_reachability_check = use_reachability_check
 
+        # 合法跳转目标集合（JUMPDEST 的 PC），对应 amd64 后端的 c.jumpTable / c.jumpList。
+        # 必须是全集：跳转目标校验据此判定 INVALID_JUMP，部分集合会把合法跳转判成非法。
+        self.valid_jump_targets = {block.pc for block in blocks if block.is_jump_target}
+
         # 创建动态 CFG
         self.cfg = DynamicCFG(blocks)
 
@@ -164,6 +168,9 @@ class SymbolicExecutor:
         entry_block = self.blocks_by_pc.get(entry_pc)
         if entry_block is None:
             raise ValueError(f"Entry block not found: pc={entry_pc}")
+
+        # 在执行任何块之前预填充合法跳转目标全集，供 JUMP/JUMPI 的目标校验使用。
+        initial_state.valid_jump_targets = set(self.valid_jump_targets)
 
         # 创建初始全局状态
         entry_node = self.cfg.get_or_create_node(entry_pc)

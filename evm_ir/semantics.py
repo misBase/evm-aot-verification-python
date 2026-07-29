@@ -4,7 +4,7 @@ EVM IR语义建模。
 本模块使用Z3为EVM IR操作提供语义建模。
 """
 
-from z3 import BitVec, BitVecNumRef, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Or, UDiv, URem, LShR, SignExt, ZeroExt, Lambda, Select, simplify
+from z3 import BitVec, BitVecNumRef, BitVecRef, BitVecVal, Concat, Extract, If, UGE, ULT, And, Not, Or, UDiv, URem, LShR, SignExt, ZeroExt, Lambda, Select, is_false, is_true, simplify
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from evm_ir.status_code import EvmStatusCode
@@ -496,37 +496,64 @@ class EVMIRSemantics:
         """初始化EVM IR语义模型。"""
         self.op_semantics = EVMOperationSemantics()
 
-def _bv_to_int(value: "BitVecRef") -> "Optional[int]":
-    """If the BitVec is concrete, return its integer value; otherwise, return None."""
-    if isinstance(value, BitVecNumRef):
-        return value.as_long()
-    from z3 import simplify
-    simplified = simplify(value)
-    if isinstance(simplified, BitVecNumRef):
-        return simplified.as_long()
+def _jump_target_candidates(op: EvmOperator, state: "SMTState") -> "Optional[List[int]]":
+    """返回本次跳转的合法落地集合，对齐 amd64 codegen（impl_amd64.go compileEVMJUMP）。
+
+    - ImmediateSet 非空：即 codegen 逐个 CMPQ 的候选。元素已由 IR 层符号跳转解析器保证在
+      targetBlocks 内（symbolic_jump_resolver.go:565），无需再与 valid_jump_targets 取交集。
+    - 否则取 valid_jump_targets（is_jump_target=True 的块 PC），对应 codegen 的 c.jumpTable，
+      覆盖静态 Immediate 形态。
+
+    真动态跳转不在此建模，由 cfg_executor 以 UnsupportedJumpError 拒绝。
+    返回 None 表示 valid_jump_targets 未预填充（调用方不施加校验），故返回集合恒非空。
+    """
+    if op.immediate_set:
+        return list(op.immediate_set)
+
+    if state.valid_jump_targets:
+        return sorted(state.valid_jump_targets)
+
     return None
 
 
-def _is_valid_jump_destination(state: "SMTState", dest_bv: "BitVecRef") -> "Optional[bool]":
-    """Return True if dest is a concrete JUMPDEST within the code bounds.
-    Returns None if we cannot determine validity concretely."""
-    dest_int = _bv_to_int(dest_bv)
-    if dest_int is None:
-        return None
+def _apply_jump_destination_check(
+    op: EvmOperator,
+    state: "SMTState",
+    dest_bv: "BitVecRef",
+    taken_cond: "Optional[Any]" = None,
+) -> None:
+    """把 "dest 不是合法跳转目标 -> INVALID_JUMP" 写进 state.error_code。
 
-    code_size_int = _bv_to_int(state.callengine_code_size_bytes)
-    if code_size_int is None:
-        return None
+    候选恒小于 2^64，``dest == target`` 已蕴含 codegen 的 compileLocIsUint64 范围检查。
+    ``taken_cond`` 用于 JUMPI：未跳转路径 codegen 直接 fallthrough，不走目标比较链。
 
-    if dest_int >= code_size_int or dest_int < 0:
-        return False
+    局限：
 
-    code_byte = Select(state.code, BitVecVal(dest_int, 64))
-    code_byte_int = _bv_to_int(code_byte)
-    if code_byte_int is None:
-        return None
+    - 只打错误码，不产生终止状态。非法目标在 cfg_executor 里没有对应后继块，该路径被
+      丢弃而非建模成 INVALID_JUMP 终态，故全程序验证下这里近乎 no-op；实际生效的是
+      单指令 refinement 测试。
+    - valid_jump_targets 未预填充时（SMTState 默认 None）静默跳过校验，非 fail-closed。
+    """
+    targets = _jump_target_candidates(op, state)
+    if targets is None:
+        return
 
-    return code_byte_int == 0x5B
+    is_valid = Or([dest_bv == BitVecVal(t, 256) for t in targets])
+
+    if taken_cond is not None:
+        is_valid = Or(Not(taken_cond), is_valid)
+
+    is_valid = simplify(is_valid)
+    if is_true(is_valid):
+        return
+
+    invalid_jump = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
+    if is_false(is_valid):
+        state.error_code = invalid_jump
+        state.error_string = "Invalid jump destination"
+        return
+
+    state.error_code = If(is_valid, state.error_code, invalid_jump)
 
 
 def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
@@ -546,10 +573,10 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
     op_semantics = EVMOperationSemantics()
     
     if kind == "TAG":
-        if op.block is not None and op.block.is_jump_target:
-            if state.valid_jump_targets is None:
-                state.valid_jump_targets = set()
-            state.valid_jump_targets.add(op.pc)
+        # TAG 对语义是无操作（仅标记块入口）。
+        # 合法跳转目标集合不在这里增量收集：执行到某个 JUMP 时后继块可能尚未被访问，
+        # 收到的会是部分集合，据此判定跳转非法会产生假反例。该集合由
+        # SymbolicExecutor 在执行前按全部块一次性预填充（见 cfg_executor.py）。
         return state
     
     elif kind == "BLOCKEND":
@@ -1325,39 +1352,28 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         return state
     
     elif kind == "JUMPI":
-        # JUMPI: dest, cond = pop, pop
+        # JUMPI: 静态形态（PUSH 折叠）目标在 immediate，只 pop condition；
+        # 否则 pop condition 与 dest。栈行为对齐 symbolic_jump_resolver.go 的 JUMPI 分支。
         if op.is_static and op.immediate is not None:
             cond_bv, state.evm_stack = state.evm_stack.pop()
-            cond_int = _bv_to_int(cond_bv)
-            if cond_int is not None and cond_int != 0:
-                is_valid = _is_valid_jump_destination(state, BitVecVal(op.immediate, 256))
-                if is_valid is False:
-                    state.error_code = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
-                    state.error_string = "Invalid jump destination"
+            dest_bv = BitVecVal(op.immediate, 256)
         else:
             cond_bv, stack_after_pop1 = state.evm_stack.pop()
             dest_bv, state.evm_stack = stack_after_pop1.pop()
-            cond_int = _bv_to_int(cond_bv)
-            if cond_int is not None and cond_int != 0:
-                is_valid = _is_valid_jump_destination(state, dest_bv)
-                if is_valid is False:
-                    state.error_code = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
-                    state.error_string = "Invalid jump destination"
+
+        # 目标校验只在 cond != 0（真正发生跳转）的路径上生效。
+        taken = cond_bv != BitVecVal(0, cond_bv.size())
+        _apply_jump_destination_check(op, state, dest_bv, taken_cond=taken)
         return state
 
     elif kind == "JUMP":
-        # JUMP: dest = pop
+        # JUMP: 静态形态目标已折叠进 immediate，不 pop；否则 pop dest。
         if op.is_static and op.immediate is not None:
-            is_valid = _is_valid_jump_destination(state, BitVecVal(op.immediate, 256))
-            if is_valid is False:
-                state.error_code = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
-                state.error_string = "Invalid jump destination"
+            dest_bv = BitVecVal(op.immediate, 256)
         else:
             dest_bv, state.evm_stack = state.evm_stack.pop()
-            is_valid = _is_valid_jump_destination(state, dest_bv)
-            if is_valid is False:
-                state.error_code = BitVecVal(EvmStatusCode.INVALID_JUMP, 8)
-                state.error_string = "Invalid jump destination"
+
+        _apply_jump_destination_check(op, state, dest_bv)
         return state
 
     elif kind == "REVERT":

@@ -295,6 +295,8 @@ def test_jump_to_invalid_dest_error_code():
         operand_values=(10,),
         initial_code_word_offsets=(0,),
         code_size_bytes=8,
+        # IR Block 1 的 JUMPDEST 在 PC 6，是唯一合法目标；dest=10 落在集合外。
+        evm_valid_jump_targets=(6,),
         expected_status_code=X86_STATUS_CODES["invalid_jump"],
         x86_callengine_limb_values=X86_CONTROL_FLOW_GAS_CONTEXT,
         x86_execution_mode="cfg",
@@ -352,6 +354,8 @@ def test_jumpi_to_invalid_dest_error_code():
         operand_values=(10, 1),
         initial_code_word_offsets=(0,),
         code_size_bytes=8,
+        # IR Block 1 的 JUMPDEST 在 PC 6，是唯一合法目标；cond=1 且 dest=10 落在集合外。
+        evm_valid_jump_targets=(6,),
         expected_status_code=X86_STATUS_CODES["invalid_jump"],
         x86_callengine_limb_values=X86_CONTROL_FLOW_GAS_CONTEXT,
         x86_execution_mode="cfg",

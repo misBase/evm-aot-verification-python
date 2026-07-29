@@ -4,7 +4,7 @@
 from common.uint256 import Uint256
 from evm_ir.semantics import EVMIRSemantics, EVMOperationSemantics, evm_operator_to_z3
 from evm_ir.models import EvmOperator
-from evm_ir.status_code import get_status_code_from_error
+from evm_ir.status_code import EvmStatusCode, get_status_code_from_error
 from x86_64.semantics import X86SemanticsModel
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
 from x86_64.models import Register, X86Instruction
@@ -471,17 +471,77 @@ def test_sstore_read_only_sets_write_protection_error():
 
 
 def test_jump_sets_invalid_jump_error_when_destination_is_not_jumpdest():
-    """测试 JUMP 在目标地址不是 JUMPDEST 时设置错误字符串。"""
+    """测试 JUMP 在目标不属于合法跳转目标集合时设置错误字符串。"""
     op = EvmOperator(kind="JUMP", pc=0)
     state = SMTState()
-    state.callengine_code_size_bytes = BitVecVal(2, 64)
-    state.code = Store(state.code, BitVecVal(0, 64), BitVecVal(0x00, 8))
-    state.code = Store(state.code, BitVecVal(1, 64), BitVecVal(0x00, 8))
+    state.valid_jump_targets = {6}
     state.evm_stack = state.evm_stack.push(BitVecVal(1, 256))
     state = evm_operator_to_z3(op, state)
 
     assert state.error_string == "Invalid jump destination"
     assert get_status_code_from_error(state.error_string) == 8
+
+
+def test_jump_to_valid_target_leaves_error_code_untouched():
+    """目标在合法集合内时不应产生 INVALID_JUMP。"""
+    op = EvmOperator(kind="JUMP", pc=0)
+    state = SMTState()
+    state.valid_jump_targets = {6}
+    state.evm_stack = state.evm_stack.push(BitVecVal(6, 256))
+    state = evm_operator_to_z3(op, state)
+
+    assert state.error_string is None
+    assert is_true(simplify(state.error_code == BitVecVal(EvmStatusCode.RETURNED, 8)))
+
+
+def test_jump_without_target_set_stays_silent():
+    """未预填充合法目标集合时保持沉默，避免用部分集合产生假反例。"""
+    op = EvmOperator(kind="JUMP", pc=0)
+    state = SMTState()
+    state.evm_stack = state.evm_stack.push(BitVecVal(1, 256))
+    state = evm_operator_to_z3(op, state)
+
+    assert state.error_string is None
+
+
+def test_jump_with_immediate_set_uses_candidate_targets():
+    """多目标跳转按 immediate_set 判定：符号 dest 得到 ITE 形式的 error_code。"""
+    op = EvmOperator(kind="JUMP", pc=0, immediate_set=[6, 20])
+    state = SMTState()
+    dest = BitVec("dest", 256)
+    state.evm_stack = state.evm_stack.push(dest)
+    state = evm_operator_to_z3(op, state)
+
+    solver = Solver()
+    solver.add(dest == BitVecVal(20, 256))
+    solver.add(state.error_code != BitVecVal(EvmStatusCode.RETURNED, 8))
+    assert solver.check() == unsat, "dest 命中 immediate_set 时不应报 INVALID_JUMP"
+
+    solver = Solver()
+    solver.add(dest == BitVecVal(7, 256))
+    solver.add(state.error_code != BitVecVal(EvmStatusCode.INVALID_JUMP, 8))
+    assert solver.check() == unsat, "dest 未命中 immediate_set 时应报 INVALID_JUMP"
+
+
+def test_jumpi_not_taken_does_not_report_invalid_jump():
+    """JUMPI 未跳转的路径上不施加目标校验（codegen 直接 fallthrough）。"""
+    op = EvmOperator(kind="JUMPI", pc=0, immediate_set=[6])
+    state = SMTState()
+    cond = BitVec("cond", 256)
+    # 压栈顺序：先 dest 后 cond，使 cond 位于栈顶（JUMPI 先 pop cond）。
+    state.evm_stack = state.evm_stack.push(BitVecVal(99, 256))
+    state.evm_stack = state.evm_stack.push(cond)
+    state = evm_operator_to_z3(op, state)
+
+    solver = Solver()
+    solver.add(cond == BitVecVal(0, 256))
+    solver.add(state.error_code != BitVecVal(EvmStatusCode.RETURNED, 8))
+    assert solver.check() == unsat, "cond=0 未跳转，不应报 INVALID_JUMP"
+
+    solver = Solver()
+    solver.add(cond == BitVecVal(1, 256))
+    solver.add(state.error_code != BitVecVal(EvmStatusCode.INVALID_JUMP, 8))
+    assert solver.check() == unsat, "cond!=0 且 dest=99 不在集合内，应报 INVALID_JUMP"
 
 
 def _make_x86_ret_state(status_code: int, stack_values, sp: int = 0,
