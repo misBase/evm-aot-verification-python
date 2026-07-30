@@ -307,18 +307,17 @@ class SymbolicExecutor:
         # 执行块中的所有操作
         current_mstate = mstate.copy()
 
-        # TAG 序言守卫，镜像 impl_amd64.go compileEVMTag(tag *ir.Block)。Go 侧的
-        # 检查次序是定死的，这里逐条对齐：
+        # TAG 序言守卫，镜像 impl_amd64.go compileEVMTag(tag *ir.Block) 的检查次序：
         #   1. makeStaticUseGas(tag.StaticGas) → jmpIfGasNotEnough → OUT_OF_GAS
         #   2. CMP MinDepth; JCS               → STACK_UNDERFLOW
         #   3. CMP MaxDepth+1; JCC             → STACK_REACHED_LIMIT
-        # 后两个检查无条件发射、无 1024 阈值，sp 在 Go 侧以字节计（×32），这里以
-        # 栈项计。无 TAG 即无检查；"条件恒不成立就不建路径"由 simplify + is_false
-        # 剪枝承担。次序体现为后一个条件都要带上前面所有条件的否定，否则会产出
-        # 条件重叠、状态码互相矛盾的终态。
+        # 次序体现为后一个条件都带上前面所有条件的否定，否则会产出条件重叠、状态码
+        # 互相矛盾的终态。后两个检查在 Go 侧无条件发射、无 1024 阈值，sp 以字节计
+        # （×32），这里以栈项计。无 TAG 即无检查；恒不成立的条件由 simplify +
+        # is_false 剪掉，不建路径。
         if any(op.kind.upper() == "TAG" for op in block.operations):
-            # 1. gas 检查（default-off：仅 oog_modeling_enabled 时放开这条分支，
-            #    功能等价/check_gas 下 gas 由 program_verifier 的恒足假设保证）。
+            # gas 检查 default-off：只有 oog_modeling_enabled 才放开这条分支，其余
+            # 模式下 gas 恒足由 program_verifier 的假设保证。
             if (current_mstate.oog_modeling_enabled
                     and getattr(block, "static_gas", 0)):
                 from z3 import ULT
@@ -330,7 +329,7 @@ class SymbolicExecutor:
 
             sp = current_mstate.evm_stack.SP
 
-            # 2. Go 是无符号比较，MinDepth==0 时恒假 —— 跳过是等价变换。
+            # Go 是无符号比较，MinDepth==0 时恒假 —— 跳过是等价变换。
             # （Z3 Int 有符号，负 SP 会被误判；负 SP 靠本守卫维持不可达，
             #   SP 若改 BitVec 或引入符号入口 SP，这里要补无符号语义。）
             if block.min_depth > 0:
@@ -338,7 +337,7 @@ class SymbolicExecutor:
             else:
                 is_underflow = BoolVal(False)
 
-            # 3. MaxDepth < 0（ir.InvalidMax）时恒真，对应 Go 的无条件 exit。
+            # MaxDepth < 0（ir.InvalidMax）时恒真，对应 Go 的无条件 exit。
             is_overflow = simplify(
                 And(Not(is_oog), Not(is_underflow), sp > IntVal(block.max_depth))
             )
@@ -368,13 +367,11 @@ class SymbolicExecutor:
                 # 本块不可能被正常进入，停止执行与后继传播。
                 return []
 
-        # block 入口扣减静态 gas（镜像 go-hpc-evm makeStaticUseGas: 每个 block 入口
-        # 一次性扣 Blk.StaticGas）。在 gas 恒足前提下（由 program_verifier 注入的
-        # UGE(G, bound) 假设保证），不触发 out-of-gas，与 x86 侧
-        # SUBQ staticGas;MOVQ->[R13+0x70] 同步一致。
-        # 仅 gas_modeling_enabled（symbolic_gas）时扣减：否则功能等价验证下
-        # evm_gas 应保持平凡常量，不让 PathObservation 的 gas 键变成循环程序里
-        # 极深的 If-chain（拖慢 path translate / 引入无谓复杂度）。
+        # block 入口一次性扣静态 gas，镜像 makeStaticUseGas 与 x86 侧的
+        # `SUBQ staticGas; MOVQ -> [R13+0x70]`（编译期已把块内各指令的静态 gas 求和
+        # 成一个常量，所以这里也必须按块扣、不能逐 opcode 扣）。
+        # 仅 gas_modeling_enabled（symbolic_gas）时扣减：功能等价验证下 evm_gas 保持
+        # 平凡常量，避免 PathObservation 的 gas 键在循环程序里变成极深的 If-chain。
         if current_mstate.gas_modeling_enabled and getattr(block, "static_gas", 0):
             current_mstate.evm_gas = current_mstate.evm_gas.consume_static(block.static_gas)
 

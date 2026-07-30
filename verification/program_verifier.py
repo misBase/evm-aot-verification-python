@@ -59,34 +59,20 @@ def _collect_assumptions(*states):
 _GAS_BOUND_MAX_ITERATION = 500
 
 
-# gas 验证的指令分层（全覆盖路径 A，见 memory: gas_full_coverage_codegen_layers）。
+# gas 验证的指令分三档（见 memory: gas_full_coverage_codegen_layers）：
 #
-# 已**真证明**的动态 gas（x86 codegen 可见，EVM 侧建真实公式）：
-#   阶段 1：MSTORE/RETURN/MLOAD/MSTORE8（内存扩展）、SHA3（内存扩展+word gas）、
-#           CALLDATACOPY/CODECOPY/RETURNDATACOPY/MCOPY/REVERT（内存扩展+copy word gas）
-#   A 类：LOG0..LOG4（memoryLogGas = 内存扩展 + LogGas + n*TopicGas + size*DataGas，
-#         x86 memoryLogGas codegen 全程可见，EVM 侧 _charge_log_gas 建真实公式）。
-#
-# 已**UF 兜底**（host/builtin gas 不可见，两侧扣同名 host_gas_uf 相消，验证「两侧
-# 扣同一 gas + 栈参数一致」，host 公式本身是 assume 非 prove）：
-#   SLOAD/SSTORE/BALANCE/EXTCODESIZE/EXTCODEHASH/SELFDESTRUCT（host）、EXP（builtin）、
-#   CALL/CALLCODE/DELEGATECALL/STATICCALL（host）。
-#   EVM 侧 charge_host_gas_uf + x86 侧 _deduct_host_gas_uf（go_function_semantics），
-#   两侧读同一组栈值（功能等价已证相等）扣同名 UF。已移出本拒绝集。
-#   CALL 系列额外:x86 的 dealWithAddGas/SubGas returnGas 链是**可见机器码**（反汇编
-#   已建模、加减净 0），且 checkMemoryAndCalcDynamicGasCall=nil（无可见内存扩展），
-#   故 host UF 即全部 host gas → 可验。
-#
-# 下面是仍 **fail-closed** 拒绝的指令。它们除 host UF 外，x86 还有**可见**的内存
-# 扩展 gas（memoryCreateGasN / ExtCodeCopy）尚未在 EVM 侧对齐建模；只挂 UF 不够，
-# 会漏掉可见部分的差异。在可见部分对齐前显式拒绝（fail-closed，不会假绿）。
+# 1. 真证明（x86 codegen 可见，EVM 侧建了真实公式）：
+#    MSTORE/RETURN/MLOAD/MSTORE8（内存扩展）、SHA3（+word gas）、CALLDATACOPY/
+#    CODECOPY/RETURNDATACOPY/MCOPY/REVERT（+copy word gas）、LOG0..LOG4。
+# 2. UF 兜底（host/builtin gas 不可见，两侧扣同名 host_gas_uf 相消）：
+#    SLOAD/SSTORE/BALANCE/EXTCODESIZE/EXTCODEHASH/SELFDESTRUCT/EXP +
+#    CALL/CALLCODE/DELEGATECALL/STATICCALL。见 state/host_gas.py。
+# 3. 仍 fail-closed 拒绝：下面这三个。它们除 host UF 外，x86 还有**可见**的内存
+#    扩展 gas 尚未在 EVM 侧建模，只挂 UF 会漏掉这段可见差异。
 _DYNAMIC_GAS_UNSUPPORTED_KINDS = frozenset({
-    # EXTCODECOPY:x86 有可见内存扩展 + copy word gas（checkMemoryAndCalcDynamicGas
-    # ExtCodeCopy），EVM 侧尚未建该可见部分（host UF 已挂）。待对齐可见部分。
+    # 可见部分 = 内存扩展 + copy word gas（checkMemoryAndCalcDynamicGasExtCodeCopy）。
     "EXTCODECOPY",
-    # CREATE/CREATE2:x86 有可见的内存扩展 + InitCodeWordGas（memoryCreateGasN，
-    # checkMemoryAndCalcDynamicGasCreate≠nil），EVM 侧尚未建该可见部分（host UF
-    # 已挂、returnGas 链已自动建模）。待对齐可见部分。
+    # 可见部分 = 内存扩展 + InitCodeWordGas（memoryCreateGasN）。returnGas 链已对齐。
     "CREATE",
     "CREATE2",
 })
@@ -94,28 +80,17 @@ _DYNAMIC_GAS_UNSUPPORTED_KINDS = frozenset({
 
 def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram,
                                       oog_mode: bool = False) -> list[str]:
-    """Return dynamic-gas operators that gas checking must still reject.
+    """返回 gas 检查仍必须 fail-closed 拒绝的动态 gas 指令（非空即防假绿守卫）。
 
-    全覆盖路径 A 下，gas 验证分两档:**真证明**（x86 可见，已建真实公式）与
-    **UF 兜底**（B 类，host 黑盒，两侧同名 host_gas_uf 相消）。本函数返回仍需
-    fail-closed 拒绝的指令 = CREATE/CREATE2/EXTCODECOPY:这些指令**两侧的 host
-    UF 都已挂好**，但 x86 codegen 还有**可见的内存扩展 gas**（memoryCreateGasN /
-    InitCodeWordGas / ExtCodeCopy）尚未在 EVM 侧建模——只靠 UF 相消会漏掉这段
-    可见差异，故 fail-closed 拒绝直到 EVM 侧补齐可见部分。返回非空列表是防假绿守卫。
+    默认拒绝集见 _DYNAMIC_GAS_UNSUPPORTED_KINDS。CALL 系列不在其中：它们无可见
+    内存扩展（checkMemoryAndCalcDynamicGasCall=nil），returnGas 链虽是可见机器码
+    但加减净 0 且两侧已对齐，故 host UF 即覆盖全部 host gas。
 
-    其余 B 类（SLOAD/SSTORE/BALANCE/EXTCODESIZE/EXTCODEHASH/SELFDESTRUCT/EXP +
-    CALL/CALLCODE/DELEGATECALL/STATICCALL）在 **check_gas（阶段 0，gas 恒足）** 下
-    已转正、不在拒绝集:它们无可见内存扩展（CALL 系列的 returnGas 链是可见机器码但
-    加减净 0、已对齐），host UF 即全部 host gas。LOG（A 类）也不在拒绝集:其 gas 在
-    x86 memoryLogGas codegen 全程可见，EVM 侧 _charge_log_gas 镜像真实公式建模。
-
-    **oog_mode（check_oog）额外拒绝 host 动态 gas 指令（HOST_GAS_UF_KINDS）**:
-    host UF 只让两侧在 host 调用点**钳零并继续执行**（相消），并**不分叉 host
-    动态 gas 耗尽的 OOG 终止路径**。而 EVM 侧目前只对 block 静态 gas 分叉 OOG
-    （cfg_executor）。于是 SLOAD/EXP/CALL 等的 host 动态 gas 是否会触发 OOG、
-    两侧 OOG 行为是否一致，**根本没有被验证**——OOG 模式放行它们 = 假绿。在补齐
-    host 动态 OOG 分叉建模前，check_oog 必须 fail-closed 拒绝这些指令。
-    （check_gas 不受影响:gas 恒足前提已剪掉所有 OOG，host UF 相消即足够。）
+    oog_mode（check_oog）额外拒绝整个 HOST_GAS_UF_KINDS：host UF 只让两侧在调用点
+    钳零后继续执行，**不分叉** host 动态 gas 耗尽的 OOG 路径，而 EVM 侧目前只对
+    block 静态 gas 分叉 OOG。于是 SLOAD/EXP/CALL 的 host 动态 gas 会不会触发 OOG、
+    两侧行为是否一致根本没被验证，放行即假绿。check_gas 不受影响——恒足前提已剪掉
+    所有 OOG。
     """
     from state.host_gas import HOST_GAS_UF_KINDS
 
@@ -142,11 +117,10 @@ def _inject_gas_sufficiency_assumption(evm_program: EVMProgram, initial_state: S
     阶段 0 只比较 gas 终值（不验 OOG 行为），需保证两侧都不触发 out-of-gas，
     否则 EVM 侧 consume_static 钳零会与 x86 的 OOG 跳转语义分叉。
 
-    bound = (∑ block.static_gas) × max_iteration 是程序实际可扣 static gas 的
-    **可证上界**（每个 block 最多经过 max_iteration 次），不是魔法常量。
-    - ∑static_gas == 0（无静态 gas）→ 不注入（无需约束）。
-    - bound 接近/超过 2^64（会 wrap）→ **fail-closed 不注入**：宁可不剪 OOG 分支
-      （检查更严，可能 SAT/unknown），也不注入错误的 wrap 约束。
+    bound = (∑ block.static_gas) × max_iteration 是可扣 static gas 的可证上界（每个
+    block 最多经过 max_iteration 次），不是魔法常量。∑static_gas == 0 时无需约束；
+    bound ≥ 2^64（会 wrap）时 fail-closed 不注入——宁可不剪 OOG 分支（检查更严，
+    可能 SAT/unknown），也不注入错误的 wrap 约束。
     """
     from z3 import BitVecVal, UGE
 
@@ -181,10 +155,10 @@ class ProgramEquivalenceChecker:
         Args:
             timeout_ms: SMT求解器超时（毫秒）
             verbose: 启用详细输出
-            check_gas: 是否启用 gas 终值一致性检查（阶段 0/1，gas 充足路径终值）。
-            check_oog: 是否启用 OOG 路径一致性检查（阶段 3B）。True 时不注入 gas
-                恒足假设、放开 EVM 侧 OOG 分叉，验 out-of-gas 路径的 status code
-                两侧一致。隐含需要 status 检查（故一并开启 check_gas 的检查通道）。
+            check_gas: 启用 gas 终值一致性检查（gas 充足路径）。
+            check_oog: 启用 OOG 路径一致性检查。不注入 gas 恒足假设、放开 EVM 侧
+                OOG 分叉，验 out-of-gas 路径的 status code 两侧一致；它需要 status
+                检查通道，故一并开启 check_gas 的检查。
         """
         self.refinement_checker = RefinementChecker(
             timeout_ms=timeout_ms, verbose=verbose,
@@ -247,23 +221,15 @@ class ProgramEquivalenceChecker:
         if path_pair_workers <= 0:
             raise ValueError("path_pair_workers must be a positive integer")
 
-        # 遇到未建模动态 gas opcode 必须 fail-closed，避免 EVM/x86 两侧都尚未
-        # 建模动态扣减/OOG 时出现假绿。check_oog 同样要走此 guard：底层已开启
-        # gas/status 检查（RefinementChecker(check_gas=check_gas or check_oog)）。
-        # 两类未覆盖情况要区分:
-        #   - B 类（EXP/SSTORE/CALL 等）:动态 gas **完全未在 EVM 侧建模**（仅挂
-        #     host-gas UF，x86 侧 UF 未接入），由本 guard fail-closed 拒绝。
-        #   - LOG（A 类）:动态 gas **已建模**（_charge_log_gas），故不在拒绝集；
-        #     但 EVM 侧仅对 block.static_gas 分叉 OOG（cfg_executor），未对 LOG 动态
-        #     gas 耗尽分叉 OOG 终止路径。当 gas 足以过 static 检查但不足以覆盖 LOG
-        #     动态 gas 时，x86 产生一条 OOG 终止路径而 EVM 不产生 → 该 x86 路径无
-        #     对应 EVM 路径，触发 **terminal-path 覆盖检查失败**（"EVM terminal paths
-        #     do not cover all inputs"），fail-closed、不假绿（注意:失败现象是覆盖
-        #     检查报错，不是 pair 级 gas SAT）。LOG + check_oog 暂不被 guard 拦截，
-        #     待 LOG 动态 gas OOG 分叉建模后再完善。
+        # 未建模动态 gas 的 opcode 必须 fail-closed，避免两侧都漏扣时假绿。check_oog
+        # 也走这个 guard（它开着 gas/status 检查通道），并额外拒绝 HOST_GAS_UF_KINDS。
+        #
+        # 已知缺口：LOG 的动态 gas 已建模、不在拒绝集，但 EVM 侧没有对 LOG 动态 gas
+        # 分叉 OOG。gas 够过 static 检查却不够付 LOG 时，x86 会多出一条 OOG 终止路径
+        # 而 EVM 没有 → 报 terminal-path 覆盖检查失败（"EVM terminal paths do not
+        # cover all inputs"，注意不是 pair 级 gas SAT），fail-closed 不假绿。待补齐
+        # LOG 动态 gas 的 OOG 分叉建模。
         if self.check_gas or self.check_oog:
-            # check_oog 额外拒绝 host 动态 gas 指令:它们的 host 动态 OOG 分叉未
-            # 建模（host UF 只两侧钳零续跑、不分叉），放行 = 假绿（见 Fix #2）。
             unsupported_dynamic_gas = _find_unsupported_dynamic_gas_ops(
                 evm_program, oog_mode=self.check_oog
             )
@@ -277,15 +243,13 @@ class ProgramEquivalenceChecker:
                     f"modeled yet for stage 0: {sample}",
                 )
 
-        # 阶段 3B（OOG 路径一致性）:放开 EVM 侧 OOG 分叉，**不**注入恒足假设
-        # （否则 OOG 恒假被剪）。EVM/x86 各自产生 OOG 终止路径，由 terminal-path
-        # pair 检查验 status code（含 out_of_gas=12）两侧一致。
+        # OOG 路径一致性：放开 EVM 侧 OOG 分叉，**不**注入恒足假设（否则 OOG 恒假
+        # 被剪）。两侧各自产生 OOG 终止路径，由 terminal-path pair 检查验 status code
+        # （含 OUT_OF_GAS=12）一致。
         if self.check_oog:
-            # Fix #4:OOG 分叉条件是 ULT(gas, static_gas)。若初始 gas 是具体大常量
-            # （默认 create_initial_state() 给 1e9），ULT(1e9, static) 恒假 → 所有
-            # OOG 分支被剪 → OOG 一致性根本没验却返回 VERIFIED（假绿）。check_oog
-            # 必须 fail-closed 要求 symbolic gas（initial_state 经
-            # create_initial_state(symbolic_gas=True) 构造）。
+            # 分叉条件是 ULT(gas, static_gas)：初始 gas 若是具体常量（默认 1e9），
+            # 条件恒假、所有 OOG 分支被剪 → 什么都没验却返回 VERIFIED。故要求
+            # create_initial_state(symbolic_gas=True)。
             from z3 import is_bv_value
             gas_sym = initial_state.evm_gas.Gas
             if is_bv_value(gas_sym):
@@ -298,18 +262,16 @@ class ProgramEquivalenceChecker:
                 )
             initial_state.gas_modeling_enabled = True
             initial_state.oog_modeling_enabled = True
-        # gas 一致性（阶段 0/1）:仅在 gas 检查且非 OOG 模式时注入「gas 恒足」前提
-        # （UGE(G, bound)），让两侧 out-of-gas 分支恒假被剪，验 gas 充足路径终值。
+        # 非 OOG 模式：注入 gas 恒足前提 UGE(G, bound)，剪掉两侧 out-of-gas 分支，
+        # 只验 gas 充足路径的终值。
         elif self.check_gas:
             _inject_gas_sufficiency_assumption(evm_program, initial_state)
 
-        # gas/OOG 检查强制走 path_observations 模式（修复 scope assumption 全局
-        # 泄漏）:动态 gas 的 success-path scope assumption（如 ULE(requested,
-        # 0x1FFFFFFFE0)）是 **path-local** 的——merged-result 模式会把所有路径的
-        # assumption 无条件 And 成全局 extra_condition，越界约束 sibling 路径
-        # （failure_path_assumption_global_leak 病理 → 假绿）。path_observations
-        # 模式下 _path_observation 把 assumption And 进**各路径自己的** condition，
-        # 不泄漏。多内存操作 + 多路径的真实程序需要这个隔离。
+        # gas/OOG 检查必须走 path_observations 模式。动态 gas 的 scope assumption
+        # （如 ULE(requested, 0x1FFFFFFFE0)）是 path-local 的，而 merged-result 模式
+        # 会把所有路径的 assumption 无条件 And 成全局条件，越界约束 sibling 路径 →
+        # 假绿（failure_path_assumption_global_leak）。path_observations 模式把
+        # assumption And 进各路径自己的 condition，不泄漏。
         if (self.check_gas or self.check_oog) and not path_observations:
             path_observations = True
             if self.verbose:

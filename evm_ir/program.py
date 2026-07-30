@@ -345,10 +345,9 @@ class EVMProgram:
             expr = If(condition, gstate.mstate.error_code, expr)
         merged.error_code = expr
 
-        # 合并 EVM gas（不同路径经过的 block 不同 → static gas 扣减不同）。
-        # 必须像 SP/storage 一样做 If(condition,...) 链合并;否则 multi-path
-        # 程序会拿第一条路径的 gas 去比 x86 已 side-channel 合并的 gas，造成
-        # 假绿/假 SAT。
+        # 合并 EVM gas：不同路径经过的 block 不同 → static gas 扣减不同，必须像
+        # SP/storage 一样做 If(condition,...) 链合并。否则 multi-path 程序会拿第一条
+        # 路径的 gas 去比 x86 已 side-channel 合并的 gas → 假绿/假 SAT。
         from state.smt_state import EVMGasState
         if len(global_states) == 1:
             merged.evm_gas = global_states[0].mstate.evm_gas

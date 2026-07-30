@@ -62,12 +62,10 @@ class GasEquivalenceChecks:
     ):
         """在给定 solver 上检查 gas 终值等价（支持并行 worker 的私有 solver）。
 
-        缺一侧 gas（None）则视为「无 gas 观测」直接通过——让不携带 gas 的旧
-        observation（单测 dummy 等）不触发检查，而非误报。
+        两侧都无 gas 观测才 skip（不带 gas 的旧 observation / dummy 单测）。不对称
+        （一侧有、一侧 None）必须 fail-closed：那是该侧漏填 gas 的建模缺口，静默
+        skip 会假绿——无法比较不等于已验证。
         """
-        # 仅当**两侧都无 gas 观测**才 skip（不带 gas 的旧 observation / dummy 单测）。
-        # 不对称（一侧有、一侧 None）必须 fail-closed:那是「该侧漏填 gas」的建模
-        # 缺口，静默 skip 会假绿（无法比较 ≠ 已验证）。
         if evm_gas is None and x86_gas is None:
             return True, "Gas not observed (both sides, skipped)"
         if evm_gas is None or x86_gas is None:
@@ -78,13 +76,11 @@ class GasEquivalenceChecks:
 
         prefix = self._ctx.context_prefix(context)
 
-        # **必须 reset solver（不论共享/私有）**。并行 worker 的私有 solver 在同一
-        # check_observables 调用里被前序 memory/storage 子检查累积了断言，且这些
-        # 断言合起来常已是 UNSAT（memory 等价查询本就是「找不到反例 → unsat」）。
-        # 若这里只 push/pop 而不 reset，gas 查询就叠加在一个已 UNSAT 的基底上 →
-        # 恒 UNSAT → gas 不一致被假绿（曾导致并行 path_observations 模式严重 bug）。
-        # storage 检查一直是无条件 reset 的；gas/status 对齐同一范式。reset 已清空
-        # 全部断言，故下面不再需要 push/pop。
+        # 必须 reset（共享/私有 solver 都要）。并行 worker 的私有 solver 在同一次
+        # check_observables 里已被前序 memory/storage 子检查累积成 UNSAT 基底（等价
+        # 查询本就是「找不到反例 → unsat」）；只 push/pop 会让 gas 查询叠在这个基底
+        # 上恒 UNSAT → 假绿。storage 检查一直是无条件 reset，此处对齐。reset 已清空
+        # 断言，故不再需要 push/pop。
         if not self._ctx.reset_solver_with_budget_for(
             solver, self._ctx.timeout_ms, deadline
         ):

@@ -193,17 +193,15 @@ class SMTState:
         self.assume_calldata_offset_no_overflow: bool = True
         self.abstract_calldataload_words: bool = False
 
-        # gas 动态建模开关（阶段 1）。仅当 create_initial_state(symbolic_gas=True)
-        # 时置 True：此时各指令语义才会扣减内存扩展/word 动态 gas 并注入相应
-        # success-path scope assumption（offset 高 192-bit==0 等）。
-        # 默认 False：功能等价验证（不比较 gas）不应被这些 gas-only 的 scope
-        # assumption 越界约束路径（否则大程序多路径分析会出假 SAT）。
+        # gas 动态建模开关，由 create_initial_state(symbolic_gas=True) 打开：只有它
+        # 为 True 时指令语义才扣减动态 gas 并注入相应的 success-path scope assumption
+        # （offset 高 192-bit==0 等）。默认 False——功能等价验证不比较 gas，不该被这些
+        # gas-only 的 assumption 越界约束路径（大程序多路径分析会出假 SAT）。
         self.gas_modeling_enabled: bool = False
 
-        # OOG 路径建模开关（阶段 3B）。仅当 check_oog（不注入 gas 恒足假设）时
-        # 置 True：此时 EVM block 入口在 gas < static_gas 时分叉一条 out-of-gas
-        # 终止路径（error_code=OUT_OF_GAS），镜像 x86 makeStaticUseGas 的 JCS。
-        # 默认 False：不改变现有路径（功能等价/check_gas 均不放开 OOG 分支）。
+        # OOG 路径建模开关，仅 check_oog（不注入 gas 恒足假设）时打开：block 入口在
+        # gas < static_gas 时分叉一条 error_code=OUT_OF_GAS 的终止路径，镜像 x86
+        # makeStaticUseGas 的 JCS。默认 False，不改变现有路径。
         self.oog_modeling_enabled: bool = False
 
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）

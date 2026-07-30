@@ -273,7 +273,7 @@ class OutputRefinementChecks:
             if not verified:
                 return False, msg
 
-        # gas 终值等价（阶段 0）。gas 缺省（None）时 checker 内部跳过。
+        # gas 终值等价（两侧都缺省时 checker 内部跳过）。
         if self._gas is not None:
             verified, msg = self._gas._check_gas_equivalence_with_solver(
                 solver,

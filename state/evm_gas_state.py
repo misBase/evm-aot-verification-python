@@ -34,12 +34,11 @@ class EVMGasState:
         Returns:
             具有更新Gas的新EVMGasState
 
-        Note（gas 一致性阶段 0 前提）:
-            下面的 If(UGT(amount,Gas), 0, Gas-amount) 把 out-of-gas 钳到 0，
-            这与 x86 makeStaticUseGas「gas<staticGas 时 JCS 跳 OOG handler、
-            不再 SUBQ」的语义**仅在 gas 恒足前提下等价**（两侧都不触发 OOG）。
-            阶段 0 靠 program_verifier 注入的 UGE(G, bound) 假设保证恒足。
-            **不要**把「恒足」编进本函数（钳零逻辑要留给将来 OOG 一致性复用）。
+        Note:
+            钳零（out-of-gas 时置 0）与 x86 makeStaticUseGas「gas<staticGas 就 JCS
+            跳 OOG handler、不再 SUBQ」**仅在 gas 恒足前提下等价**，该前提由
+            program_verifier 注入的 UGE(G, bound) 保证。不要把恒足编进本函数——
+            钳零逻辑要留给 OOG 一致性复用。
         """
         from z3 import BitVecVal, If, UGT
         amount_bv = BitVecVal(amount, 64)
@@ -74,9 +73,9 @@ class EVMGasState:
     def is_out_of_gas(self) -> BoolRef:
         """检查是否耗尽Gas（Gas == 0）。
 
-        Note: future-use。生产 OOG 判断现在走 cfg_executor 的 OOG 路径分叉
-        （ULT(gas, cost) 分叉出 error_code=OUT_OF_GAS 的终止路径），不依赖本方法的
-        「钳零后 == 0」判断。保留供将来更细的 OOG 状态查询；当前仅单测覆盖。
+        Note: future-use。生产 OOG 判断走 cfg_executor 的路径分叉（ULT(gas, cost)
+        分叉出 error_code=OUT_OF_GAS 的终止路径），不依赖这里的「钳零后 == 0」。
+        当前仅单测覆盖。
 
         Returns:
             BoolRef：如果Gas == 0则为True
@@ -133,19 +132,14 @@ def charge_memory_expansion_gas(state, requested_size_64):
 
     Returns:
         更新后的 state（与入参同一对象）。
-
-    Note（scope 前提）:
-        调用方需在 success-path scope assumption 下保证 requested ≤ 0x1FFFFFFFE0
-        ⟹ memWords ≤ 0xFFFFFFFF ⟹ square < 2^64（高 64 位为 0），x86 128-bit
-        mul/div 的低 64 位结果才与此定义式安全对齐。
     """
     from z3 import BitVecVal, ZeroExt, Extract, UDiv, UGT, If, LShR, ULE
 
-    # success-path scope assumption（**关键**）:requested ≤ 0x1FFFFFFFE0。
-    # x86 memoryGasCost 在 newMemSize > 0x1FFFFFFFE0 时跳 GasUintOverflow/OOG、
-    # 不走 mul/div 成功路径；EVM 侧这里继续算 memWords²/512。若不约束，验证器会
-    # 拿「EVM 成功域」对「x86 OOG 域」比较 → 比较域不一致 → 假绿/误报。在所有
-    # 内存扩展 gas 入口（本函数是唯一 chokepoint）统一加此 scope 约束。
+    # success-path scope assumption：requested ≤ 0x1FFFFFFFE0。x86 memoryGasCost 在
+    # 超过它时跳 GasUintOverflow/OOG、不走 mul/div 成功路径，而这里仍会算
+    # memWords²/512；不约束就等于拿「EVM 成功域」比「x86 OOG 域」。它同时保证
+    # memWords ≤ 0xFFFFFFFF ⟹ square < 2^64，与 x86 128-bit mul/div 的低 64 位对齐。
+    # 本函数是所有内存扩展 gas 的唯一入口，故统一在此加约束。
     state.add_assumption(ULE(requested_size_64, BitVecVal(0x1FFFFFFFE0, 64)))
 
     thirty_one = BitVecVal(31, 64)
@@ -190,21 +184,18 @@ def charge_log_gas(state, n_topics, size_64):
     """LOG 的常量 + data gas，镜像 go-hpc-evm gasLog / memoryLogGas codegen。
 
     Go gasLog（gas_table.go:215，x86 memoryLogGas codegen 全程可见）:
-        gas  = memoryGasCost(memSize)          # 内存扩展（调用方先扣，见 _charge_log_gas）
+        gas  = memoryGasCost(memSize)          # 内存扩展（调用方先扣）
         gas += LogGas                          # 375，常量
         gas += n * LogTopicGas                 # n*375，常量
         gas += requestedSize * LogDataGas      # **每字节** 8，size=stack.Back(1)
 
-    与 SHA3/COPY 的 word gas 关键区别:LOG data gas 按**字节**计费（size*8），
-    不是按 word（toWordSize），故不能复用 charge_word_gas。
+    与 SHA3/COPY 的 word gas 关键区别：LOG data gas 按**字节**计费（size*8）而非
+    按 word，故不能复用 charge_word_gas。内存扩展那段由调用方 _charge_log_gas 单独
+    调 charge_memory_expansion_gas，本函数只叠加后三段。
 
-    内存扩展部分由调用方（_charge_log_gas）单独调 charge_memory_expansion_gas，
-    本函数只负责 LogGas + n*TopicGas + size*DataGas 三段叠加。
-
-    溢出健全性（**依赖调用顺序**）:本函数不单独加 scope assumption。调用点
-    _charge_log_gas 先调 charge_memory_expansion_gas，后者对 requested=offset+size
-    加 `ULE(requested, 0x1FFFFFFFE0)`，而 size ≤ requested ⟹ size ≤ 0x1FFFFFFFE0
-    ⟹ size*LogDataGas(8) < 2^64 不溢出，x86 makeSafeMul overflow 分支恒假被剪。
+    溢出健全性**依赖调用顺序**：调用点先调 charge_memory_expansion_gas，其
+    `ULE(requested, 0x1FFFFFFFE0)` 加上 size ≤ requested 即保证 size*8 < 2^64，
+    x86 makeSafeMul 的 overflow 分支恒假被剪。
 
     Args:
         state: SMTState；就地扣减 evm_gas。
@@ -230,13 +221,11 @@ def charge_word_gas(state, word_len_64, word_gas_const):
     与 memoryGasCost 不同，word gas 基于「数据长度的 word 数」（SHA3 的 size /
     COPY 的 length），**不依赖也不更新 lastGasCost / memory size**——它是纯叠加。
 
-    溢出健全性（**依赖调用顺序**）:本函数不单独加 scope assumption，因为所有
-    调用点（_charge_memory_and_word_gas / _charge_mcopy_gas）都**先**调用
-    charge_memory_expansion_gas，后者已加 `ULE(requested, 0x1FFFFFFFE0)`，而
-    word_len ≤ requested（offset≥0）⟹ word_len ≤ 0x1FFFFFFFE0 ⟹ words=
-    (word_len+31)>>5 ≤ 0xFFFFFFFF ⟹ words*word_gas_const（const≤6）< 2^64，
-    不溢出，x86 makeSafeMul 的 overflow 分支恒假被剪。**若将来单独调用本函数，
-    必须自行保证 word_len ≤ 0x1FFFFFFFE0。**
+    溢出健全性**依赖调用顺序**：所有调用点（_charge_memory_and_word_gas /
+    _charge_mcopy_gas）都先调 charge_memory_expansion_gas，其
+    `ULE(requested, 0x1FFFFFFFE0)` 加上 word_len ≤ requested 即保证
+    words*word_gas_const（const≤6）< 2^64，x86 makeSafeMul 的 overflow 分支恒假
+    被剪。**若将来单独调用本函数，必须自行保证 word_len ≤ 0x1FFFFFFFE0。**
 
     Args:
         state: SMTState；就地扣减 evm_gas。
