@@ -193,6 +193,19 @@ class SMTState:
         self.assume_calldata_offset_no_overflow: bool = True
         self.abstract_calldataload_words: bool = False
 
+        # gas 动态建模开关（阶段 1）。仅当 create_initial_state(symbolic_gas=True)
+        # 时置 True：此时各指令语义才会扣减内存扩展/word 动态 gas 并注入相应
+        # success-path scope assumption（offset 高 192-bit==0 等）。
+        # 默认 False：功能等价验证（不比较 gas）不应被这些 gas-only 的 scope
+        # assumption 越界约束路径（否则大程序多路径分析会出假 SAT）。
+        self.gas_modeling_enabled: bool = False
+
+        # OOG 路径建模开关（阶段 3B）。仅当 check_oog（不注入 gas 恒足假设）时
+        # 置 True：此时 EVM block 入口在 gas < static_gas 时分叉一条 out-of-gas
+        # 终止路径（error_code=OUT_OF_GAS），镜像 x86 makeStaticUseGas 的 JCS。
+        # 默认 False：不改变现有路径（功能等价/check_gas 均不放开 OOG 分支）。
+        self.oog_modeling_enabled: bool = False
+
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
         self.stack_base = None
         self.stack_num_inputs = 0
@@ -295,6 +308,12 @@ class SMTState:
         other.abstract_calldataload_words = getattr(
             self, 'abstract_calldataload_words', False,
         )
+        other.gas_modeling_enabled = getattr(
+            self, 'gas_modeling_enabled', False,
+        )
+        other.oog_modeling_enabled = getattr(
+            self, 'oog_modeling_enabled', False,
+        )
 
     def copy_callengine_side_channels_to(self, other: 'SMTState') -> None:
         """复制 callEngine side-channel 字段到另一个 SMTState。"""
@@ -356,6 +375,7 @@ class SMTState:
         num_inputs: int = 0,
         calldata_size_bytes: Optional[int] = None,
         calldata_size_max_bytes: Optional[int] = None,
+        symbolic_gas: bool = False,
     ) -> 'SMTState':
         """创建具有符号输入的初始SMT状态。
 
@@ -460,7 +480,22 @@ class SMTState:
         initial_state.callengine_stack_byte_offset = BitVecVal(0, 64)
         initial_state.callengine_stack_base = r14
         initial_state.callengine_callvalue = callvalue64
-        initial_state.callengine_gas_remaining = BitVecVal(1000000000, 64)
+        # gas:
+        # - symbolic_gas=False（默认）：固定为大常量 1000000000，使 x86 的
+        #   makeStaticUseGas `cmp/jb OOG` 恒不跳、out-of-gas 分支不可达——这是
+        #   功能等价验证（stack/storage/output）所需的旧行为，不能引入 OOG 路径。
+        # - symbolic_gas=True（gas 一致性验证）：用符号 G，EVM 侧 evm_gas 与
+        #   x86 侧 callengine_gas_remaining([R13+0x70]) 共享同一 G 作为同一起点；
+        #   「gas 恒足」前提由 program_verifier 在 check_gas=True 时注入的
+        #   UGE(G, bound) 假设保证，从而剪掉 OOG 分支。
+        if symbolic_gas:
+            gas_remaining = BitVec('GasRemaining', 64)
+        else:
+            gas_remaining = BitVecVal(1000000000, 64)
+        initial_state.callengine_gas_remaining = gas_remaining
+        initial_state.evm_gas = EVMGasState(initial_gas=gas_remaining)
+        # 仅符号 gas 时开启动态 gas 建模（扣减 + scope assumption）。
+        initial_state.gas_modeling_enabled = symbolic_gas
         initial_state.callengine_self_address_pointer = self_address_ptr
         initial_state.callengine_origin_address_pointer = origin_address_ptr
         initial_state.callengine_caller_address_pointer = caller_address_ptr
@@ -506,7 +541,7 @@ class SMTState:
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
             r13 + BitVecVal(callengine_offsets["gas_remaining"], 64),
-            BitVecVal(1000000000, 64),
+            gas_remaining,
             domain=MemoryDomain.CALLENGINE,
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(

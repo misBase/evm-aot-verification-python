@@ -186,6 +186,26 @@ class GoFunctionSemantics:
             domain=MemoryDomain.CALLENGINE,
         )
 
+    def _deduct_host_gas_uf(self, mstate: SMTState, opcode: str,
+                            stack_args) -> None:
+        """x86 侧扣 host-gas UF（与 EVM 侧 charge_host_gas_uf 同名相消）。
+
+        host gas 在 Go runtime 不可见，手动从 callengine_gas_remaining 扣同一 UF。
+        stack_args 必须是该 host 调用点刚 pop 出的、与 EVM 侧同序的栈值（两侧栈
+        已被功能等价证明相等 → UF 同参相消）。仅 gas_modeling_enabled 生效。
+        """
+        from state.host_gas import deduct_host_gas_uf_x86
+        deduct_host_gas_uf_x86(
+            mstate,
+            opcode,
+            stack_args,
+            offsets=self.aot_profile.offsets,
+            store_64bit=lambda addr, val, dom: mstate.x86_memory.store_64bit(
+                addr, val, domain=dom
+            ),
+            callengine_domain=MemoryDomain.CALLENGINE,
+        )
+
     def _clear_caller_saved_pointer_tags(self, mstate: SMTState) -> None:
         for reg in (
             Register.RAX, Register.RCX, Register.RDX, Register.RSI, Register.RDI,
@@ -392,6 +412,8 @@ class GoFunctionSemantics:
         val = mstate.evm_storage.sload(key)
         sp, mstate = self._push_uint256(sp, val, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM SLOAD 同参 [key] 相消）。host runtime 冷热账户不可见。
+        self._deduct_host_gas_uf(mstate, "SLOAD", [key])
         return mstate
 
     def _handle_sstore(self, sp: int, mstate: SMTState) -> SMTState:
@@ -400,6 +422,8 @@ class GoFunctionSemantics:
         val, sp, mstate = self._pop_uint256(sp, mstate)
         mstate.evm_storage = mstate.evm_storage.sstore(key, val)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM SSTORE 同参 [key, val] 相消）。冷热+退款不可见。
+        self._deduct_host_gas_uf(mstate, "SSTORE", [key, val])
         return mstate
 
     def _handle_sha3(self, sp: int, mstate: SMTState) -> SMTState:
@@ -423,6 +447,8 @@ class GoFunctionSemantics:
         result = uninterpreted.balance_semantics(addr)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM BALANCE 同参 [addr] 相消）。冷热账户访问不可见。
+        self._deduct_host_gas_uf(mstate, "BALANCE", [addr])
         return mstate
 
     def _handle_self_balance(self, sp: int, mstate: SMTState) -> SMTState:
@@ -438,6 +464,8 @@ class GoFunctionSemantics:
         result = uninterpreted.ext_code_size_semantics(addr)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM EXTCODESIZE 同参 [addr] 相消）。冷热账户不可见。
+        self._deduct_host_gas_uf(mstate, "EXTCODESIZE", [addr])
         return mstate
 
     def _handle_ext_code_copy(self, sp: int, mstate: SMTState,
@@ -458,6 +486,11 @@ class GoFunctionSemantics:
             effect_tag=f"extcodecopy_idx_{effect_id}",
         )
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM EXTCODECOPY 同参 [addr, size] 相消）。EXTCODECOPY 仍
+        # 整体 fail-closed（x86 可见内存扩展 + copy word gas 未在 EVM 侧对齐），但
+        # 这里保持两侧 UF 对称:将来对齐可见部分、移出 guard 时无需再补 x86 侧，避免
+        # 「EVM 扣 UF 而 x86 不扣」的 fail-open 陷阱（参见 review Issue 1）。
+        self._deduct_host_gas_uf(mstate, "EXTCODECOPY", [addr, size])
         return mstate
 
     def _handle_ext_code_hash(self, sp: int, mstate: SMTState) -> SMTState:
@@ -466,6 +499,8 @@ class GoFunctionSemantics:
         result = uninterpreted.ext_code_hash_semantics(addr)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM EXTCODEHASH 同参 [addr] 相消）。冷热账户不可见。
+        self._deduct_host_gas_uf(mstate, "EXTCODEHASH", [addr])
         return mstate
 
     def _handle_block_hash(self, sp: int, mstate: SMTState) -> SMTState:
@@ -478,8 +513,10 @@ class GoFunctionSemantics:
 
     def _handle_self_destruct(self, sp: int, mstate: SMTState) -> SMTState:
         """SELFDESTRUCT: 弹出 address（终止执行，无返回值）。"""
-        _addr, sp, mstate = self._pop_uint256(sp, mstate)
+        beneficiary, sp, mstate = self._pop_uint256(sp, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM SELFDESTRUCT 同参 [beneficiary] 相消）。冷热+账户创建不可见。
+        self._deduct_host_gas_uf(mstate, "SELFDESTRUCT", [beneficiary])
         return mstate
 
     def _handle_log(
@@ -563,6 +600,10 @@ class GoFunctionSemantics:
         result = uninterpreted.create_semantics(value, offset, size, mstate.x86_memory.evm_mem, effect_id=effect_id)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM CREATE 同参 [value,offset,size] 相消）。注意 x86 的
+        # dealWithAddGas/SubGas returnGas 链与 CREATE 内存扩展是**另外**的可见机器码
+        # （已由反汇编建模），此 UF 只承载 host cost 部分。
+        self._deduct_host_gas_uf(mstate, "CREATE", [value, offset, size])
         return mstate
 
     def _handle_create2(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
@@ -577,6 +618,9 @@ class GoFunctionSemantics:
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM CREATE2 同参 [value,offset,size,salt] 相消）。CREATE2
+        # 同 CREATE 仍 fail-closed（可见内存扩展 + InitCodeWordGas 未对齐）。
+        self._deduct_host_gas_uf(mstate, "CREATE2", [value, offset, size, salt])
         return mstate
 
     def _handle_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
@@ -620,6 +664,12 @@ class GoFunctionSemantics:
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM CALL 同参 7 项相消）。x86 的 dealWithAddGas/SubGas
+        # returnGas 链是另外的可见机器码（已建模、净额为 0）；CALL 无可见内存扩展
+        # （checkMemoryAndCalcDynamicGasCall 返回 nil），故此 UF 即全部 host gas。
+        self._deduct_host_gas_uf(mstate, "CALL", [
+            gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+        ])
         return mstate
 
     def _handle_call_code(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
@@ -663,6 +713,10 @@ class GoFunctionSemantics:
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM CALLCODE 同参 7 项相消）。同 CALL，无可见内存扩展。
+        self._deduct_host_gas_uf(mstate, "CALLCODE", [
+            gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+        ])
         return mstate
 
     def _handle_delegate_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
@@ -705,6 +759,10 @@ class GoFunctionSemantics:
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM DELEGATECALL 同参 6 项相消，无 value）。无可见内存扩展。
+        self._deduct_host_gas_uf(mstate, "DELEGATECALL", [
+            gas, addr, args_offset, args_size, ret_offset, ret_size,
+        ])
         return mstate
 
     def _handle_static_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
@@ -742,6 +800,10 @@ class GoFunctionSemantics:
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM STATICCALL 同参 6 项相消，无 value）。无可见内存扩展。
+        self._deduct_host_gas_uf(mstate, "STATICCALL", [
+            gas, addr, args_offset, args_size, ret_offset, ret_size,
+        ])
         return mstate
 
     def _handle_tload(self, sp: int, mstate: SMTState) -> SMTState:
@@ -852,6 +914,9 @@ class GoFunctionSemantics:
         result = arithmetic.exp_semantics(base, exponent)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
+        # host gas UF（与 EVM EXP 同参 [exponent] 相消）。dealWithExp 在 builtin
+        # runtime 算 gas（按 expByteLen），x86 机器码不可见。
+        self._deduct_host_gas_uf(mstate, "EXP", [exponent])
         return mstate
 
     def _handle_builtin_addmod(self, sp: int, mstate: SMTState) -> SMTState:
@@ -891,17 +956,38 @@ class GoFunctionSemantics:
            建模为一个可按地址读写的无限 Z3 Array，因此不会显式验证 buffer 扩容、
            长度变化或扩容后的基址重定位。
 
-        因此，这里不做栈 pop/push，也不修改 SMT 状态中的内存元数据。
+        这里同步更新 memory size side-channel [R13+0x18]。
 
-        TODO:
-        后续如果要更精确地贴近 go-hpc-evm AOT，需要补充对 callEngine 中
-        growNumber、memoryElement0Address、memorySliceLen 等字段的建模，
-        并在 memory_grow 后同步更新这些可观察状态，以验证内存扩容相关语义。
+        **gas 建模分支（gas_modeling_enabled）**:growNumber（[R13+0x108] =
+        callengine_builtin_arg0）已经是 rounded byte size（native code 在
+        makeStoreCheck/RETURN 把 memWords<<5 写入 [R13+0x108]，Go
+        dealWithMemoryGrow 直接 targetMemSize := growNumber），故直接用，不 <<5。
+        内存扩展动态 gas 的 expansion branch（newMemSize > mem.Len()）依赖这个值。
+        **单调守卫（Fix #3）**:Go dealWithMemoryGrow 有 `if targetMemSize > memLen`，
+        内存只增不减，故这里用 If(UGT(target, old), target, old)——无条件覆盖会让
+        target < memLen 时内存缩小（重复扣费/减法下溢），且与 EVM 侧 If(rounded>old,
+        rounded, old) 不对齐。
+
+        **功能等价分支（默认，gas off）**:保留历史 `<<5` 行为——既有功能等价
+        验证（含 SHA3 等经此 builtin 的程序）依赖它写入 [R13+0x18] 的值与 x86
+        下游读取一致；贸然改成 byte size 会破坏既有 return-data/memory observable。
+        gas 建模是新增维度，不应改变功能等价路径的此行为。
         """
-        from z3 import BitVecVal
+        from z3 import BitVecVal, If, UGT
 
-        new_page_count = mstate.callengine_builtin_arg0
-        new_size_bytes = new_page_count << BitVecVal(5, 64)
+        if getattr(mstate, "gas_modeling_enabled", False):
+            # growNumber 已是 rounded byte size（target memory size）。
+            target = mstate.callengine_builtin_arg0
+            # Fix #3:镜像 Go dealWithMemoryGrow 的 `if targetMemSize > memLen`——
+            # 内存大小单调不减，只在扩容时更新。无条件覆盖会让 target < memLen 时
+            # 内存反而缩小（如 160→grow(32)→32），导致后续访问重复扣费/减法下溢，
+            # 且与 EVM 侧 charge_memory_expansion_gas 的 If(rounded>old, rounded, old)
+            # 不对齐。
+            old_size = mstate.callengine_memory_size_bytes
+            new_size_bytes = If(UGT(target, old_size), target, old_size)
+        else:
+            # 功能等价分支（gas off）:保留历史 <<5 行为（既有 observable 依赖）。
+            new_size_bytes = mstate.callengine_builtin_arg0 << BitVecVal(5, 64)
 
         # 保持 x86_memory 中的 callEngine 元数据同步，避免慢路径读到旧值。
         self._sync_callengine_u64_field(
@@ -917,6 +1003,11 @@ class GoFunctionSemantics:
 
         Go runtime 的 dealWithGasCost 会弹出 1 个值，不压回结果。
         这里不对 gas 余额做等价性建模。
+
+        **已知 gap（gas 验证）**:本 builtin 不扣 host-gas UF。当前 gas 一致性验证的
+        指令（EXP 等）不经此 builtin 路由 gas，故无影响。但若将来 codegen 把某指令的
+        gas 改走 dealWithGasCost 而 EVM 侧无对应扣减，会出现两侧 gas 不对齐——届时需
+        给本 handler 补 host-gas UF 或把相关指令纳入 _DYNAMIC_GAS_UNSUPPORTED_KINDS。
         """
         _gas, sp, mstate = self._pop_uint256(sp, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)

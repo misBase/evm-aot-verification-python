@@ -29,6 +29,7 @@ OBSERVATION_KEYS = {
     "storage",
     "transient_storage",
     "status_code",
+    "gas",
 }
 
 
@@ -128,6 +129,7 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         ),
         PathObservation(
             condition=selector == BitVecVal(1, 1),
@@ -139,6 +141,7 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         ),
     ]
     x86_observations = [
@@ -152,6 +155,7 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         )
     ]
 
@@ -178,6 +182,7 @@ def _status_observation(state, *, x86: bool, status_code: int) -> PathObservatio
         storage=state.evm_storage.Storage,
         transient_storage=state.evm_transient_storage.TransientStorage,
         status_code=BitVecVal(status_code, 8),
+        gas=None,
     )
 
 
@@ -271,6 +276,7 @@ def test_path_coverage_is_checked_under_precondition():
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         )
     ]
     x86_observations = [
@@ -284,6 +290,7 @@ def test_path_coverage_is_checked_under_precondition():
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         )
     ]
 
@@ -311,6 +318,7 @@ def test_path_coverage_failure_reports_incomplete_certificate_reason():
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         )
     ]
     coverage = PathCoverageCertificate(
@@ -388,6 +396,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         )
     ]
     x86_observations = [
@@ -401,6 +410,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         ),
         PathObservation(
             condition=BoolVal(True),
@@ -412,6 +422,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=BitVecVal(0, 8),
+            gas=None,
         ),
     ]
 

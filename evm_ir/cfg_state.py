@@ -187,7 +187,6 @@ class GlobalState:
         self.node = node
         self.loop_time = {}
 
-
         # 执行深度（用于循环检测）
         self.depth = 0
 

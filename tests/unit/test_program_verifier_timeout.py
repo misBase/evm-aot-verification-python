@@ -41,6 +41,7 @@ class _DummyEVMProgram:
                     storage=state.evm_storage.Storage,
                     transient_storage=state.evm_transient_storage.TransientStorage,
                     status_code=BitVecVal(0, 8),
+                    gas=None,
                 )
             ],
             merged_state=state if merge_state else None,
@@ -75,6 +76,7 @@ class _DummyX86Program:
                     storage=state.evm_storage.Storage,
                     transient_storage=state.evm_transient_storage.TransientStorage,
                     status_code=BitVecVal(0, 8),
+                    gas=None,
                 )
             ],
             merged_state=state if merge_state else None,

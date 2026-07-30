@@ -13,6 +13,7 @@ OBSERVATION_KEYS = frozenset({
     "storage",
     "transient_storage",
     "status_code",
+    "gas",
 })
 
 
@@ -30,6 +31,11 @@ class PathObservation:
     transient_storage: Any
     # 必填：给默认值会让漏传的 producer 一路静默到 refinement 检查里变成假绿。
     status_code: Any
+    # 该终止路径的剩余 gas（EVM 侧 evm_gas.Gas / x86 侧 callengine_gas_remaining）。
+    # 同样必填、同样的理由。值可以是 None，但那必须是「本次运行没建模 gas」的显式
+    # 表态（由 gas_modeling_enabled 决定），不能是 producer 忘了传——所以不给默认值，
+    # 让漏传在构造处就 TypeError，而不是漂到 gas 检查里变成静默 skip。
+    gas: Any
 
     def __getitem__(self, key: str) -> Any:
         if key not in OBSERVATION_KEYS:
@@ -54,6 +60,7 @@ class PathObservation:
             "storage": self.storage,
             "transient_storage": self.transient_storage,
             "status_code": self.status_code,
+            "gas": self.gas,
         }
 
 

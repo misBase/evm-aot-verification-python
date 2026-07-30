@@ -48,8 +48,9 @@ _PATH_RESULT_KEYS = (
     "has_return_data",
     "storage",
     "transient_storage",
-    # worker 私有 Context 只翻译这里列出的键，漏键会让 status 比较静默失效。
+    # worker 私有 Context 只翻译这里列出的键，漏键会让 status/gas 比较静默失效。
     "status_code",
+    "gas",
 )
 
 
@@ -91,11 +92,13 @@ class PathRefinementChecks:
         outputs: OutputRefinementChecks,
         storage: StorageEquivalenceChecks,
         memory: MemoryContentChecks,
+        gas=None,
     ):
         self._ctx = ctx
         self._outputs = outputs
         self._storage = storage
         self._memory = memory
+        self._gas = gas
 
     def check_refinement_paths(
         self,
@@ -335,7 +338,26 @@ class PathRefinementChecks:
             if not verified:
                 return False, msg
 
-        return True, "Status code, storage and transient storage equivalent"
+        # gas 终值等价（阶段 0）。这条路径在 aggregate fallback 成功后是唯一被
+        # 调到的状态 observable 检查（不再走 _check_state_observables_with_solver），
+        # 故 gas 检查必须也在这里追加，否则 fallback 路径会静默漏检 gas。
+        # status code 不在这里重复检查：上面 _outputs._check_status_code_with_solver
+        # 已经覆盖了同一条路径。
+        if self._gas is not None:
+            verified, msg = self._gas._check_gas_equivalence_with_solver(
+                solver,
+                evm_result.get("gas"),
+                x86_result.get("gas"),
+                deadline,
+                path_condition,
+                context,
+                logs,
+                ctx,
+            )
+            if not verified:
+                return False, msg
+
+        return True, "Status code, gas, storage and transient storage equivalent"
 
     def _check_evm_path_return_memory_against_x86_union(
         self,

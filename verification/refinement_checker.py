@@ -13,6 +13,7 @@
 from typing import Optional, Tuple
 
 from .refinement_context import _RefinementContext
+from .refinement_gas import GasEquivalenceChecks
 from .refinement_memory import MemoryContentChecks
 from .refinement_outputs import OutputRefinementChecks
 from .refinement_paths import PathRefinementChecks, _PathPairChunkCheckResult
@@ -30,6 +31,7 @@ class RefinementChecker:
         timeout_ms: int = 60000,
         verbose: bool = False,
         z3_verbose: bool = False,
+        check_gas: bool = False,
     ):
         """初始化精化检查器。
 
@@ -38,16 +40,26 @@ class RefinementChecker:
             verbose: 启用应用层详细输出（subcheck 时间、path-pair 进度等）
             z3_verbose: 是否同时打开 z3 自身的 verbose（极吵；默认关，避免淹没
                 应用层日志）。perf 调试用 verbose=True, z3_verbose=False。
+            check_gas: 是否启用 gas 终值一致性检查（阶段 0）。默认 False：
+                gas 检查只覆盖静态 gas，对含动态 gas 指令（MSTORE/RETURN/CALL
+                等）的程序会 SAT；且许多测试桩 hex 不含 gas codegen。需显式
+                开启（配合纯静态 gas fixture），避免破坏既有功能等价验证。
         """
         self._ctx = _RefinementContext(timeout_ms, verbose, z3_verbose)
         self._storage = StorageEquivalenceChecks(self._ctx)
         self._memory = MemoryContentChecks(self._ctx)
-        self._outputs = OutputRefinementChecks(self._ctx, self._storage, self._memory)
+        # gas 检查默认关闭：check_gas=False 时 _gas=None，所有 gas 检查点
+        # （均写了 `if self._gas is not None`）静默跳过。
+        self._gas = GasEquivalenceChecks(self._ctx) if check_gas else None
+        self._outputs = OutputRefinementChecks(
+            self._ctx, self._storage, self._memory, self._gas
+        )
         self._paths = PathRefinementChecks(
             self._ctx,
             self._outputs,
             self._storage,
             self._memory,
+            self._gas,
         )
 
     # --- 共享状态的只读转发（外部代码与测试直接读取这些 knob）---

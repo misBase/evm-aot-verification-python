@@ -251,6 +251,7 @@ class X86Program:
             'storage': merged_state.evm_storage.Storage,
             'transient_storage': merged_state.evm_transient_storage.TransientStorage,
             'status_code': merged_state.callengine_status_code,
+            'gas': merged_state.callengine_gas_remaining,
             'summary_stats': self.last_summary_stats,
             # merged 模式 fail-closed：被剪路径通过证书暴露给 program_verifier。
             'coverage': executor.path_coverage_certificate(),
@@ -405,6 +406,7 @@ class X86Program:
             storage=state.evm_storage.Storage,
             transient_storage=state.evm_transient_storage.TransientStorage,
             status_code=state.callengine_status_code,
+            gas=state.callengine_gas_remaining,
         )
 
     def _get_instructions(self) -> List[X86Instruction]:
@@ -439,6 +441,7 @@ class X86Program:
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
             'status_code': state.callengine_status_code,
+            'gas': state.callengine_gas_remaining,
             'summary_stats': self.last_summary_stats,
             'coverage': PathCoverageCertificate.by_construction(
                 "empty x86 program has one unconditional terminal result",
@@ -588,6 +591,7 @@ class X86Program:
             'storage': state.evm_storage.Storage,
             'transient_storage': state.evm_transient_storage.TransientStorage,
             'status_code': state.callengine_status_code,
+            'gas': state.callengine_gas_remaining,
             'summary_stats': self.last_summary_stats,
             'coverage': PathCoverageCertificate.by_construction(
                 "sequential x86 fallback has one unconditional terminal result",
