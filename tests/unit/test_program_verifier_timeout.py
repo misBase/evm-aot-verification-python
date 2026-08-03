@@ -195,7 +195,9 @@ def test_verify_program_pair_uses_independent_stack_check_budget(monkeypatch):
     )
 
     assert verified
-    assert msg == "ok"
+    # 本测试只管 stack-check 的独立 timeout 预算；成功消息会被 _annotate_gas_scope
+    # 附上 gas 结论范围，故用 startswith 而非全等。
+    assert msg.startswith("ok")
     assert captured["n_elements"] == 1
     assert captured["deadline"] == 1000.456
 

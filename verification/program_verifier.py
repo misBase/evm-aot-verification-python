@@ -6,6 +6,7 @@
 """
 
 import time
+from enum import Enum
 from typing import Tuple, Optional
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
@@ -13,6 +14,29 @@ from x86_64.summaries import X86SummaryConfig
 from .refinement_checker import RefinementChecker
 from .call_site_mapping import build_call_site_mapping
 from state.smt_state import SMTState
+
+
+class GasCheck(str, Enum):
+    """gas 检查模式。每个取值绑定一种初始 gas 配置，verify_program_pair fail-closed 校验。
+
+    - OFF：不比较 gas（功能等价），但**仍要求具体预算**。OFF 下 host gas UF 是关的，
+      两侧都不扣 host cost，符号 gas 会让后续可见 OOG 阈值短一个 host cost（真实可达的
+      OOG 区域被漏掉）；具体预算把这个缺口压成空集。详见 verify_program_pair 内的说明。
+    - FIXED_BUDGET：比较 gas，**要求具体预算**。结论是「从这一个预算出发」的**单点**
+      结论，不是 ∀initial_gas。具体值让 `ULT(budget, cost)` 在 simplify 阶段折成 False，
+      省掉每个 block 一次可达性查询。
+    - FULL：比较 gas，**要求符号 gas**，对所有初始 gas 量化。具体值会把要验的 OOG 分支
+      折死，故拒绝。
+
+    两者的差别是「固定一个 gas 点」vs「量化所有 gas」，**不是**「无 OOG 路径」vs「有」：
+    FIXED_BUDGET 下依赖符号 offset 的动态 fee 仍能超预算，那类 OOG 分支照样保留。
+
+    结论范围（三个模式共同适用）见 ProgramEquivalenceChecker.__init__。
+    """
+
+    OFF = "off"
+    FIXED_BUDGET = "fixed_budget"
+    FULL = "full"
 
 
 def _merged_coverage_failure(evm_result: dict, x86_result: dict) -> Optional[str]:
@@ -54,11 +78,6 @@ def _collect_assumptions(*states):
     return out
 
 
-# 循环上界系数：cfg_executor 的 max_iteration 硬上界（超过即被特殊处理），
-# 故任一 block 最多被经过这么多次。用作 gas 恒足 bound 的保守乘子。
-_GAS_BOUND_MAX_ITERATION = 500
-
-
 # gas 验证的指令分三档（见 memory: gas_full_coverage_codegen_layers）：
 #
 # 1. 真证明（x86 codegen 可见，EVM 侧建了真实公式）：
@@ -67,36 +86,32 @@ _GAS_BOUND_MAX_ITERATION = 500
 # 2. UF 兜底（host/builtin gas 不可见，两侧扣同名 host_gas_uf 相消）：
 #    SLOAD/SSTORE/BALANCE/EXTCODESIZE/EXTCODEHASH/SELFDESTRUCT/EXP +
 #    CALL/CALLCODE/DELEGATECALL/STATICCALL。见 state/host_gas.py。
-# 3. 仍 fail-closed 拒绝：下面这三个。它们除 host UF 外，x86 还有**可见**的内存
-#    扩展 gas 尚未在 EVM 侧建模，只挂 UF 会漏掉这段可见差异。
+# 3. 仍 fail-closed 拒绝：下面这三个。它们的可见 fee **已经建模**
+#    （semantics._charge_memory_and_word_gas），拒绝理由是剩下的部分没核实。
 _DYNAMIC_GAS_UNSUPPORTED_KINDS = frozenset({
-    # 可见部分 = 内存扩展 + copy word gas（checkMemoryAndCalcDynamicGasExtCodeCopy）。
+    # 待补：无专用 fixture，放行等于放进任意符号 offset/size 的实例而无回归覆盖。
     "EXTCODECOPY",
-    # 可见部分 = 内存扩展 + InitCodeWordGas（memoryCreateGasN）。returnGas 链已对齐。
+    # 待补：MAX_INIT_CODE_SIZE_EXCEEDED(16) 两侧行为未核对；gas_create fixture 的
+    # value/offset/size 全是常量 0（size==0 的退化实例），撑不起 opcode 级放行。
     "CREATE",
     "CREATE2",
 })
 
 
-def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram,
-                                      oog_mode: bool = False) -> list[str]:
-    """返回 gas 检查仍必须 fail-closed 拒绝的动态 gas 指令（非空即防假绿守卫）。
+def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram) -> list[str]:
+    """返回 gas 检查仍必须 fail-closed 拒绝的动态 gas 指令（非空即拒绝受理）。
 
-    默认拒绝集见 _DYNAMIC_GAS_UNSUPPORTED_KINDS。CALL 系列不在其中：它们无可见
-    内存扩展（checkMemoryAndCalcDynamicGasCall=nil），returnGas 链虽是可见机器码
-    但加减净 0 且两侧已对齐，故 host UF 即覆盖全部 host gas。
+    拒绝集见 _DYNAMIC_GAS_UNSUPPORTED_KINDS，与 gas_check 模式无关。
 
-    oog_mode（check_oog）额外拒绝整个 HOST_GAS_UF_KINDS：host UF 只让两侧在调用点
-    钳零后继续执行，**不分叉** host 动态 gas 耗尽的 OOG 路径，而 EVM 侧目前只对
-    block 静态 gas 分叉 OOG。于是 SLOAD/EXP/CALL 的 host 动态 gas 会不会触发 OOG、
-    两侧行为是否一致根本没被验证，放行即假绿。check_gas 不受影响——恒足前提已剪掉
-    所有 OOG。
+    HOST_GAS_UF_KINDS 不在其中（含 FULL）：host gas 两侧扣同名 UF 相消，而 host gas
+    耗尽后的终止没有任何生成代码（见 state/host_gas.py 模块 docstring），没有 x86 行为
+    可以不一致。结论范围由 _annotate_gas_scope 写进成功消息。CALL 系列另无可见内存扩展
+    （checkMemoryAndCalcDynamicGasCall=nil）；其 returnGas 加减是可见机器码，两侧按相同
+    顺序建模，host-success 路径上相消，host-exhaustion 后的续跑状态两侧仍走同构的
+    _consume_clamp_64 而逐状态比较（那里 0-rg 会回绕，并非净 0），只是其终止行为不在
+    证明范围内。
     """
-    from state.host_gas import HOST_GAS_UF_KINDS
-
     reject = _DYNAMIC_GAS_UNSUPPORTED_KINDS
-    if oog_mode:
-        reject = reject | HOST_GAS_UF_KINDS
 
     unsupported: list[str] = []
     for block in getattr(evm_program, "blocks", None) or []:
@@ -111,62 +126,44 @@ def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram,
     return unsupported
 
 
-def _inject_gas_sufficiency_assumption(evm_program: EVMProgram, initial_state: SMTState) -> None:
-    """注入「gas 恒足」前提 UGE(G, bound)，让 out-of-gas 分支恒假被剪。
-
-    阶段 0 只比较 gas 终值（不验 OOG 行为），需保证两侧都不触发 out-of-gas，
-    否则 EVM 侧 consume_static 钳零会与 x86 的 OOG 跳转语义分叉。
-
-    bound = (∑ block.static_gas) × max_iteration 是可扣 static gas 的可证上界（每个
-    block 最多经过 max_iteration 次），不是魔法常量。∑static_gas == 0 时无需约束；
-    bound ≥ 2^64（会 wrap）时 fail-closed 不注入——宁可不剪 OOG 分支（检查更严，
-    可能 SAT/unknown），也不注入错误的 wrap 约束。
-    """
-    from z3 import BitVecVal, UGE
-
-    blocks = getattr(evm_program, "blocks", None)
-    if not blocks:
-        # 程序未暴露 blocks（如测试 stub）→ 无法算 bound，不注入假设。
-        return
-    total_static = sum(getattr(b, "static_gas", 0) or 0 for b in blocks)
-    if total_static <= 0:
-        return
-
-    bound = total_static * _GAS_BOUND_MAX_ITERATION
-    if bound >= (1 << 64):
-        # 上界超出 64-bit gas 表示范围 → 无法给出健全的 bound，fail-closed。
-        return
-
-    gas_symbol = initial_state.evm_gas.Gas
-    assumption = UGE(gas_symbol, BitVecVal(bound, 64))
-
-    if initial_state.assumptions is None:
-        initial_state.assumptions = []
-    initial_state.assumptions.append(assumption)
+# 曾有 _inject_gas_sufficiency_assumption（注入 UGE(G, Σstatic_gas × 500) 剪 OOG 分支），
+# 已删除：它从来不是健全性要求（钳零删掉后，不注入也照样 VERIFIED，只是路径 1→3、
+# 全配对 pair 1→9），而 GasCheck.FIXED_BUDGET 的具体预算把同一件事做得更彻底——
+# `ULT(budget, cost)` 在 simplify 阶段就折死，不必每个 block 一次可达性查询。
 
 
 class ProgramEquivalenceChecker:
     """验证EVM和x86程序之间的等价性。"""
 
     def __init__(self, timeout_ms: int = 60000, verbose: bool = False,
-                 check_gas: bool = False, check_oog: bool = False):
+                 gas_check: 'GasCheck | str' = GasCheck.OFF):
         """初始化程序等价性检查器。
+
+        gas 检查的结论范围（所有模式适用，按这个口径读 VERIFIED）：
+
+        - 验 **x86 可见 gas 计算**：makeStaticUseGas、checkMemoryAndCalcDynamicGas* 的
+          内存扩展/word/log fee、CALL 系 returnGas 链。
+        - host/builtin gas **数额**靠两侧同名 host_gas_uf 相消：证的是「两侧扣同一个数、
+          栈参数一致」（能抓参数传错），host 公式本身是 assume。
+        - host gas **耗尽后的终止**不在范围内，也不是缺口——那一处没有生成代码。
+          理由见 state/host_gas.py 模块 docstring。
 
         Args:
             timeout_ms: SMT求解器超时（毫秒）
             verbose: 启用详细输出
-            check_gas: 启用 gas 终值一致性检查（gas 充足路径）。
-            check_oog: 启用 OOG 路径一致性检查。不注入 gas 恒足假设、放开 EVM 侧
-                OOG 分叉，验 out-of-gas 路径的 status code 两侧一致；它需要 status
-                检查通道，故一并开启 check_gas 的检查。
+            gas_check: GasCheck 之一（也接受其字符串值）。各模式语义见 GasCheck。
+
+        Raises:
+            ValueError: gas_check 不是合法的 GasCheck 取值。
         """
+        # 运行时归一化：类型标注拦不住字符串，而 `self.gas_check is GasCheck.OFF`
+        # 这类 identity 判断会把裸字符串 "off" 误当成"已启用 gas 检查"。
+        self.gas_check = GasCheck(gas_check)
         self.refinement_checker = RefinementChecker(
             timeout_ms=timeout_ms, verbose=verbose,
-            check_gas=check_gas or check_oog,
+            check_gas=self.gas_check is not GasCheck.OFF,
         )
-        self.check_oog = check_oog
         self.verbose = verbose
-        self.check_gas = check_gas
 
     def verify_program_pair(self,
                            evm_program: EVMProgram,
@@ -221,58 +218,128 @@ class ProgramEquivalenceChecker:
         if path_pair_workers <= 0:
             raise ValueError("path_pair_workers must be a positive integer")
 
-        # 未建模动态 gas 的 opcode 必须 fail-closed，避免两侧都漏扣时假绿。check_oog
-        # 也走这个 guard（它开着 gas/status 检查通道），并额外拒绝 HOST_GAS_UF_KINDS。
+        # IR 不变量：有 static_gas 的 block 必须带 TAG。静态 gas 的 OOG 守卫挂在 TAG
+        # 序言上，而扣减无条件执行且是纯减法（consume_static 不钳零）——无 TAG 时 gas
+        # 不足会回绕成 ~2^64 静默继续，后续 OOG 判断全部失效。
         #
-        # 已知缺口：LOG 的动态 gas 已建模、不在拒绝集，但 EVM 侧没有对 LOG 动态 gas
-        # 分叉 OOG。gas 够过 static 检查却不够付 LOG 时，x86 会多出一条 OOG 终止路径
-        # 而 EVM 没有 → 报 terminal-path 覆盖检查失败（"EVM terminal paths do not
-        # cover all inputs"，注意不是 pair 级 gas SAT），fail-closed 不假绿。待补齐
-        # LOG 动态 gas 的 OOG 分叉建模。
-        if self.check_gas or self.check_oog:
-            unsupported_dynamic_gas = _find_unsupported_dynamic_gas_ops(
-                evm_program, oog_mode=self.check_oog
+        # 放在 verifier 入口而非 cfg_executor：这是**编译器产出 IR** 的不变量。仓库里大量
+        # 合成 EVMBlock（static_gas 非零、无 TAG）直接驱动执行器测裸 CFG，不该被打断。
+        bad_blocks = [
+            b for b in (getattr(evm_program, "blocks", None) or [])
+            if getattr(b, "static_gas", 0)
+            and not any((getattr(op, "kind", "") or "").upper() == "TAG"
+                        for op in (getattr(b, "operations", None) or []))
+        ]
+        if bad_blocks:
+            sample = ", ".join(f"pc=0x{getattr(b, 'pc', 0):x}" for b in bad_blocks[:8])
+            if len(bad_blocks) > 8:
+                sample += f", ... (+{len(bad_blocks) - 8} more)"
+            return (
+                False,
+                "✗ IR INVARIANT VIOLATED: block(s) carry static_gas but have no TAG "
+                f"operation: {sample}. The static-gas OOG guard lives in the TAG "
+                "prologue, so such a block would deduct gas without ever branching "
+                "to OUT_OF_GAS — insufficient gas would wrap around instead "
+                "(fail-closed)",
             )
+
+        # 未建模动态 gas 的 opcode 必须 fail-closed，避免两侧都漏扣时假绿。
+        # （LOG 曾是已知缺口，现已随 _charge_log_gas 走 _charge_dynamic_gas 补齐。）
+        if self.gas_check is not GasCheck.OFF:
+            unsupported_dynamic_gas = _find_unsupported_dynamic_gas_ops(evm_program)
             if unsupported_dynamic_gas:
                 sample = ", ".join(unsupported_dynamic_gas[:8])
                 if len(unsupported_dynamic_gas) > 8:
                     sample += f", ... (+{len(unsupported_dynamic_gas) - 8} more)"
                 return (
                     False,
-                    "✗ GAS CHECK UNSUPPORTED: dynamic gas operators are not "
-                    f"modeled yet for stage 0: {sample}",
+                    "✗ GAS CHECK UNSUPPORTED: these operators are outside the "
+                    f"currently provable gas scope: {sample}",
                 )
 
-        # OOG 路径一致性：放开 EVM 侧 OOG 分叉，**不**注入恒足假设（否则 OOG 恒假
-        # 被剪）。两侧各自产生 OOG 终止路径，由 terminal-path pair 检查验 status code
-        # （含 OUT_OF_GAS=12）一致。
-        if self.check_oog:
-            # 分叉条件是 ULT(gas, static_gas)：初始 gas 若是具体常量（默认 1e9），
-            # 条件恒假、所有 OOG 分支被剪 → 什么都没验却返回 VERIFIED。故要求
-            # create_initial_state(symbolic_gas=True)。
-            from z3 import is_bv_value
-            gas_sym = initial_state.evm_gas.Gas
-            if is_bv_value(gas_sym):
+        # --- 初始 gas 配置校验 ---
+        from z3 import is_bv_value, simplify
+
+        # 两侧初始 gas 必须同源 —— **所有模式**都查。gas 现在无条件参与控制流（OOG 分叉），
+        # 起点不同就不是在比同一个输入程序，`OFF` 也不例外。create_initial_state 用同一个
+        # 对象喂 evm_gas 与 callengine_gas_remaining，但调用方拿到 state 后可以改任意字段。
+        evm_gas = simplify(initial_state.evm_gas.Gas)
+        aot_gas = simplify(initial_state.callengine_gas_remaining)
+        if not evm_gas.eq(aot_gas):
+            return (
+                False,
+                "✗ GAS CONFIG REJECTED: initial gas differs between the two sides — "
+                f"IR evm_gas={evm_gas}, AOT callengine_gas_remaining={aot_gas}. "
+                "Both must start from the same value (fail-closed)",
+            )
+
+        # 必须先 simplify 再判 concrete：is_bv_value 只看语法形式，
+        # `BitVecVal(1,64) + BitVecVal(2,64)` 语义上就是 3 却返回 False —— 不化简的话
+        # FULL 会把这种"语义具体"的 gas 当成符号量接受，实际只验了单点却声称量化全部。
+        concrete = is_bv_value(evm_gas)
+
+        # OFF 要求具体预算，但**这不是对下面这个缺口的修复**，只是关掉了其中最明显的
+        # 一类反例。缺口本身仍在，如实记在这里：
+        #
+        # OFF 下 host_gas_uf_enabled 关着，两侧都不扣 host cost H，于是后续可见 gas 检查
+        # 判的是 `S > G` 而非真实的 `S > G-H`，`S ≤ G < H+S` 这片真实可达的 OOG 区域被
+        # 漏掉——这是 under-approximation，方向上会假绿。具体预算**并不能**消除它：H 是
+        # 无约束 UF，`G=1e9, H=999999998, S=3` 就是一个具体预算下的反例（host 调用成功，
+        # 扣完剩 2，下一步真实 OOG，而模型仍拿 1e9 去判）。所以 OFF 的结论是**条件性**的：
+        # 前提是「预算足够，且不存在受 host 扣费影响的后续 OOG」。该前提由
+        # _annotate_gas_scope 写进每一条 VERIFIED 消息，不靠文档口头声明。
+        #
+        # 为什么不干脆所有模式都开 host UF：gas 会变成含无约束 UF 的表达式，后继 block 的
+        # `ULT(gas, static_gas)` 再也折不掉。实测合成 12 block + 1 个 SLOAD：EVM 终止路径
+        # 1 → 12（pair 检查是 O(n×m)，候选 pair 1 → 144）。大合约上的膨胀已实测（见
+        # tests/integration/test_gas_consistency_contracts.py）：决定规模的是输入形态而非
+        # block 数——723 block 的 CErc20 固定 selector 在 FULL 下 7.6s/18 条路径，而 40
+        # block 的 muti_block 在符号 calldatasize 下 x86 路径 30 → 102+、>25min 未跑完。
+        #
+        # TODO: 待办（择一）：① 遇 host op 时 OFF 也 fail-closed 拒绝；② 给 host UF 的陪域加
+        # 结构性上界，让 OOG 分支变成可证不可满足而被剪掉——实测该法能把路径压回 1，但
+        # **对 CALL 系不成立**：gasCall 把 63/64 转发额度算进 cost（evm/gas_table.go:378），
+        # H 随预算等比放大，小上界会不健全。
+        if self.gas_check is GasCheck.OFF and not concrete:
+            return (
+                False,
+                "✗ GAS CONFIG REJECTED: GasCheck.OFF requires a concrete initial gas "
+                f"budget; got symbolic {evm_gas}. OFF leaves host gas unmodeled, so "
+                "with symbolic gas the downstream OOG threshold is short by the host "
+                "cost — use GasCheck.FULL to reason over all initial gas values",
+            )
+
+        # 比较 gas 的两个模式：形态与模式必须匹配，否则结论含义或求解规模不再是该模式
+        # 承诺的那个。这里也由 verifier **自己**打开 host gas UF —— 它默认关，而
+        # SLOAD/SSTORE/CALL/EXP 的 host gas 只有这一条路，关着就是 vacuous 通过。
+        gas_budget = evm_gas.as_long() if concrete else None
+        if self.gas_check is not GasCheck.OFF:
+            if self.gas_check is GasCheck.FULL and concrete:
                 return (
                     False,
-                    "✗ OOG CHECK UNSUPPORTED: check_oog requires symbolic gas "
-                    "(use create_initial_state(symbolic_gas=True)); got a concrete "
-                    f"gas constant {gas_sym}, which prunes all OOG branches "
-                    "(fail-closed to avoid false green)",
+                    "✗ GAS CHECK UNSUPPORTED: GasCheck.FULL requires symbolic gas "
+                    "(use create_initial_state(symbolic_gas=True)); got gas that "
+                    f"simplifies to the constant {evm_gas}, which folds away the very "
+                    "OOG branches FULL is meant to verify (fail-closed)",
                 )
-            initial_state.gas_modeling_enabled = True
-            initial_state.oog_modeling_enabled = True
-        # 非 OOG 模式：注入 gas 恒足前提 UGE(G, bound)，剪掉两侧 out-of-gas 分支，
-        # 只验 gas 充足路径的终值。
-        elif self.check_gas:
-            _inject_gas_sufficiency_assumption(evm_program, initial_state)
+            if self.gas_check is GasCheck.FIXED_BUDGET and not concrete:
+                return (
+                    False,
+                    "✗ GAS CHECK UNSUPPORTED: GasCheck.FIXED_BUDGET requires a "
+                    "concrete initial gas budget (use create_initial_state() or "
+                    f"create_initial_state(gas_budget=...)); got symbolic {evm_gas}. "
+                    "Symbolic gas leaves every block's OOG branch feasible, so the "
+                    "mode's path-scale promise no longer holds — use GasCheck.FULL "
+                    "to verify over all initial gas values",
+                )
+            initial_state.host_gas_uf_enabled = True
 
-        # gas/OOG 检查必须走 path_observations 模式。动态 gas 的 scope assumption
+        # gas 检查必须走 path_observations 模式。动态 gas 的 scope assumption
         # （如 ULE(requested, 0x1FFFFFFFE0)）是 path-local 的，而 merged-result 模式
         # 会把所有路径的 assumption 无条件 And 成全局条件，越界约束 sibling 路径 →
         # 假绿（failure_path_assumption_global_leak）。path_observations 模式把
         # assumption And 进各路径自己的 condition，不泄漏。
-        if (self.check_gas or self.check_oog) and not path_observations:
+        if self.gas_check is not GasCheck.OFF and not path_observations:
             path_observations = True
             if self.verbose:
                 print("    ├─ gas/OOG check: forcing path_observations=True "
@@ -284,7 +351,7 @@ class ProgramEquivalenceChecker:
             print(f"└─ x86 Program: {x86_program}")
 
         if path_observations:
-            return self._verify_program_pair_path_observations(
+            verified, message = self._verify_program_pair_path_observations(
                 evm_program,
                 x86_program,
                 initial_state,
@@ -297,6 +364,7 @@ class ProgramEquivalenceChecker:
                 x86_reachability_timeout_ms=x86_reachability_timeout_ms,
                 max_depth=max_depth,
             )
+            return verified, self._annotate_gas_scope(verified, message, gas_budget)
 
         # 步骤1：公式构建 - EVM（两级路径感知）
         if self.verbose:
@@ -409,7 +477,7 @@ class ProgramEquivalenceChecker:
         if stack_check is None:
             if self.verbose:
                 print("\n[5] Skipping stack equivalence check (debug disabled).")
-            return verified, message
+            return verified, self._annotate_gas_scope(verified, message, gas_budget)
 
         # 步骤5：栈一致性检查（调试用），使用独立 timeout budget
         if self.verbose:
@@ -437,7 +505,7 @@ class ProgramEquivalenceChecker:
                 f"({stack_check_timeout_ms} ms)"
             )
 
-        return verified, message
+        return verified, self._annotate_gas_scope(verified, message, gas_budget)
 
     def _loop_guard_note(self, evm_program: EVMProgram,
                          x86_program: X86Program) -> Optional[str]:
@@ -490,6 +558,32 @@ class ProgramEquivalenceChecker:
                 f"mode={stat.get('mode')})"
             )
         return lines
+
+    def _annotate_gas_scope(self, verified: bool, message: Optional[str],
+                            gas_budget: Optional[int]) -> Optional[str]:
+        """把 gas 结论的适用范围写进成功消息。
+
+        库调用方拿不到 CLI 的那行输出，只有这个 message。不写范围的话，
+        「FIXED_BUDGET 单点预算下通过」会被读成「所有 gas 下通过」。
+        """
+        if not verified or not message:
+            return message
+        if self.gas_check is GasCheck.OFF:
+            # OFF 不比较 gas，但 gas 决定控制流且 host cost 未建模——结论是条件性的，
+            # 必须让调用方看见，不能只留一个朴素的 VERIFIED。
+            return (
+                f"{message} [functional equivalence at the fixed initial gas budget "
+                f"{gas_budget}; host gas is NOT modeled in this mode, so any "
+                "out-of-gas that would be caused by host cost is not covered]"
+            )
+        if self.gas_check is GasCheck.FIXED_BUDGET:
+            scope = f"gas equivalent for the fixed initial budget {gas_budget}"
+        else:
+            scope = "gas and OOG paths equivalent over all initial gas values"
+        return (
+            f"{message} [{scope}; host gas amounts cancel as uninterpreted "
+            "functions and host-exhaustion termination is out of scope]"
+        )
 
     def _verify_program_pair_path_observations(
         self,

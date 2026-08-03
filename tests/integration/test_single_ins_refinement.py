@@ -1051,12 +1051,24 @@ HASH_0X20_CASES = [
 ]
 
 
+# LOG 的 x86 core 只截了 host bridge，**不含** checkMemoryAndCalcDynamicGasLog 的
+# gas 前言（用 cap 常量 0x1FFFFFFFE0 的字节特征可验：这些 core 里没有它）。所以
+# x86 侧没有 GAS_UINT_OVERFLOW / cap-OOG 这些 exit，而 EVM 侧会为符号 offset/size
+# 分叉出来 → 必然 mismatch。
+#
+# 与本文件里**所有**其它内存 op 用例同一处理：把内存操作数定成具体的合法值
+# （offset=0、size=32，同 RETURN/REVERT 的 operand_values=(32, 0)），让 gas 错误
+# 分支静态判死，只验证 host bridge 那段。topic 保持符号。
+#
+# 这些 gas 错误路径的对齐**不由本文件覆盖**——它由 tests/data/gas_log1.{json,hex}
+# （Go 生成的完整程序，含 gas 前言）在 test_gas_consistency_stage1.py 里端到端验证。
 LOG_0XA0_CASES = [
     # IR: LOG0, STOP
     InstructionRefinementCase(
         name="LOG0",
         evm_kind="LOG",
         arity=2,
+        operand_values=(32, 0),   # size=32, offset=0（栈顶是 offset）
         x86_core_hex=X86_LOG0_CORE_HEX_SEQUENCE,
         base_addr=X86_CORE_BASE_ADDR,
         evm_immediate=0,
@@ -1069,6 +1081,7 @@ LOG_0XA0_CASES = [
         name="LOG1",
         evm_kind="LOG",
         arity=3,
+        operand_values=(None, 32, 0),   # topic1 符号, size=32, offset=0
         x86_core_hex=X86_LOG1_CORE_HEX_SEQUENCE,
         base_addr=X86_CORE_BASE_ADDR,
         evm_immediate=1,
@@ -1081,6 +1094,7 @@ LOG_0XA0_CASES = [
         name="LOG2",
         evm_kind="LOG",
         arity=4,
+        operand_values=(None, None, 32, 0),
         x86_core_hex=X86_LOG2_CORE_HEX_SEQUENCE,
         base_addr=X86_CORE_BASE_ADDR,
         evm_immediate=2,
@@ -1093,6 +1107,7 @@ LOG_0XA0_CASES = [
         name="LOG3",
         evm_kind="LOG",
         arity=5,
+        operand_values=(None, None, None, 32, 0),
         x86_core_hex=X86_LOG3_CORE_HEX_SEQUENCE,
         base_addr=X86_CORE_BASE_ADDR,
         evm_immediate=3,
@@ -1105,6 +1120,7 @@ LOG_0XA0_CASES = [
         name="LOG4",
         evm_kind="LOG",
         arity=6,
+        operand_values=(None, None, None, None, 32, 0),
         x86_core_hex=X86_LOG4_CORE_HEX_SEQUENCE,
         base_addr=X86_CORE_BASE_ADDR,
         evm_immediate=4,

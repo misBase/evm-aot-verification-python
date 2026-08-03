@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from verification.program_verifier import ProgramEquivalenceChecker
+from verification.program_verifier import GasCheck, ProgramEquivalenceChecker
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
@@ -32,12 +32,14 @@ def _load_pair(name):
     return evm, x86
 
 
-def _verify(name, **kw):
+def _verify(name, *, mode=GasCheck.FIXED_BUDGET, **kw):
     evm, x86 = _load_pair(name)
+    # 模式与初始 gas 形态必须匹配，否则被 verify_program_pair 的配置校验 fail-closed 拒绝。
+    initial_state = SMTState.create_initial_state(symbolic_gas=mode is GasCheck.FULL)
     return ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=mode
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        evm, x86, initial_state,
         stack_check=None, **kw
     )
 
@@ -67,6 +69,36 @@ def test_host_gas_uf_consistency_passes(name):
     实参一致、UF 相消。gas_call_returngas 专门覆盖 returnGas≠0（否则会假 SAT）。"""
     verified, msg = _verify(name)
     assert verified, f"{name} host-gas UF should cancel and verify, got: {msg}"
+
+
+@pytest.mark.parametrize("name", [
+    "gas_sload",           # 普通 host function
+    "gas_exp",             # builtin（gas 在 dealWithExp 内）
+    "gas_call_returngas",  # CALL 系且 returnGas != 0
+])
+def test_host_gas_uf_consistency_passes_under_full(name):
+    """FULL（符号 gas，量化所有初始预算）下 host 指令同样放行且 UF 相消。
+
+    FULL 曾把整个 HOST_GAS_UF_KINDS 纳入拒绝集，删除后这里是持续回归证据。三个 fixture
+    覆盖三条不同接线：纯 host UF / builtin UF / returnGas 链（add → UF → sub）。"""
+    verified, msg = _verify(name, mode=GasCheck.FULL)
+    assert verified, f"{name} host-gas UF should cancel under FULL, got: {msg}"
+
+
+def test_host_gas_uf_tampered_opcode_caught_under_full(monkeypatch):
+    """防假绿:FULL 通道的 gas observable 非 vacuous——篡改 x86 侧 UF opcode 必须 SAT。
+
+    正向用例全绿只说明两侧相消，不排除 FULL 下 gas 根本没进比较。"""
+    import x86_64.go_function_semantics as gfs
+    orig = gfs.GoFunctionSemantics._deduct_host_gas_uf
+
+    def tampered(self, mstate, opcode, args):
+        return orig(self, mstate, "WRONGOP" if opcode == "SLOAD" else opcode, args)
+
+    monkeypatch.setattr(gfs.GoFunctionSemantics, "_deduct_host_gas_uf", tampered)
+    verified, msg = _verify("gas_sload", mode=GasCheck.FULL)
+    assert not verified, "tampered x86 UF opcode must be caught under FULL"
+    assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
 
 
 def test_host_gas_uf_tampered_opcode_caught(monkeypatch):

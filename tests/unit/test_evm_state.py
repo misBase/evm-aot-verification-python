@@ -250,22 +250,23 @@ class TestEVMGasState:
         gas = EVMGasState(initial_gas=BitVecVal(1000, 64))
         new_gas = gas.consume_static(100)
 
-        # 创建求解器验证Gas消耗
         solver = Solver()
-        # Gas应该减少100，或者为0（如果溢出）
-        # 这里我们假设有足够的Gas
-        solver.add(new_gas.Gas == BitVecVal(900, 64))
-        assert solver.check() == sat
+        solver.add(new_gas.Gas != BitVecVal(900, 64))
+        assert solver.check() == unsat
 
-    def test_consume_static_overflow(self):
-        """测试Gas溢出情况。"""
+    def test_consume_static_is_plain_subtraction(self):
+        """consume_static **不钳零**：gas 不足这一支由 TAG 守卫分叉，不在这里压成 0。
+
+        x86 makeStaticUseGas 在 `gas < staticGas` 时 JCS 跳 OOG handler、根本不执行
+        SUBQ。若这里钳零而分叉被关掉，gas=50/static=100 会让 IR 继续跑出 STOPPED
+        而 AOT 给 OUT_OF_GAS。
+        """
         gas = EVMGasState(initial_gas=BitVecVal(50, 64))
         new_gas = gas.consume_static(100)
 
-        # Gas应该变为0（out of gas）
         solver = Solver()
         solver.add(new_gas.Gas == BitVecVal(0, 64))
-        assert solver.check() == sat
+        assert solver.check() == unsat, "不该钳零：50-100 应回绕，而不是变成 0"
 
     def test_consume_dynamic(self):
         """测试消耗动态Gas。"""

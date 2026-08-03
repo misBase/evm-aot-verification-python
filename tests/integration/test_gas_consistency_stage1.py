@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from verification.program_verifier import ProgramEquivalenceChecker
+from verification.program_verifier import GasCheck, ProgramEquivalenceChecker
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
@@ -31,8 +31,8 @@ def test_mstore_return_memory_gas_consistency_passes():
     """MSTORE+RETURN 内存扩展动态 gas:EVM memoryGasCost == x86 mul/mul/div 链。"""
     evm_program, x86_program = _load_mstore_return_pair()
 
-    checker = ProgramEquivalenceChecker(timeout_ms=120000, check_gas=True)
-    initial_state = SMTState.create_initial_state(symbolic_gas=True)
+    checker = ProgramEquivalenceChecker(timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET)
+    initial_state = SMTState.create_initial_state()
     verified, msg = checker.verify_program_pair(
         evm_program, x86_program, initial_state, stack_check=None
     )
@@ -46,8 +46,8 @@ def test_mstore_return_tampered_memory_gas_caught(monkeypatch):
     monkeypatch.setattr(gas_state, "_MEMORY_GAS", 9)
 
     evm_program, x86_program = _load_mstore_return_pair()
-    checker = ProgramEquivalenceChecker(timeout_ms=120000, check_gas=True)
-    initial_state = SMTState.create_initial_state(symbolic_gas=True)
+    checker = ProgramEquivalenceChecker(timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET)
+    initial_state = SMTState.create_initial_state()
     verified, msg = checker.verify_program_pair(
         evm_program, x86_program, initial_state, stack_check=None
     )
@@ -82,9 +82,9 @@ def test_mload_memory_gas_consistency_passes():
     """纯 MLOAD 内存扩展动态 gas(gas_mload fixture,Go 编译器生成)。"""
     evm, x86 = _load_pair("gas_mload")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=120000, check_gas=True
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert verified, f"MLOAD memory gas consistency should hold, got: {msg}"
 
@@ -95,9 +95,9 @@ def test_mload_tampered_memory_gas_caught(monkeypatch):
     monkeypatch.setattr(gas_state, "_MEMORY_GAS", 9)
     evm, x86 = _load_pair("gas_mload")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=120000, check_gas=True
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert not verified and "gas" in msg.lower()
 
@@ -106,9 +106,9 @@ def test_sha3_word_gas_consistency_passes():
     """SHA3 内存扩展 + word gas(每 word 6)+ host bridge(gas_sha3 fixture)。"""
     evm, x86 = _load_pair("gas_sha3")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert verified, f"SHA3 word+memory gas consistency should hold, got: {msg}"
 
@@ -116,16 +116,16 @@ def test_sha3_word_gas_consistency_passes():
 def test_sha3_tampered_word_gas_caught(monkeypatch):
     """防假绿:篡改 SHA3 word gas(6→9)→ gas_sha3 应 SAT。"""
     import state.evm_gas_state as gas_state
-    orig = gas_state.charge_word_gas
+    orig = gas_state.word_fee
     monkeypatch.setattr(
-        gas_state, "charge_word_gas",
-        lambda state, word_len, _const: orig(state, word_len, 9),
+        gas_state, "word_fee",
+        lambda word_len, _const: orig(word_len, 9),
     )
     evm, x86 = _load_pair("gas_sha3")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert not verified and "gas" in msg.lower()
 
@@ -134,9 +134,9 @@ def test_calldatacopy_word_gas_consistency_passes():
     """CALLDATACOPY 内存扩展 + copy word gas(每 word 3)(gas_calldatacopy fixture)。"""
     evm, x86 = _load_pair("gas_calldatacopy")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert verified, f"CALLDATACOPY copy+memory gas consistency should hold, got: {msg}"
 
@@ -152,9 +152,9 @@ def test_stage1d_memory_dynamic_gas_consistency(name):
     """逐指令内存扩展动态 gas 一致性(CODECOPY/MSTORE8/REVERT/MCOPY)。"""
     evm, x86 = _load_pair(name)
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert verified, f"{name} memory gas consistency should hold, got: {msg}"
 
@@ -168,9 +168,9 @@ def test_log_gas_consistency_passes():
     x86 checkMemoryAndCalcDynamicGasLog/memoryLogGas 机器码可见。"""
     evm, x86 = _load_pair("gas_log1")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert verified, f"LOG gas consistency should hold, got: {msg}"
 
@@ -182,9 +182,9 @@ def test_log_tampered_data_gas_caught(monkeypatch):
 
     evm, x86 = _load_pair("gas_log1")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert not verified, "tampered LOG data gas must be caught (false green otherwise)"
     assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
@@ -197,9 +197,9 @@ def test_log_tampered_flat_gas_caught(monkeypatch):
 
     evm, x86 = _load_pair("gas_log1")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert not verified, "tampered LogGas must be caught (false green otherwise)"
     assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
@@ -215,9 +215,9 @@ def test_log_tampered_topic_gas_caught(monkeypatch):
 
     evm, x86 = _load_pair("gas_log1")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert not verified, "tampered LogTopicGas must be caught (false green otherwise)"
     assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
@@ -238,9 +238,9 @@ def test_memory_gas_parallel_pathobs_passes():
     """阶段1 内存扩展 gas 在并行 path_observations 模式下正确通过。"""
     evm, x86 = _load_pair("gas_mload")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        evm, x86, SMTState.create_initial_state(),
         stack_check=None, path_observations=True, path_pair_workers=2,
     )
     assert verified, f"MLOAD gas should verify in parallel mode, got: {msg}"
@@ -257,9 +257,9 @@ def test_memory_gas_parallel_pathobs_tamper_caught(monkeypatch):
 
     evm, x86 = _load_pair("gas_mload")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        evm, x86, SMTState.create_initial_state(),
         stack_check=None, path_observations=True, path_pair_workers=2,
     )
     assert not verified, "parallel-mode memory-gas mismatch must be caught (false green bug)"

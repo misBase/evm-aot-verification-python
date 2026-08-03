@@ -8,6 +8,10 @@
       "min_depth": 2,
       "operations": [
         {
+          "kind": "TAG",
+          "pc": 0
+        },
+        {
           "kind": "ADD",
           "pc": 0
         },

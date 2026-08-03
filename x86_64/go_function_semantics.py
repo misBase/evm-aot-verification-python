@@ -191,8 +191,8 @@ class GoFunctionSemantics:
         """x86 侧扣 host-gas UF（与 EVM 侧 charge_host_gas_uf 同名相消）。
 
         stack_args 必须是该调用点刚 pop 出的、与 EVM 侧同序的栈值（两侧栈已由功能
-        等价证明相等 → UF 同参相消）。仅 gas_modeling_enabled 生效。原理见
-        state/host_gas.py。
+        等价证明相等 → UF 同参相消）。仅 host_gas_uf_enabled 生效，且必须与 EVM 侧
+        charge_host_gas_uf 同开同关。原理见 state/host_gas.py。
         """
         from state.host_gas import deduct_host_gas_uf_x86
         deduct_host_gas_uf_x86(
@@ -952,32 +952,25 @@ class GoFunctionSemantics:
            建模为一个可按地址读写的无限 Z3 Array，因此不会显式验证 buffer 扩容、
            长度变化或扩容后的基址重定位。
 
-        这里同步更新 memory size side-channel [R13+0x18]。
+        这里同步更新 memory size side-channel [R13+0x18]，镜像 Go dealWithMemoryGrow：
 
-        gas 建模分支（gas_modeling_enabled）：growNumber（[R13+0x108] =
-        callengine_builtin_arg0）本身已是 rounded byte size（native code 把
-        memWords<<5 写进去，Go dealWithMemoryGrow 直接 targetMemSize := growNumber），
-        故直接用、不再 <<5；内存扩展 gas 的 expansion 判断依赖这个值。并按
-        dealWithMemoryGrow 的 `if targetMemSize > memLen` 只增不减——无条件覆盖会在
-        target < memLen 时让内存缩小（重复扣费/减法下溢），也与 EVM 侧的
-        If(rounded>old, rounded, old) 不对齐。
+            targetMemSize := c.growNumber        // [R13+0x108]，已是 rounded byte size
+            if targetMemSize > memLen { ... }    // 只增不减
 
-        功能等价分支（默认，gas off）：保留历史 `<<5` 行为。既有验证（含 SHA3 等经此
-        builtin 的程序）依赖它写入 [R13+0x18] 的值与 x86 下游读取一致，改成 byte size
-        会破坏已有的 return-data/memory observable。
+        - growNumber **本身就是 rounded byte size**（native code 写的是 memWords<<5），
+          直接用、不能再 <<5。曾有个 `gas off` 分支保留 `<<5`（把字节当 word 数、放大
+          32 倍），那是遗留 bug：它让 x86 的 [R13+0x18] 与 EVM 侧 bookkeeping 分叉，
+          下一次 expansion fee 与 OOG 阈值两侧就不同。
+        - 只增不减：无条件覆盖会在 target < memLen 时让内存缩小（重复扣费、
+          `newTotal - lastGasCost` 减法下溢），也与 EVM 侧 memory_expansion_fee 的
+          `If(rounded>old, rounded, old)` 不对齐。
         """
-        from z3 import BitVecVal, If, UGT
+        from z3 import If, UGT
 
-        if getattr(mstate, "gas_modeling_enabled", False):
-            # growNumber 已是 rounded byte size（target memory size）。
-            target = mstate.callengine_builtin_arg0
-            # 只增不减，镜像 dealWithMemoryGrow 的 `if targetMemSize > memLen`
-            # （理由见 docstring）。
-            old_size = mstate.callengine_memory_size_bytes
-            new_size_bytes = If(UGT(target, old_size), target, old_size)
-        else:
-            # 功能等价分支（gas off）:保留历史 <<5 行为（既有 observable 依赖）。
-            new_size_bytes = mstate.callengine_builtin_arg0 << BitVecVal(5, 64)
+        # growNumber 已是 rounded byte size（target memory size）。
+        target = mstate.callengine_builtin_arg0
+        old_size = mstate.callengine_memory_size_bytes
+        new_size_bytes = If(UGT(target, old_size), target, old_size)
 
         # 保持 x86_memory 中的 callEngine 元数据同步，避免慢路径读到旧值。
         self._sync_callengine_u64_field(

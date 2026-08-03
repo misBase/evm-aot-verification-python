@@ -80,7 +80,8 @@ poetry install
 
 Verify EVM IR and x86-64 machine code:
 ```bash
-poetry run python main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose] [--check-gas]
+poetry run python main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose]
+                         [--gas-check {off,fixed-budget,full}] [--gas-budget N]
 ```
 
 Or run the test suite:
@@ -100,8 +101,11 @@ poetry run python main.py contract.ir.json 498b46c0... --base-addr 0x6c
 # With custom timeout and verbose output
 poetry run python main.py contract.ir.json 498b46c0... --timeout 30000 --verbose
 
-# Include stage-0 gas remaining equivalence (static gas only)
-poetry run python main.py contract.ir.json 498b46c0... --check-gas
+# Gas equivalence from one concrete budget (single-point conclusion)
+poetry run python main.py contract.ir.json 498b46c0... --gas-check fixed-budget --gas-budget 1000000
+
+# Gas + OOG paths over all initial gas values (symbolic gas)
+poetry run python main.py contract.ir.json 498b46c0... --gas-check full
 
 # Run all tests
 poetry run pytest

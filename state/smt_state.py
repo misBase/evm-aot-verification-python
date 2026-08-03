@@ -23,6 +23,12 @@ from state.x86_state import (
     X86RegisterState,
 )
 
+# 具体 gas 预算的默认值。1e9 远高于任何正常程序的 Σstatic_gas（真实 block gas limit
+# 约 3e7），因此静态 gas 的 OOG 条件能在 simplify 阶段折死；同时它仍是个具体常量，
+# GasCheck.FIXED_BUDGET 的结论因此是"从这一个预算出发"的单点结论。
+_DEFAULT_GAS_BUDGET = 1_000_000_000
+
+
 @dataclass
 class PendingErrorBranch:
     """一条待分裂的错误路径，由 opcode 语义函数产生、executor 立即消费。
@@ -193,16 +199,17 @@ class SMTState:
         self.assume_calldata_offset_no_overflow: bool = True
         self.abstract_calldataload_words: bool = False
 
-        # gas 动态建模开关，由 create_initial_state(symbolic_gas=True) 打开：只有它
-        # 为 True 时指令语义才扣减动态 gas 并注入相应的 success-path scope assumption
-        # （offset 高 192-bit==0 等）。默认 False——功能等价验证不比较 gas，不该被这些
-        # gas-only 的 assumption 越界约束路径（大程序多路径分析会出假 SAT）。
-        self.gas_modeling_enabled: bool = False
-
-        # OOG 路径建模开关，仅 check_oog（不注入 gas 恒足假设）时打开：block 入口在
-        # gas < static_gas 时分叉一条 error_code=OUT_OF_GAS 的终止路径，镜像 x86
-        # makeStaticUseGas 的 JCS。默认 False，不改变现有路径。
-        self.oog_modeling_enabled: bool = False
+        # host/builtin gas UF 开关。**唯一写入方是 program_verifier**（gas_check != OFF
+        # 时置位）——曾经 create_initial_state 也跟着 symbolic_gas 置位，第二个事实源会让
+        # 具体 gas 连带关掉 host UF，gas 比较对 host 段 vacuous。
+        #
+        # 这是 gas 相关的唯一开关。曾经的 gas_modeling_enabled / oog_modeling_enabled 都
+        # 已删除：它们能关掉本该无条件成立的东西（gas 是决定控制流的内部状态，扣减与 OOG
+        # 分叉都不可关；"终值是否比较"那一层在 RefinementChecker(check_gas=...) 里）。
+        #
+        # 本字段**不**管 host gas 耗尽后的终止——那一处没有生成代码，两侧同构钳零续跑，
+        # 属于声明范围之外而非缺口，理由见 state/host_gas.py 模块 docstring。
+        self.host_gas_uf_enabled: bool = False
 
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
         self.stack_base = None
@@ -306,11 +313,8 @@ class SMTState:
         other.abstract_calldataload_words = getattr(
             self, 'abstract_calldataload_words', False,
         )
-        other.gas_modeling_enabled = getattr(
-            self, 'gas_modeling_enabled', False,
-        )
-        other.oog_modeling_enabled = getattr(
-            self, 'oog_modeling_enabled', False,
+        other.host_gas_uf_enabled = getattr(
+            self, 'host_gas_uf_enabled', False,
         )
 
     def copy_callengine_side_channels_to(self, other: 'SMTState') -> None:
@@ -374,6 +378,7 @@ class SMTState:
         calldata_size_bytes: Optional[int] = None,
         calldata_size_max_bytes: Optional[int] = None,
         symbolic_gas: bool = False,
+        gas_budget: Optional[int] = None,
     ) -> 'SMTState':
         """创建具有符号输入的初始SMT状态。
 
@@ -386,12 +391,17 @@ class SMTState:
             num_inputs: 要创建的符号输入数量（默认0）
             calldata_size_bytes: 固定 calldata 字节长度；None 表示使用 64-bit 符号长度。
             calldata_size_max_bytes: 符号 calldata 长度的无符号上界；None 表示不添加上界。
+            symbolic_gas: True 时初始 gas 用符号 G（GasCheck.FULL 要求）；False（默认）
+                用具体预算（GasCheck.OFF / FIXED_BUDGET 要求）。
+            gas_budget: 具体 gas 预算，仅 symbolic_gas=False 时可用；None 表示
+                _DEFAULT_GAS_BUDGET。
 
         Returns:
             具有符号输入的已初始化SMTState
 
         Raises:
-            ValueError: 如果num_inputs为负数或过大（>1024），或 calldata 长度参数超出 uint64
+            ValueError: 如果num_inputs为负数或过大（>1024）、calldata 长度参数超出
+                uint64、gas_budget 超出 uint64，或 symbolic_gas=True 时同时给了 gas_budget
         """
         # Lazy imports to avoid circular dependencies
         from common.uint256 import Uint256
@@ -478,22 +488,27 @@ class SMTState:
         initial_state.callengine_stack_byte_offset = BitVecVal(0, 64)
         initial_state.callengine_stack_base = r14
         initial_state.callengine_callvalue = callvalue64
-        # gas:
-        # - symbolic_gas=False（默认）：固定为大常量 1000000000，使 x86 的
-        #   makeStaticUseGas `cmp/jb OOG` 恒不跳、out-of-gas 分支不可达——这是
-        #   功能等价验证（stack/storage/output）所需的旧行为，不能引入 OOG 路径。
-        # - symbolic_gas=True（gas 一致性验证）：用符号 G，EVM 侧 evm_gas 与
-        #   x86 侧 callengine_gas_remaining([R13+0x70]) 共享同一 G 作为同一起点；
-        #   「gas 恒足」前提由 program_verifier 在 check_gas=True 时注入的
-        #   UGE(G, bound) 假设保证，从而剪掉 OOG 分支。
+        # gas。关键不变量：**evm_gas 与 callengine_gas_remaining([R13+0x70]) 必须是同一个
+        # 对象** —— 两侧路径剪枝自动对称、gas 假设无需跨侧传递，全靠这一点。
+        # - symbolic_gas=False（默认，GasCheck.OFF / FIXED_BUDGET）：具体预算。
+        #   `ULT(budget, cost)` 在 simplify 阶段折成 False，省掉可达性查询；但只对成本
+        #   可静态判定的分支有效，符号 offset 的动态 fee 仍能超预算、OOG 分支照样保留。
+        # - symbolic_gas=True（GasCheck.FULL）：符号 G，对所有初始 gas 量化。
         if symbolic_gas:
+            if gas_budget is not None:
+                raise ValueError(
+                    "gas_budget 只对具体 gas 有意义；symbolic_gas=True 时不要同时指定"
+                )
             gas_remaining = BitVec('GasRemaining', 64)
         else:
-            gas_remaining = BitVecVal(1000000000, 64)
+            budget = _DEFAULT_GAS_BUDGET if gas_budget is None else int(gas_budget)
+            if not 0 <= budget < (1 << 64):
+                raise ValueError(f"gas_budget 必须落在 uint64 范围内，got {budget}")
+            gas_remaining = BitVecVal(budget, 64)
         initial_state.callengine_gas_remaining = gas_remaining
         initial_state.evm_gas = EVMGasState(initial_gas=gas_remaining)
-        # 仅符号 gas 时开启动态 gas 建模（扣减 + scope assumption）。
-        initial_state.gas_modeling_enabled = symbolic_gas
+        # 注意 host_gas_uf_enabled **有意不在这里赋值**（唯一写入方是 program_verifier，
+        # 理由见 __init__ 处该字段的注释）。gas 扣减与 bookkeeping 始终建模、与开关无关。
         initial_state.callengine_self_address_pointer = self_address_ptr
         initial_state.callengine_origin_address_pointer = origin_address_ptr
         initial_state.callengine_caller_address_pointer = caller_address_ptr

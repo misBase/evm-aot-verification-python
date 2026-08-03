@@ -27,8 +27,19 @@ def _load_ext_contract_pair(case: str, contract: str) -> tuple[EVMProgram, X86Pr
     return evm_program, x86_program
 
 
-def _selector_state(selector: int, calldata_size: int | None = None) -> SMTState:
-    state = SMTState.create_initial_state(calldata_size_bytes=calldata_size)
+def _selector_state(
+    selector: int,
+    calldata_size: int | None = None,
+    symbolic_gas: bool = False,
+) -> SMTState:
+    """构造写好 4 字节 selector 的初始状态。
+
+    symbolic_gas 供 GasCheck.FULL 使用（见 test_gas_consistency_contracts.py）：
+    模式与初始 gas 形态不匹配会被 verify_program_pair fail-closed 拒绝。
+    """
+    state = SMTState.create_initial_state(
+        calldata_size_bytes=calldata_size, symbolic_gas=symbolic_gas
+    )
     for offset, byte in enumerate(selector.to_bytes(4, "big")):
         state.calldata = Store(
             state.calldata,

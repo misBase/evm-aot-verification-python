@@ -36,9 +36,14 @@ from common.div_bridge import verified_div_bridges
 from common.uint256 import Uint256
 from evm_ir.models import EvmOperator
 from evm_ir.semantics import EVMOperationSemantics, evm_operator_to_z3
+from state.evm_gas_state import EVMGasState
 from state.evm_memory_state import EVMMemoryState
 from state.evm_stack_state import EVMStackState
 from state.smt_state import MemoryDomain, PointerTag, SMTState
+
+# 单指令桩的 gas 起点：远大于任何单指令的动态 fee（最大的内存扩展 fee 也只有几十），
+# 与 test_single_ins_refinement.X86_CONTROL_FLOW_INITIAL_GAS 取同一量级。
+_STUB_INITIAL_GAS = 100_000
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register
 from x86_64.program import X86Program
@@ -611,6 +616,16 @@ def _build_evm_initial_state(
     """
     state = SMTState()
     state.evm_stack = EVMStackState(sp=IntVal(0))
+    # gas 起点给具体大常量（可被 case.evm_context_values 的 "gas" 覆盖）。
+    #
+    # 单指令桩里 x86 core 大多是**截断**的，不含 checkMemoryAndCalcDynamicGas* 的
+    # gas 前言（只有 RETURN/REVERT 含），所以 x86 侧没有 OOG/GasUintOverflow exit；
+    # 而 IR 侧的 gas 状态语义是无条件建模的，符号 gas 会让 dynamicCost > gas 的分支
+    # 活起来、产出 x86 侧无法对应的 OOG 终态。给一个远大于任何单指令 fee 的具体值
+    # 就把它静态判死——与本模块把内存 offset/length 定成具体合法值（operand_values）
+    # 是同一个取舍：单指令桩只验 gas 充足域，OOG 路径的对齐交给
+    # tests/data/gas_*.{json,hex} 的完整程序端到端验证。
+    state.evm_gas = EVMGasState(initial_gas=BitVecVal(_STUB_INITIAL_GAS, 64))
     # EVM 侧直接把操作数压入符号栈，再交给 opcode 语义执行。
     for operand in operands:
         state.evm_stack = state.evm_stack.push(operand.to_bv256())

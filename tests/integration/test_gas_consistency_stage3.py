@@ -1,19 +1,19 @@
 """阶段3 gas 一致性:status code 终态等价（3A）。
 
 EVM 派生 status（终止类型 STOP→2/RETURN→0/REVERT→1，映射 aot_profile.status_codes）
-与 x86 callengine_status_code 逐终止路径一致。check_gas=True 时一并检查（status 与
-gas 同属 gas 验证维度，均需 symbolic_gas）。
+与 x86 callengine_status_code 逐终止路径一致；status 与 gas 同属 gas 验证维度，
+gas_check != OFF 时一并检查。
 
-3B（OOG 路径放开）:check_oog 模式下 EVM block 入口在 gas<static 时分叉 OOG
-终止路径（status=12），与 x86 逐路径配对（见 test_oog_*）。仅 block 入口 OOG
-已实现;含内存动态 gas 点的程序开 check_oog 会 fail-closed（SAT）。
+OOG 路径部分用 GasCheck.FULL（符号 gas）：block 入口在 gas<static 时分叉 OOG 终止路径
+（status=12），与 x86 逐路径配对（见 test_oog_*）。FIXED_BUDGET 的具体预算会把这些
+常量成本的 OOG 条件在 simplify 阶段折死，验不到。
 """
 
 import os
 
 import pytest
 
-from verification.program_verifier import ProgramEquivalenceChecker
+from verification.program_verifier import GasCheck, ProgramEquivalenceChecker
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
@@ -39,12 +39,12 @@ def _load_pair(name):
     ("gas_codecopy", 2),
 ])
 def test_status_code_consistency_passes(name, expected_status):
-    """终止路径 status code 两侧一致（check_gas=True 一并验 gas+status）。"""
+    """终止路径 status code 两侧一致（gas_check=GasCheck.FIXED_BUDGET 一并验 gas+status）。"""
     evm, x86 = _load_pair(name)
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert verified, f"{name} status code consistency should hold, got: {msg}"
 
@@ -65,9 +65,9 @@ def test_tampered_status_code_caught(monkeypatch):
 
     evm, x86 = _load_pair("gas_mload")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=120000, check_gas=True
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None
+        evm, x86, SMTState.create_initial_state(), stack_check=None
     )
     assert not verified, "tampered status must be caught"
     assert "status" in msg.lower(), f"expected status counterexample, got: {msg}"
@@ -87,11 +87,11 @@ def _load_add_with_push():
 
 
 def test_oog_path_status_consistency_passes():
-    """3B:check_oog 放开 OOG 分叉,EVM/x86 各产生正常(status 2)+OOG(status 12)
-    路径,逐路径 status code 一致。add_with_push 单 block(只 block 入口 static gas)。"""
+    """FULL 下 OOG 分叉可行,EVM/x86 各产生正常(status 2)+OOG(status 12) 路径,
+    逐路径 status code 一致。add_with_push 单 block(只 block 入口 static gas)。"""
     evm, x86 = _load_add_with_push()
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_oog=True
+        timeout_ms=180000, gas_check=GasCheck.FULL
     ).verify_program_pair(
         evm, x86, SMTState.create_initial_state(symbolic_gas=True),
         stack_check=None, path_observations=True,
@@ -100,7 +100,7 @@ def test_oog_path_status_consistency_passes():
 
 
 def test_oog_tampered_status_caught(monkeypatch):
-    """防假绿:check_oog 下篡改 EVM 正常路径 status(STOP STOPPED→GAS_UINT_OVERFLOW(13))→ SAT。"""
+    """防假绿:FULL 下篡改 EVM 正常路径 status(STOP STOPPED→GAS_UINT_OVERFLOW(13))→ SAT。"""
     import evm_ir.semantics as sem
     from z3 import BitVecVal
     orig = sem.evm_operator_to_z3
@@ -114,12 +114,78 @@ def test_oog_tampered_status_caught(monkeypatch):
     monkeypatch.setattr(sem, "evm_operator_to_z3", patched)
     evm, x86 = _load_add_with_push()
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=120000, check_oog=True
+        timeout_ms=120000, gas_check=GasCheck.FULL
     ).verify_program_pair(
         evm, x86, SMTState.create_initial_state(symbolic_gas=True),
         stack_check=None, path_observations=True,
     )
     assert not verified and "status" in msg.lower()
+
+
+# --- 动态 gas 的 OOG 路径一致性（E4）---
+#
+# 这批 fixture 含可见的内存扩展/word gas。IR 侧现在会在 dynamicCost > 剩余 gas 时
+# 分叉一条 OUT_OF_GAS 终态（镜像 x86 makeUseGas 的 JCS，gas_dynamic_amd64.go:402-408），
+# 于是两侧的动态 OOG 路径可以逐路径比状态码。此前 IR 侧只是钳零续跑、不分叉，
+# 这些用例在 FULL 下必然报 mismatch。
+#
+# 注意只有 GasCheck.FULL 能验到它：FIXED_BUDGET 的具体预算会把这些常量 fee 的 OOG
+# 条件在 simplify 阶段折成 False，路径根本不建。
+@pytest.mark.parametrize("name", [
+    "gas_mload",     # 内存扩展（pureMemoryGascost）
+    "gas_mstore8",   # 内存扩展，access_size=1
+    "gas_revert",    # 内存扩展，calcMemSize64(offset, length)
+    "gas_sha3",      # 内存扩展 + Sha3WordGas
+    "gas_codecopy",  # 内存扩展 + CopyGas
+    "gas_mcopy",     # max(dst,src) + CopyGas
+    "gas_log1",      # 内存扩展 + LogGas + TopicGas + 每字节 LogDataGas
+])
+def test_dynamic_oog_path_status_consistency(name):
+    evm, x86 = _load_pair(name)
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=180000, gas_check=GasCheck.FULL
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        stack_check=None, path_observations=True,
+    )
+    assert verified, f"{name} 动态 OOG 路径状态码应一致，got: {msg}"
+
+
+def test_dynamic_oog_tampered_status_caught(monkeypatch):
+    """防假绿：把 E4 分支的状态码从 OUT_OF_GAS(12) 篡改成 GAS_UINT_OVERFLOW(13) → SAT。
+
+    这两个码在 gas 语义里是真实区分的：memorySize 阶段的溢出给 13，而
+    dynamicGas 阶段（含 UseGas 失败与 memoryGasCost 的 cap）经
+    interpreter.go:204-205 塌缩成 12。搞混了必须被抓到。
+    """
+    import dataclasses
+
+    import evm_ir.semantics as sem
+    from evm_ir.status_code import EvmStatusCode
+
+    orig = sem._charge_dynamic_gas
+
+    def patched(state, requested, branches, extra_fees=(), **kwargs):
+        out = orig(state, requested, branches, extra_fees, **kwargs)
+        if out.pending_errors:
+            last = out.pending_errors[-1]
+            if last.status_code == EvmStatusCode.OUT_OF_GAS:
+                out.pending_errors[-1] = dataclasses.replace(
+                    last, status_code=EvmStatusCode.GAS_UINT_OVERFLOW
+                )
+        return out
+
+    monkeypatch.setattr(sem, "_charge_dynamic_gas", patched)
+    evm, x86 = _load_pair("gas_mload")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=180000, gas_check=GasCheck.FULL
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        stack_check=None, path_observations=True,
+    )
+    assert not verified and "status" in msg.lower(), (
+        f"E4 状态码 12→13 的篡改必须被抓到，got verified={verified} msg={msg}"
+    )
 
 
 # --- Review 修复回归（防再退化）---
@@ -134,7 +200,7 @@ def test_merged_status_is_not_none_for_multipath():
         if not os.path.exists(p):
             continue
         evm = EVMProgram(load_ir_from_json(p))
-        st = SMTState.create_initial_state(symbolic_gas=True)
+        st = SMTState.create_initial_state()
         _, res = evm.to_z3(st)
         s = res.get("status_code")
         assert s is not None and is_bv(s), (
@@ -142,8 +208,8 @@ def test_merged_status_is_not_none_for_multipath():
         )
 
 
-def test_check_oog_rejects_unmodeled_dynamic_gas():
-    """Fix#3:check_oog 也要走 unsupported-dynamic-gas guard，否则 OOG 一致性被
+def test_full_rejects_unmodeled_dynamic_gas():
+    """FULL 也要走 unsupported-dynamic-gas guard，否则 OOG 一致性被
     放大到未建模指令 → 假绿/误报。
 
     注意:EXP/SLOAD/CALL 等已转 host-gas UF 兜底、移出拒绝集；CREATE 仍 fail-closed
@@ -155,14 +221,14 @@ def test_check_oog_rejects_unmodeled_dynamic_gas():
                      is_stop=False)
     block.operations = [
         EvmOperator(kind=k, pc=i, block=block)
-        for i, k in enumerate(["CREATE", "STOP"])
+        for i, k in enumerate(["TAG", "CREATE", "STOP"])
     ]
     evm = EVMProgram(CompilerEVMResult([block]))
-    verified, message = ProgramEquivalenceChecker(check_oog=True).verify_program_pair(
+    verified, message = ProgramEquivalenceChecker(gas_check=GasCheck.FULL).verify_program_pair(
         evm, object(), SMTState.create_initial_state(symbolic_gas=True),
     )
     assert not verified
-    assert "dynamic gas operators are not modeled yet" in message
+    assert "outside the currently provable gas scope" in message
 
 
 def test_oog_precedes_stack_underflow_in_tag_guard():
@@ -191,9 +257,9 @@ def test_oog_precedes_stack_underflow_in_tag_guard():
     ]
     evm = EVMProgram(CompilerEVMResult([block]))
 
+    # OOG 分叉无条件建模，不需要开关；符号 gas 是让它成为可行路径的前提
+    # （具体预算会把 ULT(budget, static_gas) 折成 False，分支根本不建）。
     st = SMTState.create_initial_state(symbolic_gas=True)
-    st.oog_modeling_enabled = True
-    st.gas_modeling_enabled = True
     gas = st.evm_gas.Gas
 
     semantics = evm.to_z3_paths(st, use_reachability_check=False)
@@ -221,7 +287,7 @@ def test_oog_precedes_stack_underflow_in_tag_guard():
         solver.add(And(gas_short, obs.condition, obs.status_code == oog_code))
         reachable.append(solver.check())
     assert any(r != unsat for r in reachable), (
-        "check_oog 下应当分叉出一条 OUT_OF_GAS 终止路径"
+        "符号 gas 下应当分叉出一条 OUT_OF_GAS 终止路径"
     )
 
 
@@ -231,9 +297,9 @@ def test_status_check_parallel_workers_cross_context():
     否则跨 context 混用触发 z3 错误。用 gas_mload + path_pair_workers=2 触发。"""
     evm, x86 = _load_pair("gas_mload")
     verified, msg = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+        timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        evm, x86, SMTState.create_initial_state(),
         stack_check=None, path_observations=True, path_pair_workers=2,
     )
     assert verified, f"parallel-worker status check should hold, got: {msg}"
@@ -258,57 +324,221 @@ def test_evm_derived_status_matches_aot_profile_codes():
 
 # --- Branch-review fixes（合并前修复，防再退化）---
 
-def test_check_oog_rejects_host_dynamic_gas_ops():
-    """Fix #2:check_oog 模式下，host 动态 gas 指令（SLOAD/EXP/CALL 等）的
-    **host 动态 OOG 分叉尚未建模**（host UF 只两侧钳零、继续执行，不分叉 OOG
-    终止路径）。EVM 仅对 block 静态 gas 分叉 OOG，故这些指令的 host 动态 OOG
-    一致性根本没验证；放行 = 假绿。check_oog 必须把 HOST_GAS_UF_KINDS 也纳入
-    unsupported guard，fail-closed 拒绝。
+@pytest.mark.parametrize("mode", [GasCheck.FIXED_BUDGET, GasCheck.FULL])
+def test_host_dynamic_gas_ops_allowed_in_both_gas_modes(mode):
+    """host 指令（HOST_GAS_UF_KINDS）在**两个** gas 模式下都放行，两侧 host UF 相消。
 
-    用 gas_sload（PUSH 7 → SLOAD → STOP）触发:修复前返回 VERIFIED（假绿），
-    修复后必须被 guard 拒绝。"""
+    FULL 曾把整个 HOST_GAS_UF_KINDS 纳入拒绝集，理由是"host 动态 OOG 两侧没验，放行即
+    假绿"——不成立：host gas 耗尽后的终止没有生成代码，没有 x86 行为可以不一致
+    （见 state/host_gas.py 模块 docstring）。它实际只防"把 FULL 的 VERIFIED 读成*所有*
+    OOG 都验过"，而那一层由成功消息的范围声明承担（下面对 FULL 的断言即钉住这点）。
+
+    用 gas_sload（PUSH 7 → SLOAD → STOP）。"""
     evm, x86 = _load_pair("gas_sload")
+    initial_state = SMTState.create_initial_state(
+        symbolic_gas=mode is GasCheck.FULL
+    )
     verified, message = ProgramEquivalenceChecker(
-        timeout_ms=120000, check_oog=True
-    ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
-        stack_check=None,
-    )
-    assert not verified, (
-        "check_oog must reject SLOAD (host dynamic-gas OOG not modeled), "
-        f"got VERIFIED: {message}"
-    )
-    assert "dynamic gas operators are not modeled yet" in message
+        timeout_ms=180000, gas_check=mode
+    ).verify_program_pair(evm, x86, initial_state, stack_check=None)
+    assert verified, f"{mode} should verify gas_sload, got: {message}"
+    if mode is GasCheck.FULL:
+        # 替代旧拒绝的"别把结论读过头"守卫：范围必须写在消息里，不靠文档口头声明。
+        assert "over all initial gas values" in message, message
+        assert "host-exhaustion termination is out of scope" in message, message
 
 
-def test_check_gas_still_allows_host_dynamic_gas_ops():
-    """对照 Fix #2:check_gas（阶段 0，非 OOG）下 host 指令仍应放行（gas 恒足前提
-    剪 OOG，host UF 相消即可）。确保 #2 的 OOG 拒绝不误伤 check_gas 通道。"""
+def test_fixed_budget_rejects_symbolic_gas():
+    """FIXED_BUDGET + 符号 gas 必须 fail-closed。
+
+    符号 gas 下每个 block 的 OOG 分支都保持可行，该模式承诺的路径规模不再成立；
+    要对所有初始 gas 量化应当改用 GasCheck.FULL。
+    """
     evm, x86 = _load_pair("gas_sload")
-    verified, message = ProgramEquivalenceChecker(
-        timeout_ms=180000, check_gas=True
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
-        stack_check=None,
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None,
     )
-    assert verified, f"check_gas should still verify gas_sload, got: {message}"
+    assert not verified, "FIXED_BUDGET + 符号 gas 必须被拒"
+    assert "concrete initial gas budget" in msg, f"错误信息应指明缺具体预算，got: {msg}"
 
 
-def test_check_oog_requires_symbolic_gas():
-    """Fix #4:check_oog 只设开关、不校验初始 gas 是否符号化。传默认
-    create_initial_state()（gas 固定 1e9）会让 ULT(1e9, static_gas) 恒假、
-    所有 OOG 分叉被剪，OOG 一致性根本没验却返回 VERIFIED（假绿）。
+def test_fixed_budget_honours_explicit_budget():
+    """--gas-budget 一路透传：换一个具体预算，结论仍成立且仍是单点结论。"""
+    evm, x86 = _load_pair("gas_sload")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(gas_budget=50_000), stack_check=None,
+    )
+    assert verified, f"gas_sload 在预算 50000 下应通过，got: {msg}"
 
-    check_oog 必须 fail-closed 要求 symbolic gas。"""
+
+def test_check_gas_forces_host_gas_uf_on():
+    """verifier 自己置位 host_gas_uf_enabled，不依赖调用方经 factory 间接打开。
+
+    即使调用方显式关掉它，gas_check != OFF 时也必须重新打开——否则 host gas 整段被
+    跳过而结论照常是 VERIFIED。
+    """
+    evm, x86 = _load_pair("gas_sload")
+    state = SMTState.create_initial_state()
+    state.host_gas_uf_enabled = False          # 调用方手动关掉
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
+    ).verify_program_pair(evm, x86, state, stack_check=None)
+
+    assert state.host_gas_uf_enabled, "verifier 必须把 host gas UF 重新打开"
+    assert verified, f"重新打开后 gas_sload 应通过，got: {msg}"
+
+
+def test_full_rejects_concrete_gas():
+    """FULL + 具体 gas 必须 fail-closed。
+
+    具体预算会把 ULT(budget, static_gas) 折成 False、所有 OOG 分叉被剪 —— OOG 一致性
+    根本没验却返回 VERIFIED（假绿）。要用具体预算请改 GasCheck.FIXED_BUDGET。
+    """
     evm, x86 = _load_add_with_push()
     verified, message = ProgramEquivalenceChecker(
-        timeout_ms=120000, check_oog=True
+        timeout_ms=120000, gas_check=GasCheck.FULL
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(),  # 默认非符号 gas
+        evm, x86, SMTState.create_initial_state(),   # 具体预算
         stack_check=None, path_observations=True,
     )
     assert not verified, (
-        "check_oog with concrete (non-symbolic) gas must fail-closed, "
-        f"got VERIFIED: {message}"
+        f"FULL with a concrete gas budget must fail-closed, got VERIFIED: {message}"
     )
-    assert "symbolic gas" in message.lower()
+    assert "requires symbolic gas" in message
+
+
+def test_full_rejects_gas_that_simplifies_to_a_constant():
+    """`is_bv_value` 只看语法形式：`BitVecVal(1,64)+BitVecVal(2,64)` 语义上就是 3 却
+    返回 False。不先 simplify 的话 FULL 会把这种"语义具体"的 gas 当符号量接受，
+    实际只验了单点却声称量化所有初始 gas。"""
+    from z3 import BitVecVal
+    from state.evm_gas_state import EVMGasState
+
+    evm, x86 = _load_add_with_push()
+    state = SMTState.create_initial_state()
+    folded = BitVecVal(1, 64) + BitVecVal(2, 64)
+    state.evm_gas = EVMGasState(initial_gas=folded)
+    state.callengine_gas_remaining = folded
+
+    verified, message = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.FULL
+    ).verify_program_pair(evm, x86, state, stack_check=None)
+    assert not verified, "可化简为常量的 gas 必须被 FULL 拒绝"
+    assert "simplifies to the constant" in message
+
+
+def test_fixed_budget_accepts_gas_that_simplifies_to_a_constant():
+    """同一个表达式在 FIXED_BUDGET 下应被规范化后接受（预算 = 3 会让程序 OOG，
+    这里只断言不被 gas 配置校验拦下）。"""
+    from z3 import BitVecVal
+    from state.evm_gas_state import EVMGasState
+
+    evm, x86 = _load_add_with_push()
+    state = SMTState.create_initial_state()
+    folded = BitVecVal(1_000_000, 64) + BitVecVal(2, 64)
+    state.evm_gas = EVMGasState(initial_gas=folded)
+    state.callengine_gas_remaining = folded
+
+    verified, message = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
+    ).verify_program_pair(evm, x86, state, stack_check=None)
+    assert "GAS CHECK UNSUPPORTED" not in (message or ""), message
+    assert verified, message
+    assert "fixed initial budget 1000002" in message, (
+        f"成功消息必须带上规范化后的预算，got: {message}"
+    )
+
+
+def test_mismatched_initial_gas_between_sides_is_rejected():
+    """IR 与 AOT 必须从同一个初始 gas 出发。调用方改了任一侧而模式校验只看 EVM 侧的话，
+    比的就不是同一件事，却照常返回 VERIFIED。"""
+    from z3 import BitVecVal
+
+    evm, x86 = _load_pair("gas_sload")
+    state = SMTState.create_initial_state()
+    state.callengine_gas_remaining = BitVecVal(12345, 64)   # 只改 AOT 侧
+
+    verified, message = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
+    ).verify_program_pair(evm, x86, state, stack_check=None)
+    assert not verified, "两侧初始 gas 不一致必须 fail-closed"
+    assert "initial gas differs between the two sides" in message
+
+
+def test_success_message_carries_gas_scope():
+    """库调用方只有这个 message：必须能读出模式、预算与 host-OOG 不在范围内。"""
+    evm, x86 = _load_pair("gas_sload")
+    verified, message = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(gas_budget=777_000), stack_check=None,
+    )
+    assert verified, message
+    assert "fixed initial budget 777000" in message
+    assert "host-exhaustion termination is out of scope" in message
+
+
+def test_off_rejects_symbolic_gas():
+    """GasCheck.OFF + 符号 gas 必须 fail-closed。
+
+    OFF 下 host gas UF 是关的，两侧都不扣 host cost H。后续可见 gas 检查因此判的是
+    `S > G` 而不是真实的 `S > G-H`，`S ≤ G < H+S` 这片真实可达的 OOG 区域被漏掉 ——
+    符号 gas 下这是实打实的 under-approximation。具体预算把缺口压成空集。
+    """
+    evm, x86 = _load_pair("gas_sload")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.OFF
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True), stack_check=None,
+    )
+    assert not verified, "OFF + 符号 gas 必须被拒（host gas 未建模）"
+    assert "GasCheck.OFF requires a concrete initial gas budget" in msg
+
+
+def test_mismatched_initial_gas_rejected_in_every_mode():
+    """两侧初始 gas 同源是**所有模式**的前提：gas 无条件参与控制流，起点不同就不是在比
+    同一个输入程序，OFF 也不例外。"""
+    from z3 import BitVecVal
+
+    evm, x86 = _load_pair("gas_sload")
+    for mode in (GasCheck.OFF, GasCheck.FIXED_BUDGET):
+        state = SMTState.create_initial_state()
+        state.callengine_gas_remaining = BitVecVal(4242, 64)   # 只改 AOT 侧
+        verified, msg = ProgramEquivalenceChecker(
+            timeout_ms=120000, gas_check=mode
+        ).verify_program_pair(evm, x86, state, stack_check=None)
+        assert not verified, f"{mode}: 两侧初始 gas 不一致必须 fail-closed"
+        assert "initial gas differs between the two sides" in msg, mode
+
+
+def test_off_still_verifies_with_concrete_budget():
+    """对照：OFF + 具体预算（正常配置）不受上面两条守卫影响。"""
+    evm, x86 = _load_pair("gas_sload")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.OFF
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(), stack_check=None,
+    )
+    assert verified, msg
+
+
+def test_off_success_message_discloses_unmodeled_host_gas():
+    """OFF 的结论是**条件性**的，前提必须出现在每条 VERIFIED 消息里。
+
+    OFF 不扣 host cost H，后续可见 gas 检查判的是 `S > G` 而非 `S > G-H`；要求具体预算
+    只关掉了符号 G 那类反例，`G=1e9, H=999999998, S=3` 仍是具体预算下的反例。调用方只有
+    这条 message，不写前提就会把条件性结论读成无条件的。
+    """
+    evm, x86 = _load_pair("gas_sload")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.OFF
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(gas_budget=555_000), stack_check=None,
+    )
+    assert verified, msg
+    assert "fixed initial gas budget 555000" in msg
+    assert "host gas is NOT modeled in this mode" in msg

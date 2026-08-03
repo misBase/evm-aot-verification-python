@@ -4,8 +4,8 @@
 （mov rax,[r13+0x70]; cmp; jb OOG; sub; mov [r13+0x70],rax）。
 
 使用 add_with_push（纯静态 gas，无动态 gas 指令）+ 含完整 gas prologue 的
-X86_ADD_FULL_HEX_SEQUENCE。gas 检查需 symbolic_gas=True（共享符号 G）+
-check_gas=True（启用 gas 检查并注入「gas 恒足」前提剪掉 OOG 分支）。
+X86_ADD_FULL_HEX_SEQUENCE。gas_check=GasCheck.FIXED_BUDGET：具体预算让静态 gas 的
+OOG 条件在 simplify 阶段折死，只验充足路径的 gas 终值。
 
 注意:含动态 gas 指令（MSTORE/RETURN/CALL...）的程序属阶段 1，本阶段不覆盖。
 """
@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from verification.program_verifier import ProgramEquivalenceChecker
+from verification.program_verifier import GasCheck, ProgramEquivalenceChecker
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
@@ -39,8 +39,8 @@ def test_gas_consistency_static_only_passes():
     """纯静态 gas 程序:EVM 扣 block.static_gas == x86 makeStaticUseGas 扣 gas。"""
     evm_program, x86_program = _load_add_with_push_pair()
 
-    checker = ProgramEquivalenceChecker(timeout_ms=60000, check_gas=True)
-    initial_state = SMTState.create_initial_state(symbolic_gas=True)
+    checker = ProgramEquivalenceChecker(timeout_ms=60000, gas_check=GasCheck.FIXED_BUDGET)
+    initial_state = SMTState.create_initial_state()
     verified, msg = checker.verify_program_pair(
         evm_program, x86_program, initial_state, stack_check=None
     )
@@ -55,8 +55,8 @@ def test_gas_consistency_tampered_static_gas_caught():
     for block in evm_program.blocks:
         block.static_gas = 99
 
-    checker = ProgramEquivalenceChecker(timeout_ms=60000, check_gas=True)
-    initial_state = SMTState.create_initial_state(symbolic_gas=True)
+    checker = ProgramEquivalenceChecker(timeout_ms=60000, gas_check=GasCheck.FIXED_BUDGET)
+    initial_state = SMTState.create_initial_state()
     verified, msg = checker.verify_program_pair(
         evm_program, x86_program, initial_state, stack_check=None
     )

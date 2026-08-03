@@ -31,6 +31,7 @@ from common.path_observation import PathCoverageCertificate
 from utils.z3_helpers import expr_mentions_symbol, get_simplified_bv_const_value
 
 from .refinement_context import _RefinementContext
+from .refinement_gas import GasEquivalenceChecks
 from .refinement_memory import MemoryContentChecks
 from .refinement_outputs import OutputRefinementChecks
 from .refinement_storage import StorageEquivalenceChecks
@@ -92,7 +93,7 @@ class PathRefinementChecks:
         outputs: OutputRefinementChecks,
         storage: StorageEquivalenceChecks,
         memory: MemoryContentChecks,
-        gas=None,
+        gas: Optional[GasEquivalenceChecks] = None,
     ):
         self._ctx = ctx
         self._outputs = outputs

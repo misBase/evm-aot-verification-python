@@ -40,10 +40,10 @@ class RefinementChecker:
             verbose: 启用应用层详细输出（subcheck 时间、path-pair 进度等）
             z3_verbose: 是否同时打开 z3 自身的 verbose（极吵；默认关，避免淹没
                 应用层日志）。perf 调试用 verbose=True, z3_verbose=False。
-            check_gas: 是否启用 gas 终值一致性检查（阶段 0）。默认 False：
-                gas 检查只覆盖静态 gas，对含动态 gas 指令（MSTORE/RETURN/CALL
-                等）的程序会 SAT；且许多测试桩 hex 不含 gas codegen。需显式
-                开启（配合纯静态 gas fixture），避免破坏既有功能等价验证。
+            check_gas: 是否启用 gas 终值一致性检查。默认 False——许多测试桩 hex 是
+                截断的 core，不含 gas codegen，开着会必然 SAT。生产入口由
+                ProgramEquivalenceChecker 按 GasCheck 模式喂入（OFF 以外都为 True），
+                模式语义与结论范围见 verification.GasCheck。
         """
         self._ctx = _RefinementContext(timeout_ms, verbose, z3_verbose)
         self._storage = StorageEquivalenceChecks(self._ctx)

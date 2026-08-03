@@ -4,7 +4,7 @@ EVM IR语义建模。
 本模块使用Z3为EVM IR操作提供语义建模。
 """
 
-from z3 import BitVec, BitVecNumRef, BitVecRef, BitVecVal, Concat, Extract, If, UGE, UGT, ULT, And, Not, Or, UDiv, URem, LShR, SignExt, ZeroExt, Lambda, Select, is_false, is_true, simplify
+from z3 import BitVec, BitVecNumRef, BitVecRef, BitVecVal, BoolVal, Concat, Extract, If, UGE, UGT, ULT, And, Not, Or, UDiv, URem, LShR, SignExt, ZeroExt, Lambda, Select, is_false, is_true, simplify
 from typing import List, Optional, Dict, Any, Tuple
 from .models import EVMBlock, EvmOperator
 from evm_ir.status_code import EvmStatusCode, set_terminal_status
@@ -26,6 +26,7 @@ from common.arithmetic import (
     x86_div64_quotient_fits_assumption,
 )
 from state.smt_state import SMTState, EVMStackState, EVMMemoryState, PendingErrorBranch
+from state.evm_gas_state import CREATE2_WORD_GAS, INIT_CODE_WORD_GAS
 
 # RETURN指令的常量
 MAX_RETURN_DATA_SIZE = 256  # 最大返回数据大小（字节）（256字节 = 2048位）
@@ -55,127 +56,300 @@ def _uint256_to_u64_with_overflow_max(value: BitVecRef) -> BitVecRef:
     )
 
 
-def _charge_memory_gas_for_access(state, offset_bv, access_size_64):
-    """对一次内存访问扣减内存扩展动态 gas（阶段 1）。
+# gas 错误分支的快照类：错误瞬间哪些 side-channel 已写入，必须与 x86 的 exit 时刻一致。
+#   PRE_FEE  三项都未写。E2/E3 在 dynamicGas **之前**返回（interpreter.go:190/195）；
+#            cap 支的 jmpIfB(gas_dynamic:517) 跳到 :582，**跳过** :578 的 lastGasCost 写入。
+#   POST_FEE 只有 lastGasCost 已写。makeUseGas 在 memoryGasCost 之后才跑，其 SUBQ 在 JCS
+#            之后（gas_dynamic:402-408）故 gas 不扣；memoryGrow 更在 UseGas 之后，
+#            故 mem_size 不变（interpreter.go:204-208）。
+SNAPSHOT_PRE_FEE = "pre_fee"
+SNAPSHOT_POST_FEE = "post_fee"
 
-    requested = offset + access_size（64-bit）。镜像 x86 memoryGasCost。
-    在 success-path scope assumption 下处理 offset：高 192 位为 0（无损截断），
-    且 offset + access_size 不溢出 uint64。这是被验证域的缩小（非无损先验），
-    与 calldataload no-overflow 不同——memory overflow 区两侧同行为未单独证。
+# toWordSize 的饱和边界（common.go:70）与 memoryGasCost 的 cap（gas_table.go:38，= 32×0xFFFFFFFF）。
+_MAX_UINT64_MINUS_31 = (1 << 64) - 32
+_MEM_SIZE_CAP = 0x1FFFFFFFE0
 
-    access_size_64 为 64-bit BitVec（MSTORE=32, MSTORE8=1, 或 RETURN 的 length）。
 
-    仅当 gas_modeling_enabled（symbolic_gas）时生效：否则功能等价验证不应被
-    gas-only 的 scope assumption 越界约束（见 SMTState.gas_modeling_enabled）。
+def _snapshot_for_error_branch(state):
+    """拍一份独占快照，即使 state 上已挂了别的待分裂分支。
+
+    `SMTState.copy()` 在 `pending_errors` 非空时 fail-closed（smt_state.py:263）。但一条
+    opcode 可以合法地产生多组分支——RETURNDATACOPY 先有 gas 前言的 exit，再有 errPoint 的
+    ReturnDataOutOfBounds。临时摘队列不丢信息：`copy()` 本来也把新 state 的队列置空。
     """
-    if not getattr(state, "gas_modeling_enabled", False):
-        return state
-    from state.evm_gas_state import charge_memory_expansion_gas
+    saved = state.pending_errors
+    state.pending_errors = []
+    try:
+        return state.copy()
+    finally:
+        state.pending_errors = saved
 
-    if offset_bv.size() == 256:
-        # scope: offset 高 192 位为 0
-        state.add_assumption(Extract(255, 64, offset_bv) == BitVecVal(0, 192))
-        offset_64 = Extract(63, 0, offset_bv)
-    elif offset_bv.size() == 64:
-        offset_64 = offset_bv
-    else:
-        raise ValueError(f"offset must be 64/256-bit, got {offset_bv.size()}")
 
-    requested = offset_64 + access_size_64
-    # scope: offset + access_size 不溢出（requested >= offset_64）
-    state.add_assumption(UGE(requested, offset_64))
-    charge_memory_expansion_gas(state, requested)
+def _split_uint64(value_bv):
+    """拆成 (高位非零, 低 64 位)，镜像 uint256.Uint64WithOverflow 的两个返回值。
+
+    64-bit 入参视为恒不溢出（调用方已在 64 位域内）。其它宽度 fail-closed 抛错，
+    静默截断会让溢出分支凭空消失。
+    """
+    size = value_bv.size()
+    if size == 256:
+        return Extract(255, 64, value_bv) != BitVecVal(0, 192), Extract(63, 0, value_bv)
+    if size == 64:
+        return BoolVal(False), value_bv
+    raise ValueError(f"offset/length must be 64 or 256 bits, got {size}")
+
+
+def _mem_size_tail_branches(requested_64):
+    """requested 之后的两个共用错误分支。
+
+        interpreter.go:194  if memorySize, ovf = SafeMul(toWordSize(memSize), 32); ovf {
+                                return nil, ErrGasUintOverflow                    // → 13
+                            }
+        gas_table.go:38     if newMemSize > 0x1FFFFFFFE0 {
+                                return 0, ErrGasUintOverflow   // 经 :205 塌缩 → **12**
+                            }
+
+    两个条件都不是照抄字面，推导写在这里免得被"简化"掉：
+
+    - SafeMul 溢出 ⟺ `requested > MaxUint64-31`：边界内 toWordSize 是
+      `(size+31)/32 ≤ MaxUint64/32`、乘 32 不溢出；越界则饱和成 `MaxUint64/32+1`、
+      乘 32 必溢出。x86 makeSafeMulWithOverFlow(gas_dynamic:298-323) 是"先饱和再靠
+      MULQ 的 CF 检测"，等价。
+    - Go 的 cap 比的是**已舍入**的 memorySize，这里比未舍入的 requested：
+      `cap = 32×0xFFFFFFFF` ⟹ `ceil(requested/32)*32 ≤ cap ⟺ requested ≤ cap`，双向成立
+      （舍入本身溢出的情形已被前一条排除）。
+
+    Returns:
+        [(cond, status_code, snapshot_kind), ...]，按解释器顺序。
+    """
+    return [
+        (UGT(requested_64, BitVecVal(_MAX_UINT64_MINUS_31, 64)),
+         EvmStatusCode.GAS_UINT_OVERFLOW, SNAPSHOT_PRE_FEE),
+        (UGT(requested_64, BitVecVal(_MEM_SIZE_CAP, 64)),
+         EvmStatusCode.OUT_OF_GAS, SNAPSHOT_PRE_FEE),
+    ]
+
+
+def _calc_mem_size_64(offset_bv, length_bv):
+    """镜像 Go calcMemSize64（common.go:30）：返回 (requested_64, 有序错误分支)。
+
+    短路顺序一条都不能挪；x86 makeCalcMemSize64(gas_dynamic:325-343) 逐条同构
+    （compileLocIsUint64(l) → TESTQ l1/JEQ → compileLocIsUint64(o) → ADDQ/CMPQ/JCS）：
+
+        if !l.IsUint64() { return 0, true }              // ① length 非 uint64 → 13
+        if length64 == 0 { return 0, false }             // ② 短路，**不检查 offset**
+        offset64, ovf := off.Uint64WithOverflow()
+        if ovf           { return 0, true }              // ③ offset 非 uint64 → 13
+        val := offset64 + length64
+        return val, val < offset64                       // ④ 进位            → 13
+
+    ② 是语义要点：`RETURN(offset=2^200, length=0)` 在解释器和 AOT 里都是正常路径、
+    fee=0。旧实现无条件 assume offset 高 192 位为 0，把这条合法路径排除在验证域外。
+
+    返回的分支按 append 顺序即检查顺序；互斥化由
+    cfg_executor._execute_op_with_outcome 负责，这里**不要**自己串否定链。
+    """
+    length_hi_nonzero, length_64 = _split_uint64(length_bv)
+    offset_hi_nonzero, offset_64 = _split_uint64(offset_bv)
+
+    length_is_zero = length_64 == BitVecVal(0, 64)
+    end = offset_64 + length_64
+
+    branches = [
+        (length_hi_nonzero, EvmStatusCode.GAS_UINT_OVERFLOW, SNAPSHOT_PRE_FEE),
+        # ③④ 都带上 ¬② —— length==0 时 Go 已经 return，不看 offset。
+        (And(Not(length_is_zero), offset_hi_nonzero),
+         EvmStatusCode.GAS_UINT_OVERFLOW, SNAPSHOT_PRE_FEE),
+        (And(Not(length_is_zero), ULT(end, offset_64)),
+         EvmStatusCode.GAS_UINT_OVERFLOW, SNAPSHOT_PRE_FEE),
+    ]
+    requested_64 = If(length_is_zero, BitVecVal(0, 64), end)
+    return requested_64, branches + _mem_size_tail_branches(requested_64)
+
+
+def _calc_mem_size_64_with_uint(offset_bv, const_size):
+    """镜像 Go calcMemSize64WithUint（common.go:40），length 为非零常量。
+
+    MLOAD/MSTORE 是 32、MSTORE8 是 1，都 ≠ 0 ⟹ `length64 == 0` 短路不可达，
+    offset 检查恒执行——即没有 ①②，只剩 ③④ 与共用尾部。
+    x86 对应 makeCalcMemSize64WithUintN(gas_dynamic:389-400)。
+    """
+    if const_size == 0:
+        raise ValueError("const_size 必须非零：为零时 Go 走 length==0 短路，应改用 _calc_mem_size_64")
+    offset_hi_nonzero, offset_64 = _split_uint64(offset_bv)
+    end = offset_64 + BitVecVal(const_size, 64)
+
+    branches = [
+        (offset_hi_nonzero, EvmStatusCode.GAS_UINT_OVERFLOW, SNAPSHOT_PRE_FEE),
+        (ULT(end, offset_64), EvmStatusCode.GAS_UINT_OVERFLOW, SNAPSHOT_PRE_FEE),
+    ]
+    return end, branches + _mem_size_tail_branches(end)
+
+
+def _charge_dynamic_gas(state, requested_64, mem_size_branches, extra_fees=()):
+    """挂 gas 错误分支并在正常路径上演化 gas/bookkeeping。
+
+    对齐 interpreter.go:187-209 的整段流程：
+
+        memSize, ovf := operation.memorySize(stack)   // 溢出 → mem_size_branches
+        memorySize, ovf = SafeMul(toWordSize(memSize), 32)
+        dynamicCost, err = operation.dynamicGas(...)  // memFee + extra，**累加成总额**
+        if err != nil || !contract.UseGas(dynamicCost) {
+            return nil, ErrOutOfGas                   // → E4 分支，gas 不扣
+        }
+        if memorySize > 0 { mem.Resize(memorySize) }  // 正常路径才扩容
+
+    三个要点：
+
+    1. **总额一次判断**。解释器 `UseGas(dynamicCost)` 与 x86 的单个 makeUseGas
+       （gas_dynamic:402-408）都只判一次；分成 memFee/wordFee 各判一次在 gas 不足时
+       结论不同。
+    2. **gas 状态无条件演化**。gas 是决定控制流的内部状态，不是只在比较时才要的
+       observable：连续两条动态 gas 指令、`G-f1 < f2 ≤ G` 时不扣 f1 就漏掉 AOT 在第二条
+       处的 OOG；lastGasCost 不更新则第二次扩展按 `newTotal-0` 计费，阈值本身就错。
+    3. **正常路径是纯减法**。E4 已把不足分叉出去，此路径上钳零分支恒假；纯减法既忠于
+       `contract.Gas -= cost`，又避免 gas 退化成深 If-chain。
+
+    E4 用 `UGT(total, gas)`（`total == gas` **不**触发）：解释器 `UseGas` 是
+    `if gas < cost`；x86 makeUseGas 同义——assembler 的
+    `CompileRegisterToRegister(CMPQ, from, to)` 语义是 `from - to`，由
+    makeSafeMulWithOverFlow:304、memoryGasCost:516、:548 三处注释交叉印证。
+
+    Args:
+        state: SMTState；就地追加 pending_errors 并演化 gas/side-channel。
+        requested_64: 本次访问的 requested memory size（64-bit）。
+        mem_size_branches: `_calc_mem_size_64*` 返回的有序分支列表。
+        extra_fees: 叠加在内存扩展之上的 word/log fee（64-bit BitVec 序列）。
+    """
+    from state.evm_gas_state import EVMGasState, memory_expansion_fee
+
+    fee, new_mem_size, new_last_gas = memory_expansion_fee(
+        state.callengine_memory_size_bytes,
+        state.callengine_memory_gas_used,
+        requested_64,
+    )
+    total_fee = fee
+    for part in extra_fees:
+        total_fee = total_fee + part
+
+    # blast_select_store 折叠栈上的 Store/Select 链——内存 offset 常来自
+    # MLOAD(0x40) 的 free-memory-pointer，不折叠的话具体值识别不出来，会白留一堆
+    # 不可满足的错误路径（同 RETURNDATACOPY 的既有先例）。
+    live = [(simplify(cond, blast_select_store=True), status, kind)
+            for cond, status, kind in mem_size_branches]
+    live = [item for item in live if not is_false(item[0])]
+    if any(kind != SNAPSHOT_PRE_FEE for _, _, kind in live):
+        raise ValueError(
+            "mem_size_branches 只能是 PRE_FEE：它们在 dynamicGas 之前就返回，"
+            "gas/lastGasCost/mem_size 一项都没写。若要加 POST_FEE 分支，"
+            "必须像 E4 那样单独构造快照，不能混进这个列表"
+        )
+
+    # E4 无条件建模：makeUseGas 的 CMPQ/JCS 是可见机器码，不能有开关。要让它不产生
+    # 路径，靠足够大的具体 gas 预算把条件 simplify 成 False，而不是跳过建模。
+    e4_cond = simplify(UGT(total_fee, state.evm_gas.Gas), blast_select_store=True)
+    if is_false(e4_cond):
+        e4_cond = None
+
+    # 每条分支独占快照对象：共用会被 executor 的 shared_error_snapshot 检查拦下
+    # （前一条已进 final_states，改的是同一个引用）。
+    snapshots = [_snapshot_for_error_branch(state) for _ in live]
+    e4_snapshot = _snapshot_for_error_branch(state) if e4_cond is not None else None
+    if e4_snapshot is not None:
+        # POST_FEE：memoryGasCost 已写完 lastGasCost 才轮到 makeUseGas。
+        e4_snapshot.callengine_memory_gas_used = new_last_gas
+
+    for (cond, status, _kind), snapshot in zip(live, snapshots):
+        state.pending_errors.append(
+            PendingErrorBranch(condition=cond, status_code=status,
+                               terminal_state=snapshot)
+        )
+    if e4_cond is not None:
+        state.pending_errors.append(
+            PendingErrorBranch(condition=e4_cond,
+                               status_code=EvmStatusCode.OUT_OF_GAS,
+                               terminal_state=e4_snapshot)
+        )
+
+    state.callengine_memory_size_bytes = new_mem_size
+    state.callengine_memory_gas_used = new_last_gas
+    state.evm_gas = EVMGasState(initial_gas=state.evm_gas.Gas - total_fee)
     return state
+
+
+def _charge_memory_gas_for_access(state, offset_bv, access_size):
+    """MLOAD / MSTORE / MSTORE8 的内存扩展 gas。
+
+    Go: memorySize=calcMemSize64WithUint(Back(0), 32|1) + dynamicGas=pureMemoryGascost
+    （jump_table.go:594-614、gas_table.go:265）；x86: makeStoreCheck(storeSize)。
+    access_size 是 int 常量（32 或 1）。
+    """
+    requested, branches = _calc_mem_size_64_with_uint(offset_bv, access_size)
+    return _charge_dynamic_gas(state, requested, branches)
 
 
 def _charge_memory_gas_for_return(state, offset_bv, length_bv):
-    """对 RETURN/REVERT 引用的内存区间扣减内存扩展动态 gas（阶段 1）。
+    """RETURN / REVERT 的内存扩展 gas。
 
-    requested = If(length == 0, 0, offset + length)。length == 0 时不引用内存、
-    不扩容、不计 gas（镜像 Go calcMemSize64：length 为 0 时 size 为 0）。
-    在 success-path scope assumption 下：offset/length 高 192 位为 0，
-    offset + length 不溢出 uint64。仅 gas_modeling_enabled 时生效。
+    Go: memoryReturn/memoryRevert=calcMemSize64(Back(0), Back(1)) + pureMemoryGascost；
+    x86: makeCalcReturnIns(0, 1)。
     """
-    if not getattr(state, "gas_modeling_enabled", False):
-        return state
-    from state.evm_gas_state import charge_memory_expansion_gas
-
-    if offset_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, offset_bv) == BitVecVal(0, 192))
-        offset_64 = Extract(63, 0, offset_bv)
-    else:
-        offset_64 = offset_bv
-    if length_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, length_bv) == BitVecVal(0, 192))
-        length_64 = Extract(63, 0, length_bv)
-    else:
-        length_64 = length_bv
-
-    end = offset_64 + length_64
-    state.add_assumption(UGE(end, offset_64))  # scope: 不溢出
-    requested = If(length_64 == BitVecVal(0, 64), BitVecVal(0, 64), end)
-    charge_memory_expansion_gas(state, requested)
-    return state
+    requested, branches = _calc_mem_size_64(offset_bv, length_bv)
+    return _charge_dynamic_gas(state, requested, branches)
 
 
 def _charge_memory_and_word_gas(state, offset_bv, length_bv, word_gas_const):
-    """SHA3 / COPY 系列:内存扩展 gas（offset+length）+ 按 word 计费（length）。
+    """SHA3 / COPY 系列：内存扩展 gas + 按 word 计费的叠加段。
 
-    镜像 Go memoryGasWithType：memoryGasCost(offset+length) 之上叠加
-    toWordSize(length) * word_gas_const（SHA3=Sha3WordGas=6，COPY=CopyGas=3）。
-    length == 0 时内存不扩、word gas=0。success-path scope:offset/length 高 192
-    位为 0，offset+length 不溢出。仅 gas_modeling_enabled 时生效。
+    Go: calcMemSize64(offset, length) + gasSha3 / memoryCopierGas(pos)，都是
+    `memoryGasCost(memSize) + toWordSize(length)*const`（gas_table.go:66-87、244-260），
+    SHA3=Sha3WordGas 6、COPY 系=CopyGas 3；x86: memoryGasWithType(gas_dynamic:463)。
+    两段 fee 交给 _charge_dynamic_gas 累加成总额后判一次。
     """
-    if not getattr(state, "gas_modeling_enabled", False):
-        return state
-    from state.evm_gas_state import charge_memory_expansion_gas, charge_word_gas
+    from state.evm_gas_state import word_fee
 
-    if offset_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, offset_bv) == BitVecVal(0, 192))
-        offset_64 = Extract(63, 0, offset_bv)
-    else:
-        offset_64 = offset_bv
-    if length_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, length_bv) == BitVecVal(0, 192))
-        length_64 = Extract(63, 0, length_bv)
-    else:
-        length_64 = length_bv
-
-    end = offset_64 + length_64
-    state.add_assumption(UGE(end, offset_64))  # scope: 不溢出
-    requested = If(length_64 == BitVecVal(0, 64), BitVecVal(0, 64), end)
-    charge_memory_expansion_gas(state, requested)
-    charge_word_gas(state, length_64, word_gas_const)
-    return state
+    requested, branches = _calc_mem_size_64(offset_bv, length_bv)
+    _, length_64 = _split_uint64(length_bv)
+    return _charge_dynamic_gas(
+        state, requested, branches, [word_fee(length_64, word_gas_const)],
+    )
 
 
 def _charge_mcopy_gas(state, dst_offset_bv, src_offset_bv, length_bv):
-    """MCOPY 动态 gas：内存扩展用 max(dst,src)+length，copy word gas 用 length(3)。
+    """MCOPY 动态 gas：内存扩展用 max(dst,src)+length，copy word gas 用 length。
 
-    Go MCOPY 取 source/dest 较大者算内存扩展（baseCalcGasWithPointAndFuncDynamicOffset）。
-    success-path scope:dst/src/length 高 192 位为 0，max(dst,src)+length 不溢出。
-    仅 gas_modeling_enabled 时生效。
+    Go memoryMcopy（memory_table.go）:
+
+        mStart := stack.Back(0)                     // dest
+        if stack.Back(1).Gt(mStart) {               // **256-bit** Gt
+            mStart = stack.Back(1)                  // source
+        }
+        return calcMemSize64(mStart, stack.Back(2))
+
+    **max 必须在 256 位上比**：x86 compileSubValuesForCompare(impl_amd64.go:848-866)
+    是 SUBQ+SBBQ×3 的全 256 位借位链。先截 64 位只在"高位为零"的 assumption 下等价，
+    撤掉后 dst=2^200/src=0 会截成 0 而误选 src。
     """
-    if not getattr(state, "gas_modeling_enabled", False):
-        return state
-    from state.evm_gas_state import charge_memory_expansion_gas, charge_word_gas
+    from state.evm_gas_state import word_fee
 
-    if dst_offset_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, dst_offset_bv) == BitVecVal(0, 192))
-    if src_offset_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, src_offset_bv) == BitVecVal(0, 192))
-    if length_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, length_bv) == BitVecVal(0, 192))
-    dst64 = _truncate_to_64(dst_offset_bv)
-    src64 = _truncate_to_64(src_offset_bv)
-    len64 = _truncate_to_64(length_bv)
-    base = If(UGT(dst64, src64), dst64, src64)
-    end = base + len64
-    state.add_assumption(UGE(end, base))  # scope: 不溢出
-    requested = If(len64 == BitVecVal(0, 64), BitVecVal(0, 64), end)
-    charge_memory_expansion_gas(state, requested)
-    charge_word_gas(state, len64, 3)
-    return state
+    mstart_bv = _max_uint256(dst_offset_bv, src_offset_bv)
+    requested, branches = _calc_mem_size_64(mstart_bv, length_bv)
+    _, length_64 = _split_uint64(length_bv)
+    return _charge_dynamic_gas(
+        state, requested, branches, [word_fee(length_64, 3)],
+    )
+
+
+def _max_uint256(left_bv, right_bv):
+    """全宽无符号 max（MCOPY 的 `mStart = max(dest, source)`）。
+
+    宽度不一致时 fail-closed：静默 ZeroExt 会掩盖调用方传错操作数。
+    """
+    if left_bv.size() != right_bv.size():
+        raise ValueError(
+            f"max operands must be same width, got {left_bv.size()} vs {right_bv.size()}"
+        )
+    return If(UGT(left_bv, right_bv), left_bv, right_bv)
 
 
 def _return_gas_for(op) -> int:
@@ -210,28 +384,24 @@ def _return_gas_for(op) -> int:
 def _charge_log_gas(state, offset_bv, size_bv, n_topics):
     """LOG 动态 gas（x86 memoryLogGas codegen 全程可见，故建真实公式而非 UF）。
 
-    镜像 Go gasLog：内存扩展(offset+size) + LogGas(375) + n*LogTopicGas(375)
-    + size*LogDataGas(8，**每字节**)。size==0 时内存不扩、data gas=0。
-    success-path scope：offset/size 高 192 位为 0，offset+size 不溢出。
-    仅 gas_modeling_enabled 时生效。
+    Go: memorySize=memoryLog=calcMemSize64(Back(0), Back(1))，dynamicGas=makeGasLog(n)
+    （gas_table.go:214-242）:
+
+        gas  = memoryGasCost(memSize)
+        gas += LogGas                          // 375
+        gas += n * LogTopicGas                 // n*375
+        gas += requestedSize * LogDataGas      // **每字节** 8，不是每 word
+
+    x86 memoryLogGas(gas_dynamic:590) 的 data 段用
+    makeSafeMulWithOverFlowWithNoToWordSize——刻意不做 toWordSize。
     """
-    if not getattr(state, "gas_modeling_enabled", False):
-        return state
-    from state.evm_gas_state import charge_memory_expansion_gas, charge_log_gas
+    from state.evm_gas_state import log_fee
 
-    if offset_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, offset_bv) == BitVecVal(0, 192))
-    if size_bv.size() == 256:
-        state.add_assumption(Extract(255, 64, size_bv) == BitVecVal(0, 192))
-    offset_64 = _truncate_to_64(offset_bv)
-    size_64 = _truncate_to_64(size_bv)
-
-    end = offset_64 + size_64
-    state.add_assumption(UGE(end, offset_64))  # scope: 不溢出
-    requested = If(size_64 == BitVecVal(0, 64), BitVecVal(0, 64), end)
-    charge_memory_expansion_gas(state, requested)
-    charge_log_gas(state, n_topics, size_64)
-    return state
+    requested, branches = _calc_mem_size_64(offset_bv, size_bv)
+    _, size_64 = _split_uint64(size_bv)
+    return _charge_dynamic_gas(
+        state, requested, branches, [log_fee(n_topics, size_64)],
+    )
 
 
 def _go_getdata_byte(byte_array,
@@ -736,7 +906,7 @@ def _apply_jump_destination_check(
         PendingErrorBranch(
             condition=Not(is_valid),
             status_code=EvmStatusCode.INVALID_JUMP,
-            terminal_state=state.copy(),
+            terminal_state=_snapshot_for_error_branch(state),
         )
     )
 
@@ -1008,7 +1178,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         offset_bv, stack_after_pop = state.evm_stack.pop()
         # 内存扩展动态 gas（阶段 1）：MLOAD 引用 [offset, offset+32)，与 MSTORE
         # 同构（access_size=32）。镜像 x86 先算 gas 再访问内存。
-        _charge_memory_gas_for_access(state, offset_bv, BitVecVal(32, 64))
+        _charge_memory_gas_for_access(state, offset_bv, 32)
         mem_value, new_memory_state = state.evm_memory.load_256bit(offset_bv)
         state.evm_stack = stack_after_pop.push(mem_value)
         state.evm_memory = new_memory_state
@@ -1018,10 +1188,10 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # MSTORE：弹出偏移量和值，将32字节存储到内存
         offset_bv, stack_after_pop1 = state.evm_stack.pop()
         value, stack_after_pop2 = stack_after_pop1.pop()
-        # 内存扩展动态 gas（阶段 1，镜像 x86 makeStoreCheck：先算 gas 再 grow）。
-        # requested = offset + 32。scope assumption（offset 高 192 位为 0）保证
-        # _truncate_to_64 无损，且后续 memWords 在 x86 64-bit codegen 域内对齐。
-        _charge_memory_gas_for_access(state, offset_bv, BitVecVal(32, 64))
+        # 内存扩展动态 gas（镜像 x86 makeStoreCheck：先算 gas 再 grow）。
+        # requested = offset + 32；offset 高 192 位非零、offset+32 进位、cap 超限
+        # 都会分叉出各自的错误终态，不再用 assumption 把它们排除在验证域外。
+        _charge_memory_gas_for_access(state, offset_bv, 32)
         new_memory_state = state.evm_memory.store_256bit(offset_bv, value)
         state.evm_stack = stack_after_pop2
         state.evm_memory = new_memory_state
@@ -1032,7 +1202,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         offset_bv, stack_after_pop1 = state.evm_stack.pop()
         value_bv, stack_after_pop2 = stack_after_pop1.pop()
         # 内存扩展动态 gas（阶段 1）：MSTORE8 引用 [offset, offset+1)，access_size=1。
-        _charge_memory_gas_for_access(state, offset_bv, BitVecVal(1, 64))
+        _charge_memory_gas_for_access(state, offset_bv, 1)
         byte_val = Extract(7, 0, value_bv)
         new_memory_state = state.evm_memory.set_byte(offset_bv, byte_val)
         state.evm_stack = stack_after_pop2
@@ -1174,15 +1344,17 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         data_offset_bv, stack_after_pop2 = stack_after_pop1.pop()
         length_bv, stack_after_pop3 = stack_after_pop2.pop()
 
-        # 三次 popUint256 在越界检查之前（impl_amd64.go:3128-3130），先把弹栈结果
-        # 写回去，快照才能带上已弹栈的状态。
+        # 两组错误分支的快照点不同，取决于它们在 codegen 里相对三次 popUint256
+        # （impl_amd64.go:3128-3130）的位置：
+        #   - gas 前言的 exit（checkMemoryAndCalcDynamicGasReturnDataCopy，:3124）在 pop
+        #     **之前** → 快照里参数仍在栈上，所以这里先扣 gas、后写回弹栈结果。
+        #   - errPoint 的 ReturnDataOutOfBounds（:3143+）在 pop **之后** → 快照是弹栈后的。
+        # 两者共用一个快照会让其中一组的栈深与 x86 的 exit 错位（终态 stack 目前不是
+        # 证明 observable，但加入后就会暴露）。
+        _charge_memory_and_word_gas(state, mem_offset_bv, length_bv, 3)
         state.evm_stack = stack_after_pop3
 
-        # 动态 gas：内存扩展(memOffset+length) + copy word gas(3)。必须在下面的错误
-        # 分支快照之前扣——x86 侧 checkMemoryAndCalcDynamicGasReturnDataCopy 是
-        # compileEVMRETURNDATACOPY 的第一件事（impl_amd64.go:3124），先于 3143+ 的
-        # errPoint，所以越界终态的 gas 也已经扣过。
-        _charge_memory_and_word_gas(state, mem_offset_bv, length_bv, 3)
+        # 越界终态的 gas 已经扣过：gas 前言先于 errPoint 执行。
 
         # 镜像 compileEVMRETURNDATACOPY（impl_amd64.go:3143-3178）的三条错误分支，
         # 它们都跳到同一个 errPoint 发射 exit(ReturnDataOutOfBounds)：
@@ -1208,7 +1380,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
                 PendingErrorBranch(
                     condition=oob_cond,
                     status_code=EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS,
-                    terminal_state=state.copy(),
+                    terminal_state=_snapshot_for_error_branch(state),
                 )
             )
         if is_true(oob_cond):
@@ -1379,6 +1551,11 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         dest_offset_bv, stack2 = stack1.pop()
         offset_bv, stack3 = stack2.pop()
         size_bv, stack4 = stack3.pop()
+        # 可见 fee = memoryCopierGas(3)：memoryExtCodeCopy=calcMemSize64(Back(1),Back(3))
+        # = (destOffset, size) + CopyGas word gas。与其它 copy 同形，只是槽位不同。
+        # 必须在写内存之前：x86 checkMemoryAndCalcDynamicGasExtCodeCopy 是
+        # compileEVMEXTCODECOPY 的第一条语句（impl_amd64.go:3105），错误 exit 早于 copy。
+        _charge_memory_and_word_gas(state, dest_offset_bv, size_bv, 3)
         state.evm_memory = _write_symbolic_memory_slice(
             state.evm_memory,
             dest_offset_bv,
@@ -1389,9 +1566,10 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             effect_tag=f"extcodecopy_idx_{op.pc}",
         )
         state.evm_stack = stack4
-        # host gas（冷热账户）不可见 → UF，依赖 addr 与 size。x86 侧还有可见的内存
-        # 扩展 + copy word gas 未在这里建模，故 EXTCODECOPY 仍留在 program_verifier
-        # 的拒绝集里 fail-closed。
+        # host gas（冷热账户）不可见 → UF，依赖 addr 与 size。可见的内存扩展 + copy
+        # word gas 已在上面建模（:1561），EXTCODECOPY 仍留在 program_verifier 的拒绝集里
+        # 是因为**没有专用 fixture**，放行等于让任意符号 offset/size 的实例进来而无回归
+        # 覆盖——不是因为 fee 没建模。
         from state.host_gas import charge_host_gas_uf
         charge_host_gas_uf(state, "EXTCODECOPY", [addr_bv, size_bv])
         return state
@@ -1437,16 +1615,27 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         value_bv, stack1 = state.evm_stack.pop()
         offset_bv, stack2 = stack1.pop()
         size_bv, stack3 = stack2.pop()
+        # 严格按 compileEVMCREATE（impl_amd64.go:3940-3962）的四段：
+        #   dealWithAddGas(rg) → checkMemoryAndCalcDynamicGasCreate → host → dealWithSubGas(rg)
+        # 可见 fee 的检查落在 add/sub 窗口**之内**——顺序错了 gas 终值虽相同（加减相消），
+        # 但可见 fee 的 OOG 阈值会少算一个 rg：应判 `fee > gas+rg`，错序则判 `fee > gas`。
+        # 可见 fee = memoryCreate=calcMemSize64(Back(1),Back(2)) + toWordSize(Back(2))*
+        # InitCodeWordGas（x86 memoryCreateGasN，gas_dynamic:429）。
+        from state.host_gas import (
+            add_return_gas, charge_host_gas_uf, sub_return_gas,
+        )
+        return_gas = _return_gas_for(op)
+        add_return_gas(state, return_gas)
+        _charge_memory_and_word_gas(state, offset_bv, size_bv, INIT_CODE_WORD_GAS)
         result = uninterpreted.create_semantics(
             value_bv, offset_bv, size_bv, state.evm_memory.Memory, effect_id=op.pc
         )
         state.evm_stack = stack3.push(result)
-        # host UF + returnGas 链镜像。x86 侧可见的内存扩展 + InitCodeWordGas 尚未
-        # 在这里建模，故 CREATE 仍留在 program_verifier 的拒绝集里 fail-closed。
-        from state.host_gas import charge_host_gas_uf_with_return_gas
-        charge_host_gas_uf_with_return_gas(
-            state, "CREATE", [value_bv, offset_bv, size_bv], _return_gas_for(op)
-        )
+        # host gas 仍是 UF。可见 fee 已对齐，但 CREATE 仍在 program_verifier 的拒绝集里：
+        # host UF 与 returnGas 链的交互、MAX_INIT_CODE_SIZE_EXCEEDED(16) 状态码都未核实，
+        # gas **数值**检查继续 fail-closed。
+        charge_host_gas_uf(state, "CREATE", [value_bv, offset_bv, size_bv])
+        sub_return_gas(state, return_gas)
         return state
 
     elif kind == "CREATE2":
@@ -1454,15 +1643,22 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         offset_bv, stack2 = stack1.pop()
         size_bv, stack3 = stack2.pop()
         salt_bv, stack4 = stack3.pop()
+        # 同 CREATE 的四段顺序（compileEVMCREATE2，impl_amd64.go:4046-4071），只是 word
+        # 常量是 InitCodeWordGas + Sha3WordGas——memoryCreate2GasN 多算一次 keccak 的
+        # word gas（gas_dynamic:433）。
+        from state.host_gas import (
+            add_return_gas, charge_host_gas_uf, sub_return_gas,
+        )
+        return_gas = _return_gas_for(op)
+        add_return_gas(state, return_gas)
+        _charge_memory_and_word_gas(state, offset_bv, size_bv, CREATE2_WORD_GAS)
         result = uninterpreted.create2_semantics(
             value_bv, offset_bv, size_bv, salt_bv, state.evm_memory.Memory, effect_id=op.pc
         )
         state.evm_stack = stack4.push(result)
-        # 同 CREATE：host UF + returnGas 链，可见部分未对齐，guard 保持 fail-closed。
-        from state.host_gas import charge_host_gas_uf_with_return_gas
-        charge_host_gas_uf_with_return_gas(
-            state, "CREATE2", [value_bv, offset_bv, size_bv, salt_bv], _return_gas_for(op)
-        )
+        # gas 数值检查仍 fail-closed 拒绝，理由同 CREATE。
+        charge_host_gas_uf(state, "CREATE2", [value_bv, offset_bv, size_bv, salt_bv])
+        sub_return_gas(state, return_gas)
         return state
 
     elif kind == "CALL":
@@ -1738,16 +1934,17 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # 获取主题数量
         num_topics = op.immediate if op.immediate is not None else 0
 
-        # 弹出 offset 和 size（栈顶两个）——Go gasLog 用 Back(0)=offset、Back(1)=size
-        # 算内存扩展与 data gas。
-        offset_bv, state.evm_stack = state.evm_stack.pop()
-        size_bv, state.evm_stack = state.evm_stack.pop()
+        # 读 Back(0)=offset、Back(1)=size，但**先不写回 state.evm_stack**：
+        # checkMemoryAndCalcDynamicGasLog 是 compileEVMLog 的第一条语句
+        # （impl_amd64.go:3908）、早于所有 locationStack.popUint256()，故它的错误 exit
+        # 带的是**未弹栈**的 SP。同 MSTORE/RETURN 的既有范式。
+        offset_bv, stack_after_pop1 = state.evm_stack.pop()
+        size_bv, stack_after_pop2 = stack_after_pop1.pop()
 
-        # 在弹出 topics 前扣，与 x86 checkMemoryAndCalcDynamicGasLog 在 host 调用前
-        # 算 gas 对齐。
         _charge_log_gas(state, offset_bv, size_bv, num_topics)
 
-        # 弹出所有主题
+        # gas 扣完再提交弹栈：offset、size 与 num_topics 个 topic。
+        state.evm_stack = stack_after_pop2
         for _ in range(num_topics):
             _, state.evm_stack = state.evm_stack.pop()
 

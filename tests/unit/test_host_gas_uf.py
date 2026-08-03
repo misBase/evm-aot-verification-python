@@ -4,7 +4,7 @@
 - 同 opcode + 同参 ⟹ UF 相消（evm_gas == x86_gas 可 UNSAT）。
 - 同 opcode + 不同参 ⟹ 不相消（存在反例 → 安全，不会假绿）。
 - 不同 opcode ⟹ 不相消（SLOAD 的 UF 不等于 SSTORE 的 UF）。
-- gas_modeling_enabled 关时 charge_host_gas_uf 不动 gas（不污染功能等价）。
+- host_gas_uf_enabled 关时 charge_host_gas_uf 不动 gas（不污染功能等价）。
 """
 
 from z3 import BitVec, Solver, sat, unsat
@@ -85,22 +85,30 @@ def test_uf_same_full_value_still_cancels():
     assert s.check() == unsat, "same full 256-bit value must still cancel"
 
 
-def test_charge_off_when_gas_modeling_disabled():
-    """gas_modeling_enabled=False 时 charge_host_gas_uf 不改 evm_gas。"""
+def test_charge_off_when_host_gas_uf_disabled():
+    """host_gas_uf_enabled=False 时 charge_host_gas_uf 不改 evm_gas。
+
+    注意这个开关只管 host gas UF；gas **状态语义**（静态/动态扣减、bookkeeping）
+    始终建模，不受它控制。
+    """
     state = SMTState.create_initial_state()  # symbolic_gas 默认 False
-    assert not getattr(state, "gas_modeling_enabled", False)
+    assert not getattr(state, "host_gas_uf_enabled", False)
     before = state.evm_gas.Gas
     charge_host_gas_uf(state, "SLOAD", [BitVec("k", 256)])
-    assert state.evm_gas.Gas is before, "gas must be untouched when modeling disabled"
+    assert state.evm_gas.Gas is before, "gas must be untouched when UF disabled"
 
 
-def test_charge_on_when_gas_modeling_enabled():
-    """gas_modeling_enabled=True 时 charge_host_gas_uf 扣减 evm_gas。"""
+def test_charge_on_when_host_gas_uf_enabled():
+    """host_gas_uf_enabled=True 时 charge_host_gas_uf 扣减 evm_gas。
+
+    必须显式置位：唯一写入方是 program_verifier，create_initial_state 不再跟着
+    symbolic_gas 一起打开它（那是第二个事实源）。
+    """
     state = SMTState.create_initial_state(symbolic_gas=True)
-    assert getattr(state, "gas_modeling_enabled", False)
+    state.host_gas_uf_enabled = True
     before = state.evm_gas.Gas
     charge_host_gas_uf(state, "SLOAD", [BitVec("k", 256)])
-    assert state.evm_gas.Gas is not before, "gas must change when modeling enabled"
+    assert state.evm_gas.Gas is not before, "gas must change when UF enabled"
 
 
 def test_host_and_builtin_kinds_partition():

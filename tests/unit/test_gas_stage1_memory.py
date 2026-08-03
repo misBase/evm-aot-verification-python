@@ -39,14 +39,20 @@ class TestMemoryGrowBuiltin:
         got = simplify(state.callengine_memory_size_bytes)
         assert got.eq(BitVecVal(160, 64)), f"expected 160, got {got}"
 
-    def test_memory_grow_legacy_shift_when_gas_off(self):
-        # 功能等价分支（gas off）：保留历史 <<5 行为，避免破坏既有 observable。
-        state = SMTState.create_initial_state()  # gas off
+    def test_memory_grow_uses_byte_size_in_all_modes(self):
+        """gas 状态语义无条件建模：不再有 `gas off 就 <<5` 的遗留分支。
+
+        `<<5` 把 rounded byte size 当 word 数、放大 32 倍，会让 x86 的 [R13+0x18]
+        与 EVM 侧 bookkeeping 分叉，下一次 expansion fee 与 OOG 阈值两侧不同。
+        """
+        state = SMTState.create_initial_state()  # symbolic_gas 默认 False
         sem = GoFunctionSemantics(GO_HPC_EVM_PROFILE)
         state.callengine_builtin_arg0 = BitVecVal(32, 64)
         state = sem._handle_builtin_memory_grow(sp=0, mstate=state)
         got = simplify(state.callengine_memory_size_bytes)
-        assert got.eq(BitVecVal(32 << 5, 64)), f"gas-off keeps legacy <<5; got {got}"
+        assert got.eq(BitVecVal(32, 64)), (
+            f"growNumber 已是 byte size，任何模式下都不该再 <<5；got {got}"
+        )
 
     def test_memory_grow_does_not_shrink(self):
         """Fix #3:gas 分支必须镜像 Go dealWithMemoryGrow 的 `if targetMemSize >

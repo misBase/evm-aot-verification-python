@@ -467,8 +467,16 @@ def test_set_terminal_status_projects_string_from_code():
 
 
 def _returndatacopy_state(data_offset, length, return_data_size: int) -> SMTState:
-    """按 EVM 栈序压入 RETURNDATACOPY 的三个参数并执行。"""
+    """按 EVM 栈序压入 RETURNDATACOPY 的三个参数并执行。
+
+    gas 给具体大常量：本组测试的主题是 ReturnDataOutOfBounds 那三条分支，而 IR 侧
+    的 gas 状态语义是无条件建模的，符号 gas 会额外挂一条 dynamicCost > gas 的
+    OUT_OF_GAS 分支、干扰 `_sole_error_branch` 的计数。gas 充足时它静态判死。
+    """
+    from state.evm_gas_state import EVMGasState
+
     state = SMTState()
+    state.evm_gas = EVMGasState(initial_gas=BitVecVal(100_000, 64))
     state.callengine_return_data_size_bytes = BitVecVal(return_data_size, 64)
     for value in (length, data_offset, 0):   # length, returnDataOffset, memOffset
         state.evm_stack = state.evm_stack.push(

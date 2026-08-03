@@ -18,7 +18,24 @@ go-hpc-evm 把一部分指令的 gas 计算完全放在 Go runtime 里，x86 机
 codegen bug），**不是** host gas 公式本身正确——后者是 assume，要真证明须为 Go
 runtime 建 SMT 模型（未做）。
 
-参见 memory: gas_full_coverage_codegen_layers。
+--- 「host gas 耗尽」为什么不建 OOG 分叉：那一处没有代码可验 ---
+
+两侧都用 _consume_clamp_64 钳零续跑、都不分叉，而 host_gas_uf 是无约束自由函数
+（`cost > gas` 永远可满足），于是模型里有一批真实执行不存在的「扣爆后带 gas=0 继续跑」
+路径。这不是缺口：
+
+- compileCallGoFunction(impl_amd64.go:323-338) 只发射 spill / 写 returnAddress /
+  写 status / 写 SP / RET，**返回地址处不检查 host 结果**；要不要重入由 Go 循环决定
+  （engine_evm.go:657 `if err != nil { return nil, err }`）。没有 x86 行为可以不一致。
+- 那些续跑状态是机器码的**不可达**状态。我们在其上也做了比较 —— 多验不是少验，
+  只可能误报，不可能假绿；且两侧带同一钳零值继续走，下游可见 gas 检查照常逐路径比较。
+- 该调用点仅有的 codegen（上面 5 条）已在存在的那条路径上验过：UF 只有两侧栈参数一致
+  才相消。codegen 不分叉，验一条路径即验完。
+
+与 evm_ir/semantics.py 对**写保护**的既有判断同源（同样是 Go error 终止、不回写 native
+status）。范围声明见 ProgramEquivalenceChecker.__init__。
+
+参见 memory: gas_full_coverage_codegen_layers、docs/关键问题记录.md #19。
 """
 
 from typing import Sequence
@@ -100,8 +117,9 @@ def host_gas_uf(opcode: str, stack_args: Sequence[BitVecRef]) -> BitVecRef:
 def charge_host_gas_uf(state, opcode: str, stack_args: Sequence[BitVecRef]):
     """EVM 侧扣减一次 host/builtin 调用的 host-gas UF。
 
-    仅 gas_modeling_enabled 时生效（与 charge_memory_expansion_gas 同一 gate）：
-    功能等价验证下不引入 gas UF，避免污染既有 observable。
+    仅 host_gas_uf_enabled 时生效：功能等价验证下不引入 gas UF，避免污染既有
+    observable。注意这与 gas **状态语义**（静态/动态 gas 扣减、bookkeeping）不同，
+    后者始终建模、不受开关控制。
 
     Args:
         state: SMTState；就地扣减 evm_gas。
@@ -111,25 +129,57 @@ def charge_host_gas_uf(state, opcode: str, stack_args: Sequence[BitVecRef]):
     Returns:
         更新后的 state（与入参同一对象）。
     """
-    if not getattr(state, "gas_modeling_enabled", False):
+    if not getattr(state, "host_gas_uf_enabled", False):
         return state
     cost = host_gas_uf(opcode, stack_args)
     state.evm_gas = state.evm_gas.consume_dynamic(cost)
     return state
 
 
+def add_return_gas(state, return_gas: int):
+    """镜像 x86 dealWithAddGas（impl_amd64.go:3967）：`[R13+0x70] += returnGas`。
+
+    这是**可见机器码**（plain ADDQ，不钳零），属于 gas 状态语义而非 host UF，所以
+    **无条件执行**、不受 host_gas_uf_enabled 门控。CREATE/CREATE2 的可见动态 fee 检查
+    落在 add/sub 这个窗口**之内**（compileEVMCREATE 的顺序是 add → 可见 fee → host →
+    sub），门控掉它会让 OOG 阈值差一个 returnGas。
+    """
+    if not return_gas:
+        return state
+    from state.evm_gas_state import EVMGasState
+
+    state.evm_gas = EVMGasState(initial_gas=state.evm_gas.Gas + BitVecVal(return_gas, 64))
+    return state
+
+
+def sub_return_gas(state, return_gas: int):
+    """镜像 x86 dealWithSubGas（impl_amd64.go:3983）：`[R13+0x70] -= returnGas`。
+
+    与 add_return_gas 成对；同样无条件执行。
+    """
+    if not return_gas:
+        return state
+    from state.evm_gas_state import EVMGasState
+
+    state.evm_gas = EVMGasState(initial_gas=state.evm_gas.Gas - BitVecVal(return_gas, 64))
+    return state
+
+
 def charge_host_gas_uf_with_return_gas(state, opcode: str,
                                        stack_args: Sequence[BitVecRef],
                                        return_gas: int):
-    """CALL/CREATE 系列：镜像 x86 dealWithAddGas → host UF → dealWithSubGas 链。
+    """**CALL 系列专用**：dealWithAddGas → host UF → dealWithSubGas。
 
     x86 codegen 在 host 调用前后对 [R13+0x70] 做 plain ADD/SUB returnGas
-    （returnGas = Blk.StaticGas - op.Immediate），host gas 扣减夹在中间。EVM 侧若
-    只扣 UF，host 调用点两侧 gas 就差一个 returnGas，clamp 的实参不同 ⟹ UF 不
-    相消 ⟹ returnGas≠0 时假 SAT（fail-closed 但漏报）。
+    （= Blk.StaticGas - op.Immediate），host gas 扣减夹在中间。EVM 侧若只扣 UF，
+    host 调用点两侧 gas 就差一个 returnGas ⟹ clamp 实参不同 ⟹ UF 不相消 ⟹
+    returnGas≠0 时假 SAT。
 
-    故这里三段严格对齐；return_gas==0 时退化为纯 charge_host_gas_uf。仅
-    gas_modeling_enabled 生效。
+    **CREATE/CREATE2 不能用本函数**：它们在 add/sub 窗口内还有**可见的**动态 fee
+    （compileEVMCREATE 的顺序是 add → checkMemoryAndCalcDynamicGasCreate → host → sub，
+    impl_amd64.go:3940-3962），必须由调用方显式串成四段，否则可见 fee 的 OOG 阈值会
+    少算一个 returnGas。CALL 系没有可见 fee（checkMemoryAndCalcDynamicGasCall 返回 nil），
+    所以可以打包。
 
     Args:
         state: SMTState；就地扣减 evm_gas。
@@ -137,25 +187,17 @@ def charge_host_gas_uf_with_return_gas(state, opcode: str,
         stack_args: 影响 gas 的栈输入（与 x86 侧同序）。
         return_gas: Blk.StaticGas - op.Immediate（int，≥0）。
     """
-    if not getattr(state, "gas_modeling_enabled", False):
-        return state
-    from state.evm_gas_state import EVMGasState
-    rg = BitVecVal(int(return_gas), 64)
-    # dealWithAddGas：plain += returnGas（无钳零，镜像 x86 ADDQ）。
-    state.evm_gas = EVMGasState(initial_gas=state.evm_gas.Gas + rg)
-    # host UF：clamp 扣减（与 x86 makeUseGas 一致）。
-    cost = host_gas_uf(opcode, stack_args)
-    state.evm_gas = state.evm_gas.consume_dynamic(cost)
-    # dealWithSubGas：plain -= returnGas（无钳零，镜像 x86 SUBQ）。
-    state.evm_gas = EVMGasState(initial_gas=state.evm_gas.Gas - rg)
+    add_return_gas(state, return_gas)
+    charge_host_gas_uf(state, opcode, stack_args)
+    sub_return_gas(state, return_gas)
     return state
 
 
 def _consume_clamp_64(gas64: BitVecRef, cost64: BitVecRef) -> BitVecRef:
     """out-of-gas 钳零的 64-bit 扣减：If(cost>gas, 0, gas-cost)。
 
-    必须与 EVMGasState.consume_dynamic 逐字一致，否则 gas 恒足前提下两侧不会同时
-    退化成 gas-cost、UF 不相消 → 假 SAT。
+    必须与 EVMGasState.consume_dynamic 逐字一致：两侧表达式同构才能在比较时相消，
+    否则 UF 不相消 → 假 SAT。
     """
     return If(UGT(cost64, gas64), BitVecVal(0, 64), gas64 - cost64)
 
@@ -166,7 +208,8 @@ def deduct_host_gas_uf_x86(mstate, opcode: str, stack_args: Sequence[BitVecRef],
 
     host gas 在 Go runtime 内、机器码不可见，故手动从 callengine_gas_remaining
     扣同一个 UF。stack_args 必须与 EVM 侧是同一组栈值、同次序（该调用点两侧栈已
-    由功能等价证明相等）。仅 gas_modeling_enabled 生效。
+    由功能等价证明相等）。仅 host_gas_uf_enabled 生效，且必须与 EVM 侧
+    charge_host_gas_uf 同开同关，否则 UF 不相消。
 
     Args:
         mstate: x86 SMTState；就地更新 callengine_gas_remaining 与 [R13+0x70]。
@@ -176,7 +219,7 @@ def deduct_host_gas_uf_x86(mstate, opcode: str, stack_args: Sequence[BitVecRef],
         store_64bit: 写 [R13+off] 的回调，保持 side-channel 与 x86_memory 一致。
         callengine_domain: CALLENGINE 内存域（由 caller 传入，避免依赖 x86 模块）。
     """
-    if not getattr(mstate, "gas_modeling_enabled", False):
+    if not getattr(mstate, "host_gas_uf_enabled", False):
         return
     from x86_64.models import Register
 

@@ -316,10 +316,13 @@ class SymbolicExecutor:
         # （×32），这里以栈项计。无 TAG 即无检查；恒不成立的条件由 simplify +
         # is_false 剪掉，不建路径。
         if any(op.kind.upper() == "TAG" for op in block.operations):
-            # gas 检查 default-off：只有 oog_modeling_enabled 才放开这条分支，其余
-            # 模式下 gas 恒足由 program_verifier 的假设保证。
-            if (current_mstate.oog_modeling_enabled
-                    and getattr(block, "static_gas", 0)):
+            # gas 检查**无条件**建模：下面的扣减是无条件的纯减法，不分叉就会在 gas
+            # 不足时回绕续跑（IR 给 STOPPED 而 AOT 给 OUT_OF_GAS）。钳零在解释器里没有
+            # 对应物——UseGas 失败是**终止**，不是归零续跑。
+            #
+            # 代价可控：具体 gas 预算（GasCheck.OFF / FIXED_BUDGET）下条件在 simplify
+            # 阶段折成 False，连路径都不建；符号 gas（FULL）下这条分支正是要验的东西。
+            if getattr(block, "static_gas", 0):
                 from z3 import ULT
                 is_oog = simplify(
                     ULT(current_mstate.evm_gas.Gas, BitVecVal(block.static_gas, 64))
@@ -370,9 +373,9 @@ class SymbolicExecutor:
         # block 入口一次性扣静态 gas，镜像 makeStaticUseGas 与 x86 侧的
         # `SUBQ staticGas; MOVQ -> [R13+0x70]`（编译期已把块内各指令的静态 gas 求和
         # 成一个常量，所以这里也必须按块扣、不能逐 opcode 扣）。
-        # 仅 gas_modeling_enabled（symbolic_gas）时扣减：功能等价验证下 evm_gas 保持
-        # 平凡常量，避免 PathObservation 的 gas 键在循环程序里变成极深的 If-chain。
-        if current_mstate.gas_modeling_enabled and getattr(block, "static_gas", 0):
+        # 无条件扣减：动态 gas 的 OOG 阈值必须建立在"静态 gas 已扣"之上，少扣一块阈值
+        # 就是错的。具体预算下扣减后仍是常量，不会引入 If-chain。
+        if getattr(block, "static_gas", 0):
             current_mstate.evm_gas = current_mstate.evm_gas.consume_static(block.static_gas)
 
         # 过滤出实际执行的操作（跳过标记）

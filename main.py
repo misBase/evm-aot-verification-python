@@ -6,7 +6,8 @@ EVM AOT翻译验证工具
 之间的语义等价性。
 
 用法：
-    python main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose] [--check-gas]
+    python main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose]
+                   [--gas-check {off,fixed-budget,full}] [--gas-budget N]
 """
 
 import argparse
@@ -14,7 +15,7 @@ import sys
 from evm_ir.program import EVMProgram
 from evm_ir.json_parser import load_ir_from_json
 from x86_64.program import X86Program
-from verification.program_verifier import ProgramEquivalenceChecker
+from verification.program_verifier import GasCheck, ProgramEquivalenceChecker
 from state.smt_state import SMTState
 
 
@@ -28,7 +29,8 @@ def parse_args():
   python main.py tests/data/example_ir.json 498b46c0490346e0...
   python main.py contract.ir.json 498b46c0... --base-addr 0x6c
   python main.py contract.ir.json 498b46c0... --timeout 30000 --verbose
-  python main.py contract.ir.json 498b46c0... --check-gas
+  python main.py contract.ir.json 498b46c0... --gas-check fixed-budget
+  python main.py contract.ir.json 498b46c0... --gas-check full
         """
     )
     
@@ -65,9 +67,24 @@ def parse_args():
     )
 
     parser.add_argument(
-        '--check-gas',
-        action='store_true',
-        help='Enable stage-0 gas remaining equivalence check (static gas only)'
+        '--gas-check',
+        choices=[m.value.replace('_', '-') for m in GasCheck],
+        default=GasCheck.OFF.value,
+        help=(
+            'Gas equivalence check mode. "off" (default) skips gas comparison; '
+            '"fixed-budget" compares gas from one concrete budget; '
+            '"full" uses symbolic gas and verifies OOG paths over all budgets.'
+        ),
+    )
+
+    parser.add_argument(
+        '--gas-budget',
+        type=int,
+        default=None,
+        help=(
+            'Concrete initial gas budget for --gas-check fixed-budget (and off). '
+            'Ignored for "full", which requires symbolic gas.'
+        ),
     )
     
     return parser.parse_args()
@@ -79,7 +96,8 @@ def verify_programs(
     base_addr: int,
     timeout_ms: int,
     verbose: bool,
-    check_gas: bool = False,
+    gas_check: 'GasCheck | str' = GasCheck.OFF,
+    gas_budget: int = None,
 ):
     """验证EVM和x86程序之间的等价性。
     
@@ -89,7 +107,8 @@ def verify_programs(
         base_addr: x86代码的基址
         timeout_ms: 求解器超时（毫秒）
         verbose: 启用详细输出
-        check_gas: 启用阶段0 gas 终值一致性检查（仅静态 gas）
+        gas_check: gas 检查模式（GasCheck，或其字符串值）
+        gas_budget: 具体 gas 预算；仅非 FULL 模式有效
         
     Returns:
         (verified, message)，如果程序等价则verified为True
@@ -99,7 +118,7 @@ def verify_programs(
         print(f"Loading x86 code from hex: {x86_hex[:64]}..." if len(x86_hex) > 64 else f"Loading x86 code from hex: {x86_hex}")
         print(f"Base address: 0x{base_addr:x}")
         print(f"Timeout: {timeout_ms}ms")
-        print(f"Gas check: {'enabled (stage 0/static only)' if check_gas else 'disabled'}")
+        print(f"Gas check: {GasCheck(gas_check).value}")
         print()
     
     # 从JSON加载EVM程序
@@ -118,13 +137,18 @@ def verify_programs(
         return False, f"Error parsing x86 hex: {e}"
     
     # 使用ProgramEquivalenceChecker验证
+    mode = GasCheck(gas_check)
     checker = ProgramEquivalenceChecker(
         timeout_ms=timeout_ms,
         verbose=verbose,
-        check_gas=check_gas,
+        gas_check=mode,
     )
     # TODO: should be delete later
-    initial_state = SMTState.create_initial_state(2, symbolic_gas=check_gas)
+    # 初始 gas 配置必须与模式匹配，否则 verify_program_pair 会 fail-closed 拒绝。
+    if mode is GasCheck.FULL:
+        initial_state = SMTState.create_initial_state(2, symbolic_gas=True)
+    else:
+        initial_state = SMTState.create_initial_state(2, gas_budget=gas_budget)
     return checker.verify_program_pair(evm_program, x86_program, initial_state)
 
 
@@ -145,12 +169,20 @@ def main():
         args.base_addr,
         args.timeout,
         args.verbose,
-        args.check_gas,
+        args.gas_check.replace('-', '_'),
+        args.gas_budget,
     )
     
     # 输出结果
     if verified:
-        suffix = " including stage-0 gas" if args.check_gas else ""
+        mode = GasCheck(args.gas_check.replace('-', '_'))
+        if mode is GasCheck.FIXED_BUDGET:
+            budget = args.gas_budget if args.gas_budget is not None else 1_000_000_000
+            suffix = f" including gas, for fixed initial budget {budget}"
+        elif mode is GasCheck.FULL:
+            suffix = " including gas and OOG paths (symbolic initial gas)"
+        else:
+            suffix = ""
         print(f"✓ VERIFIED: Programs are semantically equivalent{suffix}")
         if args.verbose and message:
             print(f"  {message}")

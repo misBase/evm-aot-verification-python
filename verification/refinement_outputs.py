@@ -21,6 +21,7 @@ from state.smt_state import MemoryDomain
 from utils.z3_helpers import get_simplified_bv_const_value
 
 from .refinement_context import _RefinementContext
+from .refinement_gas import GasEquivalenceChecks
 from .refinement_memory import MemoryContentChecks
 from .refinement_storage import StorageEquivalenceChecks
 
@@ -39,7 +40,7 @@ class OutputRefinementChecks:
         ctx: _RefinementContext,
         storage: StorageEquivalenceChecks,
         memory: MemoryContentChecks,
-        gas=None,
+        gas: Optional[GasEquivalenceChecks] = None,
     ):
         self._ctx = ctx
         self._storage = storage

@@ -26,30 +26,25 @@ class EVMGasState:
             self.Gas = initial_gas
 
     def consume_static(self, amount: int) -> 'EVMGasState':
-        """消耗静态Gas。
+        """扣减静态 Gas —— **纯减法，不钳零**。
+
+        对齐 x86 makeStaticUseGas：`gas < staticGas` 时 JCS 跳 OOG handler、**根本不执行
+        SUBQ**；所以"gas 不足"这一支是控制流分叉，不是把余额压成 0 继续跑。分叉由
+        cfg_executor 的 TAG 守卫负责（无条件建模），到得了这里就意味着 gas 已足够，
+        钳零分支恒假。
+
+        曾经这里钳零而分叉被开关关掉，于是 gas=2/static=3 时 IR 给 STOPPED、AOT 给
+        OUT_OF_GAS——终止分支不一致。别把钳零加回来。
 
         Args:
-            amount: 要消耗的Gas数量
+            amount: 要扣减的 Gas 数量。
 
         Returns:
-            具有更新Gas的新EVMGasState
-
-        Note:
-            钳零（out-of-gas 时置 0）与 x86 makeStaticUseGas「gas<staticGas 就 JCS
-            跳 OOG handler、不再 SUBQ」**仅在 gas 恒足前提下等价**，该前提由
-            program_verifier 注入的 UGE(G, bound) 保证。不要把恒足编进本函数——
-            钳零逻辑要留给 OOG 一致性复用。
+            新的 EVMGasState。
         """
-        from z3 import BitVecVal, If, UGT
-        amount_bv = BitVecVal(amount, 64)
+        from z3 import BitVecVal
 
-        # 检查Gas溢出：如果Gas < amount，设为0（out of gas）
-        new_gas = If(UGT(amount_bv, self.Gas),
-                     BitVecVal(0, 64),
-                     self.Gas - amount_bv)
-
-        new_state = EVMGasState(initial_gas=new_gas)
-        return new_state
+        return EVMGasState(initial_gas=self.Gas - BitVecVal(amount, 64))
 
     def consume_dynamic(self, cost: BitVec) -> 'EVMGasState':
         """消耗动态Gas。
@@ -100,8 +95,8 @@ _MEMORY_GAS = 3        # params.MemoryGas
 _QUAD_COEFF_DIV = 512  # params.QuadCoeffDiv
 
 
-def charge_memory_expansion_gas(state, requested_size_64):
-    """对一次内存访问扣减内存扩展动态 gas，镜像 Go memoryGasCost 的 expansion branch。
+def memory_expansion_fee(mem_size_bytes, last_gas_cost, requested_size_64):
+    """纯计算 memoryGasCost 的 expansion 分支，返回 (fee, new_mem_size, new_last_gas)。
 
     Go memoryGasCost(newMemSize):
         memWords   = (newMemSize + 31) >> 5
@@ -122,25 +117,19 @@ def charge_memory_expansion_gas(state, requested_size_64):
       是 128-bit），否则 64-bit UDiv 配不上 → Z3 bit-blast。
     - 扣减/字段更新只在 expands 时发生，避免连续内存操作过扣。
 
-    side-channel 字段语义：
-    - callengine_memory_size_bytes  = [R13+0x18] = mem.Len()（rounded byte size）
-    - callengine_memory_gas_used    = [R13+0x20] = mem.lastGasCost
+    **不改 state、不注入 assumption**：写回哪几项由调用方决定——gas 错误分支的快照
+    要求各不相同（cap/溢出分支一项都不写、dynamic-OOG 分支只写 lastGasCost），
+    耦合在一起就没法分别构造。详见 evm_ir.semantics._charge_dynamic_gas。
 
     Args:
-        state: SMTState；就地更新 evm_gas 与两个 callengine 字段。
-        requested_size_64: 64-bit BitVec，本次访问触及的最高字节+1（如 MSTORE=offset+32）。
+        mem_size_bytes: 当前 [R13+0x18] = mem.Len()（rounded byte size）。
+        last_gas_cost: 当前 [R13+0x20] = mem.lastGasCost。
+        requested_size_64: 本次访问触及的最高字节+1（如 MSTORE=offset+32）。
 
     Returns:
-        更新后的 state（与入参同一对象）。
+        (fee, new_mem_size, new_last_gas)，均为 64-bit BitVec。
     """
-    from z3 import BitVecVal, ZeroExt, Extract, UDiv, UGT, If, LShR, ULE
-
-    # success-path scope assumption：requested ≤ 0x1FFFFFFFE0。x86 memoryGasCost 在
-    # 超过它时跳 GasUintOverflow/OOG、不走 mul/div 成功路径，而这里仍会算
-    # memWords²/512；不约束就等于拿「EVM 成功域」比「x86 OOG 域」。它同时保证
-    # memWords ≤ 0xFFFFFFFF ⟹ square < 2^64，与 x86 128-bit mul/div 的低 64 位对齐。
-    # 本函数是所有内存扩展 gas 的唯一入口，故统一在此加约束。
-    state.add_assumption(ULE(requested_size_64, BitVecVal(0x1FFFFFFFE0, 64)))
+    from z3 import BitVecVal, ZeroExt, Extract, UDiv, UGT, If, LShR
 
     thirty_one = BitVecVal(31, 64)
     # memWords = (requested + 31) >> 5
@@ -148,7 +137,7 @@ def charge_memory_expansion_gas(state, requested_size_64):
     # rounded = memWords << 5
     rounded = mem_words << BitVecVal(5, 64)
 
-    # square = memWords * memWords（scope 下 < 2^64，但用 128-bit 表达保证与 x86
+    # square = memWords * memWords（cap 内 < 2^64，但用 128-bit 表达保证与 x86
     # 的 128-bit dividend 对齐）
     square_128 = ZeroExt(64, mem_words) * ZeroExt(64, mem_words)
     # quad = (square / 512)，128-bit UDiv 取低 64 位（镜像 x86 div r64）
@@ -158,14 +147,44 @@ def charge_memory_expansion_gas(state, requested_size_64):
     lin_64 = mem_words * BitVecVal(_MEMORY_GAS, 64)
     new_total = lin_64 + quad_64
 
-    old_mem_size = state.callengine_memory_size_bytes
-    old_last_gas = state.callengine_memory_gas_used
+    expands = UGT(rounded, mem_size_bytes)
+    fee = If(expands, new_total - last_gas_cost, BitVecVal(0, 64))
+    new_mem_size = If(expands, rounded, mem_size_bytes)
+    new_last_gas = If(expands, new_total, last_gas_cost)
+    return fee, new_mem_size, new_last_gas
 
-    expands = UGT(rounded, old_mem_size)
-    fee = If(expands, new_total - old_last_gas, BitVecVal(0, 64))
 
-    state.callengine_memory_size_bytes = If(expands, rounded, old_mem_size)
-    state.callengine_memory_gas_used = If(expands, new_total, old_last_gas)
+def charge_memory_expansion_gas(state, requested_size_64):
+    """**test-only**：memory_expansion_fee 的就地封装。
+
+    生产路径走 evm_ir.semantics._charge_dynamic_gas（累加总额后判一次 OOG 并挂错误
+    分支）；本函数只剩单测在用。
+
+    side-channel 字段语义：
+    - callengine_memory_size_bytes  = [R13+0x18] = mem.Len()（rounded byte size）
+    - callengine_memory_gas_used    = [R13+0x20] = mem.lastGasCost
+
+    Args:
+        state: SMTState；就地更新 evm_gas 与两个 callengine 字段。
+        requested_size_64: 64-bit BitVec，本次访问触及的最高字节+1。
+
+    Returns:
+        更新后的 state（与入参同一对象）。
+    """
+    from z3 import BitVecVal, ULE
+
+    # ⚠️ 这条 assumption 会**静默缩小验证域**（requested ≤ 0x1FFFFFFFE0，保证
+    # memWords ≤ 0xFFFFFFFF ⟹ square < 2^64）。生产路径不再用它——_calc_mem_size_64
+    # 把同一边界建成了真实的 OUT_OF_GAS 终态分支。别在新代码里调用本函数。
+    state.add_assumption(ULE(requested_size_64, BitVecVal(0x1FFFFFFFE0, 64)))
+
+    fee, new_mem_size, new_last_gas = memory_expansion_fee(
+        state.callengine_memory_size_bytes,
+        state.callengine_memory_gas_used,
+        requested_size_64,
+    )
+    state.callengine_memory_size_bytes = new_mem_size
+    state.callengine_memory_gas_used = new_last_gas
     state.evm_gas = state.evm_gas.consume_dynamic(fee)
     return state
 
@@ -174,67 +193,95 @@ def charge_memory_expansion_gas(state, requested_size_64):
 _SHA3_WORD_GAS = 6   # params.Sha3WordGas
 _COPY_GAS = 3        # params.CopyGas
 
+# CREATE 系 word gas（memoryGasCreate 的 gasConst）
+INIT_CODE_WORD_GAS = 2                                   # params.InitCodeWordGas
+CREATE2_WORD_GAS = INIT_CODE_WORD_GAS + _SHA3_WORD_GAS    # memoryCreate2GasN = 2+6
+
 # LOG 协议常量（params/protocol_params.go）
 _LOG_GAS = 375        # params.LogGas（每条 LOG 一次）
 _LOG_TOPIC_GAS = 375  # params.LogTopicGas（每个 topic）
 _LOG_DATA_GAS = 8     # params.LogDataGas（**每字节**，注意不是每 word）
 
 
-def charge_log_gas(state, n_topics, size_64):
-    """LOG 的常量 + data gas，镜像 go-hpc-evm gasLog / memoryLogGas codegen。
+def log_fee(n_topics, size_64):
+    """纯计算 LOG 的常量 + data gas，镜像 go-hpc-evm gasLog / memoryLogGas codegen。
 
-    Go gasLog（gas_table.go:215，x86 memoryLogGas codegen 全程可见）:
-        gas  = memoryGasCost(memSize)          # 内存扩展（调用方先扣）
+    Go gasLog（gas_table.go:214，x86 memoryLogGas codegen 全程可见）:
+        gas  = memoryGasCost(memSize)          # 内存扩展（调用方另算）
         gas += LogGas                          # 375，常量
         gas += n * LogTopicGas                 # n*375，常量
         gas += requestedSize * LogDataGas      # **每字节** 8，size=stack.Back(1)
 
     与 SHA3/COPY 的 word gas 关键区别：LOG data gas 按**字节**计费（size*8）而非
-    按 word，故不能复用 charge_word_gas。内存扩展那段由调用方 _charge_log_gas 单独
-    调 charge_memory_expansion_gas，本函数只叠加后三段。
+    按 word，故不能复用 word_fee。本函数只算后三段。
 
-    溢出健全性**依赖调用顺序**：调用点先调 charge_memory_expansion_gas，其
-    `ULE(requested, 0x1FFFFFFFE0)` 加上 size ≤ requested 即保证 size*8 < 2^64，
+    溢出健全性**依赖调用顺序**：调用点先经 memory_expansion_fee 的 cap 分支
+    （requested ≤ 0x1FFFFFFFE0）加上 size ≤ requested，即保证 size*8 < 2^64，
     x86 makeSafeMul 的 overflow 分支恒假被剪。
+
+    Args:
+        n_topics: LOG 的 topic 数（int，0..4）。
+        size_64: 64-bit BitVec，LOG 数据字节长度（栈 Back(1)）。
+
+    Returns:
+        64-bit BitVec fee。
+    """
+    from z3 import BitVecVal
+
+    flat = BitVecVal(_LOG_GAS + n_topics * _LOG_TOPIC_GAS, 64)
+    data_fee = size_64 * BitVecVal(_LOG_DATA_GAS, 64)
+    return flat + data_fee
+
+
+def charge_log_gas(state, n_topics, size_64):
+    """**test-only**：log_fee 的就地封装，生产路径已无调用方（走 _charge_dynamic_gas）。
 
     Args:
         state: SMTState；就地扣减 evm_gas。
         n_topics: LOG 的 topic 数（int，0..4）。
         size_64: 64-bit BitVec，LOG 数据字节长度（栈 Back(1)）。
     """
-    from z3 import BitVecVal
-
-    flat = BitVecVal(_LOG_GAS + n_topics * _LOG_TOPIC_GAS, 64)
-    data_fee = size_64 * BitVecVal(_LOG_DATA_GAS, 64)
-    state.evm_gas = state.evm_gas.consume_dynamic(flat + data_fee)
+    state.evm_gas = state.evm_gas.consume_dynamic(log_fee(n_topics, size_64))
     return state
 
 
-def charge_word_gas(state, word_len_64, word_gas_const):
-    """额外扣减「按 word 计费」的动态 gas（SHA3 / COPY 系列）。
+def word_fee(word_len_64, word_gas_const):
+    """纯计算「按 word 计费」的动态 gas（SHA3 / COPY / CREATE 系列）。
 
-    镜像 Go memoryGasWithType 的 copy/word gas 段:
+    镜像 Go memoryGasWithType / memoryGasCreate 的 word gas 段:
         words = toWordSize(word_len) = (word_len + 31) >> 5
         fee   = words * word_gas_const
-    （在 memoryGasCost 之上叠加；SHA3 word_gas_const=6，COPY=3。）
+    （在 memoryGasCost 之上叠加；SHA3=Sha3WordGas 6，COPY=CopyGas 3，
+    CREATE=InitCodeWordGas 2，CREATE2=InitCodeWordGas+Sha3WordGas 8。）
 
     与 memoryGasCost 不同，word gas 基于「数据长度的 word 数」（SHA3 的 size /
     COPY 的 length），**不依赖也不更新 lastGasCost / memory size**——它是纯叠加。
 
-    溢出健全性**依赖调用顺序**：所有调用点（_charge_memory_and_word_gas /
-    _charge_mcopy_gas）都先调 charge_memory_expansion_gas，其
-    `ULE(requested, 0x1FFFFFFFE0)` 加上 word_len ≤ requested 即保证
-    words*word_gas_const（const≤6）< 2^64，x86 makeSafeMul 的 overflow 分支恒假
-    被剪。**若将来单独调用本函数，必须自行保证 word_len ≤ 0x1FFFFFFFE0。**
+    溢出健全性**依赖调用顺序**：调用点先经 memory_expansion_fee 的 cap 分支
+    （requested ≤ 0x1FFFFFFFE0）加上 word_len ≤ requested，即保证
+    words*word_gas_const（const≤8）< 2^64，x86 makeSafeMul 的 overflow 分支恒假被剪。
+    **若将来在没有 cap 分支的地方调用本函数，必须自行保证 word_len ≤ 0x1FFFFFFFE0。**
+
+    Args:
+        word_len_64: 64-bit BitVec，按 word 计费的数据字节长度。
+        word_gas_const: 每 word 的 gas（int）。
+
+    Returns:
+        64-bit BitVec fee。
+    """
+    from z3 import BitVecVal, LShR
+
+    words = LShR(word_len_64 + BitVecVal(31, 64), BitVecVal(5, 64))
+    return words * BitVecVal(word_gas_const, 64)
+
+
+def charge_word_gas(state, word_len_64, word_gas_const):
+    """**test-only**：word_fee 的就地封装，生产路径已无调用方（走 _charge_dynamic_gas）。
 
     Args:
         state: SMTState；就地扣减 evm_gas。
         word_len_64: 64-bit BitVec，按 word 计费的数据字节长度。
         word_gas_const: 每 word 的 gas（int）。
     """
-    from z3 import BitVecVal, LShR
-
-    words = LShR(word_len_64 + BitVecVal(31, 64), BitVecVal(5, 64))
-    fee = words * BitVecVal(word_gas_const, 64)
-    state.evm_gas = state.evm_gas.consume_dynamic(fee)
+    state.evm_gas = state.evm_gas.consume_dynamic(word_fee(word_len_64, word_gas_const))
     return state

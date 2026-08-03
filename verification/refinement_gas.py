@@ -18,6 +18,8 @@ from typing import Optional
 
 from z3 import sat, unsat, BoolVal
 
+from .refinement_context import _RefinementContext
+
 
 class GasEquivalenceChecks:
     """EVM↔x86 gas 终值等价检查。
@@ -25,7 +27,7 @@ class GasEquivalenceChecks:
     用组合：接收共享的 _RefinementContext（solver/timeout/日志 helper）。
     """
 
-    def __init__(self, ctx):
+    def __init__(self, ctx: _RefinementContext):
         self._ctx = ctx
 
     def _check_gas_equivalence(
