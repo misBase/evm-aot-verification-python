@@ -54,13 +54,7 @@ class RefinementChecker:
         self._outputs = OutputRefinementChecks(
             self._ctx, self._storage, self._memory, self._gas
         )
-        self._paths = PathRefinementChecks(
-            self._ctx,
-            self._outputs,
-            self._storage,
-            self._memory,
-            self._gas,
-        )
+        self._paths = PathRefinementChecks(self._ctx, self._outputs)
 
     # --- 共享状态的只读转发（外部代码与测试直接读取这些 knob）---
 

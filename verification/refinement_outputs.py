@@ -241,7 +241,13 @@ class OutputRefinementChecks:
         logs: Optional[list[str]],
         ctx,
     ) -> Tuple[bool, Optional[str]]:
-        """检查 return data 之外的状态 observable：storage 和 transient storage。"""
+        """检查 return data 之外的状态 observable：storage、transient storage，以及
+        gas checker 启用且两侧都有 observation 时的 gas。
+
+        主路径与 pair 的 aggregate fallback 分支都委托到这里，是状态 observable 的
+        唯一清单。但只管**编排层**：新增字段还要同步 ``PathObservation`` 与
+        ``refinement_paths._PATH_RESULT_KEYS``（并行翻译白名单，漏键静默失效）。
+        """
         evm_storage = evm_result.get('storage')
         x86_storage = x86_result.get('storage')
         if evm_storage is not None and x86_storage is not None:
@@ -301,7 +307,10 @@ class OutputRefinementChecks:
         logs: Optional[list[str]] = None,
         ctx=None,
     ) -> Tuple[bool, Optional[str]]:
-        """检查 return data、memory、storage、transient storage 是否精化一致。
+        """检查终止状态码、return data、memory 与状态 observable 是否精化一致。
+
+        状态 observable 各自在两侧都有 observation（gas 还需 checker 启用）时才实际
+        检查，故成功消息用 "enabled state observables" 而非逐项枚举。
 
         这里的 solver 查询都按“寻找反例”来写：SAT 表示存在某组输入让
         某个 observable 不一致；UNSAT 才表示在 path_condition 下已证明相等。
@@ -384,7 +393,7 @@ class OutputRefinementChecks:
                 verified, msg = unrolled
                 if not verified:
                     return False, msg
-                # 快路径只覆盖 return metadata 和 memory；storage 仍按常规等价检查。
+                # 快路径只覆盖 return metadata 和 memory；状态 observable 仍照常检查。
                 verified, msg = self._check_state_observables_with_solver(
                     solver,
                     evm_result,
@@ -399,9 +408,9 @@ class OutputRefinementChecks:
                     return False, msg
 
                 msg = (
-                    "✓ VERIFIED: x86 refines EVM (non-empty return-data conditions, "
-                    "lengths, memory contents, storage, and transient storage are "
-                    "equivalent for all inputs)"
+                    "✓ VERIFIED: x86 refines EVM (termination status, non-empty "
+                    "return-data conditions, lengths, memory contents, and enabled "
+                    "state observables are equivalent for all inputs)"
                 )
                 if not context:
                     self._ctx.emit_solver_log(logs, f"    └─ {msg}")
@@ -459,7 +468,7 @@ class OutputRefinementChecks:
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 
-        # 返回数据已证明一致后，再检查持久/临时 storage 这两个状态 observable。
+        # 返回数据已证明一致后，再检查状态 observable（storage/transient/gas）。
         verified, msg = self._check_state_observables_with_solver(
             solver,
             evm_result,
@@ -474,8 +483,9 @@ class OutputRefinementChecks:
             return False, msg
 
         msg = (
-            "✓ VERIFIED: x86 refines EVM (non-empty return-data conditions, lengths, "
-            "memory contents, storage, and transient storage are equivalent for all inputs)"
+            "✓ VERIFIED: x86 refines EVM (termination status, non-empty return-data "
+            "conditions, lengths, memory contents, and enabled state observables are "
+            "equivalent for all inputs)"
         )
         if not context:
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")

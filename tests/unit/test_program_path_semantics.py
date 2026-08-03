@@ -3,6 +3,8 @@
 
 import threading
 
+import pytest
+
 import x86_64.program as x86_program_module
 from common.path_observation import PathCoverageCertificate, PathObservation
 from evm_ir.json_parser import CompilerEVMResult
@@ -170,8 +172,8 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
     assert "2/2 feasible pair(s)" in message
 
 
-def _status_observation(state, *, x86: bool, status_code: int) -> PathObservation:
-    """零长度返回、两侧 observable 完全相同，只有 status code 可变。"""
+def _status_observation(state, *, x86: bool, status_code: int, gas=None) -> PathObservation:
+    """零长度返回、两侧 observable 完全相同，只有 status code 与 gas 可变。"""
     return PathObservation(
         condition=BoolVal(True),
         offset=BitVecVal(0, 64),
@@ -182,7 +184,7 @@ def _status_observation(state, *, x86: bool, status_code: int) -> PathObservatio
         storage=state.evm_storage.Storage,
         transient_storage=state.evm_transient_storage.TransientStorage,
         status_code=BitVecVal(status_code, 8),
-        gas=None,
+        gas=gas,
     )
 
 
@@ -223,6 +225,60 @@ def test_status_mismatch_survives_aggregate_return_memory_fallback(monkeypatch):
     assert aggregate_results == [True]
     assert not verified
     assert "termination status codes differ" in message
+
+
+@pytest.mark.parametrize("path_pair_workers", [1, 2])
+def test_gas_mismatch_survives_aggregate_return_memory_fallback(
+    monkeypatch, path_pair_workers
+):
+    """aggregate fallback 命中后，gas 检查必须仍然独立跑一遍。
+
+    fallback 只证 return-presence/length/memory；零长度返回让它必然成功。gas 不一致
+    若不在 fallback 分支里补查，失败就被静默吞掉 = 假绿。串行与并行两条编排各有一个
+    fallback 调用点，都要覆盖。
+    """
+    state = SMTState.create_initial_state()
+    gas = BitVec("Gas", 64)
+    evm_observations = [
+        _status_observation(
+            state, x86=False, status_code=EvmStatusCode.STOPPED, gas=gas
+        )
+    ]
+    x86_observations = [
+        _status_observation(
+            state,
+            x86=True,
+            status_code=EvmStatusCode.STOPPED,
+            gas=gas - BitVecVal(1, 64),
+        )
+    ]
+
+    checker = RefinementChecker(timeout_ms=5000, check_gas=True)
+    aggregate_results = []
+    original_aggregate = checker._paths._check_evm_path_return_memory_against_x86_union
+
+    def spying_aggregate(*args, **kwargs):
+        result = original_aggregate(*args, **kwargs)
+        aggregate_results.append(result)
+        return result
+
+    monkeypatch.setattr(
+        checker._paths,
+        "_check_evm_path_return_memory_against_x86_union",
+        spying_aggregate,
+    )
+
+    verified, message = checker.check_refinement_paths(
+        evm_observations,
+        x86_observations,
+        path_pair_workers=path_pair_workers,
+    )
+
+    # fallback 必须真的被触发且成功，否则这条测试退化成"主路径也能抓到 gas"，
+    # 证明不了 fallback 分支的 gas 覆盖。
+    assert aggregate_results == [True]
+    assert not verified
+    assert "gas differs" in message
 
 
 def test_status_mismatch_detected_in_parallel_path_pairs():
@@ -473,7 +529,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
     )
     monkeypatch.setattr(
         checker._paths,
-        "_check_path_pair_status_storage_transient_with_solver",
+        "_check_path_pair_status_and_state_observables_with_solver",
         fake_status_storage,
     )
 
