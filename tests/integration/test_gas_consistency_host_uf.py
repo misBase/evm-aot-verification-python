@@ -151,9 +151,9 @@ def test_host_gas_uf_tampered_return_gas_caught(monkeypatch):
     """防假绿:EVM 侧 returnGas 算错（+1）→ 与 x86 dealWithAddGas/SubGas 不匹配 → SAT。
 
     用 returnGas≠0 的 fixture，证明 returnGas 链对齐是非空的（不是恒成立）。"""
-    import evm_ir.semantics as sem
-    orig = sem._return_gas_for
-    monkeypatch.setattr(sem, "_return_gas_for", lambda op: orig(op) + 1)
+    import evm_ir.semantics_gas as gas_sem
+    orig = gas_sem.return_gas_for
+    monkeypatch.setattr(gas_sem, "return_gas_for", lambda op: orig(op) + 1)
 
     verified, msg = _verify("gas_call_returngas")
     assert not verified, "tampered EVM returnGas must be caught"

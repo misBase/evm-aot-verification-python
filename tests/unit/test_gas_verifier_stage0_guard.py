@@ -61,7 +61,7 @@ def test_stage0_gas_guard_rejects_dynamic_gas_ops_before_x86_execution():
 
 
 def test_stage0_gas_guard_allows_log():
-    """LOG 已转正为 A 类（memoryLogGas codegen x86 全程可见，EVM 侧 _charge_log_gas
+    """LOG 已转正为 A 类（memoryLogGas codegen x86 全程可见，EVM 侧 charge_log_gas
     建真实公式），不再 fail-closed 拒绝。
 
     注意:真实 IR 的 LOG kind 就是 "LOG"（topic 数在 op.immediate），不是

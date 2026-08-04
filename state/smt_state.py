@@ -305,6 +305,22 @@ class SMTState:
 
         return new_state
 
+    def snapshot_for_error_branch(self) -> 'SMTState':
+        """拍一份独占快照，即使 state 上已挂了别的待分裂分支。
+
+        这是 :meth:`copy` 的 ``pending_errors`` fail-closed 守卫的**唯一合法豁免**。
+        守卫本身是对的——静默重置队列会让整条错误路径无声消失——但一条 opcode 可以
+        合法地产生多组分支：RETURNDATACOPY 先有 gas 前言的 exit，再有 errPoint 的
+        ReturnDataOutOfBounds。临时摘队列不丢信息：``copy()`` 本来也把新 state 的
+        队列置空；``finally`` 保证 ``copy()`` 内部抛异常时原队列照样还回去。
+        """
+        saved = self.pending_errors
+        self.pending_errors = []
+        try:
+            return self.copy()
+        finally:
+            self.pending_errors = saved
+
     def copy_verification_options_to(self, other: 'SMTState') -> None:
         """复制 verifier 局部建模开关到另一个 state。"""
         other.assume_calldata_offset_no_overflow = getattr(

@@ -87,7 +87,7 @@ def _collect_assumptions(*states):
 #    SLOAD/SSTORE/BALANCE/EXTCODESIZE/EXTCODEHASH/SELFDESTRUCT/EXP +
 #    CALL/CALLCODE/DELEGATECALL/STATICCALL。见 state/host_gas.py。
 # 3. 仍 fail-closed 拒绝：下面这三个。它们的可见 fee **已经建模**
-#    （semantics._charge_memory_and_word_gas），拒绝理由是剩下的部分没核实。
+#    （semantics_gas.charge_memory_and_word_gas），拒绝理由是剩下的部分没核实。
 _DYNAMIC_GAS_UNSUPPORTED_KINDS = frozenset({
     # 待补：无专用 fixture，放行等于放进任意符号 offset/size 的实例而无回归覆盖。
     "EXTCODECOPY",
@@ -244,7 +244,7 @@ class ProgramEquivalenceChecker:
             )
 
         # 未建模动态 gas 的 opcode 必须 fail-closed，避免两侧都漏扣时假绿。
-        # （LOG 曾是已知缺口，现已随 _charge_log_gas 走 _charge_dynamic_gas 补齐。）
+        # （LOG 曾是已知缺口，现已随 charge_log_gas 走 charge_dynamic_gas 补齐。）
         if self.gas_check is not GasCheck.OFF:
             unsupported_dynamic_gas = _find_unsupported_dynamic_gas_ops(evm_program)
             if unsupported_dynamic_gas:

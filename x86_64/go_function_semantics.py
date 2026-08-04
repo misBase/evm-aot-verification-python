@@ -17,6 +17,7 @@ from .aot_profile import X86AOTProfile
 from state.smt_state import SMTState, MemoryDomain
 from common import uninterpreted
 from common import arithmetic
+from common.u64 import truncate_to_64
 from x86_64.models import Register
 
 logger = logging.getLogger(__name__)
@@ -215,7 +216,7 @@ class GoFunctionSemantics:
 
     def _update_return_data_source(self, mstate: SMTState, ret_size: BitVec,
                                    byte_fn, effect_tag: str) -> SMTState:
-        size_64 = self._truncate_to_64(ret_size)
+        size_64 = truncate_to_64(ret_size)
         idx = BitVec(f"{effect_tag}_returndata_idx", 64)
         old_return_data = mstate.return_data
         mstate.return_data = Lambda(
@@ -356,16 +357,6 @@ class GoFunctionSemantics:
 
         return handler(sp, mstate)
 
-    def _truncate_to_64(self, value: BitVec) -> BitVec:
-        """将256位偏移量截断到64位。"""
-        from z3 import Extract
-
-        if value.size() == 64:
-            return value
-        if value.size() == 256:
-            return Extract(63, 0, value)
-        raise ValueError(f"Expected 64-bit or 256-bit BitVec, got {value.size()} bits")
-
     def _write_call_return_data(self, mstate: SMTState, ret_offset: BitVec, ret_size: BitVec,
                                 return_byte_fn, effect_id: int,
                                 should_copy=None) -> SMTState:
@@ -385,8 +376,8 @@ class GoFunctionSemantics:
         """将一个符号化字节切片写入 x86 内存（EVM 256-bit memory，R15 域）。"""
         from x86_64.models import Register
 
-        dest_offset_64 = self._truncate_to_64(dest_offset)
-        size_64 = self._truncate_to_64(size)
+        dest_offset_64 = truncate_to_64(dest_offset)
+        size_64 = truncate_to_64(size)
         zero_64 = BitVecVal(0, 64)
         r15 = mstate.x86_registers.get_register(Register.R15)
         base_addr = r15 + dest_offset_64
@@ -546,7 +537,7 @@ class GoFunctionSemantics:
 
         # AOT 编译器只把 LOG topic 数写入低 64-bit limb，Go host.Log()
         # 也通过 Uint64() 读取它；高 limb 可能保留旧栈内容，不能参与比较。
-        n_topics_low64 = self._truncate_to_64(n_topics_bv)
+        n_topics_low64 = truncate_to_64(n_topics_bv)
         n_topics_simplified = simplify(n_topics_low64)
         n_topics_from_stack = (
             n_topics_simplified.as_long() if is_bv_value(n_topics_simplified) else None

@@ -160,10 +160,10 @@ def test_dynamic_oog_tampered_status_caught(monkeypatch):
     """
     import dataclasses
 
-    import evm_ir.semantics as sem
+    import evm_ir.semantics_gas as gas_sem
     from evm_ir.status_code import EvmStatusCode
 
-    orig = sem._charge_dynamic_gas
+    orig = gas_sem.charge_dynamic_gas
 
     def patched(state, requested, branches, extra_fees=(), **kwargs):
         out = orig(state, requested, branches, extra_fees, **kwargs)
@@ -175,7 +175,7 @@ def test_dynamic_oog_tampered_status_caught(monkeypatch):
                 )
         return out
 
-    monkeypatch.setattr(sem, "_charge_dynamic_gas", patched)
+    monkeypatch.setattr(gas_sem, "charge_dynamic_gas", patched)
     evm, x86 = _load_pair("gas_mload")
     verified, msg = ProgramEquivalenceChecker(
         timeout_ms=180000, gas_check=GasCheck.FULL

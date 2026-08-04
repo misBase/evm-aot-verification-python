@@ -119,7 +119,7 @@ def memory_expansion_fee(mem_size_bytes, last_gas_cost, requested_size_64):
 
     **不改 state、不注入 assumption**：写回哪几项由调用方决定——gas 错误分支的快照
     要求各不相同（cap/溢出分支一项都不写、dynamic-OOG 分支只写 lastGasCost），
-    耦合在一起就没法分别构造。详见 evm_ir.semantics._charge_dynamic_gas。
+    耦合在一起就没法分别构造。详见 evm_ir.semantics_gas.charge_dynamic_gas。
 
     Args:
         mem_size_bytes: 当前 [R13+0x18] = mem.Len()（rounded byte size）。
@@ -157,7 +157,7 @@ def memory_expansion_fee(mem_size_bytes, last_gas_cost, requested_size_64):
 def charge_memory_expansion_gas(state, requested_size_64):
     """**test-only**：memory_expansion_fee 的就地封装。
 
-    生产路径走 evm_ir.semantics._charge_dynamic_gas（累加总额后判一次 OOG 并挂错误
+    生产路径走 evm_ir.semantics_gas.charge_dynamic_gas（累加总额后判一次 OOG 并挂错误
     分支）；本函数只剩单测在用。
 
     side-channel 字段语义：
@@ -174,7 +174,7 @@ def charge_memory_expansion_gas(state, requested_size_64):
     from z3 import BitVecVal, ULE
 
     # ⚠️ 这条 assumption 会**静默缩小验证域**（requested ≤ 0x1FFFFFFFE0，保证
-    # memWords ≤ 0xFFFFFFFF ⟹ square < 2^64）。生产路径不再用它——_calc_mem_size_64
+    # memWords ≤ 0xFFFFFFFF ⟹ square < 2^64）。生产路径不再用它——calc_mem_size_64
     # 把同一边界建成了真实的 OUT_OF_GAS 终态分支。别在新代码里调用本函数。
     state.add_assumption(ULE(requested_size_64, BitVecVal(0x1FFFFFFFE0, 64)))
 
@@ -234,7 +234,7 @@ def log_fee(n_topics, size_64):
 
 
 def charge_log_gas(state, n_topics, size_64):
-    """**test-only**：log_fee 的就地封装，生产路径已无调用方（走 _charge_dynamic_gas）。
+    """**test-only**：log_fee 的就地封装，生产路径已无调用方（走 semantics_gas.charge_dynamic_gas）。
 
     Args:
         state: SMTState；就地扣减 evm_gas。
@@ -276,7 +276,7 @@ def word_fee(word_len_64, word_gas_const):
 
 
 def charge_word_gas(state, word_len_64, word_gas_const):
-    """**test-only**：word_fee 的就地封装，生产路径已无调用方（走 _charge_dynamic_gas）。
+    """**test-only**：word_fee 的就地封装，生产路径已无调用方（走 semantics_gas.charge_dynamic_gas）。
 
     Args:
         state: SMTState；就地扣减 evm_gas。

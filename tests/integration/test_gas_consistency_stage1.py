@@ -162,7 +162,7 @@ def test_stage1d_memory_dynamic_gas_consistency(name):
 # --- A 类 LOG gas（内存扩展 + LogGas + n*TopicGas + size*DataGas，x86 全程可见）---
 
 def test_log_gas_consistency_passes():
-    """LOG1 动态 gas:EVM _charge_log_gas == x86 memoryLogGas codegen 链。
+    """LOG1 动态 gas:EVM charge_log_gas == x86 memoryLogGas codegen 链。
 
     A 类真证明:LogGas(375)+TopicGas(375)+size*DataGas(8) + 内存扩展，全部在
     x86 checkMemoryAndCalcDynamicGasLog/memoryLogGas 机器码可见。"""

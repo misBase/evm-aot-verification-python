@@ -18,11 +18,11 @@ from z3 import (
     BitVec, BitVecVal, BoolVal, Solver, UGT, is_false, is_true, sat, simplify, unsat,
 )
 
-from evm_ir.semantics import (
+from evm_ir.semantics_gas import (
     SNAPSHOT_PRE_FEE,
-    _calc_mem_size_64,
-    _calc_mem_size_64_with_uint,
-    _charge_dynamic_gas,
+    calc_mem_size_64,
+    calc_mem_size_64_with_uint,
+    charge_dynamic_gas,
 )
 from evm_ir.status_code import EvmStatusCode
 from state.evm_gas_state import EVMGasState, word_fee
@@ -48,10 +48,10 @@ def _state(symbolic_gas=True):
 
 
 class TestCalcMemSize64:
-    """`_calc_mem_size_64` 镜像 Go calcMemSize64（evm/common.go:30）的短路顺序。"""
+    """`calc_mem_size_64` 镜像 Go calcMemSize64（evm/common.go:30）的短路顺序。"""
 
     def test_normal_input_leaves_no_error_branch(self):
-        requested, branches = _calc_mem_size_64(BitVecVal(0, 256), BitVecVal(32, 256))
+        requested, branches = calc_mem_size_64(BitVecVal(0, 256), BitVecVal(32, 256))
         assert simplify(requested).eq(BitVecVal(32, 64))
         assert all(is_false(c) for c in _conds(branches))
 
@@ -62,36 +62,36 @@ class TestCalcMemSize64:
         x86 makeCalcMemSize64 的 `TESTQ l1; JEQ`(gas_dynamic:333) 同构。旧实现
         无条件 assume offset 高 192 位为 0，把这条合法路径排除在验证域外。
         """
-        requested, branches = _calc_mem_size_64(TWO_200, BitVecVal(0, 256))
+        requested, branches = calc_mem_size_64(TWO_200, BitVecVal(0, 256))
         assert simplify(requested).eq(BitVecVal(0, 64))
         assert all(is_false(c) for c in _conds(branches)), (
             "length==0 时不检查 offset，该输入在解释器与 AOT 里都不报错"
         )
 
     def test_length_not_uint64_is_first_branch(self):
-        _, branches = _calc_mem_size_64(BitVecVal(0, 256), TWO_200)
+        _, branches = calc_mem_size_64(BitVecVal(0, 256), TWO_200)
         assert is_true(_conds(branches)[0])
         assert _statuses(branches)[0] == GUO
 
     def test_offset_not_uint64_when_length_nonzero(self):
-        _, branches = _calc_mem_size_64(TWO_200, BitVecVal(1, 256))
+        _, branches = calc_mem_size_64(TWO_200, BitVecVal(1, 256))
         conds = _conds(branches)
         assert is_false(conds[0]), "length 是 uint64，① 应恒假"
         assert is_true(conds[1]) and _statuses(branches)[1] == GUO
 
     def test_offset_plus_length_carry(self):
-        _, branches = _calc_mem_size_64(
+        _, branches = calc_mem_size_64(
             BitVecVal((1 << 64) - 1, 256), BitVecVal(2, 256)
         )
         assert is_true(_conds(branches)[2])
         assert _statuses(branches)[2] == GUO
 
     def test_all_branches_are_pre_fee_snapshots(self):
-        _, branches = _calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
+        _, branches = calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
         assert all(kind == SNAPSHOT_PRE_FEE for _, _, kind in branches)
 
     def test_symbolic_operands_keep_branches_live(self):
-        _, branches = _calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
+        _, branches = calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
         for cond in _conds(branches):
             assert not is_false(cond) and not is_true(cond)
 
@@ -105,7 +105,7 @@ class TestMemSizeCap:
     """
 
     def test_cap_exceeded_gives_out_of_gas_not_overflow(self):
-        _, branches = _calc_mem_size_64(
+        _, branches = calc_mem_size_64(
             BitVecVal(MEM_SIZE_CAP + 1, 256), BitVecVal(1, 256)
         )
         assert is_true(_conds(branches)[-1])
@@ -113,7 +113,7 @@ class TestMemSizeCap:
         assert _statuses(branches)[-2] == GUO, "倒数第二条是 E3 的 SafeMul 溢出(13)"
 
     def test_requested_equal_to_cap_is_allowed(self):
-        requested, branches = _calc_mem_size_64(
+        requested, branches = calc_mem_size_64(
             BitVecVal(MEM_SIZE_CAP - 1, 256), BitVecVal(1, 256)
         )
         assert simplify(requested).eq(BitVecVal(MEM_SIZE_CAP, 64))
@@ -124,26 +124,26 @@ class TestCalcMemSize64WithUint:
     """MLOAD/MSTORE/MSTORE8 走 calcMemSize64WithUint，length 是非零常量。"""
 
     def test_no_length_branches(self):
-        _, with_uint = _calc_mem_size_64_with_uint(BitVec("o", 256), 32)
-        _, generic = _calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
+        _, with_uint = calc_mem_size_64_with_uint(BitVec("o", 256), 32)
+        _, generic = calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
         assert len(with_uint) == len(generic) - 1, (
             "length 是非零常量 ⟹ 没有 ① length-非-uint64 分支"
         )
 
     def test_offset_overflow_detected(self):
-        _, branches = _calc_mem_size_64_with_uint(TWO_200, 32)
+        _, branches = calc_mem_size_64_with_uint(TWO_200, 32)
         assert is_true(_conds(branches)[0])
         assert _statuses(branches)[0] == GUO
 
     def test_normal_offset(self):
-        requested, branches = _calc_mem_size_64_with_uint(BitVecVal(64, 256), 32)
+        requested, branches = calc_mem_size_64_with_uint(BitVecVal(64, 256), 32)
         assert simplify(requested).eq(BitVecVal(96, 64))
         assert all(is_false(c) for c in _conds(branches))
 
     def test_zero_const_size_is_fail_closed(self):
         """const_size=0 时 Go 走 length==0 短路，语义不同，必须抛错而非静默同构。"""
         with pytest.raises(ValueError, match="const_size"):
-            _calc_mem_size_64_with_uint(BitVecVal(0, 256), 0)
+            calc_mem_size_64_with_uint(BitVecVal(0, 256), 0)
 
 
 class TestChargeDynamicGasNormalPath:
@@ -157,8 +157,8 @@ class TestChargeDynamicGasNormalPath:
     def test_plain_subtraction_no_clamp(self):
         state = _state(symbolic_gas=False)
         gas_before = state.evm_gas.Gas
-        requested, branches = _calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
+        charge_dynamic_gas(state, requested, branches)
 
         solver = Solver()
         solver.add(state.evm_gas.Gas != gas_before - BitVecVal(3, 64))
@@ -178,10 +178,10 @@ class TestChargeDynamicGasNormalPath:
         state = _state(symbolic_gas=False)
         gas_before = state.evm_gas.Gas
         for offset in (0, 32):
-            requested, branches = _calc_mem_size_64_with_uint(
+            requested, branches = calc_mem_size_64_with_uint(
                 BitVecVal(offset, 256), 32
             )
-            _charge_dynamic_gas(state, requested, branches)
+            charge_dynamic_gas(state, requested, branches)
 
         # 1 word: total=3；2 words: lin=6, quad=floor(4/512)=0 → total=6，delta=3
         solver = Solver()
@@ -194,8 +194,8 @@ class TestChargeDynamicGasNormalPath:
         """SHA3(offset=0, len=32) = memFee(3) + wordFee(1 word × Sha3WordGas 6)。"""
         state = _state(symbolic_gas=False)
         gas_before = state.evm_gas.Gas
-        requested, branches = _calc_mem_size_64(BitVecVal(0, 256), BitVecVal(32, 256))
-        _charge_dynamic_gas(
+        requested, branches = calc_mem_size_64(BitVecVal(0, 256), BitVecVal(32, 256))
+        charge_dynamic_gas(
             state, requested, branches, [word_fee(BitVecVal(32, 64), 6)],
         )
         solver = Solver()
@@ -225,8 +225,8 @@ class TestGasStateEvolvesInAllModes:
         fees = []
         for offset in (0, 32):
             gas_before = simplify(ir.evm_gas.Gas)
-            requested, branches = _calc_mem_size_64_with_uint(BitVecVal(offset, 256), 32)
-            _charge_dynamic_gas(ir, requested, branches)
+            requested, branches = calc_mem_size_64_with_uint(BitVecVal(offset, 256), 32)
+            charge_dynamic_gas(ir, requested, branches)
             ir.pending_errors = []
             fees.append(simplify(gas_before - ir.evm_gas.Gas))
 
@@ -298,15 +298,15 @@ class TestGasStateEvolvesInAllModes:
         # gas = 静态 5 + 动态 3 刚好够 → 不 OOG
         state = _state()
         state.evm_gas = EVMGasState(initial_gas=BitVecVal(8, 64)).consume_static(5)
-        requested, branches = _calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
+        charge_dynamic_gas(state, requested, branches)
         assert not state.pending_errors, "5+3 == 8 恰好够，不该 OOG"
 
         # gas 少 1 → 动态段 OOG
         state = _state()
         state.evm_gas = EVMGasState(initial_gas=BitVecVal(7, 64)).consume_static(5)
-        requested, branches = _calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
+        charge_dynamic_gas(state, requested, branches)
         assert [int(b.status_code) for b in state.pending_errors] == [OOG], (
             "扣掉静态 5 后只剩 2 < 3，必须在动态段 OOG"
         )
@@ -504,7 +504,7 @@ class TestPerOpcodeWiring:
 
         Go memoryMcopy 用 256-bit `Gt`；x86 compileSubValuesForCompare
         （impl_amd64.go:848-866）是 SUBQ+SBBQ×3 的全 256 位借位链。
-        旧实现先 `_truncate_to_64` 再比，`dst=2^200` 截断成 0 会误选 src=0，
+        旧实现先 `truncate_to_64` 再比，`dst=2^200` 截断成 0 会误选 src=0，
         于是整条溢出分支消失。
         """
         # 栈序：length, src, dst（dst 在栈顶 = Back(0)）
@@ -553,15 +553,15 @@ class TestChargeDynamicGasE4:
     def test_concrete_gas_prunes_branch(self):
         """具体 gas（功能等价模式的 1e9）+ 具体 fee ⟹ 条件静态判死，零额外路径。"""
         state = _state(symbolic_gas=False)
-        requested, branches = _calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
+        charge_dynamic_gas(state, requested, branches)
         assert not state.pending_errors
 
     def test_symbolic_gas_forks_with_correct_condition(self):
         state = _state()
         gas_before = state.evm_gas.Gas
-        requested, branches = _calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
+        charge_dynamic_gas(state, requested, branches)
 
         assert len(state.pending_errors) == 1
         branch = state.pending_errors[0]
@@ -579,8 +579,8 @@ class TestChargeDynamicGasE4:
         """
         state = _state()
         gas_before = state.evm_gas.Gas
-        requested, branches = _calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
+        charge_dynamic_gas(state, requested, branches)
 
         snapshot = state.pending_errors[0].terminal_state
         assert snapshot.evm_gas.Gas.eq(gas_before), "gas 必须未扣"
@@ -602,8 +602,8 @@ class TestChargeDynamicGasE4:
         """
         state = _state()
         state.evm_gas = EVMGasState(initial_gas=BitVecVal(gas, 64))
-        requested, branches = _calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64_with_uint(BitVecVal(0, 256), 32)
+        charge_dynamic_gas(state, requested, branches)
 
         if expect_oog:
             assert len(state.pending_errors) == 1
@@ -621,10 +621,10 @@ class TestChargeDynamicGasE4:
         state = _state()
         state.evm_gas = EVMGasState(initial_gas=BitVecVal(10 ** 9, 64))  # 让 E4 静态判死
         state.callengine_memory_gas_used = BitVecVal(7, 64)              # 可辨识的旧值
-        requested, branches = _calc_mem_size_64(
+        requested, branches = calc_mem_size_64(
             BitVecVal(MEM_SIZE_CAP + 1, 256), BitVecVal(1, 256)
         )
-        _charge_dynamic_gas(state, requested, branches)
+        charge_dynamic_gas(state, requested, branches)
 
         # append 顺序 = 解释器检查顺序：mem-size 分支在前、E4 在后。cap 超限时
         # memWords > 0xFFFFFFFF ⟹ fee > 2^55，所以 E4 必然跟着一起为真；生产里它被
@@ -647,8 +647,8 @@ class TestChargeDynamicGasE4:
         必须先把所有快照拍完再 append，边拍边 append 会在第二条上抛 LogicError。
         """
         state = _state()
-        requested, branches = _calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
+        charge_dynamic_gas(state, requested, branches)
 
         pending = state.pending_errors
         assert len(pending) == len(branches) + 1, "5 条 mem-size 分支 + 1 条 E4"
@@ -658,21 +658,20 @@ class TestChargeDynamicGasE4:
     def test_snapshot_works_when_other_branches_already_queued(self):
         """队列非空时也要能拍快照。
 
-        `SMTState.copy()` 在 pending_errors 非空时 fail-closed（smt_state.py:263），
+        `SMTState.copy()` 在 pending_errors 非空时 fail-closed（smt_state.py:270），
         但 RETURNDATACOPY 合法地有两组分支（gas 前言的 exit 在前、errPoint 的 oob 在后），
-        故 `_snapshot_for_error_branch` 临时摘队列绕过该守卫。
+        故 `SMTState.snapshot_for_error_branch()` 临时摘队列绕过该守卫。
         """
-        from evm_ir.semantics import _snapshot_for_error_branch
         from evm_ir.status_code import EvmStatusCode as SC
         from state.smt_state import PendingErrorBranch
 
         state = _state()
-        requested, branches = _calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
-        _charge_dynamic_gas(state, requested, branches)
+        requested, branches = calc_mem_size_64(BitVec("o", 256), BitVec("l", 256))
+        charge_dynamic_gas(state, requested, branches)
         assert state.pending_errors, "前置条件：队列里已有 gas 分支"
 
         before = len(state.pending_errors)
-        snapshot = _snapshot_for_error_branch(state)
+        snapshot = state.snapshot_for_error_branch()
         assert snapshot.pending_errors == [], "快照自身不该带待分裂队列"
         assert len(state.pending_errors) == before, "拍完快照要把队列恢复原样"
         state.pending_errors.append(
