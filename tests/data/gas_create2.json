@@ -1,0 +1,58 @@
+{
+  "control_frames": [
+    {
+      "is_jump_target": false,
+      "is_stop": true,
+      "max_depth": 1020,
+      "min_depth": 0,
+      "operations": [
+        {
+          "kind": "TAG",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "123",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "32",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 2
+        },
+        {
+          "immediate": "64",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 4
+        },
+        {
+          "immediate": "7",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 6
+        },
+        {
+          "immediate": "32012",
+          "kind": "CREATE2",
+          "param": 7,
+          "pc": 8
+        },
+        {
+          "kind": "STOP",
+          "pc": 9
+        },
+        {
+          "kind": "STOP",
+          "pc": 10
+        }
+      ],
+      "pc": 0,
+      "stack_depth": 1,
+      "static_gas": 32012
+    }
+  ]
+}

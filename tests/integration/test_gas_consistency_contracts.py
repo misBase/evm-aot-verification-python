@@ -34,7 +34,11 @@ import pytest
 from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from state.smt_state import SMTState
-from verification.program_verifier import GasCheck, ProgramEquivalenceChecker
+from verification.program_verifier import (
+    GasCheck,
+    ProgramEquivalenceChecker,
+    _find_unsupported_dynamic_gas_ops,
+)
 from x86_64.program import X86Program
 from x86_64.summaries import TRUSTED_SUMMARY_CONFIG
 
@@ -259,12 +263,40 @@ def test_perf_erc20_lite_sbb_bug_still_caught_with_gas():
 # ---------------------------------------------------------------- fail-closed
 
 
-def test_safe_extcodecopy_rejected_by_gas_scope():
-    """真实合约命中未建模动态 gas 指令 → 拒绝受理，而不是悄悄放行。
+def test_safe_no_longer_rejected_by_gas_scope():
+    """Safe（含 1 处 EXTCODECOPY@pc=0x2366）不再被 gas scope 守卫拒绝受理。
 
-    Safe 含 1 处 EXTCODECOPY（_DYNAMIC_GAS_UNSUPPORTED_KINDS），是拒绝集在真实合约上
-    生效的唯一证据。拒绝发生在符号执行之前，因此这条秒级返回。
+    这条曾是「拒绝集在真实合约上生效」的证据。EXTCODECOPY 解禁后语义反转：守卫必须
+    **放行**它。
+
+    直接对真实合约调用守卫函数，而不是跑 verify_program_pair 再看消息里有没有那句
+    拒绝文案——后者会被任何其它预检失败（IR 不变量、gas 配置、超时）弄成假绿。
     """
+    evm_program, _ = _load_ext_contract_pair("safe", "Safe")
+
+    assert _find_unsupported_dynamic_gas_ops(evm_program) == [], (
+        "Safe 不应再被 gas scope 守卫拒绝"
+    )
+    # 前提校验：这个合约确实含 EXTCODECOPY，否则上面那条断言是 vacuous 的。
+    kinds = {
+        (getattr(op, "kind", "") or "").upper()
+        for block in evm_program.blocks
+        for op in block.operations
+    }
+    assert "EXTCODECOPY" in kinds, "fixture 变了：Safe 不再含 EXTCODECOPY"
+
+
+@pytest.mark.skip(reason=(
+    "Safe 全合约端到端在 gas 模式下未跑通：无 selector 约束时 742 block 的 dispatcher "
+    "撑开路径，实测 >6.5min 仍停在符号执行阶段。**这不是本次 EXTCODECOPY 解禁引入的**"
+    "——Safe 在本仓库从来没有任何端到端覆盖，连 GasCheck.OFF 的功能等价测试都不存在"
+    "（tests/integration/test_ext_contract_verification.py 里没有 Safe）。启用前需要先"
+    "定位一个能到达 block pc=0x235f（EXTCODECOPY 所在块）的 selector 并压下路径规模。"
+    "EXTCODECOPY 自身的 gas 覆盖由 gas_extcodecopy / gas_extcodecopy_sym 提供，其可达性"
+    "由 test_gas_consistency_host_uf.py 的 *_visible_fee_actually_charged 用 spy 计数坐实。"
+))
+def test_safe_extcodecopy_gas_consistency():
+    """Safe 的 EXTCODECOPY 端到端 gas 一致性（待路径规模压下来后启用）。"""
     evm_program, x86_program = _load_ext_contract_pair("safe", "Safe")
 
     verified, msg = _verify_with_gas(
@@ -274,9 +306,8 @@ def test_safe_extcodecopy_rejected_by_gas_scope():
         mode=GasCheck.FIXED_BUDGET,
     )
 
-    assert not verified, "EXTCODECOPY must be rejected fail-closed under gas check"
-    assert "outside the currently provable gas scope" in msg, f"unexpected message: {msg}"
-    assert "EXTCODECOPY" in msg, f"rejection should name the operator, got: {msg}"
+    assert verified, f"Safe gas consistency should hold, got: {msg}"
+    assert FIXED_BUDGET_SCOPE in msg, f"gas scope missing from message: {msg}"
 
 
 # ---------------------------------------------------------------- 已知膨胀

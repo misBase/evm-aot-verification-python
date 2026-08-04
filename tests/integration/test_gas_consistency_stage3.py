@@ -208,12 +208,18 @@ def test_merged_status_is_not_none_for_multipath():
         )
 
 
-def test_full_rejects_unmodeled_dynamic_gas():
+def test_full_rejects_unmodeled_dynamic_gas(monkeypatch):
     """FULL 也要走 unsupported-dynamic-gas guard，否则 OOG 一致性被
     放大到未建模指令 → 假绿/误报。
 
-    注意:EXP/SLOAD/CALL 等已转 host-gas UF 兜底、移出拒绝集；CREATE 仍 fail-closed
-    （x86 可见内存扩展 + InitCodeWordGas 未对齐），用它验证 guard 仍生效。"""
+    allowlist 的差集当前为空（登记的动态 gas 指令全部已建模），所以这里把 CREATE 从
+    已建模集里临时摘掉来触发 guard——验的是「guard 在 FULL 下同样生效」这条性质，
+    而不是 CREATE 本身的状态（它已放行，见 test_gas_consistency_host_uf.py）。"""
+    import verification.program_verifier as pv
+    monkeypatch.setattr(
+        pv, "_MODELED_DYNAMIC_GAS_KINDS", pv._MODELED_DYNAMIC_GAS_KINDS - {"CREATE"}
+    )
+
     from evm_ir.json_parser import CompilerEVMResult
     from evm_ir.models import EVMBlock, EvmOperator
     block = EVMBlock(pc=0, stack_depth=0, min_depth=0, max_depth=1024,

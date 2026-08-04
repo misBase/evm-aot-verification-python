@@ -160,6 +160,239 @@ def test_host_gas_uf_tampered_return_gas_caught(monkeypatch):
     assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
 
 
+# --- CREATE / CREATE2 / EXTCODECOPY：可见 fee + host UF 混合 ---
+#
+# 这三个 opcode 曾整体 fail-closed 拒绝（_DYNAMIC_GAS_UNSUPPORTED_KINDS），理由是
+# 「缺专用 fixture」与「MAX_INIT_CODE_SIZE_EXCEEDED(16) 未核对」。下面的 fixture 补上了
+# 前者；后者经核对在 amd64 codegen 里根本不产生该状态码（`evmNativeCallStatus-
+# MaxInitCodeSizeExceeded` 全包只出现在 engine_evm.go:260 枚举与 :280 的 error 映射，
+# memoryGasCreate 的 `// check if codeSize > MaxInitCodeSize` 注释下没有比较指令），
+# 与 host gas 耗尽同类：Go host 内 error 终止、无生成代码可验。
+#
+# 与纯 host op 的区别：它们同时有**可见**动态 fee（memoryCreate{,2}GasN /
+# memoryCopierGas(3)）和**不可见**的 host cost，两段都必须对上才会 UNSAT。
+
+@pytest.mark.parametrize("name", [
+    "gas_create",            # 内存扩展 + InitCodeWordGas(2)，returnGas=0
+    "gas_create_returngas",  # 同上但 returnGas=13：可见 fee 落在 add/sub 窗口内
+    "gas_create2",           # word 常量是 InitCodeWordGas+Sha3WordGas(8)
+    "gas_extcodecopy",       # calcMemSize64(Back(1),Back(3)) + CopyGas(3)
+])
+@pytest.mark.parametrize("mode", [GasCheck.FIXED_BUDGET, GasCheck.FULL])
+def test_create_family_gas_consistency_passes(name, mode):
+    """CREATE/CREATE2/EXTCODECOPY 的可见 fee 与 host UF 在两种模式下都一致。
+
+    FULL 不能省：FIXED_BUDGET 的具体预算会把常量 fee 的 OOG 条件在 simplify 阶段
+    折成 False，那些分支根本不建，只证明了正常路径的 gas 终值。"""
+    verified, msg = _verify(name, mode=mode)
+    assert verified, f"{name} [{mode.value}] gas consistency should hold, got: {msg}"
+
+
+def test_create_tampered_init_code_word_gas_caught(monkeypatch):
+    """防假绿:CREATE 的 InitCodeWordGas 2→9 必须 SAT。
+
+    patch 目标是 **evm_ir.semantics** 上的名字：semantics.py 用模块级
+    `from state.evm_gas_state import INIT_CODE_WORD_GAS` 绑定，改
+    state.evm_gas_state 上的同名常量对已绑定的引用无效（会得到假绿的绿）。"""
+    import evm_ir.semantics as sem
+    monkeypatch.setattr(sem, "INIT_CODE_WORD_GAS", 9)
+
+    verified, msg = _verify("gas_create")
+    assert not verified, "tampered InitCodeWordGas must be caught"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
+
+
+def test_create2_tampered_word_gas_caught(monkeypatch):
+    """防假绿:CREATE2 的 word 常量 8→2（= CREATE 的 InitCodeWordGas）必须 SAT。
+
+    改成 CREATE 的常量而不是随便一个数，直接证明两者**被区分**——memoryCreate2GasN
+    比 memoryCreateGasN 多算一次 keccak 的 Sha3WordGas，混用不会被这条测试放过。"""
+    import evm_ir.semantics as sem
+    monkeypatch.setattr(sem, "CREATE2_WORD_GAS", 2)
+
+    verified, msg = _verify("gas_create2")
+    assert not verified, "tampered CREATE2 word gas must be caught"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
+
+
+def test_extcodecopy_tampered_copy_word_gas_caught(monkeypatch):
+    """防假绿:EXTCODECOPY 的 copy word gas 3→9 必须 SAT。
+
+    EXTCODECOPY 的 `3` 在 semantics.py 里是字面量、没有具名常量可改，但
+    semantics_gas.charge_memory_and_word_gas 走的是 `gas_state.word_fee(...)`
+    模块属性访问，patch state.evm_gas_state.word_fee 即可生效。"""
+    import state.evm_gas_state as gas_state
+    orig = gas_state.word_fee
+    monkeypatch.setattr(
+        gas_state, "word_fee", lambda word_len, _const: orig(word_len, 9)
+    )
+
+    verified, msg = _verify("gas_extcodecopy")
+    assert not verified, "tampered EXTCODECOPY copy word gas must be caught"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
+
+
+@pytest.mark.parametrize("name,word_gas_const", [
+    ("gas_create", 2),        # InitCodeWordGas
+    ("gas_create2", 8),       # InitCodeWordGas + Sha3WordGas
+    ("gas_extcodecopy", 3),   # CopyGas
+])
+def test_create_family_visible_fee_actually_charged(name, word_gas_const, monkeypatch):
+    """正向用例不是 vacuous 的:可见 fee 确实被扣了，且 word 常量是预期的那个。
+
+    「VERIFIED」本身不排除「这条指令压根没被执行到」——路径被剪掉时两侧同样不扣，
+    gas 照样相等。这里在 EVM 侧的扣费入口装计数器，确认符号执行真的走到了该指令，
+    并顺带钉死它用的 word gas 常量（三个 opcode 各不相同，混用会被这里抓到）。
+    """
+    import evm_ir.semantics_gas as gas_sem
+
+    seen = []
+    orig = gas_sem.charge_memory_and_word_gas
+
+    def spy(state, offset_bv, length_bv, const):
+        seen.append(const)
+        return orig(state, offset_bv, length_bv, const)
+
+    monkeypatch.setattr(gas_sem, "charge_memory_and_word_gas", spy)
+
+    verified, msg = _verify(name)
+    assert verified, f"{name} should verify, got: {msg}"
+    assert seen, f"{name}: 可见 fee 从未被扣 —— 该指令没有被执行到，正例是 vacuous 的"
+    assert set(seen) == {word_gas_const}, (
+        f"{name}: word gas 常量应为 {word_gas_const}，实际 {sorted(set(seen))}"
+    )
+
+
+def test_create_tampered_return_gas_caught(monkeypatch):
+    """防假绿:CREATE 的 returnGas 算错（+1）必须 SAT。
+
+    用 returnGas=13 的 fixture。CREATE 与 CALL 系的区别是它在 add/sub 窗口**内**还有
+    可见 fee（顺序 add rg → fee → host → sub rg），窗口错位不改 gas 终值（加减相消）
+    但会让可见 fee 的 OOG 阈值少算一个 rg，所以这条链必须有非空的端到端覆盖。"""
+    import evm_ir.semantics_gas as gas_sem
+    orig = gas_sem.return_gas_for
+    monkeypatch.setattr(gas_sem, "return_gas_for", lambda op: orig(op) + 1)
+
+    verified, msg = _verify("gas_create_returngas")
+    assert not verified, "tampered CREATE returnGas must be caught"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
+
+
+# --- 符号操作数：cap / SafeMul / SafeAdd 溢出与动态 OOG 的 IR↔x86 对照 ---
+#
+# 常量 fixture 只能证明正常路径上的扣费。要让 memoryGasCost 的 cap 支、
+# makeSafeMul/SafeAdd 的溢出支（→ GAS_UINT_OVERFLOW 13）与动态 OOG（→ 12）在**端到端**
+# 层面真实可达，offset/size 必须是符号量。
+#
+# 这套配置是让它跑得动的关键，缺一不可（实测）：
+#   - abstract_calldataload_words + summary_config：**必须成对**。抽象在 EVM 侧无条件
+#     生效（semantics.py），x86 侧只在 CALLDATALOAD summary 路径里生效
+#     （x86_64/summaries/calldataload.py）。只开抽象不给 summary_config，两侧
+#     CALLDATALOAD 取值不同 → 1.2s 就"抓到"一个 status code 反例，**那是配置不对称
+#     造成的假反例**，不是建模缺陷。
+#   - enable_merge=False + x86_reachability_timeout_ms=250：把 x86 终止路径从 17 压到
+#     8。不加这两项时 7×17=119 对 pair，实测 >40min 未完成（且 skip_feasibility 也救
+#     不回来——瓶颈是每对约 6s 的固定开销，不是求解不动：逐对检查全是毫秒级 unsat
+#     且无一 unknown）。
+#   - 固定 calldata_size_bytes：符号 calldatasize 会再乘一层路径。
+_SYMBOLIC_KWARGS = dict(
+    path_observations=True,
+    path_pair_workers=4,
+    enable_merge=False,
+    x86_reachability_timeout_ms=250,
+)
+
+
+def _verify_symbolic(name, *, mode=GasCheck.FIXED_BUDGET):
+    """符号操作数 fixture 的验证入口（配置见上方注释）。"""
+    from x86_64.summaries import TRUSTED_SUMMARY_CONFIG
+
+    evm, x86 = _load_pair(name)
+    initial_state = SMTState.create_initial_state(
+        symbolic_gas=mode is GasCheck.FULL, calldata_size_bytes=64,
+    )
+    initial_state.abstract_calldataload_words = True
+    return ProgramEquivalenceChecker(
+        timeout_ms=600000, gas_check=mode
+    ).verify_program_pair(
+        evm, x86, initial_state, stack_check=None,
+        summary_config=TRUSTED_SUMMARY_CONFIG, **_SYMBOLIC_KWARGS,
+    )
+
+
+_FULL_MODE_SKIP = pytest.mark.skip(reason=(
+    "符号操作数 + 符号 gas 的组合当前不稳定/跑不完，**FIXED_BUDGET 两格已覆盖同一批"
+    "错误分支**（12/13 由符号 offset/size 触发，与 gas 是否符号无关——见 "
+    "test_symbolic_fixture_error_branches_reachable 对两种 gas 形态的断言），FULL 只额外"
+    "提供「对所有初始 gas 量化」。实测：\n"
+    "  - gas_extcodecopy_sym FULL：>420s 未完成。\n"
+    "  - gas_create_sym FULL：**单独跑 86s 通过**，但同进程里先跑过它自己的 "
+    "    FIXED_BUDGET 那格之后会退化到 >600s。这是跨测试状态污染（两个测试顺序跑即可"
+    "    复现，与 CPU 竞争无关；排在其后的 gas_extcodecopy_sym 仍是 62s，所以是同一"
+    "    fixture 第二次执行的问题，疑似 Z3 全局 context 累积——effect_id 取自 op.pc，"
+    "    两次执行符号名相同）。根因未定位，属既有基础设施问题、非本次改动引入。\n"
+    "注意这是**性能**问题不是健全性问题：超时走 fail-closed，报 TIMEOUT 失败而非假绿。"
+))
+
+
+@pytest.mark.parametrize("name,mode", [
+    ("gas_create_sym", GasCheck.FIXED_BUDGET),        # ~12s
+    ("gas_extcodecopy_sym", GasCheck.FIXED_BUDGET),   # ~62s
+    pytest.param("gas_create_sym", GasCheck.FULL, marks=_FULL_MODE_SKIP),
+    pytest.param("gas_extcodecopy_sym", GasCheck.FULL, marks=_FULL_MODE_SKIP),
+])
+def test_create_family_symbolic_operand_gas_consistency(name, mode):
+    """符号 offset/size 下 CREATE/EXTCODECOPY 的 gas 与终止状态逐路径一致。
+
+    这是 cap / SafeMul / SafeAdd 溢出分支唯一的 IR↔x86 对照（EVM 侧单测在
+    tests/unit/test_gas_error_codes.py，但那没有 x86 侧对照）。"""
+    verified, msg = _verify_symbolic(name, mode=mode)
+    assert verified, f"{name} [{mode.value}] symbolic-operand gas check failed: {msg}"
+
+
+@pytest.mark.parametrize("name", ["gas_create_sym", "gas_extcodecopy_sym"])
+@pytest.mark.parametrize("symbolic_gas", [False, True])
+def test_symbolic_fixture_error_branches_reachable(name, symbolic_gas):
+    """符号 fixture 的正例非 vacuous:12/13 两类错误分支都**真的可满足**。
+
+    上面的用例返回 VERIFIED 只说明两侧一致，不排除那些错误路径根本不可达（路径条件
+    恒假时等价检查 vacuously 通过）。这里直接枚举 EVM 终止路径并逐条判可满足性，
+    钉死 GAS_UINT_OVERFLOW(13，来自 calcMemSize64 / SafeMul 溢出）与 OUT_OF_GAS(12，
+    来自 memoryGasCost 的 cap 支与 UseGas 失败）都在被验证的路径集合里。
+    """
+    from z3 import Solver, is_bv_value, sat, simplify
+
+    evm, _ = _load_pair(name)
+    state = SMTState.create_initial_state(
+        symbolic_gas=symbolic_gas, calldata_size_bytes=64,
+    )
+    state.abstract_calldataload_words = True
+    semantics = evm.to_z3_paths(state, merge_state=False)
+
+    reachable = set()
+    for obs in semantics.as_result_dicts():
+        status = simplify(obs["status_code"])
+        if not is_bv_value(status):
+            continue
+        solver = Solver()
+        solver.set("timeout", 10000)
+        solver.add(obs["condition"])
+        if solver.check() == sat:
+            reachable.add(status.as_long())
+
+    assert 13 in reachable, (
+        f"{name}: GAS_UINT_OVERFLOW(13) 分支不可达，符号边界其实没被验到；"
+        f"实际可达状态码 {sorted(reachable)}"
+    )
+    assert 12 in reachable, (
+        f"{name}: OUT_OF_GAS(12) 分支不可达；实际可达状态码 {sorted(reachable)}"
+    )
+
+
 def test_host_gas_uf_check_off_unaffected():
     """check_gas 默认关时,host 指令功能等价不受 UF 影响（回归保护）。"""
     evm, x86 = _load_pair("gas_sload")

@@ -477,9 +477,9 @@ class GoFunctionSemantics:
             effect_tag=f"extcodecopy_idx_{effect_id}",
         )
         mstate = self._update_sp_in_memory(sp, mstate)
-        # host gas UF，与 EVM 侧同参 [addr, size] 相消。EXTCODECOPY 目前整体
-        # fail-closed，这里仍扣是为了保持两侧对称——将来移出拒绝集时不必再补 x86
-        # 侧，避免「EVM 扣 UF 而 x86 不扣」的 fail-open。
+        # host gas UF，与 EVM 侧同参 [addr, size] 相消。可见的内存扩展 + copy word
+        # gas 由反汇编建模（checkMemoryAndCalcDynamicGasExtCodeCopy 是 compileEVM-
+        # EXTCODECOPY 的第一条语句），两部分合起来使 EXTCODECOPY 在 gas 检查范围内。
         self._deduct_host_gas_uf(mstate, "EXTCODECOPY", [addr, size])
         return mstate
 

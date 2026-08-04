@@ -12,19 +12,19 @@
           "pc": 0
         },
         {
-          "immediate": "0",
+          "immediate": "32",
           "kind": "PUSH",
           "param": 1,
           "pc": 0
         },
         {
-          "immediate": "0",
+          "immediate": "64",
           "kind": "PUSH",
           "param": 1,
           "pc": 2
         },
         {
-          "immediate": "0",
+          "immediate": "7",
           "kind": "PUSH",
           "param": 1,
           "pc": 4

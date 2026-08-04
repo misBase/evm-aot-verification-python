@@ -312,15 +312,17 @@ class TestGasStateEvolvesInAllModes:
         )
 
 
-class TestCreateOpsStillFailClosedForGasValues:
-    """EXTCODECOPY/CREATE/CREATE2：错误码已对齐，但 gas **数值**检查仍被拒绝。
+class TestCreateOpsNowInGasScope:
+    """EXTCODECOPY/CREATE/CREATE2：错误码与 gas **数值**检查现在都在范围内。
 
-    可见 fee 建了，所以 E2/E3/cap/E4 的状态码能验；但 host UF 与 returnGas 链的交互、
-    MAX_INIT_CODE_SIZE_EXCEEDED(16) 都未核实。这条断言防止有人误以为 gas 数值也覆盖了。
+    可见 fee（memoryCreate{,2}GasN / memoryCopierGas(3)）本来就建了，所以 E2/E3/cap/E4
+    的状态码一直能验；本次连 gas 数值也放行——host UF 两侧对称、returnGas 链有
+    gas_create_returngas（rg=13）端到端覆盖，MAX_INIT_CODE_SIZE_EXCEEDED(16) 经核对在
+    amd64 codegen 里根本不产生（只存在于 engine_evm.go 的枚举与 error 映射）。
     """
 
     @pytest.mark.parametrize("kind", ["EXTCODECOPY", "CREATE", "CREATE2"])
-    def test_rejected_by_dynamic_gas_guard(self, kind):
+    def test_not_rejected_by_dynamic_gas_guard(self, kind):
         from evm_ir.models import EVMBlock, EvmOperator
         from verification.program_verifier import _find_unsupported_dynamic_gas_ops
 
@@ -332,10 +334,10 @@ class TestCreateOpsStillFailClosedForGasValues:
         class _Prog:
             blocks = [block]
 
-        # 拒绝与 gas_check 模式无关（HOST_GAS_UF_KINDS 已不再按模式加入拒绝集）。
+        # 放行与 gas_check 模式无关（allowlist 的差集当前为空）。
         rejected = _find_unsupported_dynamic_gas_ops(_Prog())
-        assert any(kind in item for item in rejected), (
-            f"{kind} 的 gas 数值检查必须仍被 fail-closed 拒绝，实际 {rejected}"
+        assert rejected == [], (
+            f"{kind} 的 gas 检查应已放行，实际仍被拒绝：{rejected}"
         )
 
 

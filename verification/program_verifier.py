@@ -13,6 +13,7 @@ from x86_64.program import X86Program
 from x86_64.summaries import X86SummaryConfig
 from .refinement_checker import RefinementChecker
 from .call_site_mapping import build_call_site_mapping
+from state.host_gas import HOST_GAS_UF_KINDS
 from state.smt_state import SMTState
 
 
@@ -78,40 +79,67 @@ def _collect_assumptions(*states):
     return out
 
 
-# gas 验证的指令分三档（见 memory: gas_full_coverage_codegen_layers）：
+# --- gas 验证准入检查：没建模的动态 gas 指令一律拒验 ---
 #
-# 1. 真证明（x86 codegen 可见，EVM 侧建了真实公式）：
-#    MSTORE/RETURN/MLOAD/MSTORE8（内存扩展）、SHA3（+word gas）、CALLDATACOPY/
-#    CODECOPY/RETURNDATACOPY/MCOPY/REVERT（+copy word gas）、LOG0..LOG4。
-# 2. UF 兜底（host/builtin gas 不可见，两侧扣同名 host_gas_uf 相消）：
-#    SLOAD/SSTORE/BALANCE/EXTCODESIZE/EXTCODEHASH/SELFDESTRUCT/EXP +
-#    CALL/CALLCODE/DELEGATECALL/STATICCALL。见 state/host_gas.py。
-# 3. 仍 fail-closed 拒绝：下面这三个。它们的可见 fee **已经建模**
-#    （semantics_gas.charge_memory_and_word_gas），拒绝理由是剩下的部分没核实。
-_DYNAMIC_GAS_UNSUPPORTED_KINDS = frozenset({
-    # 待补：无专用 fixture，放行等于放进任意符号 offset/size 的实例而无回归覆盖。
-    "EXTCODECOPY",
-    # 待补：MAX_INIT_CODE_SIZE_EXCEEDED(16) 两侧行为未核对；gas_create fixture 的
-    # value/offset/size 全是常量 0（size==0 的退化实例），撑不起 opcode 级放行。
-    "CREATE",
-    "CREATE2",
+# 跑 gas 检查前先扫一遍程序：碰到"gas 数额随运行时数据变化、而我们没建模"的指令就
+# 直接拒绝受理，不出 VERIFIED。判据 = 下面的全表 − 已建模表。
+# 用"已建模"这张表做判据（而不是维护一张"不支持"清单），是因为清单漏登记时指令默认
+# 放行，两侧都漏扣 gas 反而报 VERIFIED——假绿；这张表漏登记只会多拒。
+
+# 全表：go-hpc-evm `evm/jump_table.go` 里带动态 gas 的全部指令（LOG0..LOG4 记作 "LOG"，
+# topic 数在 op.immediate）。
+#
+# 这张表**手工同步**，最后核对于 commit `b3ddbdb`（与 tests/data/generators/README.md
+# 记的 fixture 版本一致）。升级 go-hpc-evm 时必须按下面两条重抽一遍——漏登记的指令不
+# 进差集，守卫就不会拦它：
+#
+#   ① struct literal 里的 `dynamicGas:` 字段（25 处）。
+#   ② 赋值形式 `instructionSet[common.X].dynamicGas = f`
+#      （:142-155 enable2929 的 SLOAD/BALANCE/EXTCODESIZE/EXTCODEHASH）。
+#      grep `"dynamicGas:"` 抓不到这一种，实际漏抽过一次。
+_DYNAMIC_GAS_KINDS = frozenset({
+    # 内存扩展 / word gas（x86 codegen 可见）
+    "MLOAD", "MSTORE", "MSTORE8", "RETURN", "REVERT", "MCOPY",
+    "SHA3", "CALLDATACOPY", "CODECOPY", "RETURNDATACOPY", "EXTCODECOPY",
+    "LOG",
+    "CREATE", "CREATE2",
+    # gas 在 Go host/builtin runtime 内（x86 不可见）
+    "SLOAD", "SSTORE", "BALANCE", "EXTCODESIZE", "EXTCODEHASH", "SELFDESTRUCT",
+    "CALL", "CALLCODE", "DELEGATECALL", "STATICCALL", "EXP",
 })
+
+# 已建模分两层（依据见 memory: gas_full_coverage_codegen_layers）。
+# 第 1 层，真证明：gas 算式在 x86 codegen 里可见，EVM 侧建了真实公式逐位比较——内存扩展
+# 与 word/copy/LOG data gas，走 semantics_gas.charge_memory_and_word_gas / charge_log_gas
+# （含 CREATE/CREATE2 的 memoryCreate{,2}GasN、EXTCODECOPY 的 memoryCopierGas(3)）。
+_PROVEN_DYNAMIC_GAS_KINDS = frozenset({
+    "MLOAD", "MSTORE", "MSTORE8", "RETURN", "REVERT", "MCOPY",
+    "SHA3", "CALLDATACOPY", "CODECOPY", "RETURNDATACOPY", "EXTCODECOPY",
+    "LOG",
+    "CREATE", "CREATE2",
+})
+# 第 2 层，UF 兜底：gas 在 Go host/builtin runtime 内部算、x86 侧看不见，两侧扣同名
+# host_gas_uf 相消。复用 state/host_gas.py 的 HOST_GAS_UF_KINDS，不抄第二份以免两处漂移。
+_MODELED_DYNAMIC_GAS_KINDS = _PROVEN_DYNAMIC_GAS_KINDS | HOST_GAS_UF_KINDS
+
+# 人工拒绝钩子：把某个"已建模"的 kind 临时挡回门外（建模有疑点、还没修时用）。
+# **当前为空**——EXTCODECOPY/CREATE/CREATE2 曾长期在此，解禁论证见
+# docs/Gas一致性验证设计.md §8「EXTCODECOPY / CREATE / CREATE2 的解禁」。
+_MANUAL_REJECT_KINDS: frozenset[str] = frozenset()
 
 
 def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram) -> list[str]:
-    """返回 gas 检查仍必须 fail-closed 拒绝的动态 gas 指令（非空即拒绝受理）。
+    """扫出程序里必须拒验的动态 gas 指令（返回非空 ⇒ 拒绝受理 gas 检查）。
 
-    拒绝集见 _DYNAMIC_GAS_UNSUPPORTED_KINDS，与 gas_check 模式无关。
+    拒绝集 = (_DYNAMIC_GAS_KINDS - _MODELED_DYNAMIC_GAS_KINDS) | _MANUAL_REJECT_KINDS，
+    与 gas_check 模式无关。当前差集为空，但机制不是摆设：新指令只要登记进
+    _DYNAMIC_GAS_KINDS 而没接建模，就自动被拦下。
 
-    HOST_GAS_UF_KINDS 不在其中（含 FULL）：host gas 两侧扣同名 UF 相消，而 host gas
-    耗尽后的终止没有任何生成代码（见 state/host_gas.py 模块 docstring），没有 x86 行为
-    可以不一致。结论范围由 _annotate_gas_scope 写进成功消息。CALL 系列另无可见内存扩展
-    （checkMemoryAndCalcDynamicGasCall=nil）；其 returnGas 加减是可见机器码，两侧按相同
-    顺序建模，host-success 路径上相消，host-exhaustion 后的续跑状态两侧仍走同构的
-    _consume_clamp_64 而逐状态比较（那里 0-rg 会回绕，并非净 0），只是其终止行为不在
-    证明范围内。
+    HOST_GAS_UF_KINDS 在任何模式下都算已建模：gas 数额靠两侧同名 UF 相消，而 host gas
+    耗尽后的终止没有对应的生成代码、不算缺口——论证见 state/host_gas.py 模块 docstring。
+    结论范围由 _annotate_gas_scope 写进成功消息。
     """
-    reject = _DYNAMIC_GAS_UNSUPPORTED_KINDS
+    reject = (_DYNAMIC_GAS_KINDS - _MODELED_DYNAMIC_GAS_KINDS) | _MANUAL_REJECT_KINDS
 
     unsupported: list[str] = []
     for block in getattr(evm_program, "blocks", None) or []:

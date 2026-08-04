@@ -42,10 +42,19 @@ def test_stage0_gas_guard_allows_static_gas_ops():
     assert _find_unsupported_dynamic_gas_ops(evm_program) == []
 
 
-def test_stage0_gas_guard_rejects_dynamic_gas_ops_before_x86_execution():
-    # CREATE 仍 fail-closed（x86 可见的 returnGas 链 + 内存扩展尚未对齐）。
-    # guard 应在 x86 执行前就拒绝（故传 object() 假 x86 也不会被触碰）。
-    # 注意:EXP/SLOAD 等已转 UF 兜底、移出拒绝集，不再触发此 guard。
+def test_stage0_gas_guard_rejects_dynamic_gas_ops_before_x86_execution(monkeypatch):
+    """未建模的动态 gas 指令必须在 x86 执行**之前**被拒（故传 object() 假 x86）。
+
+    拒绝集当前为空（所有登记在 _DYNAMIC_GAS_KINDS 的指令都已建模），所以这里把
+    CREATE 从已建模集里临时摘掉来触发 guard——这同时验证了 allowlist 的核心承诺：
+    「登记了但没建模」会被自动拦下，不依赖有人手工维护黑名单。
+    """
+    import verification.program_verifier as pv
+
+    monkeypatch.setattr(
+        pv, "_MODELED_DYNAMIC_GAS_KINDS", pv._MODELED_DYNAMIC_GAS_KINDS - {"CREATE"}
+    )
+
     evm_program = _program_with_ops("PUSH1", "CREATE", "STOP")
     checker = ProgramEquivalenceChecker(gas_check=GasCheck.FIXED_BUDGET)
 
@@ -88,19 +97,55 @@ def test_stage0_gas_guard_allows_host_uf_ops():
         )
 
 
-def test_stage0_gas_guard_still_rejects_visible_memory_part_ops():
-    """仍 fail-closed 的 op:除 host UF 外 x86 还有**可见内存扩展** gas
-    （memoryCreateGasN / ExtCodeCopy）尚未在 EVM 侧对齐。逐一覆盖防误移出。"""
-    still_rejected = (
-        "EXTCODECOPY",
-        "CREATE", "CREATE2",
-    )
-    for kind in still_rejected:
+def test_stage0_gas_guard_allows_create_family():
+    """EXTCODECOPY/CREATE/CREATE2 已在 gas 检查范围内，不再 fail-closed。
+
+    可见 fee（memoryCreate{,2}GasN / memoryCopierGas(3)）与 host UF 两侧都已接好；
+    MAX_INIT_CODE_SIZE_EXCEEDED(16) 经核对在 amd64 codegen 里根本不产生。
+    专用 fixture: gas_create / gas_create_returngas / gas_create2 /
+    gas_extcodecopy（+ 两个符号版）。"""
+    for kind in ("EXTCODECOPY", "CREATE", "CREATE2"):
         evm_program = _program_with_ops(kind)
-        unsupported = _find_unsupported_dynamic_gas_ops(evm_program)
-        assert unsupported == [f"{kind}@pc=0x1"], (  # pc=0 是 TAG
-            f"{kind} should still be fail-closed, got {unsupported}"
+        assert _find_unsupported_dynamic_gas_ops(evm_program) == [], (
+            f"{kind} should be allowed (visible fee + host UF both wired)"
         )
+
+
+def test_dynamic_gas_allowlist_has_no_gap():
+    """allowlist 不变量:登记在 _DYNAMIC_GAS_KINDS 的指令必须全部已建模。
+
+    差集非空 = 有指令需要 gas 建模却没接上，此时它会被 guard 拒绝受理（fail-closed，
+    不是假绿），但仍属于覆盖缺口，应当显式暴露而不是等某个合约撞上才发现。
+    """
+    import verification.program_verifier as pv
+
+    gap = pv._DYNAMIC_GAS_KINDS - pv._MODELED_DYNAMIC_GAS_KINDS
+    assert gap == set(), f"这些动态 gas 指令尚未建模: {sorted(gap)}"
+    # 反向：已建模集不应出现全表之外的 kind，否则说明 _DYNAMIC_GAS_KINDS 漏登记
+    # （漏登记的指令不会被 guard 检查，是真正的 fail-open 风险）。
+    stray = pv._MODELED_DYNAMIC_GAS_KINDS - pv._DYNAMIC_GAS_KINDS
+    assert stray == set(), f"_DYNAMIC_GAS_KINDS 漏登记: {sorted(stray)}"
+
+
+def test_dynamic_gas_allowlist_rejects_unmodeled_kind(monkeypatch):
+    """把某个 kind 从已建模集里摘掉，它必须立刻被拒——证明 allowlist 真的在起作用，
+    而不只是两张常量表看着好看。"""
+    import verification.program_verifier as pv
+
+    monkeypatch.setattr(
+        pv, "_MODELED_DYNAMIC_GAS_KINDS", pv._MODELED_DYNAMIC_GAS_KINDS - {"SHA3"}
+    )
+    evm_program = _program_with_ops("SHA3")
+    assert _find_unsupported_dynamic_gas_ops(evm_program) == ["SHA3@pc=0x1"]
+
+
+def test_manual_reject_hook_still_works(monkeypatch):
+    """人工拒绝钩子（当前为空）仍可临时挡下某个已建模的 kind。"""
+    import verification.program_verifier as pv
+
+    monkeypatch.setattr(pv, "_MANUAL_REJECT_KINDS", frozenset({"CREATE"}))
+    evm_program = _program_with_ops("CREATE")
+    assert _find_unsupported_dynamic_gas_ops(evm_program) == ["CREATE@pc=0x1"]
 
 
 def test_cli_parse_args_exposes_gas_check(monkeypatch):

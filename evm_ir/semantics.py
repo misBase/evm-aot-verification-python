@@ -1197,9 +1197,8 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         )
         state.evm_stack = stack4
         # host gas（冷热账户）不可见 → UF，依赖 addr 与 size。可见的内存扩展 + copy
-        # word gas 已在上面建模（:1561），EXTCODECOPY 仍留在 program_verifier 的拒绝集里
-        # 是因为**没有专用 fixture**，放行等于让任意符号 offset/size 的实例进来而无回归
-        # 覆盖——不是因为 fee 没建模。
+        # word gas 见上面的 charge_memory_and_word_gas。两部分都已接好，EXTCODECOPY
+        # 在 gas 检查范围内（fixture: gas_extcodecopy / gas_extcodecopy_sym）。
         from state.host_gas import charge_host_gas_uf
         charge_host_gas_uf(state, "EXTCODECOPY", [addr_bv, size_bv])
         return state
@@ -1261,9 +1260,15 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             value_bv, offset_bv, size_bv, state.evm_memory.Memory, effect_id=op.pc
         )
         state.evm_stack = stack3.push(result)
-        # host gas 仍是 UF。可见 fee 已对齐，但 CREATE 仍在 program_verifier 的拒绝集里：
-        # host UF 与 returnGas 链的交互、MAX_INIT_CODE_SIZE_EXCEEDED(16) 状态码都未核实，
-        # gas **数值**检查继续 fail-closed。
+        # host gas 仍是 UF；可见 fee 已对齐，CREATE 在 gas 检查范围内
+        # （fixture: gas_create / gas_create_returngas / gas_create_sym）。
+        #
+        # MAX_INIT_CODE_SIZE_EXCEEDED(16) 不需要建模：amd64 codegen **根本不产生**这个
+        # 状态码——`evmNativeCallStatusMaxInitCodeSizeExceeded` 在 evm/aot 全包只出现于
+        # engine_evm.go:260（枚举）与 :280（error 映射），memoryGasCreate 里那句
+        # `// check if codeSize > params.MaxInitCodeSize`（gas_dynamic_amd64.go:444）
+        # 下面没有任何比较指令。它与 host gas 耗尽同类：Go host 内 error 终止、不回写
+        # native status，没有 x86 行为可以不一致（论证见 state/host_gas.py 模块 docstring）。
         charge_host_gas_uf(state, "CREATE", [value_bv, offset_bv, size_bv])
         sub_return_gas(state, return_gas)
         return state
@@ -1286,7 +1291,8 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             value_bv, offset_bv, size_bv, salt_bv, state.evm_memory.Memory, effect_id=op.pc
         )
         state.evm_stack = stack4.push(result)
-        # gas 数值检查仍 fail-closed 拒绝，理由同 CREATE。
+        # 可见 fee + host UF 的分工同 CREATE（含 MAX_INIT_CODE_SIZE 的核对结论）。
+        # fixture: gas_create2。
         charge_host_gas_uf(state, "CREATE2", [value_bv, offset_bv, size_bv, salt_bv])
         sub_return_gas(state, return_gas)
         return state

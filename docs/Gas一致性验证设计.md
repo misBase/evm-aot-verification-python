@@ -88,7 +88,7 @@ CLI：`main.py --gas-check {off,fixed-budget,full} [--gas-budget N]`。
 | 检查 | 拒绝条件 | 防的是 |
 | --- | --- | --- |
 | IR 不变量 | block 有 `static_gas` 但无 TAG | 无 TAG 则 OOG 守卫不存在而扣减照做 → gas 回绕静默继续 |
-| 可验证范围 | 程序含 `_DYNAMIC_GAS_UNSUPPORTED_KINDS`（与模式无关） | 两侧都漏扣 → 假绿 |
+| 可验证范围 | 程序含未建模的动态 gas 指令（allowlist 差集，与模式无关，§8） | 两侧都漏扣 → 假绿 |
 | 两侧同源（**所有模式**） | `simplify(evm_gas) != simplify(callengine_gas_remaining)` | 起点不同就不是在比同一个输入程序 |
 | 模式匹配 | `OFF`+符号 / `FULL`+具体 / `FIXED_BUDGET`+符号 | 依次是：host gas 缺口张开；验的分支被折死；规模承诺失效 |
 
@@ -292,14 +292,58 @@ native status）。作为 host-success 路径的 over-approximation，它可能�
 阴性，但不会因省略真实 host-success 路径而假阳性——前提是结论明确限定为"不证明 host
 exhaustion 分支"，这一条已写进成功消息（§3）。
 
-## 8. 仍 fail-closed 拒绝的指令
+## 8. 可验证范围守卫（allowlist）
 
-| 指令 | 拒绝范围 | 原因 |
+`_find_unsupported_dynamic_gas_ops` 拒绝的是**「需要 gas 建模」减去「已建模」**：
+
+```python
+reject = (_DYNAMIC_GAS_KINDS - _MODELED_DYNAMIC_GAS_KINDS) | _MANUAL_REJECT_KINDS
+```
+
+| 集合 | 含义 | 当前内容 |
 | --- | --- | --- |
-| EXTCODECOPY | 全模式 | 可见 fee **已建模**；缺专用 fixture，放行等于放进任意符号 offset/size 的实例而无回归覆盖 |
-| CREATE / CREATE2 | 全模式 | 可见 fee **已建模**；`MAX_INIT_CODE_SIZE_EXCEEDED`(16) 两侧行为未核对，`gas_create` fixture 的三个操作数全是常量 0（`size==0` 退化实例），撑不起 opcode 级放行；CREATE2 无 fixture |
+| `_DYNAMIC_GAS_KINDS` | 协议层面需要额外 gas 建模的 IR kind 全表 | 25 项（见下） |
+| `_MODELED_DYNAMIC_GAS_KINDS` | 真证明集 ∪ `HOST_GAS_UF_KINDS` | 与全表相等 |
+| `_MANUAL_REJECT_KINDS` | 人工钩子：临时挡下某个已建模的 kind | **空** |
 
-拒绝集与 `gas_check` 模式无关。`HOST_GAS_UF_KINDS` **不在**其中（含 `FULL`）：按本项目口径
+**为什么是 allowlist 而不是黑名单**：黑名单（本文件的历史形态）意味着新增或漏建模的
+动态 gas 指令默认放行——两侧都漏扣就是假绿，且只能靠有人记得手工登记。allowlist 下
+只要指令登记进 `_DYNAMIC_GAS_KINDS` 而没接建模，就会自动被拦下。差集为空是不变量，
+由 `test_dynamic_gas_allowlist_has_no_gap` 守着（含反向：已建模集不得溢出全表，否则
+说明全表漏登记，那才是真正的 fail-open）。
+
+**`_DYNAMIC_GAS_KINDS` 的抽取口径**（改动时按这个重新核对 `evm/jump_table.go`）——
+带动态 gas 的全部条目，**两种语法形式都要看**：
+
+1. struct literal 里的 `dynamicGas:` 字段（25 处）：EXP / SHA3 / CALLDATACOPY /
+   CODECOPY / EXTCODECOPY / MLOAD / MSTORE / MSTORE8 / SSTORE / LOG0-4 / CREATE /
+   CALL / CALLCODE / RETURN / SELFDESTRUCT，以及 EIP 覆盖区的 MCOPY / CREATE2 /
+   STATICCALL / RETURNDATACOPY / REVERT / DELEGATECALL。
+2. **`instructionSet[common.X].dynamicGas = f` 的赋值形式**（`jump_table.go:142-155`，
+   `enable2929`）：SLOAD / BALANCE / EXTCODESIZE / EXTCODEHASH。这一形式
+   `grep "dynamicGas:"` 抓不到，实际漏抽过一次。
+
+LOG0..LOG4 映射到 IR kind 统一是 `"LOG"`（topic 数在 `op.immediate`）。取超集是安全的：
+多列一个 kind 只会多拒（fail-closed），不会假绿。
+
+### EXTCODECOPY / CREATE / CREATE2 的解禁（曾长期 fail-closed）
+
+三者的可见 fee 一直是建了的（`memoryCreate{,2}GasN` / `memoryCopierGas(3)`），拒绝理由
+是另外两条，现均已消解：
+
+- **缺专用 fixture** → 已补：`gas_create`（size=0x20/offset=0x40/value=7）、
+  `gas_create_returngas`（returnGas=13）、`gas_create2`（salt=0x7b）、`gas_extcodecopy`
+  （size=4/offset=7/destOffset=0x20/addr=1）。操作数取互不相同的可辨识值——旧
+  `gas_create` 三个操作数全 0 且 `size==0`，内存扩展 fee 与 word gas 双双为 0，既掩盖
+  槽位交换也掩盖 UF 参数顺序错误。
+- **`MAX_INIT_CODE_SIZE_EXCEEDED`(16) 两侧行为未核对** → 已核对：**amd64 codegen 根本
+  不产生这个状态码**。`evmNativeCallStatusMaxInitCodeSizeExceeded` 在 `evm/aot` 全包只
+  出现于 `engine_evm.go:260`（枚举）与 `:280`（error 映射）；`memoryGasCreate`
+  （`gas_dynamic_amd64.go:437-461`）里那句 `// check if codeSize > params.MaxInitCodeSize`
+  注释**下面没有任何比较指令**。它与 host gas 耗尽同类：Go host 内 error 终止、不回写
+  native status，没有 x86 行为可以不一致（论证见 §7 与 `state/host_gas.py`）。
+
+`HOST_GAS_UF_KINDS` 算已建模（含 `FULL`）：按本项目口径
 （`docs/关键问题记录.md` #19，目标是 IR↔AOT 而非 IR↔解释器），host gas 耗尽那一处没有生成
 代码，没有 x86 行为可以不一致；结论范围由成功消息声明（§3）而非由拒绝承担。`FULL` 曾额外
 拒绝它们，已删除，回归证据见 `test_gas_consistency_host_uf.py` 的 `*_under_full` 用例
@@ -322,23 +366,54 @@ exhaustion 分支"，这一条已写进成功消息（§3）。
 
 ## 9. 测试矩阵
 
-`poetry run pytest tests/unit/*gas* tests/integration/*gas*` → **189 passed, 1 skipped**。
+`poetry run pytest tests/unit/*gas* tests/integration/*gas*` → **213 passed, 4 skipped**
+（约 2m20s；4 项 skip 各自的原因见 §9.2、§9.1 与 `muti_block` 那条）。
 
 - `test_gas_consistency_stage0.py` — 静态 gas 正向 + 篡改 static gas 被抓。
 - `test_gas_consistency_stage1.py` — mstore_return / mload / sha3 / calldatacopy /
   codecopy / mcopy / mstore8 / revert / log1 正向 + 逐项篡改（memory gas、word gas、
   LOG flat/topic/data gas）+ 并行 path-observations 正反向。
 - `test_gas_consistency_host_uf.py` — 13 类 host/builtin 正向 + 篡改 opcode 名 / 参数
-  次序 / 漏扣 x86 侧 / 篡改 returnGas + 并行正反向。
+  次序 / 漏扣 x86 侧 / 篡改 returnGas + 并行正反向；另含 CREATE/CREATE2/EXTCODECOPY
+  这一组「可见 fee + host UF 混合」的正向（FIXED_BUDGET × FULL 双模式）、四条篡改
+  （InitCodeWordGas 2→9 / CREATE2 word 8→2 / copy word 3→9 / returnGas +1）与三条
+  **可达性**用例（见下）。
 - `test_gas_consistency_stage3.py` — status code 逐终止路径一致 + OOG 路径 status 一致
   + TAG 守卫次序 + 四类入口 fail-closed（模式-gas 错配双向、两侧初始 gas 不一致、
   可折叠为常量的 gas）+ 成功消息带范围 + 并行跨 context。
 - `test_gas_error_codes.py` — `calcMemSize64` 各错误分支、快照类、returnGas 窗口。
-- `test_gas_verifier_stage0_guard.py` — 拒绝集、IR 不变量正负例、CLI 参数、枚举归一化。
+- `test_gas_verifier_stage0_guard.py` — allowlist 三集合（差集为空的不变量、摘掉某个
+  已建模 kind 后立刻被拒、人工钩子仍生效）、IR 不变量正负例、CLI 参数、枚举归一化。
 - `test_gas_consistency_contracts.py` — 真实完整合约规模（见下节）。
 
 **每个 gas 能力都配一条反向篡改测试**（篡改后必须 SAT/失败）。这是本维度防假绿的主要
-手段，新增 gas 建模时必须同时补篡改用例。
+手段，新增 gas 建模时必须同时补篡改用例。篡改用例的断言要落到
+`COUNTEREXAMPLE FOUND` + `<observable> differs` 上——只断言 `not verified` 或
+`"gas" in msg` 的话，配置拒绝、scope 守卫拒绝、超时都能让它变绿。
+
+**正例还要防 vacuous**：`*_visible_fee_actually_charged` 在 EVM 侧扣费入口装计数器，
+确认符号执行真的走到了该指令并钉死其 word gas 常量（CREATE=2 / CREATE2=8 /
+EXTCODECOPY=3）。「VERIFIED」本身不排除「这条指令压根没被执行到」——路径被剪掉时两侧
+同样不扣，gas 照样相等。
+
+### 9.0 fixture 与生成器
+
+`tests/data/gas_*.{json,hex}` 由 `tests/data/generators/gas_fixture_gen_test.go` 产出
+（拷进 go-hpc-evm 的 `evm/aot/` 后 `GOARCH=amd64 go test -run TestGenGasFixtures`），
+绑定 go-hpc-evm commit `b3ddbdb`，用法与 GOARCH 陷阱见该目录 README。
+
+生成器**曾经只存在于 Go 工作树里、从未提交而丢失**，fixture 一度无法复现；现在它的家
+在本仓库，不要挪回去。
+
+CREATE 系新增的 fixture（操作数取互不相同的可辨识值）：
+
+| fixture | 操作数 | 覆盖点 |
+| --- | --- | --- |
+| `gas_create` | size=0x20, offset=0x40, value=7 | 内存扩展 + `InitCodeWordGas`(2)，returnGas=0 |
+| `gas_create_returngas` | 同上 + 尾部 POP/PUSH/ADD | **returnGas=13**：可见 fee 落在 add/sub 窗口内 |
+| `gas_create2` | salt=0x7b, size=0x20, offset=0x40, value=7 | `CREATE2_WORD_GAS`(8) 与 CREATE(2) 的区分 |
+| `gas_extcodecopy` | size=4, offset=7, destOffset=0x20, addr=1 | `calcMemSize64(Back(1),Back(3))` 槽位 + `CopyGas`(3) |
+| `gas_create_sym` / `gas_extcodecopy_sym` | size/offset 来自 CALLDATALOAD | 符号边界，**当前 skip**（见 9.2） |
 
 ### 9.1 合约级端到端覆盖
 
@@ -356,7 +431,14 @@ exhaustion 分支"，这一条已写进成功消息（§3）。
 
 配套反向用例：篡改入口 block `static_gas`（+1）、篡改 x86 侧 SLOAD 的 host UF opcode、
 `perf_erc20_lite_bug.hex` 的 SBB→SUB 功能 bug（确认新增的 OOG 分支与 path-local
-assumption 没有把功能反例约束掉）、Safe 的 EXTCODECOPY 触发入口 fail-closed。
+assumption 没有把功能反例约束掉）。
+
+Safe 曾是「拒绝集在真实合约上生效」的证据；EXTCODECOPY 解禁后该用例反转为断言它
+**不再**被 scope 守卫拒绝。Safe 的全合约端到端验证仍未跑通（无 selector 约束时 742
+block 的 dispatcher 撑开路径，实测 >6.5min 停在符号执行阶段），已 `@pytest.mark.skip`
+并注明启用条件。**这不是 EXTCODECOPY 解禁引入的**——Safe 在本仓库从来没有任何端到端
+覆盖，连 `GasCheck.OFF` 的功能等价测试都不存在。EXTCODECOPY 自身的 gas 覆盖由
+`gas_extcodecopy` fixture 承担，其可达性由 spy 计数坐实（§9）。
 
 **关于路径膨胀**：`GasCheck` 的注释预警过，开 gas 会打开 host gas UF，使后继 block 的
 `ULT(gas, static_gas)` 折不掉、OOG 分支全部存活（合成 12 block + 1 SLOAD 实测 EVM 终止
@@ -368,8 +450,47 @@ CErc20 在 FULL 下仍是 7.6s，决定规模的是输入形态而非 block 数�
 pair feasibility 阶段（同 fixture 在 `OFF` 下 68s）。该用例已写好并 `@pytest.mark.skip`，
 待路径规模压下来后启用。
 
-fixture 由 go-hpc-evm 侧的 in-package Go generator 产出，**必须 `GOARCH=amd64` 交叉
-编译**（arm64 Mac 上直接生成会写出 arm64 机器码，静默破坏测试）。
+### 9.2 符号操作数 fixture
+
+`gas_create_sym` / `gas_extcodecopy_sym`（size/offset 来自 `CALLDATALOAD`）把
+`memoryGasCost` 的 cap 支、`makeSafeMul`/`SafeAdd` 的溢出支与动态 OOG 推到**端到端**
+层面真实可达——常量 fixture 只能证明正常路径。这是这些错误分支**唯一的 IR↔x86 对照**
+（`test_gas_error_codes.py` 那组是 EVM 侧单测，没有 x86 侧对照）。
+
+**跑得动依赖一套特定配置，缺一不可**（`_SYMBOLIC_KWARGS` +
+`_verify_symbolic`）：
+
+| 配置项 | 作用 | 少了会怎样 |
+| --- | --- | --- |
+| `abstract_calldataload_words` **+** `summary_config` | 两侧 CALLDATALOAD 都走抽象 | **必须成对**。抽象在 EVM 侧无条件生效（`semantics.py`），x86 侧只在 CALLDATALOAD summary 里生效（`x86_64/summaries/calldataload.py`）。只开抽象不给 summary_config → 两侧取值不同 → 1.2s 就"抓到"一个 status code 反例，**那是配置不对称造成的假反例** |
+| `enable_merge=False` + `x86_reachability_timeout_ms=250` | 把 x86 终止路径 17→8 | 不加时 7×17=119 对 pair，实测 >40min 未完成；`skip_feasibility=True` 也救不回来 |
+| 固定 `calldata_size_bytes` | 去掉符号 calldatasize 那一层 | 路径再乘一层 |
+
+不加这套配置时**瓶颈不是求解不动**：逐对 verbose 显示每对的 status / memory / storage /
+gas 检查都是毫秒级 `unsat` 且**无一 unknown**，时间花在每对约 6s 的固定开销上
+（pair feasibility 预筛占大头）。与 `muti_block` 是同一个规模问题。
+
+实测结果：
+
+| fixture | 模式 | 结果 |
+| --- | --- | --- |
+| `gas_create_sym` | FIXED_BUDGET | ✅ ~12s |
+| `gas_extcodecopy_sym` | FIXED_BUDGET | ✅ ~62s |
+| `gas_create_sym` | FULL | ⏭ 单独跑 86s 通过，但同进程里排在自己的 FIXED_BUDGET 之后会退化到 >600s（见下） |
+| `gas_extcodecopy_sym` | FULL | ⏭ >420s 未完成 |
+
+FULL 两格 skip 不影响错误分支的覆盖：**12/13 分支在 FIXED_BUDGET 下同样可达**——它们由
+符号 offset/size 触发，与 gas 是否符号无关。`test_symbolic_fixture_error_branches_reachable`
+对两种 gas 形态都逐条枚举 EVM 终止路径并判可满足性，钉死 12 与 13 都在被验证的路径集合
+里（实测 7 条终止路径：13 四条、12 两条、STOPPED 一条）。FULL 只额外提供「对所有初始
+gas 量化」。
+
+**顺带发现的既有问题**：`gas_create_sym` 的 FULL 那格单独跑 86s 通过，但同进程里先跑过
+同一 fixture 的 FIXED_BUDGET 之后会退化到 >600s。两个测试顺序跑即可复现（与 CPU 竞争
+无关；排在其后的 `gas_extcodecopy_sym` 仍是 62s，所以是**同一 fixture 第二次执行**的
+问题，疑似 Z3 全局 context 累积——`effect_id` 取自 `op.pc`，两次执行符号名相同）。根因
+未定位，非 gas 改动引入。注意这是**性能**问题不是健全性问题：超时走 fail-closed，报
+TIMEOUT 失败而非假绿。
 
 ## 10. 关键文件
 
@@ -378,11 +499,13 @@ fixture 由 go-hpc-evm 侧的 in-package Go generator 产出，**必须 `GOARCH=
 | `state/evm_gas_state.py` | `EVMGasState`、费用纯函数（`memory_expansion_fee`/`word_fee`/`log_fee`） |
 | `state/host_gas.py` | host/builtin gas UF、returnGas 链、x86 侧扣减 |
 | `state/smt_state.py` | `symbolic_gas` / `gas_budget` 初始化、`host_gas_uf_enabled` |
-| `evm_ir/semantics.py` | `_charge_dynamic_gas` 与各 opcode 的扣费点次序 |
+| `evm_ir/semantics_gas.py` | `charge_dynamic_gas` / `charge_memory_and_word_gas` / `return_gas_for` |
+| `evm_ir/semantics.py` | 各 opcode 的扣费点次序（CREATE 系的 add→fee→host→sub 四段） |
 | `evm_ir/cfg_executor.py` | block 入口静态 gas、TAG 守卫内的 OOG 分叉 |
-| `verification/program_verifier.py` | `GasCheck` 模式、入口 fail-closed 守卫、结论范围标注 |
+| `verification/program_verifier.py` | `GasCheck` 模式、allowlist 范围守卫、结论范围标注 |
 | `verification/refinement_gas.py` | gas 终值等价检查 |
 | `x86_64/go_function_semantics.py` | builtin memory grow、x86 侧 host gas UF 注入 |
+| `tests/data/generators/` | fixture 生成器（Go）+ 用法 README，绑定上游 commit |
 
 ## 11. 模型演进（为什么旧文档的做法不能照抄）
 
