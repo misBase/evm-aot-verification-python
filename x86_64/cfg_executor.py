@@ -371,13 +371,16 @@ class X86SymbolicExecutor:
             default_from_end=True,
         )
 
-        # EVM 状态：stack/memory/gas 从第一个状态复制，storage 需合并（Go函数可能修改）
+        # 这三个是 EVM 侧字段，x86 侧从不读（对应物是 x86_memory 的 stack_mem /
+        # evm_mem 域，已在上面按 domain 合并），取哪条路径都不影响验证。
+        # **x86 真正的 gas 是 callengine_gas_remaining**，已随 side-channel 逐字段
+        # If 合并——别被下面这行 evm_gas 误导成"合并把 gas 丢了"。
         merged_mstate.evm_stack = states[0].mstate.evm_stack
         merged_mstate.evm_memory = states[0].mstate.evm_memory
         merged_mstate.evm_gas = states[0].mstate.evm_gas
-        merged_mstate.pc = states[0].mstate.pc
+        merged_mstate.pc = states[0].mstate.pc  # 合流点同一地址，各路径 pc 相等
 
-        # 合并 EVM storage（Go host函数调用可能修改storage）
+        # 合并 EVM storage：Go host 函数会读写它（_handle_sload/_handle_sstore），必须 If 合并
         from state.smt_state import EVMStorageState, EVMTransientStorageState
         storage_expr = states[-1].mstate.evm_storage.Storage
         for s in reversed(states[:-1]):
