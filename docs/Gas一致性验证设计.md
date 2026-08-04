@@ -398,12 +398,9 @@ EXTCODECOPY=3）。「VERIFIED」本身不排除「这条指令压根没被执�
 
 ### 9.0 fixture 与生成器
 
-`tests/data/gas_*.{json,hex}` 由 `tests/data/generators/gas_fixture_gen_test.go` 产出
-（拷进 go-hpc-evm 的 `evm/aot/` 后 `GOARCH=amd64 go test -run TestGenGasFixtures`），
-绑定 go-hpc-evm commit `b3ddbdb`，用法与 GOARCH 陷阱见该目录 README。
-
-生成器**曾经只存在于 Go 工作树里、从未提交而丢失**，fixture 一度无法复现；现在它的家
-在本仓库，不要挪回去。
+`tests/data/gas_*.{json,hex}` 由 go-hpc-evm `evm/aot` 包内的 `TestGenGasFixtures` 产出
+（`GOARCH=amd64 go test -run TestGenGasFixtures`），绑定 go-hpc-evm commit `b3ddbdb`；
+用法、GOARCH 陷阱与每条覆盖点见 `tests/data/README.md`。
 
 CREATE 系新增的 fixture（操作数取互不相同的可辨识值）：
 
@@ -505,7 +502,7 @@ TIMEOUT 失败而非假绿。
 | `verification/program_verifier.py` | `GasCheck` 模式、allowlist 范围守卫、结论范围标注 |
 | `verification/refinement_gas.py` | gas 终值等价检查 |
 | `x86_64/go_function_semantics.py` | builtin memory grow、x86 侧 host gas UF 注入 |
-| `tests/data/generators/` | fixture 生成器（Go）+ 用法 README，绑定上游 commit |
+| `tests/data/README.md` | gas fixture 用法、GOARCH 陷阱与覆盖点，绑定上游 commit |
 
 ## 11. 模型演进（为什么旧文档的做法不能照抄）
 

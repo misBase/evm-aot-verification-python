@@ -89,7 +89,7 @@ def _collect_assumptions(*states):
 # 全表：go-hpc-evm `evm/jump_table.go` 里带动态 gas 的全部指令（LOG0..LOG4 记作 "LOG"，
 # topic 数在 op.immediate）。
 #
-# 这张表**手工同步**，最后核对于 commit `b3ddbdb`（与 tests/data/generators/README.md
+# 这张表**手工同步**，最后核对于 commit `b3ddbdb`（与 tests/data/README.md
 # 记的 fixture 版本一致）。升级 go-hpc-evm 时必须按下面两条重抽一遍——漏登记的指令不
 # 进差集，守卫就不会拦它：
 #
