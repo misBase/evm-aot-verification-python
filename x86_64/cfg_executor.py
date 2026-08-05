@@ -388,6 +388,20 @@ class X86SymbolicExecutor:
             storage_expr = If(cond, s.mstate.evm_storage.Storage, storage_expr)
         merged_mstate.evm_storage = EVMStorageState(storage_array=storage_expr)
 
+        # 合并 host-gas 调用序号（If-chain，同上）：各路径调用次数不同时必须如实保留成
+        # If(cond, 1, 0)，否则后续 UF 的序号对某条路径是错的。
+        # simplify 不能省——Z3 不会自动把 If(c, 1, 1) 折成 1，而绝大多数合流点属于这种。
+        merged_seq = {}
+        zero = BitVecVal(0, 256)
+        for op in {k for s in states for k in s.mstate.host_gas_seq}:
+            expr = states[-1].mstate.host_gas_seq.get(op, zero)
+            for s in reversed(states[:-1]):
+                cond = s.get_constraints().as_bool()
+                s_seq = s.mstate.host_gas_seq.get(op, zero)
+                expr = If(cond, s_seq, expr)
+            merged_seq[op] = simplify(expr)
+        merged_mstate.host_gas_seq = merged_seq
+
         # 合并 EVM transient storage
         ts_expr = states[-1].mstate.evm_transient_storage.TransientStorage
         for s in reversed(states[:-1]):

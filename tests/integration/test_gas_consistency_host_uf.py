@@ -117,21 +117,53 @@ def test_host_gas_uf_tampered_opcode_caught(monkeypatch):
 
 
 def test_host_gas_uf_tampered_arg_order_caught(monkeypatch):
-    """防假绿:x86 侧 UF 参数次序错（SSTORE [key,val]→[val,key]）→ 不相消 → SAT。
+    """防假绿:x86 侧 UF 参数次序错（SSTORE 的 key/val 对调）→ 不相消 → SAT。
 
-    这正是 UF 按栈参数绑定带来的额外价值:抓「传给 host 的参数传错」的 codegen bug。"""
+    这正是 UF 按栈参数绑定带来的额外价值:抓「传给 host 的参数传错」的 codegen bug。
+
+    别把交换条件写成 `len(args) == 2`：SSTORE 后来多了个 old_val 参数，写死长度会让
+    篡改静默不生效、测试假绿（真发生过）。这里只交换前两个并断言确实交换到了。"""
     import x86_64.go_function_semantics as gfs
     orig = gfs.GoFunctionSemantics._deduct_host_gas_uf
+    swapped = []
 
     def tampered(self, mstate, opcode, args):
-        if opcode == "SSTORE" and len(args) == 2:
-            args = [args[1], args[0]]
+        if opcode == "SSTORE":
+            assert len(args) >= 2, f"SSTORE 的 UF 参数少于 2 个：{args}"
+            args = [args[1], args[0], *args[2:]]
+            swapped.append(opcode)
         return orig(self, mstate, opcode, args)
 
     monkeypatch.setattr(gfs.GoFunctionSemantics, "_deduct_host_gas_uf", tampered)
     verified, msg = _verify("gas_sstore")
+    assert swapped, "篡改根本没生效——这条测试没有在验它以为在验的东西"
     assert not verified, "tampered x86 UF arg order must be caught"
-    assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
+
+
+def test_sstore_old_value_participates_in_uf(monkeypatch):
+    """防假绿:x86 侧把 slot 原值换成写入**后**的值 → 与 EVM 侧不同 → SAT。
+
+    确认 old_val 这个参数真的参与相消、不是摆设。"""
+    import x86_64.go_function_semantics as gfs
+    orig = gfs.GoFunctionSemantics._deduct_host_gas_uf
+    tampered_calls = []
+
+    def tampered(self, mstate, opcode, args):
+        if opcode == "SSTORE" and len(args) == 3:
+            key, val, _old = args
+            # 写入后的值就是 val —— 模拟"取晚了"这个错误
+            args = [key, val, mstate.evm_storage.sload(key)]
+            tampered_calls.append(opcode)
+        return orig(self, mstate, opcode, args)
+
+    monkeypatch.setattr(gfs.GoFunctionSemantics, "_deduct_host_gas_uf", tampered)
+    verified, msg = _verify("gas_sstore")
+    assert tampered_calls, "篡改没生效"
+    assert not verified, "SSTORE 取写入后的值必须被抓到"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
 
 
 def test_host_gas_uf_missing_x86_charge_caught(monkeypatch):
@@ -158,6 +190,173 @@ def test_host_gas_uf_tampered_return_gas_caught(monkeypatch):
     verified, msg = _verify("gas_call_returngas")
     assert not verified, "tampered EVM returnGas must be caught"
     assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
+
+
+# --- host-gas UF 的调用序号：access-list 依赖（EIP-2929 冷热）---
+
+
+def test_sload_same_key_gas_consistency_passes():
+    """同一个 slot 读两次时两侧 gas 仍一致（序号机制没破坏相消）。
+
+    两次 SLOAD 各取序号 0 / 1，两侧必须取到相同序号才相消——这也是「两侧 host 调用
+    序列对齐」的端到端回归。"""
+    for mode in (GasCheck.FIXED_BUDGET, GasCheck.FULL):
+        verified, msg = _verify("gas_sload_same_key", mode=mode)
+        assert verified, f"gas_sload_same_key [{mode.value}] should verify, got: {msg}"
+
+
+def test_cold_warm_trajectory_is_in_the_verification_domain():
+    """真实的 (cold 2100, warm 100) 轨迹现在可满足——本次修复的直接证据。
+
+    加序号前两次调用是同一个 UF term，`uf==2100 ∧ uf==100` 直接矛盾，那条真实轨迹在
+    模型里根本不存在。带一条一元 UF 对照组坐实"改之前确实不可达"，而非 docstring 声称。
+    """
+    from z3 import BitVecSort, BitVecVal, Function, Solver, sat, unsat
+
+    from state.host_gas import host_gas_uf
+
+    key = BitVecVal(7, 256)          # fixture 里两次 SLOAD 都是 PUSH1 0x07
+    cold, warm = BitVecVal(2100, 64), BitVecVal(100, 64)
+
+    # 改后：序号让两次调用成为独立符号 → 真实轨迹可满足
+    first = host_gas_uf("SLOAD", [key], BitVecVal(0, 256))
+    second = host_gas_uf("SLOAD", [key], BitVecVal(1, 256))
+    solver = Solver()
+    solver.add(first == cold, second == warm)
+    assert solver.check() == sat, (
+        "真实的 cold→warm 轨迹必须在验证域内；UNSAT 说明序号没生效"
+    )
+
+    # 对照（= 改之前的形态）：同一个 term 不可能既是 2100 又是 100
+    unary = Function("host_gas_sload_unary_control", BitVecSort(256), BitVecSort(64))
+    control = Solver()
+    control.add(unary(key) == cold, unary(key) == warm)
+    assert control.check() == unsat, (
+        "对照组必须 UNSAT，否则这条测试证明不了序号带来的差别"
+    )
+
+
+def test_sload_seq_advances_across_calls():
+    """序号确实随调用递增，且非 access-list 指令不取号。"""
+    from z3 import BitVecVal, simplify
+
+    from state.host_gas import next_host_gas_seq
+
+    state = SMTState.create_initial_state()
+    assert simplify(next_host_gas_seq(state, "SLOAD")) == BitVecVal(0, 256)
+    assert simplify(next_host_gas_seq(state, "SLOAD")) == BitVecVal(1, 256)
+    # EXP 的 gas 是 exponent 的纯函数，不该被序号区分开
+    assert next_host_gas_seq(state, "EXP") is None
+
+
+def test_sload_seq_is_per_path():
+    """路径分叉后各分支独立计数——共享计数器会让一条路径的 SLOAD 抬高另一条的序号。"""
+    from z3 import BitVecVal, simplify
+
+    from state.host_gas import next_host_gas_seq
+
+    parent = SMTState.create_initial_state()
+    next_host_gas_seq(parent, "SLOAD")          # parent 走到 seq=1
+    branch = parent.copy()
+    next_host_gas_seq(branch, "SLOAD")          # 只有 branch 前进
+    assert simplify(parent.host_gas_seq["SLOAD"]) == BitVecVal(1, 256)
+    assert simplify(branch.host_gas_seq["SLOAD"]) == BitVecVal(2, 256)
+
+
+def test_seq_stays_a_numeral_across_many_calls():
+    """序号必须逐次折叠成 numeral，否则会长成 `0+1+1+...` 的加法链并进到 UF 参数里。"""
+    from z3 import BitVecVal, is_bv_value
+
+    from state.host_gas import next_host_gas_seq
+
+    state = SMTState.create_initial_state()
+    for _ in range(6):
+        seq = next_host_gas_seq(state, "SLOAD")
+    assert is_bv_value(seq), f"序号退化成未化简的表达式：{seq}"
+    assert seq == BitVecVal(5, 256)
+    assert is_bv_value(state.host_gas_seq["SLOAD"])
+
+
+@pytest.mark.parametrize("workers,enable_merge", [(1, False), (2, True)])
+def test_tampered_x86_seq_offset_caught(monkeypatch, workers, enable_merge):
+    """防假绿：**只**把 x86 侧的序号推快一格 → 与 EVM 侧不同 term → 不相消 → SAT。
+
+    必须单侧篡改：改 `host_gas.next_host_gas_seq` 会同时命中两侧（EVM 侧也从模块
+    __dict__ 查它），一起偏移照样相消 → 假绿。enable_merge=True 那组顺带覆盖合流点
+    If-chain 合并，workers=2 覆盖并行 worker 的独立 Z3 context。"""
+    from z3 import BitVecVal
+
+    import x86_64.go_function_semantics as gfs
+
+    orig = gfs.GoFunctionSemantics._deduct_host_gas_uf
+
+    def tampered(self, mstate, opcode, args):
+        if opcode == "SLOAD":
+            cur = mstate.host_gas_seq.get(opcode, BitVecVal(0, 256))
+            mstate.host_gas_seq[opcode] = cur + BitVecVal(1, 256)
+        return orig(self, mstate, opcode, args)
+
+    monkeypatch.setattr(gfs.GoFunctionSemantics, "_deduct_host_gas_uf", tampered)
+    verified, msg = _verify(
+        "gas_sload_same_key", path_observations=True,
+        path_pair_workers=workers, enable_merge=enable_merge,
+    )
+    assert not verified, "x86 序号偏移必须被抓到"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
+
+
+def test_tampered_evm_seq_frozen_caught(monkeypatch):
+    """防假绿：**只**冻结 EVM 侧的序号（每次都用 0）→ 第二次调用与 x86 侧不同 → SAT。
+
+    与上一条互补，验的是 EVM 侧序号确实在递增：若退化成恒 0，第一次调用仍相消、只有
+    第二次露馅——所以 fixture 必须是同一个 key 读两次。patch `charge_host_gas_uf`
+    只命中 EVM 侧（x86 侧走 `deduct_host_gas_uf_x86`），不会串到对侧。"""
+    import state.host_gas as hg
+
+    orig = hg.charge_host_gas_uf
+    frozen = []
+
+    def tampered(state, opcode, stack_args):
+        if opcode == "SLOAD":
+            state.host_gas_seq.pop(opcode, None)   # 每次都从 0 重新开始
+            frozen.append(opcode)
+        return orig(state, opcode, stack_args)
+
+    monkeypatch.setattr(hg, "charge_host_gas_uf", tampered)
+    verified, msg = _verify("gas_sload_same_key")
+    assert frozen, "篡改没生效——EVM 侧根本没走 charge_host_gas_uf"
+    assert not verified, "EVM 侧序号不递增必须被抓到"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
+
+
+def test_host_gas_seq_kinds_is_locked():
+    """锁定 HOST_GAS_SEQ_KINDS 的**精确**集合。
+
+    `host_gas_uf` 的 fail-closed 守卫只拦「在集合里却漏传 seq」，拦不住反方向——某个
+    opcode 被移出后两侧都退回一元 UF、照样相消、测试全绿而序号静默失效。改这张表前先
+    回答：该 opcode 的 Go gas 函数依赖 access list 吗？依据见 host_gas.py 与设计文档 §7.1。"""
+    from state.host_gas import HOST_GAS_SEQ_KINDS, HOST_GAS_UF_KINDS
+
+    assert HOST_GAS_SEQ_KINDS == frozenset({
+        # EIP-2929 冷热：gas 函数读写 access list
+        "SLOAD", "SSTORE", "BALANCE",
+        "EXTCODESIZE", "EXTCODEHASH", "EXTCODECOPY",
+        "CALL", "CALLCODE", "DELEGATECALL", "STATICCALL",
+    }), "HOST_GAS_SEQ_KINDS 变了；确认新成员的 Go gas 函数真的依赖 access list"
+
+    # 明确排除的三个，各有依据，别顺手加回来
+    assert "SELFDESTRUCT" not in HOST_GAS_SEQ_KINDS, "gasSuicide 固定 return 0"
+    assert "EXP" not in HOST_GAS_SEQ_KINDS, "50*byteLen(exponent)+10 是纯函数"
+    for kind in ("CREATE", "CREATE2"):
+        assert kind not in HOST_GAS_SEQ_KINDS, (
+            f"{kind} 不依赖 access list；它的隐藏依赖是 GetRemainingGas 的具体数值，"
+            "要靠 gas_before 进签名，序号不对症"
+        )
+
+    # 序号集合必须是 UF 集合的子集——不在 UF 里的 opcode 压根不会走到取号那一步
+    assert HOST_GAS_SEQ_KINDS <= HOST_GAS_UF_KINDS
 
 
 # --- CREATE / CREATE2 / EXTCODECOPY：可见 fee + host UF 混合 ---

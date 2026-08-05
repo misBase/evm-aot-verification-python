@@ -857,11 +857,14 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # 状态码 6 在 AOT 运行时不是可观察量，codegen 也从不发射它。
         key, stack_after_pop1 = state.evm_stack.pop()
         val, stack_after_pop2 = stack_after_pop1.pop()
+        # slot 写入前的值：gasSStoreEIP2929 的档位取决于 current 值，必须在 sstore
+        # 之前取，写完再取只会拿回 val 本身。x86 侧 _handle_sstore 同序。
+        old_val = state.evm_storage.sload(key)
         state.evm_storage = state.evm_storage.sstore(key, val)
         state.evm_stack = stack_after_pop2
-        # host gas（冷热 + 退款）不可见 → UF，依赖 key 与待写 value。
+        # host gas（冷热 + 退款）不可见 → UF，依赖 key、待写 value 与 slot 原值。
         from state.host_gas import charge_host_gas_uf
-        charge_host_gas_uf(state, "SSTORE", [key, val])
+        charge_host_gas_uf(state, "SSTORE", [key, val, old_val])
         return state
 
     elif kind == "CALLDATASIZE":

@@ -411,10 +411,13 @@ class GoFunctionSemantics:
         """SSTORE: pop key, pop value, Store(Storage, key, value)。"""
         key, sp, mstate = self._pop_uint256(sp, mstate)
         val, sp, mstate = self._pop_uint256(sp, mstate)
+        # 与 EVM 侧同序：slot 原值必须在 sstore 之前取（gasSStoreEIP2929 的档位取决于
+        # current 值），写完再取拿到的就是 val 本身。
+        old_val = mstate.evm_storage.sload(key)
         mstate.evm_storage = mstate.evm_storage.sstore(key, val)
         mstate = self._update_sp_in_memory(sp, mstate)
-        # host gas UF，与 EVM 侧同参 [key, val] 相消。
-        self._deduct_host_gas_uf(mstate, "SSTORE", [key, val])
+        # host gas UF，与 EVM 侧同参 [key, val, old_val] 相消。
+        self._deduct_host_gas_uf(mstate, "SSTORE", [key, val, old_val])
         return mstate
 
     def _handle_sha3(self, sp: int, mstate: SMTState) -> SMTState:

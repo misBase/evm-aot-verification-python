@@ -7,7 +7,7 @@
 - host_gas_uf_enabled 关时 charge_host_gas_uf 不动 gas（不污染功能等价）。
 """
 
-from z3 import BitVec, Solver, sat, unsat
+from z3 import BitVec, BitVecVal, Solver, sat, unsat
 
 from state.host_gas import (
     HOST_GAS_UF_KINDS,
@@ -20,24 +20,57 @@ from state.smt_state import SMTState
 
 
 def test_same_opcode_same_args_cancel():
-    """同 opcode + 同参 → 两次 UF 求值恒相等（相消）。"""
+    """同 opcode + 同参 + **同序号** → 两次 UF 求值恒相等（相消）。
+
+    SLOAD 在 HOST_GAS_SEQ_KINDS 里，序号是 UF 签名的一部分，所以「同参」现在意味着
+    栈参数与序号都相同——两侧对同一次调用取到同一个序号时才该相消。"""
     a = BitVec("a", 256)
-    u1 = host_gas_uf("SLOAD", [a])
-    u2 = host_gas_uf("SLOAD", [a])
+    seq = BitVecVal(0, 256)
+    u1 = host_gas_uf("SLOAD", [a], seq)
+    u2 = host_gas_uf("SLOAD", [a], seq)
     s = Solver()
     s.add(u1 != u2)
-    assert s.check() == unsat, "same opcode + same args must be equal (cancel)"
+    assert s.check() == unsat, "same opcode + same args + same seq must cancel"
 
 
 def test_same_opcode_diff_args_not_cancel():
     """同 opcode + 不同参 → 可不等（不假相消，安全）。"""
     a = BitVec("a", 256)
     b = BitVec("b", 256)
-    u1 = host_gas_uf("SLOAD", [a])
-    u2 = host_gas_uf("SLOAD", [b])
+    seq = BitVecVal(0, 256)
+    u1 = host_gas_uf("SLOAD", [a], seq)
+    u2 = host_gas_uf("SLOAD", [b], seq)
     s = Solver()
     s.add(u1 != u2)
     assert s.check() == sat, "different args must be allowed to differ"
+
+
+def test_same_args_diff_seq_not_cancel():
+    """**本次修复的核心性质**：同 key 的两次 SLOAD 可以扣不同的 gas。
+
+    gasSLoadEIP2929 首次返回 cold(2100)、之后 warm(100)。加序号前这两次是同一个
+    term、必然同值，真实轨迹在模型里不存在；加序号后它们是独立符号。"""
+    a = BitVec("a", 256)
+    u_first = host_gas_uf("SLOAD", [a], BitVecVal(0, 256))
+    u_second = host_gas_uf("SLOAD", [a], BitVecVal(1, 256))
+    s = Solver()
+    s.add(u_first != u_second)
+    assert s.check() == sat, (
+        "consecutive SLOADs on the same key must be allowed to cost differently "
+        "(cold 2100 then warm 100)"
+    )
+
+
+def test_seq_kind_opcode_requires_seq():
+    """fail-closed：HOST_GAS_SEQ_KINDS 里的指令漏传 seq 必须抛错。
+
+    漏传会生成一元 host_gas_sload(key)——两侧都误用旧接口时照样相消，seq 静默失效
+    而测试全绿。"""
+    import pytest
+
+    a = BitVec("a", 256)
+    with pytest.raises(ValueError, match="seq"):
+        host_gas_uf("SLOAD", [a])
 
 
 def test_different_opcode_not_cancel():
@@ -45,8 +78,9 @@ def test_different_opcode_not_cancel():
     EXTCODESIZE（都 1 个 addr 参数）精确隔离「名字不同」这一条性质，避免与
     「arity 不同」混淆。"""
     a = BitVec("a", 256)
-    u_balance = host_gas_uf("BALANCE", [a])
-    u_extcodesize = host_gas_uf("EXTCODESIZE", [a])
+    seq = BitVecVal(0, 256)          # 两者都在 HOST_GAS_SEQ_KINDS 里，序号也取同一个
+    u_balance = host_gas_uf("BALANCE", [a], seq)
+    u_extcodesize = host_gas_uf("EXTCODESIZE", [a], seq)
     s = Solver()
     s.add(u_balance != u_extcodesize)
     assert s.check() == sat, "distinct opcode names must not share a UF symbol"
@@ -78,8 +112,9 @@ def test_uf_preserves_full_256bit_identity():
 def test_uf_same_full_value_still_cancels():
     """对照 Fix #1:完整 256 位值相等时 UF 仍恒等（相消性质不被破坏）。"""
     a = BitVec("a", 256)
-    u1 = host_gas_uf("SLOAD", [a])
-    u2 = host_gas_uf("SLOAD", [a])
+    seq = BitVecVal(0, 256)
+    u1 = host_gas_uf("SLOAD", [a], seq)
+    u2 = host_gas_uf("SLOAD", [a], seq)
     s = Solver()
     s.add(u1 != u2)
     assert s.check() == unsat, "same full 256-bit value must still cancel"

@@ -40,7 +40,7 @@ status）。范围声明见 ProgramEquivalenceChecker.__init__。
 
 from typing import Sequence
 
-from z3 import BitVecRef, BitVecSort, BitVecVal, Function, If, UGT, ZeroExt
+from z3 import BitVecRef, BitVecSort, BitVecVal, Function, If, UGT, ZeroExt, simplify
 
 
 # B 类 host function 指令（gas 在 Go host runtime，x86 不可见）。
@@ -68,6 +68,34 @@ HOST_GAS_BUILTIN_KINDS = frozenset({
 # 所有需要 host-gas UF 兜底的指令。
 HOST_GAS_UF_KINDS = HOST_GAS_HOST_KINDS | HOST_GAS_BUILTIN_KINDS
 
+# 带 access-list 依赖的指令：UF 额外吃一个「调用序号」参数。
+#
+# 它们的 Go gas 函数读并**修改** access list，同参调用两次成本不同（SLOAD 首次
+# ColdSloadCostEIP2929=2100、之后 WarmStorageReadCostEIP2929=100）。Z3 的 Function
+# 同参必然同值，不带序号就只能表示 `(c, c)`，真实的 `(2100, 100)` 轨迹不在验证域内。
+#
+# ⚠️ seq 只是**调用事件的区分符**，不是 access list 的状态模型：它保证不同次调用*可以*
+# 取不同值，不表达"第一次必 cold"。详见 docs/Gas一致性验证设计.md §7.1。
+#
+# 收录判据是 Go gas 函数是否依赖 access list，逐条核对过 evm/gas_table.go。明确不收：
+# SELFDESTRUCT（gasSuicide:443 固定 return 0，无 EIP 覆盖）、EXP（纯函数，加 seq 只会
+# 丢掉"同参必同价"）、CREATE/CREATE2（gas 函数忽略 *EVM/*Contract）。
+HOST_GAS_SEQ_KINDS = frozenset({
+    "SLOAD",
+    "BALANCE",
+    "EXTCODESIZE",
+    "EXTCODEHASH",
+    "EXTCODECOPY",
+    # SSTORE 除序号外还吃 slot 的写入前值：gasSStoreEIP2929 的档位取决于 current 值。
+    "SSTORE",
+    # CALL 系还有一个 seq 管不了的隐藏依赖：gasCall 把 63/64 转发额度算进 cost
+    # （host.go:369/406），取决于 gas 的具体数值，要靠 gas_before 进签名，不在本次范围。
+    "CALL",
+    "CALLCODE",
+    "DELEGATECALL",
+    "STATICCALL",
+})
+
 
 def _normalize_uf_arg(value: BitVecRef) -> BitVecRef:
     """把栈参数统一成 256-bit，保证两侧 UF signature 一致。
@@ -94,7 +122,8 @@ def _normalize_uf_arg(value: BitVecRef) -> BitVecRef:
     )
 
 
-def host_gas_uf(opcode: str, stack_args: Sequence[BitVecRef]) -> BitVecRef:
+def host_gas_uf(opcode: str, stack_args: Sequence[BitVecRef],
+                seq: BitVecRef | None = None) -> BitVecRef:
     """构造一次 host/builtin 调用的 gas 副作用 UF（64-bit gas cost）。
 
     opcode 编进函数名，故 SLOAD 与 SSTORE 是不同符号，不会被 Z3 当成同一函数而
@@ -104,14 +133,44 @@ def host_gas_uf(opcode: str, stack_args: Sequence[BitVecRef]) -> BitVecRef:
     Args:
         opcode: 指令名（大写，如 "SLOAD"）。
         stack_args: 该指令影响 gas 的栈输入（规范化前的原始 BitVec）。
+        seq: HOST_GAS_SEQ_KINDS 里的指令必填——本路径上的调用序号，作为末位参数。
+            是 BitVec 而非 int：x86 合流点合并后可能是 `If(cond, 1, 0)`，此时相消靠
+            EUF congruence 而不是语法同一。
 
     Returns:
         64-bit BitVec，表示这一次 host 调用扣减的 gas。
+
+    Raises:
+        ValueError: HOST_GAS_SEQ_KINDS 里的指令漏传 seq。
     """
+    # fail-closed：漏传 seq 会生成一元 host_gas_sload(key)，Z3 里 arity 不同就是另一个
+    # 函数符号——两侧都误用旧接口时照样相消，seq 静默失效而测试全绿。
+    if opcode in HOST_GAS_SEQ_KINDS and seq is None:
+        raise ValueError(
+            f"{opcode} 依赖 access list，host_gas_uf 必须带 seq（见 HOST_GAS_SEQ_KINDS）；"
+            "漏传会退化成一元 UF 并静默失去调用间的区分度"
+        )
     args = [_normalize_uf_arg(a) for a in stack_args]
+    if seq is not None:
+        args.append(_normalize_uf_arg(seq))
     arg_sorts = [BitVecSort(256) for _ in args]
     f = Function(f"host_gas_{opcode.lower()}", *arg_sorts, BitVecSort(64))
     return f(*args)
+
+
+def next_host_gas_seq(state, opcode: str) -> BitVecRef | None:
+    """取该 opcode 在本路径上的当前调用序号并递增；非 stateful 指令返回 None。
+
+    两侧共用这一份递增规则——序号一旦不一致，UF 就不相消。计数器随 state.copy() 走，
+    路径分叉后各分支独立计数；合流合并见 cfg_executor._merge_at_confluence。
+    """
+    if opcode not in HOST_GAS_SEQ_KINDS:
+        return None
+    counters = state.host_gas_seq
+    seq = counters.get(opcode, BitVecVal(0, 256))
+    # simplify 不能省：Z3 不折叠常量，否则序号会长成 `0+1+1+...` 的加法链。
+    counters[opcode] = simplify(seq + BitVecVal(1, 256))
+    return seq
 
 
 def charge_host_gas_uf(state, opcode: str, stack_args: Sequence[BitVecRef]):
@@ -131,7 +190,8 @@ def charge_host_gas_uf(state, opcode: str, stack_args: Sequence[BitVecRef]):
     """
     if not getattr(state, "host_gas_uf_enabled", False):
         return state
-    cost = host_gas_uf(opcode, stack_args)
+    # 序号在开关**之后**才取：OFF 模式下计数器一动不动，功能等价验证零影响。
+    cost = host_gas_uf(opcode, stack_args, next_host_gas_seq(state, opcode))
     state.evm_gas = state.evm_gas.consume_dynamic(cost)
     return state
 
@@ -223,7 +283,8 @@ def deduct_host_gas_uf_x86(mstate, opcode: str, stack_args: Sequence[BitVecRef],
         return
     from x86_64.models import Register
 
-    cost = host_gas_uf(opcode, stack_args)
+    # 与 EVM 侧 charge_host_gas_uf 同序取号：两侧序号必须一致才相消。
+    cost = host_gas_uf(opcode, stack_args, next_host_gas_seq(mstate, opcode))
     gas_before = mstate.callengine_gas_remaining
     gas_after = _consume_clamp_64(gas_before, cost)
 

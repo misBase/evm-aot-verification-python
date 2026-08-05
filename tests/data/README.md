@@ -41,6 +41,7 @@ head -c 8 gas_create2.hex   # 期望 4d8b7538（arm64 是 011c40f9）
 
 1. **操作数取互不相同的可辨识值**。全 0 的退化实例会同时掩盖槽位交换（如 `calcMemSize64` 的 `Back(1)`/`Back(3)` 搞反）与 host-gas UF 的参数顺序错误——旧版 `gas_create` 的 value/offset/size 全 0 且 `size==0`，内存扩展 fee 与 word gas 双双为 0，等于什么都没验。
 2. **IR 的 `MarshalJSON` 必须在 `compileEvmFunction` 之后**——后者原地填 host op 的 `Param` 为 host function index；先 marshal 会导出 `Param=0` 的残缺 IR，Python 侧解析出的 host 调用点全部错位。
+3. **要验 host-gas 调用序号就得用同一个 key/地址调两次**。`gas_two_sload` 读的是两个**不同** slot，两次调用本来就是不同 UF term，验不到序号机制；`gas_sload_same_key` 才是那条（同 slot 读两次 → 真实 cold 2100 然后 warm 100，见 `docs/Gas一致性验证设计.md` §7.1）。
 
 ## 真实合约 `ext_contracts/`
 

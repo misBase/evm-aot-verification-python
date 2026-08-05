@@ -211,6 +211,10 @@ class SMTState:
         # 属于声明范围之外而非缺口，理由见 state/host_gas.py 模块 docstring。
         self.host_gas_uf_enabled: bool = False
 
+        # host-gas UF 的调用序号计数器 {opcode: 下一个序号}，值是 256-bit BitVec
+        # （合流合并后可能是 If 表达式）。递增规则见 host_gas.next_host_gas_seq。
+        self.host_gas_seq: dict = {}
+
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
         self.stack_base = None
         self.stack_num_inputs = 0
@@ -252,9 +256,10 @@ class SMTState:
             未初始化字段的SMTState实例
         """
         state = cls.__new__(cls)
-        # 唯一在这里初始化的字段：空队列必须是真列表而非缺失属性，
+        # 在这里初始化的字段都是同一个理由：空容器必须是真容器而非缺失属性，
         # 否则消费方到处都要写 getattr 兜底。
         state.pending_errors = []
+        state.host_gas_seq = {}
         return state
 
     def copy(self) -> 'SMTState':
@@ -301,6 +306,8 @@ class SMTState:
         # 后续 add_assumption() 只影响当前路径，不会回流到父/兄弟路径。
         src_assumptions = getattr(self, 'assumptions', None)
         new_state.assumptions = list(src_assumptions) if src_assumptions else None
+        # 必须拷 dict：共享会让 sibling 路径互相计数（值是 Z3 表达式，浅拷贝够用）。
+        new_state.host_gas_seq = dict(self.host_gas_seq)
         self.copy_verification_options_to(new_state)
 
         return new_state

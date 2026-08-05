@@ -257,7 +257,8 @@ EVM 侧 bookkeeping 分叉）。同时按 `if targetMemSize > memLen` 只增不�
 
 x86 机器码里没有这段 gas 指令，就没有对照对象。做法：建成同名 UF
 `host_gas_<opcode>(*stack_args)`，两侧在各自调用点各扣同一个 UF，Z3 中同名同参求值到同
-一符号，比较时相消，只留下两侧可见的 gas 做真实比较。
+一符号，比较时相消，只留下两侧可见的 gas 做真实比较。带 access-list 依赖的指令还会多吃
+一个**调用序号**参数（§7.1）。
 
 - 覆盖 `HOST_GAS_HOST_KINDS`（SLOAD/SSTORE/BALANCE/EXTCODESIZE/EXTCODEHASH/EXTCODECOPY/
   SELFDESTRUCT/CALL 四件套/CREATE 两件套）+ `HOST_GAS_BUILTIN_KINDS`（EXP）。
@@ -273,6 +274,69 @@ x86 机器码里没有这段 gas 指令，就没有对照对象。做法：建�
 
 **强度边界**：证的是「两侧扣了同一个 gas、传给 host 的栈参数一致」——能抓参数传错、
 次序错位、漏扣的 codegen bug；**不是** host gas 公式本身正确。后者是 assume。
+
+### 7.1 调用序号：把 access-list 依赖搬进 UF 签名
+
+Z3 的 `Function` 是纯函数，同参必然同值。而 Go 侧的 `gasSLoadEIP2929`
+（`evm/gas_table.go:524`）**不是**——它读 `SlotInAccessList` 并且**自己修改**它：
+
+```go
+if _, slotPresent := ...SlotInAccessList(addr, slot); !slotPresent {
+    ...AddSlotToAccessList(addr, slot)          // 副作用
+    return params.ColdSloadCostEIP2929, nil     // 2100
+}
+return params.WarmStorageReadCostEIP2929, nil   // 100
+```
+
+同一个 slot 读两次真实是 `(2100, 100)`，而不带序号的模型只能表示 `(c, c)` ——真实执行
+走过的中间状态 `G−2100` 在**任何** UF 赋值下都不存在，验证域少了一片真实可达的 gas 轨迹
+（gas 参与控制流，OOG 分叉的阈值判断就落在这些中间状态上）。
+
+做法：给 `HOST_GAS_SEQ_KINDS` 里的指令在 UF 末尾追加一个**调用序号**参数，
+`host_gas_sload(key)` → `host_gas_sload(key, seq)`。序号取自
+`SMTState.host_gas_seq`，递增规则集中在 `host_gas.next_host_gas_seq`（两侧共用，分开写
+迟早漂移）。
+
+几个要点：
+
+- **序号是 Z3 的 256-bit BitVec，不是 Python int**。x86 合流点合并后它可以是
+  `If(cond, 1, 0)`；此时相消靠 EUF congruence（参数相等 ⟹ 函数值相等）而非语法同一。
+  合并在 `_merge_at_confluence` 里按与 `evm_storage` 相同的 If-chain 范式处理，**必须
+  带 `simplify`**——Z3 不会自动把 `If(c,1,1)` 折成 `1`，不折就会在每个合流点堆一层。
+- **按 opcode 计数，不按 (opcode, key)**：key 是符号量，建模期无法判断 `k1 == k2`。
+  粗划分只增加自由度，两种真实情况都能表示（同 key `(2100,100)` 与不同 key
+  `(2100,2100)`）。
+- **漏传序号 fail-closed**：`host_gas_uf` 对 `HOST_GAS_SEQ_KINDS` 里的指令强制要求
+  `seq`。漏传会生成**一元** UF——Z3 里 arity 不同就是另一个函数符号，两侧都误用旧接口时
+  照样相消、序号机制静默失效而测试全绿，那是真实的假绿路径。
+- SSTORE 除序号外还吃 slot 的**写入前**值（`gasSStoreEIP2929` 的档位取决于 current
+  值）。两侧都必须在 `sstore` 之前取，写完再取只会拿回 `val` 本身。
+
+**收录判据**是「Go gas 函数是否依赖 access list」，逐条核对过 `gas_table.go`。明确
+**不收**的三个：
+
+| opcode | 为什么不加 |
+| --- | --- |
+| SELFDESTRUCT | `gasSuicide:443` 固定 `return 0, nil`，全仓库无 EIP 覆盖 —— 没有隐藏依赖 |
+| EXP | `50*byteLen(exponent)+10` 是真纯函数，加序号只会丢掉「同参必同价」这条正确信息 |
+| CREATE / CREATE2 | 解释器 gas 函数（`gasCreate2:278` 等）签名里 `_ *EVM, _ *Contract` 都被忽略，不依赖 access list |
+
+**仍未覆盖的隐藏依赖**：CALL 系的 63/64 转发与 CREATE/CREATE2 的
+`GetRemainingGas`（`evm/host.go:369/406` 的 `gas -= gas/64`）取决于 gas 的**具体数值**
+而非调用次序，序号代理不了。要表达它们得把 `gas_before` 加进 UF 签名——那是独立的一件
+事，且**与「给 UF 加协议上界」不是同一件事**：加参数修的是 UF identity 缺 gas 状态，
+加上界（注入 `ULE(...)` 之类）才是剪枝，后者需要前者但不会由前者自动产生。
+
+**强度边界的变化**：约束从「同参必同价」松成「同参 + 同次序必同价」。这是**放松**，
+方向安全（自由度只增不减），代价是不再断言"两次同参调用等价"。
+
+⚠️ 序号是**动态调用事件的区分符**，不是 access list 的状态模型：它只保证不同次调用
+*可以*取不同值，不表达"第一次必 cold、之后必 warm"（真实冷热还取决于同一 key 在别处
+是否已被访问、跨分支的访问历史，都没建模）。别把它写成"建模了 EIP-2929"。
+
+**顺带收益（有限）**：两侧 host 调用序列若在数量或次序上偏移，序号就对不上 → UF 不相消
+→ SAT。所以 `call_site_mapping` 的顺序假设从完全静默变成**部分**可检测——但它抓不住
+「opcode、参数、动态序号三者都相同的两个站点互换」，那种情况 UF 照样相消。
 
 ### host gas 耗尽后的终止：不在范围内，也不是缺口
 
@@ -366,8 +430,14 @@ LOG0..LOG4 映射到 IR kind 统一是 `"LOG"`（topic 数在 `op.immediate`）�
 
 ## 9. 测试矩阵
 
-`poetry run pytest tests/unit/*gas* tests/integration/*gas*` → **213 passed, 4 skipped**
-（约 2m20s；4 项 skip 各自的原因见 §9.2、§9.1 与 `muti_block` 那条）。
+Gas 主验收命令：
+
+```bash
+poetry run pytest tests/unit/*gas* tests/integration/*gas* -q
+```
+
+预期无非预期失败；有意标记为 skip 的用例由测试自身的 `reason` 说明范围与启用条件。
+不在文档中固化 passed/skipped 数量或耗时，避免正常的测试增减与机器性能差异造成陈旧信息。
 
 - `test_gas_consistency_stage0.py` — 静态 gas 正向 + 篡改 static gas 被抓。
 - `test_gas_consistency_stage1.py` — mstore_return / mload / sha3 / calldatacopy /
@@ -377,7 +447,14 @@ LOG0..LOG4 映射到 IR kind 统一是 `"LOG"`（topic 数在 `op.immediate`）�
   次序 / 漏扣 x86 侧 / 篡改 returnGas + 并行正反向；另含 CREATE/CREATE2/EXTCODECOPY
   这一组「可见 fee + host UF 混合」的正向（FIXED_BUDGET × FULL 双模式）、四条篡改
   （InitCodeWordGas 2→9 / CREATE2 word 8→2 / copy word 3→9 / returnGas +1）与三条
-  **可达性**用例（见下）。
+  **可达性**用例（见下）；调用序号（§7.1）另有 `gas_sload_same_key` 双模式正向、
+  cold/warm 轨迹可满足性（含一元 UF 对照组必须 UNSAT）、序号递增与 per-path 隔离、
+  x86 单侧序号偏移（workers 1/2 × enable_merge）、EVM 单侧序号冻结、
+  `HOST_GAS_SEQ_KINDS` 精确集合锁定，以及 SSTORE old_val 取错时机篡改。
+- `test_host_gas_seq_merge.py` — 合流点分歧合并：一支执行过 SLOAD、一支没有时序号合成
+  `If(cond,1,0)`，合流后两支继续各自递增；序号相同时折成常量（验 `simplify` 没漏）。
+  这条路径**现有 fixture 覆盖不到**（实测 perf_erc20_lite 143 次合并只有 6 次多路径，
+  且那 6 次两支 gas 逐位相同），只能直接构造状态测合并逻辑。
 - `test_gas_consistency_stage3.py` — status code 逐终止路径一致 + OOG 路径 status 一致
   + TAG 守卫次序 + 四类入口 fail-closed（模式-gas 错配双向、两侧初始 gas 不一致、
   可折叠为常量的 gas）+ 成功消息带范围 + 并行跨 context。
@@ -411,6 +488,7 @@ CREATE 系新增的 fixture（操作数取互不相同的可辨识值）：
 | `gas_create2` | salt=0x7b, size=0x20, offset=0x40, value=7 | `CREATE2_WORD_GAS`(8) 与 CREATE(2) 的区分 |
 | `gas_extcodecopy` | size=4, offset=7, destOffset=0x20, addr=1 | `calcMemSize64(Back(1),Back(3))` 槽位 + `CopyGas`(3) |
 | `gas_create_sym` / `gas_extcodecopy_sym` | size/offset 来自 CALLDATALOAD | 符号边界，**当前 skip**（见 9.2） |
+| `gas_sload_same_key` | 两次 `SLOAD(0x07)` | 调用序号（§7.1）：同 slot 读两次的 cold→warm 轨迹。现有 `gas_two_sload` 用的是两个**不同** key，验不到这条 |
 
 ### 9.1 合约级端到端覆盖
 

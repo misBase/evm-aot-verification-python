@@ -577,6 +577,8 @@ def _consume_pending_errors(state: SMTState) -> SMTState:
         combined = SMTState._create_empty()
         combined.__dict__.update(merged.__dict__)
         combined.pending_errors = []
+        # __dict__.update 是浅拷贝，会让 combined 与 merged 共享同一个 seq dict。
+        combined.host_gas_seq = dict(merged.host_gas_seq)
         combined.error_code = If(cond, error_state.error_code, merged.error_code)
         combined.return_offset = If(cond, error_state.return_offset, merged.return_offset)
         combined.return_length = If(cond, error_state.return_length, merged.return_length)
