@@ -48,7 +48,7 @@ def test_same_opcode_diff_args_not_cancel():
 def test_same_args_diff_seq_not_cancel():
     """**本次修复的核心性质**：同 key 的两次 SLOAD 可以扣不同的 gas。
 
-    gasSLoadEIP2929 首次返回 cold(2100)、之后 warm(100)。加序号前这两次是同一个
+    AOT 的 SLoad（host.go:71）首次返回 cold(2100)、之后 warm(100)。加序号前这两次是同一个
     term、必然同值，真实轨迹在模型里不存在；加序号后它们是独立符号。"""
     a = BitVec("a", 256)
     u_first = host_gas_uf("SLOAD", [a], BitVecVal(0, 256))

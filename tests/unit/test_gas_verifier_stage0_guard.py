@@ -274,3 +274,52 @@ def test_ir_invariant_applies_regardless_of_gas_mode():
             _program_without_tag(3), object(), SMTState.create_initial_state(),
         )
         assert not verified and "IR INVARIANT VIOLATED" in message, mode
+
+
+# --- CLI 输出：结论前提不得被 --verbose 门控掉 ---
+
+
+def _run_cli(monkeypatch, capsys, argv, verifier_message):
+    """跑 main.main()，返回 (exit_code, stdout)。verify_programs 打桩，不真验证。"""
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(
+        main, "verify_programs",
+        lambda *a, **kw: (True, verifier_message),
+    )
+    code = main.main()
+    return code, capsys.readouterr().out
+
+
+def test_cli_prints_full_scope_message_without_verbose(monkeypatch, capsys):
+    """默认（非 verbose）输出必须原样带上 verifier 的范围与强度边界。
+
+    曾经 message 藏在 `if args.verbose` 后面，默认只打印一句本地拼装的
+    "Programs are semantically equivalent"——条件性结论被读成无条件的。
+    """
+    annotated = (
+        "✓ VERIFIED: x86 refines EVM [functional equivalence at the fixed initial gas "
+        "budget 555000; host gas is NOT modeled in this mode]"
+    )
+    code, out = _run_cli(
+        monkeypatch, capsys,
+        ["main.py", "ir.json", "90", "--gas-budget", "555000"],
+        annotated,
+    )
+
+    assert code == 0
+    assert annotated in out, f"结论前提被吞掉了：{out!r}"
+
+
+def test_cli_does_not_synthesize_its_own_verdict_text(monkeypatch, capsys):
+    """CLI 不得自己拼结论文案——两套文案会各自演化并对不上。"""
+    code, out = _run_cli(
+        monkeypatch, capsys,
+        ["main.py", "ir.json", "90", "--gas-check", "fixed-budget"],
+        "✓ VERIFIED: from the verifier [scope here]",
+    )
+
+    assert code == 0
+    assert "from the verifier" in out
+    assert "Programs are semantically equivalent" not in out, (
+        "CLI 又开始自己拼结论文案了"
+    )

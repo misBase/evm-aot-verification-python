@@ -97,3 +97,25 @@ def test_bridge_is_truthy_lemma_not_input_restriction():
         s.add(b)
     s.add(x == BitVecVal(5, 64))
     assert s.check() == sat, "bridge must not restrict input space"
+
+
+def test_collect_handles_deeper_nesting_than_python_recursion_limit():
+    """深层嵌套不得撑爆 Python 递归——遍历必须是显式栈。
+
+    曾经是递归 walker，在默认上限 1000 处抛 RecursionError，而"修法"是调高
+    recursionlimit——只盖住 pytest，CLI 照样崩。所以这条**刻意跑在默认上限上**。
+    """
+    import sys
+
+    limit = sys.getrecursionlimit()
+    depth = limit * 3               # 远超递归版能承受的深度
+
+    a, b = BitVec("deep_a", 64), BitVec("deep_b", 64)
+    node = _udiv128(a, b)
+    for _ in range(depth):
+        node = node + BitVecVal(1, 128)
+
+    grouped = collect_div_subexprs(node)
+
+    assert len(grouped) == 1, "埋在深处的 UDiv 没被收集到"
+    assert sum(len(v) for v in grouped.values()) == 1

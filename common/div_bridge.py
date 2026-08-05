@@ -35,24 +35,26 @@ _DEFAULT_VERIFY_TIMEOUT_MS = 8_000
 
 
 def collect_div_subexprs(exprs):
-    """收集 exprs（单个或可迭代）里的 div/rem 子表达式，按 (category, size) 分组去重。"""
+    """收集 exprs（单个或可迭代）里的 div/rem 子表达式，按 (category, size) 分组去重。
+
+    **必须用显式栈**：这里的表达式上千层嵌套，递归版在 Python 默认上限 1000 处抛
+    RecursionError。调高 recursionlimit 不是修法——那只盖住 pytest，CLI 照样崩。
+    """
     grouped = defaultdict(list)
     seen = set()
 
-    def walk(node):
+    iterable = exprs if isinstance(exprs, (list, tuple)) else (exprs,)
+    stack = list(iterable)
+    while stack:
+        node = stack.pop()
         node_id = node.get_id()
         if node_id in seen:
-            return
+            continue
         seen.add(node_id)
         category = DIV_BRIDGE_CATEGORIES.get(node.decl().name())
         if category is not None:
             grouped[(category, node.size())].append(node)
-        for index in range(node.num_args()):
-            walk(node.arg(index))
-
-    iterable = exprs if isinstance(exprs, (list, tuple)) else (exprs,)
-    for expr in iterable:
-        walk(expr)
+        stack.extend(node.arg(index) for index in range(node.num_args()))
     return grouped
 
 

@@ -53,35 +53,27 @@ CLI：`main.py --gas-check {off,fixed-budget,full} [--gas-budget N]`。
 「无 OOG 路径」vs「有 OOG 路径」：具体预算下依赖符号 offset 的动态 fee 仍可能超预算，
 那类 OOG 分支照样保留；小预算下 OOG 条件甚至静态为真。
 
-### `OFF` 的已知 under-approximation（**未修复**，条件性结论）
+### `OFF` 的已知 under-approximation（**刻意保留**，条件性结论）
 
-`OFF` 下 `host_gas_uf_enabled` 是关的，两侧都不扣 host cost `H`。后续可见 gas 检查因此
-判的是 `S > G` 而非真实的 `S > G-H`，`S ≤ G < H+S` 这片**真实可达**的 OOG 区域被漏掉。
-方向上会假绿。
+`OFF` 下 `host_gas_uf_enabled` 是关的，两侧都不扣 host cost `H`。模型里的 gas 因此比真实值
+高一个 `H`，凡是依赖 gas 的行为——OOG 阈值（判的是 `S > G` 而非 `S > G-H`，漏掉
+`S ≤ G < H+S` 这片真实可达区域）、`GAS` opcode 的取值、以及由二者派生的分支——探索到的都
+是错误的路径集。方向上会假绿。
 
 `OFF` 要求具体预算只是关掉了其中最明显的一类反例（符号 `G`），**没有消除缺口**：`H` 是
-无约束 UF，`G=1e9, H=999999998, S=3` 就是具体预算下的反例——host 调用成功（`H ≤ G`），
-扣完剩 2，下一步真实 OOG，而模型仍拿 `1e9` 去判。所以 `OFF` 的结论是**条件性**的，前提是
-「预算足够，且不存在受 host 扣费影响的后续 OOG」。该前提由 `_annotate_gas_scope` 写进
-**每一条** `OFF` 的 VERIFIED 消息，不靠本文档口头声明。
+UF，`G=1e9, H=999999998, S=3` 就是具体预算下的反例——host 调用成功（`H ≤ G`），扣完剩 2，
+下一步真实 OOG，而模型仍拿 `1e9` 去判。所以 `OFF` 的结论是**条件性**的，该前提由
+`_annotate_gas_scope` 写进**每一条** `OFF` 的 VERIFIED 消息，不靠本文档口头声明。
 
-**为什么不干脆所有模式都开 host UF**：gas 会变成含无约束 UF 的表达式，后继 block 的
-`ULT(gas, static_gas)` 再也折不掉。实测合成 12 block + 1 个 SLOAD：EVM 终止路径 1 → 12
-（pair 检查是 O(n×m)，候选 pair 1 → 144）。大合约上的实际膨胀取决于 CFG 拓扑与剪枝，
-未实测，但风险方向明确。
+**为什么不干脆所有模式都开 host UF**：`OFF` 的定位是最便宜的功能等价筛查，它根本不比较
+gas，开 UF 对它零收益，却让每条路径都背上 UF 项、OOG 分支重新存活（合成 12 block + 1 个
+SLOAD 实测：EVM 终止路径 1 → 12，候选 pair 1 → 144）。§7.2 那笔上界的钱花在真正比较 gas
+的 `FIXED_BUDGET` / `FULL` 两档上。**需要关上这个缺口的调用方改用那两档即可**——这是取舍，
+不是待办。
 
-**候选修法**（择一，均未实施）：
-
-1. `OFF` 遇 host op 也 fail-closed 拒绝 —— 最彻底，但几乎所有真实合约都会被拒，功能等价
-   验证这条主线基本作废。
-2. **给 host UF 的陪域加结构性上界**（如 `ZeroExt(44, Function(..., BitVecSort(20)))`），
-   让 OOG 分支变成**可证不可满足**而被剪枝器丢弃。实测能把上面那个 12-block 用例的路径
-   压回 1（代价是每 block 一次快速 UNSAT 查询）。**但对 CALL 系不成立**：`gasCall` 把
-   63/64 转发额度算进 cost（`evm/gas_table.go:378-381`），`H` 随预算等比放大，小上界不健全。
-   可行形态是只对账户访问类（SLOAD/SSTORE/BALANCE/EXTCODE*/SELFDESTRUCT/EXP）加界，
-   CALL/CREATE 系另行处理。加界后 `budget ≥ ΣS·max_iter + N_host·max_iter·2^BITS` 就是个
-   **静态可查**的条件（`ΣS` 与 `N_host` 都能从 IR 读出），可以做成真正的 fail-closed 守卫。
-3. 找到不逐 block 分叉的 host gas 摘要/聚合模型。
+历史候选修法里，「给 host UF 加结构性上界」已按 §7.2 实施（但**只在比较 gas 的两档生效**）；
+「`OFF` 遇 host op 一律拒绝」评估后否决——几乎所有真实合约都含 CALL/CREATE，会把功能等价
+这条主线整个作废。
 
 ### 入口 fail-closed 守卫（`verify_program_pair`）
 
@@ -107,9 +99,23 @@ CLI：`main.py --gas-check {off,fixed-budget,full} [--gas-budget N]`。
 
 ```
 ✓ VERIFIED: ... [gas equivalent for the fixed initial budget 777000;
-host gas amounts cancel as uninterpreted functions and
-host-exhaustion termination is out of scope]
+host gas amounts are shared uninterpreted functions constrained by externally
+audited upper bounds — the host gas formulas themselves are NOT proven here,
+and host-exhaustion termination is out of scope]
 ```
+
+OFF 的消息是**另一套**：它刻意不建模 host gas，所以要直说缺口并给出出路——
+
+```
+✓ VERIFIED: ... [functional equivalence at the fixed initial gas budget 555000;
+host gas is NOT modeled in this mode, so the modelled gas runs high by the host cost
+and any gas-dependent behaviour (out-of-gas thresholds, the GAS opcode's value, and
+branches derived from either) is explored over the wrong path set — use
+GasCheck.FIXED_BUDGET or FULL to close that gap]
+```
+
+比较 gas 的两档措辞不能写成"host 按协议扣数"——上界是对 go-hpc-evm 的人工审计所得，
+是 assume 不是定理（§7.2）。
 
 ## 4. 比较语义
 
@@ -117,8 +123,11 @@ host-exhaustion termination is out of scope]
 组合注入 `RefinementChecker` / `PathRefinementChecks` / `RefinementOutputChecks`）：
 
 - 反例查询 `evm_gas != x86_gas`，`UNSAT` → 等价；`SAT` → 反例；`UNKNOWN` → **fail-closed**。
-- 两侧都无 gas 观测才 skip；**单侧缺失一律 fail-closed**。`PathObservation.gas` 是必填
-  字段，杜绝生产者静默省略。
+- **任一侧或两侧缺 gas 观测都 fail-closed**。走到这个 checker 就意味着 gas 检查已启用
+  （`check_gas=False` 时 `_gas is None`，`RefinementOutputChecks` 直接跳过），所以"两侧
+  都没有"不是"本次没建模 gas"，而是观测本该有却丢了——`_PATH_RESULT_KEYS` 漏键、并行
+  worker 跨 Context 翻译丢失、aggregate fallback 掉字段，全是假绿路径。曾经这里是
+  "两侧都无就 skip 成通过"。`PathObservation.gas` 另有必填约束，杜绝生产者静默省略。
 - solver **无条件 reset**（不是 push/pop）。并行 worker 的私有 solver 在同一次
   `check_observables` 里已被前序子检查累积成 UNSAT 基底，只 push/pop 会让 gas 查询恒
   UNSAT → 假绿（曾真实发生，见 `gas_parallel_pathobs_false_green`）。
@@ -277,8 +286,8 @@ x86 机器码里没有这段 gas 指令，就没有对照对象。做法：建�
 
 ### 7.1 调用序号：把 access-list 依赖搬进 UF 签名
 
-Z3 的 `Function` 是纯函数，同参必然同值。而 Go 侧的 `gasSLoadEIP2929`
-（`evm/gas_table.go:524`）**不是**——它读 `SlotInAccessList` 并且**自己修改**它：
+Z3 的 `Function` 是纯函数，同参必然同值。而 AOT 的 SLOAD host 函数
+（`evm/host.go:71` `SLoad`）**不是**——它读 `SlotInAccessList` 并且**自己修改**它：
 
 ```go
 if _, slotPresent := ...SlotInAccessList(addr, slot); !slotPresent {
@@ -309,17 +318,17 @@ return params.WarmStorageReadCostEIP2929, nil   // 100
 - **漏传序号 fail-closed**：`host_gas_uf` 对 `HOST_GAS_SEQ_KINDS` 里的指令强制要求
   `seq`。漏传会生成**一元** UF——Z3 里 arity 不同就是另一个函数符号，两侧都误用旧接口时
   照样相消、序号机制静默失效而测试全绿，那是真实的假绿路径。
-- SSTORE 除序号外还吃 slot 的**写入前**值（`gasSStoreEIP2929` 的档位取决于 current
-  值）。两侧都必须在 `sstore` 之前取，写完再取只会拿回 `val` 本身。
+- SSTORE 除序号外还吃 slot 的**写入前**值（`host.go:255` 的档位取决于 current 值）。
+  两侧都必须在 `sstore` 之前取，写完再取只会拿回 `val` 本身。
 
-**收录判据**是「Go gas 函数是否依赖 access list」，逐条核对过 `gas_table.go`。明确
-**不收**的三个：
+**收录判据**是「**该 opcode 的 AOT host 函数**是否读写 access list」，逐条核对过
+`evm/host.go`（不是 `gas_table.go`，理由见 §7.2 的警告）。明确**不收**的三个：
 
 | opcode | 为什么不加 |
 | --- | --- |
-| SELFDESTRUCT | `gasSuicide:443` 固定 `return 0, nil`，全仓库无 EIP 覆盖 —— 没有隐藏依赖 |
-| EXP | `50*byteLen(exponent)+10` 是真纯函数，加序号只会丢掉「同参必同价」这条正确信息 |
-| CREATE / CREATE2 | 解释器 gas 函数（`gasCreate2:278` 等）签名里 `_ *EVM, _ *Contract` 都被忽略，不依赖 access list |
+| SELFDESTRUCT | `host.go:328` `Suicide` 整个函数不扣 gas、不碰 access list |
+| EXP | `engine_evm.go:785` `aotGasExpEIP158` 是 exponent 的纯函数，加序号只会丢掉「同参必同价」这条正确信息 |
+| CREATE / CREATE2 | `host.go:361/398` 只做 `GetRemainingGas → gas−gas/64 → UseGas`，全函数不碰 access list |
 
 **仍未覆盖的隐藏依赖**：CALL 系的 63/64 转发与 CREATE/CREATE2 的
 `GetRemainingGas`（`evm/host.go:369/406` 的 `gas -= gas/64`）取决于 gas 的**具体数值**
@@ -337,6 +346,70 @@ return params.WarmStorageReadCostEIP2929, nil   // 100
 **顺带收益（有限）**：两侧 host 调用序列若在数量或次序上偏移，序号就对不上 → UF 不相消
 → SAT。所以 `call_site_mapping` 的顺序假设从完全静默变成**部分**可检测——但它抓不住
 「opcode、参数、动态序号三者都相同的两个站点互换」，那种情况 UF 照样相消。
+
+### 7.2 协议上界：把 host UF 从"无约束"收到"不超过审计所得的上限"
+
+host UF 原本是完全自由的函数，于是一旦扣 H，后继 block 的 `ULT(gas, static_gas)` 就再也
+折不掉，OOG 分支全部存活、路径爆炸——这正是 `muti_block` 开 gas 后 x86 终止路径 30→102+
+的来源。
+
+做法：给写得出健全上界的 opcode 加 `ULE(H, bound)`，两侧在各自扣费点同时加。
+
+**只在 FIXED_BUDGET / FULL 生效。** `GasCheck.OFF` 不开 host UF，因此也不产生上界：它的
+定位是最便宜的功能等价筛查、根本不比较 gas，开 UF 对它零收益却让每条路径都背上 UF 项。
+OFF 因此保留一个**已披露**的缺口（判 `S > G` 而非 `S > G-H`），由成功消息如实声明并指向
+另两档——这是刻意取舍，不是待办。
+
+上界表在 `state/host_gas.HOST_GAS_UPPER_BOUNDS`：
+
+| opcode | 实测静态 gas | host 动态上界 |
+| --- | --- | --- |
+| SELFDESTRUCT | 0 | `host.go:328` `Suicide` 不扣 gas；上界 0 在无符号下就等价于 `cost == 0` |
+| SLOAD | 0 | 2100（`ColdSloadCostEIP2929`） |
+| SSTORE | 0 | 22100（cold 2100 + `SstoreSetGasEIP2200` 20000） |
+| BALANCE / EXTCODESIZE / EXTCODEHASH / EXTCODECOPY | 100 | 2500（`ColdAccountAccessCost − WarmStorageReadCost`；warm 那 100 已在 static gas） |
+| EXP | 0 | 1610（`ExpGas 10 + ExpByteEIP158 50 × byteLen`，`byteLen ≤ 32`） |
+| CALL 四件套 / CREATE / CREATE2 | — | **写不出可剪枝的小常量上界** |
+
+"实测静态 gas"来自 fixture IR 的 `static_gas` 减去 PUSH 份额——锚点是 AOT 实际发射了
+什么，不是 geth 的 jump table。
+
+CALL 系无界的原因（按 AOT 实际执行的 `evm/host.go` 记）：`host.go:809` 先收
+cold−warm(2500)，再转 `host.go:741` 的 `gasCostWithHostCall`，那里累加三项——
+`CallNewAccountGas`(25000, `protocol_params.go:43`)、内存扩展(`memoryGasCostCopy`,
+`host.go:847`)、63/64 转发额度。头一项是常数，后两项无界：AOT **没有**
+`checkMemoryAndCalcDynamicGasCall`（`impl_amd64.go` 只为 Sha3/CallDataCopy/CodeCopy/
+ExtCodeCopy/ReturnDataCopy/MLoad/MStore/MStore8/MCopy/Log/Create/Create2 发射可见 fee），
+所以内存扩展的二次项整个在 host 内、我们侧没有对应项可减。CREATE/CREATE2 则是
+`host.go:361/398` 的 `GetRemainingGas → gas − gas/64 → UseGas`。
+这些 opcode **照扣不误**——扣一个无约束 UF 仍然健全，只是它们的 OOG 分支不被剪。
+
+`HOST_GAS_UNBOUNDED_KINDS` 由上界表**派生**（`HOST_GAS_UF_KINDS - 上界表的键`），新增
+host opcode 却忘了写上界时会自动落进该集合而不是被静默当成有界。
+
+**注入通道**：上界在执行期才产生（term 到执行 host op 时才存在），走不了
+`initial_state.assumptions` 那条只在入口生效的路。改由 semantics 层挂进
+`SMTState.pending_constraints`，executor 消费后并入**当前路径**的 `world_state.constraints`
+——与 `pending_errors` 同范式，未消费会 fail-closed。因为上界只提及 term 自身的参数，它是
+全局事实而非 path-local，中途并入不会越界约束 sibling。
+
+⚠️ **上界是 assume，不是定理。** 写小了会静默缩域：两侧仍共享同一个 UF、仍相消、仍
+UNSAT，被排除的真实轨迹在 Python 侧**没有任何测试看得见**。所以：
+
+- Python 侧的测试只能证明"上界确实接进了求解、两侧 wiring 一致、drain 没漏"，**证不了
+  数值**（`tests/unit/test_host_gas_bounds.py`）；
+- 数值**没有可执行的 oracle**：跨仓库放验证测试的维护成本高于它挡住的风险。代之以逐条
+  记 provenance —— 每条上界取自哪个 Go 函数的哪条分支、常量在
+  `params/protocol_params.go` 哪一行，全写在 `HOST_GAS_UPPER_BOUNDS` 的注释里，照行号
+  读源码即可复核；
+- ⚠️ **依据必须取 AOT 实际执行的实现，即 `evm/host.go` 与 `evm/aot/*`**。
+  `evm/gas_table.go` 是**解释器**的 gas 表，AOT 从不调用；两边目前数值一致纯属巧合，
+  照它复核会验错对象（本表初版就引错了源文件）；
+- **没有机器防线，也没有自动提醒**：曾有一条比对本地 go-hpc-evm HEAD 的 revision pin，
+  已删——它绑错了对象（本地工作区状态与"产出这批签入 fixture 的编译器版本"没有因果关系）
+  且信噪比为负。理由与替代流程见 `docs/关键问题记录.md` #20；上次复核参照的版本记在
+  `tests/data/README.md`；
+- 结论措辞只能说到"受外部审计所得上界约束"，不能写"按协议扣数"。
 
 ### host gas 耗尽后的终止：不在范围内，也不是缺口
 
@@ -520,10 +593,22 @@ block 的 dispatcher 撑开路径，实测 >6.5min 停在符号执行阶段）�
 路径 1→12、候选 pair 1→144）。上表是大合约上的实测：**膨胀远小于该量级**，723 block 的
 CErc20 在 FULL 下仍是 7.6s，决定规模的是输入形态而非 block 数。
 
-已知的例外是 `muti_block`（40 block，符号 calldatasize + `abstract_calldataload_words`）：
-输入形态本就撑开路径，再乘 OOG 分支后 x86 终止路径从 30 涨到 102+，实测 >25min 仍停在
-pair feasibility 阶段（同 fixture 在 `OFF` 下 68s）。该用例已写好并 `@pytest.mark.skip`，
-待路径规模压下来后启用。
+曾经的例外 `muti_block`（40 block，符号 calldatasize + `abstract_calldataload_words`）
+**已由 §7.2 的协议上界解决**：它的输入形态本就撑开路径，再乘 OOG 分支后 x86 终止路径从
+30 涨到 102+，>25min 仍停在 pair feasibility；加上界后实测 **41s / 16 EVM × 30 x86 路径
+/ 30 个可行 pair**，路径数回到与 `OFF` 相同的 30，`@pytest.mark.skip` 已移除。这条用例
+现在同时是"上界确实在剪枝"的端到端凭证——单元测试只能证明约束进了求解器，压不出这个
+量级的差别。
+
+⚠️ 顺带暴露的一件事：路径规模下来后瓶颈换成了 **AST 遍历的递归深度**——
+`common/div_bridge.collect_div_subexprs` 原是递归 walker，而这里的表达式上千层嵌套，在
+Python 默认上限 1000 处抛 `RecursionError`（还报在 `Z3_func_decl_to_ast` 这种看不出根因
+的地方）。
+
+一度用 `tests/conftest.py` 调高 `recursionlimit` 顶过去——**那是错的**：只盖住 pytest，
+CLI 与库调用方照样崩。已改成显式栈迭代，回归测试
+`test_collect_handles_deeper_nesting_than_python_recursion_limit` 刻意跑在默认上限上；
+pytest 外直接调用 muti_block 实测 46.3s 通过。
 
 ### 9.2 符号操作数 fixture
 

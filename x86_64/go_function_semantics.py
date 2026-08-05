@@ -981,9 +981,17 @@ class GoFunctionSemantics:
         Go runtime 的 dealWithGasCost 会弹出 1 个值，不压回结果。
         这里不对 gas 余额做等价性建模。
 
-        已知 gap：本 builtin 不扣 host-gas UF。当前没有指令经它路由 gas，故无影响；
-        若将来 codegen 改走 dealWithGasCost，需在此补 UF 或把相关指令纳入
-        _DYNAMIC_GAS_UNSUPPORTED_KINDS，否则两侧 gas 不对齐。
+        已知 gap：本 builtin 不扣 host-gas UF。当前没有指令经它路由 gas，故无影响。
+
+        若将来 codegen 改走 dealWithGasCost，风险分两种，只有后者是静默的：
+
+        - 该指令**已登记**进 program_verifier._DYNAMIC_GAS_KINDS：EVM 侧照扣（UF 或真实
+          公式）、x86 侧不扣 ⟹ 两侧 gas 不等 ⟹ SAT，**fail-loud**，不会假绿。
+        - 该指令**未登记**：两侧都不扣，静默不验。这才是要防的，也是登记表存在的理由。
+
+        补救：在此补 UF；若一时补不了，把该指令加进
+        program_verifier._MANUAL_REJECT_KINDS 挡回门外（拒绝集是
+        `(_DYNAMIC_GAS_KINDS - _MODELED_DYNAMIC_GAS_KINDS) | _MANUAL_REJECT_KINDS`）。
         """
         _gas, sp, mstate = self._pop_uint256(sp, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)

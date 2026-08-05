@@ -310,17 +310,20 @@ def test_safe_extcodecopy_gas_consistency():
     assert FIXED_BUDGET_SCOPE in msg, f"gas scope missing from message: {msg}"
 
 
-# ---------------------------------------------------------------- 已知膨胀
+# ------------------------------------------------ 曾经的规模瓶颈（上界生效后已解）
 
 
-@pytest.mark.skip(reason=(
-    "开 gas 后 host gas UF 打开 → 后继 block 的 ULT(gas, static_gas) 折不掉、OOG 分支"
-    "全部存活。本 fixture 的符号 calldatasize + abstract_calldataload_words 本就撑开"
-    "路径，再乘 OOG 分支后 x86 终止路径从 30 涨到 102+，实测 >25min 仍停在 pair "
-    "feasibility 阶段（同 fixture 在 GasCheck.OFF 下 68s）。待路径规模压下来后启用。"
-))
 def test_muti_block_gas_fixed_budget():
-    """muti_block（40 block，全符号 calldata 长度）的 gas 一致性。"""
+    """muti_block（40 block，全符号 calldata 长度）的 gas 一致性。
+
+    这条曾长期 skip：开 gas 后 host UF 无约束 → 后继 block 的 `ULT(gas, static_gas)`
+    折不掉、OOG 分支全部存活，x86 终止路径从 30 涨到 102+，>25min 仍停在 pair
+    feasibility。`HOST_GAS_UPPER_BOUNDS`（见 state/host_gas.py）把这批分支重新压死后
+    实测 **41s / 16 EVM × 30 x86 路径 / 30 个可行 pair**，路径数回到与 OFF 相同的 30。
+
+    它同时是"上界确实在剪枝"的端到端凭证——单元测试只能证明约束进了求解器，压不出
+    这个量级的差别。
+    """
     evm_program, x86_program = _load_data_pair("muti_block")
     initial_state = SMTState.create_initial_state(
         calldata_size_max_bytes=(1 << 63) - 1,

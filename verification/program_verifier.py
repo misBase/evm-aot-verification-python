@@ -21,8 +21,10 @@ class GasCheck(str, Enum):
     """gas 检查模式。每个取值绑定一种初始 gas 配置，verify_program_pair fail-closed 校验。
 
     - OFF：不比较 gas（功能等价），但**仍要求具体预算**。OFF 下 host gas UF 是关的，
-      两侧都不扣 host cost，符号 gas 会让后续可见 OOG 阈值短一个 host cost（真实可达的
-      OOG 区域被漏掉）；具体预算把这个缺口压成空集。详见 verify_program_pair 内的说明。
+      两侧都不扣 host cost H，于是模型里的 gas 比真实值偏高一个 H —— 凡是依赖 gas 的
+      行为（OOG 阈值、`GAS` opcode 的取值、以及由它派生的分支）探索到的都是错误的路径
+      集。具体预算**并不能**消除这个缺口，只是关掉了符号 gas 那类最明显的反例；
+      `G=1e9, H=999999998, S=3` 就是具体预算下的反例。详见 verify_program_pair 内的说明。
     - FIXED_BUDGET：比较 gas，**要求具体预算**。结论是「从这一个预算出发」的**单点**
       结论，不是 ∀initial_gas。具体值让 `ULT(budget, cost)` 在 simplify 阶段折成 False，
       省掉每个 block 一次可达性查询。
@@ -312,22 +314,16 @@ class ProgramEquivalenceChecker:
         # OFF 下 host_gas_uf_enabled 关着，两侧都不扣 host cost H，于是后续可见 gas 检查
         # 判的是 `S > G` 而非真实的 `S > G-H`，`S ≤ G < H+S` 这片真实可达的 OOG 区域被
         # 漏掉——这是 under-approximation，方向上会假绿。具体预算**并不能**消除它：H 是
-        # 无约束 UF，`G=1e9, H=999999998, S=3` 就是一个具体预算下的反例（host 调用成功，
-        # 扣完剩 2，下一步真实 OOG，而模型仍拿 1e9 去判）。所以 OFF 的结论是**条件性**的：
-        # 前提是「预算足够，且不存在受 host 扣费影响的后续 OOG」。该前提由
-        # _annotate_gas_scope 写进每一条 VERIFIED 消息，不靠文档口头声明。
+        # UF，`G=1e9, H=999999998, S=3` 就是一个具体预算下的反例（host 调用成功，扣完剩
+        # 2，下一步真实 OOG，而模型仍拿 1e9 去判）。所以 OFF 的结论是**条件性**的：前提
+        # 是「预算足够，且不存在受 host 扣费影响的后续 OOG」。该前提由 _annotate_gas_scope
+        # 写进每一条 VERIFIED 消息，不靠文档口头声明。
         #
-        # 为什么不干脆所有模式都开 host UF：gas 会变成含无约束 UF 的表达式，后继 block 的
-        # `ULT(gas, static_gas)` 再也折不掉。实测合成 12 block + 1 个 SLOAD：EVM 终止路径
-        # 1 → 12（pair 检查是 O(n×m)，候选 pair 1 → 144）。大合约上的膨胀已实测（见
-        # tests/integration/test_gas_consistency_contracts.py）：决定规模的是输入形态而非
-        # block 数——723 block 的 CErc20 固定 selector 在 FULL 下 7.6s/18 条路径，而 40
-        # block 的 muti_block 在符号 calldatasize 下 x86 路径 30 → 102+、>25min 未跑完。
-        #
-        # TODO: 待办（择一）：① 遇 host op 时 OFF 也 fail-closed 拒绝；② 给 host UF 的陪域加
-        # 结构性上界，让 OOG 分支变成可证不可满足而被剪掉——实测该法能把路径压回 1，但
-        # **对 CALL 系不成立**：gasCall 把 63/64 转发额度算进 cost（evm/gas_table.go:378），
-        # H 随预算等比放大，小上界会不健全。
+        # **这是刻意保留的取舍，不是待办。** OFF 的定位是最便宜的功能等价筛查：它根本
+        # 不比较 gas，开 host UF 对它零收益，却让每条路径都背上 UF 项、OOG 分支重新存活。
+        # HOST_GAS_UPPER_BOUNDS 那笔钱花在真正比较 gas 的 FIXED_BUDGET / FULL 两档上
+        # （见 state/host_gas.py 与 docs/Gas一致性验证设计.md §7.2）；需要把这个缺口关上
+        # 的调用方改用那两档即可。
         if self.gas_check is GasCheck.OFF and not concrete:
             return (
                 False,
@@ -597,20 +593,26 @@ class ProgramEquivalenceChecker:
         if not verified or not message:
             return message
         if self.gas_check is GasCheck.OFF:
-            # OFF 不比较 gas，但 gas 决定控制流且 host cost 未建模——结论是条件性的，
-            # 必须让调用方看见，不能只留一个朴素的 VERIFIED。
+            # 这个缺口为什么是刻意保留的，见 verify_program_pair 内的论证。
             return (
                 f"{message} [functional equivalence at the fixed initial gas budget "
-                f"{gas_budget}; host gas is NOT modeled in this mode, so any "
-                "out-of-gas that would be caused by host cost is not covered]"
+                f"{gas_budget}; host gas is NOT modeled in this mode, so the modelled "
+                "gas runs high by the host cost and any gas-dependent behaviour "
+                "(out-of-gas thresholds, the GAS opcode's value, and branches derived "
+                "from either) is explored over the wrong path set — use "
+                "GasCheck.FIXED_BUDGET or FULL to close that gap]"
             )
         if self.gas_check is GasCheck.FIXED_BUDGET:
             scope = f"gas equivalent for the fixed initial budget {gas_budget}"
         else:
             scope = "gas and OOG paths equivalent over all initial gas values"
+        # 措辞止于"受审计所得上界约束"：上界是 assume，本验证器证不了 host gas 公式，
+        # 改强成"按协议扣数"即过度声明（test_gas_modes_do_not_overclaim_bounds 盯着）。
         return (
-            f"{message} [{scope}; host gas amounts cancel as uninterpreted "
-            "functions and host-exhaustion termination is out of scope]"
+            f"{message} [{scope}; host gas amounts are shared uninterpreted functions "
+            "constrained by externally audited upper bounds — the host gas formulas "
+            "themselves are NOT proven here, and host-exhaustion termination is out "
+            "of scope]"
         )
 
     def _verify_program_pair_path_observations(

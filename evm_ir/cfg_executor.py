@@ -574,8 +574,23 @@ class SymbolicExecutor:
                 f"op {op.kind} at pc={op.pc} received a state with "
                 f"{len(mstate.pending_errors)} unconsumed error branch(es)",
             )
+        # 同理：上一条 op 挂的路径约束若没被下面 drain 走，说明 drain 漏了。丢约束本身
+        # 只是少剪枝（安全方向），但机制会静默失效，只能靠这个入口检查暴露。
+        if mstate.pending_constraints:
+            from utils.exceptions import LogicError
+            raise LogicError(
+                "unconsumed_pending_constraints",
+                f"op {op.kind} at pc={op.pc} received a state with "
+                f"{len(mstate.pending_constraints)} undrained path constraint(s)",
+            )
 
         new_mstate = op.to_z3(mstate)
+
+        # 在错误分支分裂**之前**并入：_append_error_terminal_state 会
+        # copy.copy(global_state.world_state)，此刻加进去，正常后继与各错误终态都能继承。
+        for constraint in new_mstate.pending_constraints:
+            global_state.world_state.constraints.add(constraint)
+        new_mstate.pending_constraints = []
 
         pending = list(new_mstate.pending_errors)
         new_mstate.pending_errors = []   # 状态要交给后继，队列必须先消费干净

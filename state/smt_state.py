@@ -215,6 +215,11 @@ class SMTState:
         # （合流合并后可能是 If 表达式）。递增规则见 host_gas.next_host_gas_seq。
         self.host_gas_seq: dict = {}
 
+        # semantics 层产生、待 executor 并入当前路径 world_state.constraints 的约束
+        # （目前只有 host-gas 协议上界）。与 pending_errors 同范式：semantics 拿不到
+        # world_state，只能挂在 state 上让 executor 取走。
+        self.pending_constraints: list = []
+
         # 原始 stack_base 符号值和输入数量（create_initial_state 中赋值，供栈一致性检查使用）
         self.stack_base = None
         self.stack_num_inputs = 0
@@ -260,6 +265,7 @@ class SMTState:
         # 否则消费方到处都要写 getattr 兜底。
         state.pending_errors = []
         state.host_gas_seq = {}
+        state.pending_constraints = []
         return state
 
     def copy(self) -> 'SMTState':
@@ -308,6 +314,9 @@ class SMTState:
         new_state.assumptions = list(src_assumptions) if src_assumptions else None
         # 必须拷 dict：共享会让 sibling 路径互相计数（值是 Z3 表达式，浅拷贝够用）。
         new_state.host_gas_seq = dict(self.host_gas_seq)
+        # 拷列表而非共享：漏掉 executor 的 drain 时，未消费的上界不该顺着 copy 扩散到
+        # sibling。丢一条上界只是少剪枝（安全方向），漏 drain 由 executor 的入口检查抓。
+        new_state.pending_constraints = list(self.pending_constraints)
         self.copy_verification_options_to(new_state)
 
         return new_state

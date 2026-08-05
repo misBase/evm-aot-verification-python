@@ -175,17 +175,10 @@ def main():
     
     # 输出结果
     if verified:
-        mode = GasCheck(args.gas_check.replace('-', '_'))
-        if mode is GasCheck.FIXED_BUDGET:
-            budget = args.gas_budget if args.gas_budget is not None else 1_000_000_000
-            suffix = f" including gas, for fixed initial budget {budget}"
-        elif mode is GasCheck.FULL:
-            suffix = " including gas and OOG paths (symbolic initial gas)"
-        else:
-            suffix = ""
-        print(f"✓ VERIFIED: Programs are semantically equivalent{suffix}")
-        if args.verbose and message:
-            print(f"  {message}")
+        # 无条件原样打印 verifier 的消息：结论的适用范围与强度边界由 _annotate_gas_scope
+        # 附在里面。这里一度自己拼结论文案、且只在 --verbose 下打印 message，默认输出因此
+        # 不带任何前提。别再加本地拼装的结论文案。
+        print(message or "✓ VERIFIED: Programs are semantically equivalent")
         return 0
     else:
         print("✗ VERIFICATION FAILED")

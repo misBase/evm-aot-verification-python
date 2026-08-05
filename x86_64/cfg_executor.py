@@ -1198,6 +1198,16 @@ class X86SymbolicExecutor:
             # sp必须已知才能应用Go函数语义（_pop_uint256等需要int类型的sp）
             if sp is not None:
                 from .go_function_semantics import GoFunctionSemantics, GoFunctionSemanticsError
+                # 与 EVM 侧 _execute_op_with_outcome 对称的入口守卫：带着未 drain 的约束
+                # 进来说明下面那个 drain 漏了。丢约束只是少剪枝（安全方向），不会有可见
+                # 症状，只能靠这里暴露。
+                if mstate.pending_constraints:
+                    from utils.exceptions import LogicError
+                    raise LogicError(
+                        "unconsumed_pending_constraints",
+                        f"host bridge at 0x{block.start_addr:x} received a state with "
+                        f"{len(mstate.pending_constraints)} undrained path constraint(s)",
+                    )
                 go_sem = GoFunctionSemantics(self.aot_profile)
                 try:
                     evm_pc = None
@@ -1217,6 +1227,12 @@ class X86SymbolicExecutor:
                     )
                     # 更新 global_state 的 mstate，确保后续恢复分支使用更新后的状态
                     global_state.mstate = mstate
+                    # drain host-gas 协议上界：semantics 层拿不到 world_state，只能挂在
+                    # state 上由这里并入当前路径（与 EVM 侧 _execute_op_with_outcome 对称，
+                    # 两侧都加才能让 OOG 剪枝对称，见 host_gas.emit_host_gas_bound）。
+                    for constraint in mstate.pending_constraints:
+                        global_state.world_state.constraints.add(constraint)
+                    mstate.pending_constraints = []
                 except GoFunctionSemanticsError as e:
                     # func_index已知但映射到未知函数 - 这是配置错误，应该报告
                     from utils.exceptions import LogicError

@@ -40,7 +40,7 @@ status）。范围声明见 ProgramEquivalenceChecker.__init__。
 
 from typing import Sequence
 
-from z3 import BitVecRef, BitVecSort, BitVecVal, Function, If, UGT, ZeroExt, simplify
+from z3 import BitVecRef, BitVecSort, BitVecVal, Function, If, UGT, ULE, ZeroExt, simplify
 
 
 # B 类 host function 指令（gas 在 Go host runtime，x86 不可见）。
@@ -77,24 +77,88 @@ HOST_GAS_UF_KINDS = HOST_GAS_HOST_KINDS | HOST_GAS_BUILTIN_KINDS
 # ⚠️ seq 只是**调用事件的区分符**，不是 access list 的状态模型：它保证不同次调用*可以*
 # 取不同值，不表达"第一次必 cold"。详见 docs/Gas一致性验证设计.md §7.1。
 #
-# 收录判据是 Go gas 函数是否依赖 access list，逐条核对过 evm/gas_table.go。明确不收：
-# SELFDESTRUCT（gasSuicide:443 固定 return 0，无 EIP 覆盖）、EXP（纯函数，加 seq 只会
-# 丢掉"同参必同价"）、CREATE/CREATE2（gas 函数忽略 *EVM/*Contract）。
+# 收录判据是**该 opcode 的 AOT host 函数**是否读写 access list，逐条核对过 evm/host.go
+# （不是 gas_table.go，理由见下面上界表的警告）。不收的三个都不碰 access list：
+# SELFDESTRUCT（host.go:328 连 gas 都不扣）、EXP（engine_evm.go:785，纯函数）、
+# CREATE/CREATE2（host.go:361/398 只做 GetRemainingGas → gas−gas/64 → UseGas）。
 HOST_GAS_SEQ_KINDS = frozenset({
-    "SLOAD",
-    "BALANCE",
-    "EXTCODESIZE",
-    "EXTCODEHASH",
-    "EXTCODECOPY",
-    # SSTORE 除序号外还吃 slot 的写入前值：gasSStoreEIP2929 的档位取决于 current 值。
+    "SLOAD",            # host.go:71   SlotInAccessList / AddSlotToAccessList
+    "BALANCE",          # host.go:312 → gasCostWithEip2929AccountCheck host.go:880
+    "EXTCODESIZE",      # host.go:182
+    "EXTCODEHASH",      # host.go:126
+    "EXTCODECOPY",      # host.go:216
+    # SSTORE 除序号外还吃 slot 的写入前值：host.go:255 的档位取决于 current 值。
     "SSTORE",
-    # CALL 系还有一个 seq 管不了的隐藏依赖：gasCall 把 63/64 转发额度算进 cost
-    # （host.go:369/406），取决于 gas 的具体数值，要靠 gas_before 进签名，不在本次范围。
+    # host.go:809 读写 AddressInAccessList。另有一个 seq 管不了的隐藏依赖：host.go:741
+    # 起的 gasCostWithHostCall 把 63/64 转发额度算进 cost，取决于 gas 的具体数值，要靠
+    # gas_before 进签名，不在本次范围。
     "CALL",
     "CALLCODE",
     "DELEGATECALL",
     "STATICCALL",
 })
+
+# host-gas UF 的协议上界（64-bit gas）。值是 **host 动态部分**的最大可能值，不含已由
+# static gas 或可见 fee 覆盖的份额。
+#
+# ⚠️ 上界是 **assume**，且是**手工同步项：上游 gas 实现一改，这里必须跟着手改。**
+# 写小了会静默缩域——两侧仍共享同一个 UF、仍相消、仍 UNSAT，Python 侧没有任何测试看得见。
+# 没有可执行的 oracle，**也没有任何自动提醒**：代之以逐条记依据（取哪个函数的哪条分支、
+# 常量在 params/protocol_params.go 哪一行），照行号读源码复核。换编译器版本时必须主动走
+# docs/关键问题记录.md #20 的同步流程；上次复核参照的版本记在 tests/data/README.md。
+#
+# ⚠️ **依据只能取 AOT 实际执行的 evm/host.go 与 evm/aot/*。** evm/gas_table.go 是**解释器**
+# 的 gas 表，AOT 从不调用；两边数值目前一致是巧合，照它复核会验错对象（初版就引错了）。
+#
+# 分层判据来自 fixture 的 `static_gas`（AOT 实际发射的静态份额）实测：
+#   SLOAD/SSTORE/EXP/SELFDESTRUCT 静态 0 ⟹ 全额在 dynamic；其余静态 100（= warm）。
+HOST_GAS_UPPER_BOUNDS: dict[str, int] = {
+    # host.go:328 Suicide 整个函数体只有一句 return nil, nil，注释原话
+    # "Suicide has no gas need cost and it will be return in asm" ⟹ 上界取 0
+    # （无符号下 ULE(c, 0) 就等于 c == 0，不必特判成等式）。
+    "SELFDESTRUCT": 0,
+    # host.go:71 SLoad：dynamicGas 从 0 起，二选一
+    # += ColdSloadCostEIP2929(2100, protocol_params.go:101) 或
+    # += WarmStorageReadCostEIP2929(100, :102)，之后直接 UseGas。取 cold。
+    "SLOAD": 2100,
+    # host.go:255 SStore：dynamicGas = cold 时 ColdSloadCostEIP2929(2100)、warm 时 0，
+    # 随后 += 四选一，最大是 SstoreSetGasEIP2200(20000, protocol_params.go:96)。
+    # host.go:262 的 sentry（剩余 gas <= SstoreSentryGasEIP2200 直接返 error）不产生
+    # cost，属已声明的 host-exhaustion out-of-scope。
+    "SSTORE": 22100,
+    # 账户访问三件套各有自己的 host 函数，都只 += ColdAccountAccessCostEIP2929
+    # (2600, protocol_params.go:100) − WarmStorageReadCostEIP2929(100, :102)，warm 时不加
+    # （源码原话 "We charge (cold-warm), since 'warm' is already charged as constantGas"）：
+    #   Balance host.go:312 → gasCostWithEip2929AccountCheck host.go:880
+    #   ExtCodeSize host.go:182 / ExtCodeHash host.go:126
+    "BALANCE": 2500,
+    "EXTCODESIZE": 2500,
+    "EXTCODEHASH": 2500,
+    # host.go:216 ExtCodeCopy 只 += 那 2500；内存扩展与 copy word gas 不在 host 里——首行
+    # 注释原话 "calculate dynamic gas and grow mem size are doing in asm"，对应
+    # impl_amd64.go:3105 的可见 fee。
+    "EXTCODECOPY": 2500,
+    # aotGasExpEIP158（engine_evm.go:785，AOT 实际调用的那份；注意它是 gas_table.go:347
+    # gasExpEIP158 的复制粘贴克隆，改动时两份都要看）：
+    # ExpGas(10, protocol_params.go:65) + ExpByteEIP158(50, :166)×byteLen，
+    # uint256 的 byteLen ≤ 32 ⟹ 10 + 1600。
+    # EXP 全额在 host：checkMemoryAndCalcDynamicGasEXPEip158 从未被调用（源码原话
+    # "todo: we calculate this in build function now"），没有可见 fee 分担。
+    "EXP": 1610,
+}
+
+# 写不出可用于剪枝的小常量上界的 host op —— 由上界表**派生**，不硬编码。
+# 这样新增 host opcode 却忘了写上界时会自动落进这个集合，而不是被静默当成有界
+# （沿用 program_verifier 把黑名单翻成 allowlist 的同一模式）。
+# 它们的 UF **照扣不误**（无约束 UF 仍然健全），只是 OOG 分支剪不掉、路径规模偏大。
+#
+# 当前成员及其无界的原因（同样按 AOT 实际执行的 host.go 记）：
+#   CALL 四件套  host.go:809 先收 cold−warm(2500)，再转 host.go:741 gasCostWithHostCall
+#                累加三项：CallNewAccountGas(25000, protocol_params.go:43)、内存扩展
+#                (memoryGasCostCopy, host.go:847)、63/64 转发额度。头一项是常数，后两项
+#                无界——AOT 侧没有可见 fee 可减，内存二次项整个在 host 内。
+#   CREATE/CREATE2  host.go:361/398 只做 GetRemainingGas → gas − gas/64 → UseGas。
+HOST_GAS_UNBOUNDED_KINDS = HOST_GAS_UF_KINDS - frozenset(HOST_GAS_UPPER_BOUNDS)
 
 
 def _normalize_uf_arg(value: BitVecRef) -> BitVecRef:
@@ -173,6 +237,24 @@ def next_host_gas_seq(state, opcode: str) -> BitVecRef | None:
     return seq
 
 
+def emit_host_gas_bound(state, opcode: str, cost: BitVecRef) -> None:
+    """把该 opcode 的协议上界挂进 ``state.pending_constraints``，等 executor 取走。
+
+    两侧共用这一条规则——只有一侧加的话不会不健全（上界是关于 UF term 的全局事实，
+    一侧断言在联合求解里就够），但两侧的 OOG 剪枝会不对称、路径集发散，而**最终结果
+    看不出来**。所以只能靠两侧各自的本地测试盯住，见 tests/unit/test_host_gas_bounds.py。
+
+    无上界的 opcode（HOST_GAS_UNBOUNDED_KINDS）什么都不加——它们的 UF 照扣，只是 OOG
+    分支剪不掉。宁可慢也不瞎编上界：上界写小了是静默缩域，没有任何测试看得见。
+    """
+    bound = HOST_GAS_UPPER_BOUNDS.get(opcode)
+    if bound is None:
+        return
+    # 一律用 ULE，bound==0 不特判：无符号下 `ULE(c, 0)` 与 `c == 0` 逻辑等价
+    # （0 是无符号最小值），特判没有语义收益。曾经写成等式并注释"比 ULE 更强"，是误述。
+    state.pending_constraints.append(ULE(cost, BitVecVal(bound, 64)))
+
+
 def charge_host_gas_uf(state, opcode: str, stack_args: Sequence[BitVecRef]):
     """EVM 侧扣减一次 host/builtin 调用的 host-gas UF。
 
@@ -192,6 +274,7 @@ def charge_host_gas_uf(state, opcode: str, stack_args: Sequence[BitVecRef]):
         return state
     # 序号在开关**之后**才取：OFF 模式下计数器一动不动，功能等价验证零影响。
     cost = host_gas_uf(opcode, stack_args, next_host_gas_seq(state, opcode))
+    emit_host_gas_bound(state, opcode, cost)
     state.evm_gas = state.evm_gas.consume_dynamic(cost)
     return state
 
@@ -285,6 +368,7 @@ def deduct_host_gas_uf_x86(mstate, opcode: str, stack_args: Sequence[BitVecRef],
 
     # 与 EVM 侧 charge_host_gas_uf 同序取号：两侧序号必须一致才相消。
     cost = host_gas_uf(opcode, stack_args, next_host_gas_seq(mstate, opcode))
+    emit_host_gas_bound(mstate, opcode, cost)
     gas_before = mstate.callengine_gas_remaining
     gas_after = _consume_clamp_64(gas_before, cost)
 

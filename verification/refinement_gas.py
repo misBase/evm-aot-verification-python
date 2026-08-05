@@ -30,27 +30,6 @@ class GasEquivalenceChecks:
     def __init__(self, ctx: _RefinementContext):
         self._ctx = ctx
 
-    def _check_gas_equivalence(
-        self,
-        evm_gas,
-        x86_gas,
-        deadline: Optional[float] = None,
-        path_condition=None,
-        context: str = "",
-        logs: Optional[list] = None,
-    ):
-        """用共享 ctx solver 检查 gas 终值等价（门面/串行路径）。"""
-        return self._check_gas_equivalence_with_solver(
-            self._ctx.solver,
-            evm_gas,
-            x86_gas,
-            deadline,
-            path_condition,
-            context,
-            logs,
-            ctx=None,
-        )
-
     def _check_gas_equivalence_with_solver(
         self,
         solver,
@@ -64,15 +43,22 @@ class GasEquivalenceChecks:
     ):
         """在给定 solver 上检查 gas 终值等价（支持并行 worker 的私有 solver）。
 
-        两侧都无 gas 观测才 skip（不带 gas 的旧 observation / dummy 单测）。不对称
-        （一侧有、一侧 None）必须 fail-closed：那是该侧漏填 gas 的建模缺口，静默
-        skip 会假绿——无法比较不等于已验证。
+        **任一侧或两侧缺 gas 观测都 fail-closed。** 无法比较不等于已验证。
+
+        走到这里就意味着 gas 检查已启用——``RefinementChecker`` 只在 ``check_gas``
+        为真时才构造本类（``refinement_checker.py``），而 ``RefinementOutputChecks``
+        用 ``if self._gas is not None`` 把关闭态挡在门外。所以"两侧都没有 gas"不是
+        "本次没建模 gas"，而是**观测本该有却丢了**：``_PATH_RESULT_KEYS`` 漏键、并行
+        worker 跨 Context 翻译丢失、aggregate fallback 掉字段——全是假绿路径。
+        status_code 一侧一直是这么处理的（见
+        ``tests/unit/test_refinement_return_data.py`` 的两条 missing 用例），此处对齐。
         """
-        if evm_gas is None and x86_gas is None:
-            return True, "Gas not observed (both sides, skipped)"
         if evm_gas is None or x86_gas is None:
-            missing = "EVM" if evm_gas is None else "x86"
-            msg = f"✗ GAS CHECK INCOMPLETE: {missing} side has no gas observation (fail-closed)"
+            if evm_gas is None and x86_gas is None:
+                detail = "neither side has a gas observation"
+            else:
+                detail = f"{'EVM' if evm_gas is None else 'x86'} side has no gas observation"
+            msg = f"✗ GAS CHECK INCOMPLETE: {detail} (fail-closed)"
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")
             return False, msg
 

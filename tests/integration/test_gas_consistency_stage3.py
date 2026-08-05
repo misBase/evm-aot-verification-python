@@ -535,9 +535,10 @@ def test_off_still_verifies_with_concrete_budget():
 def test_off_success_message_discloses_unmodeled_host_gas():
     """OFF 的结论是**条件性**的，前提必须出现在每条 VERIFIED 消息里。
 
-    OFF 不扣 host cost H，后续可见 gas 检查判的是 `S > G` 而非 `S > G-H`；要求具体预算
-    只关掉了符号 G 那类反例，`G=1e9, H=999999998, S=3` 仍是具体预算下的反例。调用方只有
-    这条 message，不写前提就会把条件性结论读成无条件的。
+    OFF 刻意不建模 host gas（它是最便宜的功能等价筛查、根本不比较 gas），后续可见 gas
+    检查判的是 `S > G` 而非 `S > G-H`；要求具体预算只关掉了符号 G 那类反例，
+    `G=1e9, H=999999998, S=3` 仍是具体预算下的反例。调用方只有这条 message，不写前提
+    就会把条件性结论读成无条件的，所以还要指出关缺口的出路（另两档）。
     """
     evm, x86 = _load_pair("gas_sload")
     verified, msg = ProgramEquivalenceChecker(
@@ -548,3 +549,20 @@ def test_off_success_message_discloses_unmodeled_host_gas():
     assert verified, msg
     assert "fixed initial gas budget 555000" in msg
     assert "host gas is NOT modeled in this mode" in msg
+    assert "GasCheck.FIXED_BUDGET or FULL" in msg, "要给出关掉这个缺口的出路"
+
+
+def test_gas_modes_do_not_overclaim_bounds():
+    """比较 gas 的两档不能把"受上界约束"说成"按协议扣数"。
+
+    上界是对 go-hpc-evm 人工审计得来的 assume，不是本验证器证出来的定理。
+    """
+    evm, x86 = _load_pair("gas_sload")
+    verified, msg = ProgramEquivalenceChecker(
+        timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
+    ).verify_program_pair(
+        evm, x86, SMTState.create_initial_state(), stack_check=None,
+    )
+    assert verified, msg
+    assert "externally audited upper bounds" in msg
+    assert "NOT proven here" in msg

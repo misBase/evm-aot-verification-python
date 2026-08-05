@@ -280,7 +280,8 @@ class OutputRefinementChecks:
             if not verified:
                 return False, msg
 
-        # gas 终值等价（两侧都缺省时 checker 内部跳过）。
+        # gas 终值等价。`_gas is None` = 检查未启用；一旦启用，任一侧或两侧缺 observation
+        # 都由 checker 内部 fail-closed（缺失 = 观测丢了，不是"没建模"）。
         if self._gas is not None:
             verified, msg = self._gas._check_gas_equivalence_with_solver(
                 solver,

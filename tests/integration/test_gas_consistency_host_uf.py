@@ -347,7 +347,7 @@ def test_host_gas_seq_kinds_is_locked():
     }), "HOST_GAS_SEQ_KINDS 变了；确认新成员的 Go gas 函数真的依赖 access list"
 
     # 明确排除的三个，各有依据，别顺手加回来
-    assert "SELFDESTRUCT" not in HOST_GAS_SEQ_KINDS, "gasSuicide 固定 return 0"
+    assert "SELFDESTRUCT" not in HOST_GAS_SEQ_KINDS, "host.go:328 Suicide 连 gas 都不扣"
     assert "EXP" not in HOST_GAS_SEQ_KINDS, "50*byteLen(exponent)+10 是纯函数"
     for kind in ("CREATE", "CREATE2"):
         assert kind not in HOST_GAS_SEQ_KINDS, (

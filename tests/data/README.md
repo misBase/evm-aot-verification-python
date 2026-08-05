@@ -17,12 +17,18 @@ go-hpc-evm 真实编译产出：同一段 EVM 字节码同时导出 IR JSON 与 
 
 ### 绑定的上游版本
 
-| | |
-| --- | --- |
-| 仓库 | `$GOPATH/src/github.com/bcds/go-hpc-evm` |
-| commit | `b3ddbdb`（`fix(aot): correct SIGNEXTEND jump targets and add fuzz test`） |
+当前基线 **`b3ddbdb`**（`fix(aot): correct SIGNEXTEND jump targets and add fuzz test`），仓库 `$GOPATH/src/github.com/bcds/go-hpc-evm`。这段文字**就是**事实源——没有测试去核对它，见下。
 
-机器码是该版本 codegen 的产物，IR 的 `static_gas` / host `Param` 索引也是。上游变动后重新生成时一并更新。
+绑定的东西有两类：
+
+1. 机器码是该版本 codegen 的产物，IR 的 `static_gas` / host `Param` 索引也是；
+2. `state/host_gas.HOST_GAS_UPPER_BOUNDS` 的数值来自对该版本 `evm/host.go`、`evm/aot/*`、`params/protocol_params.go` 的人工审计（**不是** `evm/gas_table.go`——那是解释器的 gas 表，AOT 从不调用）。
+
+第 2 条是**手工同步项，没有任何自动提醒**：上界写小了是**静默缩域**（两侧仍共享同一个 UF、仍相消、仍 UNSAT），Python 侧任何测试都看不见。数值没有可执行的 oracle——每条上界取自哪个 Go 函数的哪条分支、常量在哪一行，都记在 `HOST_GAS_UPPER_BOUNDS` 的注释里，照行号读源码复核。
+
+这里曾有一条比对本地 go-hpc-evm HEAD 的测试（`tests/support/go_revision.py`），已删：它绑的是**开发机工作区状态**，而决定健全性的是产出这批 checked-in fixture 的编译器版本，两者没有因果关系；上游任何无关改动都会让它变红，而消红最省事的做法恰好是它想阻止的"不复核直接改基线"。
+
+所以换编译器版本时**只能靠流程**：复核上界 → 重新生成 fixture → **最后**才更新上面那行基线。完整流程见 `docs/关键问题记录.md` #20。
 
 ### 重新生成
 
