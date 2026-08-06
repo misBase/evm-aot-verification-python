@@ -508,6 +508,7 @@ def test_verify_muti_block_program_pair_full():
     assert calldataload_stats["hits"] == 8
 
 
+@pytest.mark.slow
 def test_verify_muti_block_08_program_pair_full():
     """使用 muti_block_08.json 与 muti_block_08.hex 进行 path observation 等价验证。"""
     test_dir = os.path.dirname(__file__)

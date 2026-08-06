@@ -351,7 +351,8 @@ def test_host_dynamic_gas_ops_allowed_in_both_gas_modes(mode):
     if mode is GasCheck.FULL:
         # 替代旧拒绝的"别把结论读过头"守卫：范围必须写在消息里，不靠文档口头声明。
         assert "over all initial gas values" in message, message
-        assert "host-exhaustion termination is out of scope" in message, message
+        assert "NOT proven here" in message, message
+        assert "host-exhaustion termination" in message, message
 
 
 def test_fixed_budget_rejects_symbolic_gas():
@@ -485,7 +486,8 @@ def test_success_message_carries_gas_scope():
     )
     assert verified, message
     assert "fixed initial budget 777000" in message
-    assert "host-exhaustion termination is out of scope" in message
+    assert "NOT proven here" in message
+    assert "host-exhaustion termination" in message
 
 
 def test_off_rejects_symbolic_gas():
