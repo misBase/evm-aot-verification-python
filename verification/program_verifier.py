@@ -13,7 +13,7 @@ from x86_64.program import X86Program
 from x86_64.summaries import X86SummaryConfig
 from .refinement_checker import RefinementChecker
 from .call_site_mapping import build_call_site_mapping
-from state.host_gas import HOST_GAS_UF_KINDS
+from state.host_gas import HOST_GAS_UF_KINDS, HOST_GAS_UNBOUNDED_KINDS
 from state.smt_state import SMTState
 
 
@@ -34,7 +34,7 @@ class GasCheck(str, Enum):
     两者的差别是「固定一个 gas 点」vs「量化所有 gas」，**不是**「无 OOG 路径」vs「有」：
     FIXED_BUDGET 下依赖符号 offset 的动态 fee 仍能超预算，那类 OOG 分支照样保留。
 
-    结论范围（三个模式共同适用）见 ProgramEquivalenceChecker.__init__。
+    结论范围见 ProgramEquivalenceChecker.__init__（注意 host UF 只在后两档启用）。
     """
 
     OFF = "off"
@@ -130,6 +130,49 @@ _MODELED_DYNAMIC_GAS_KINDS = _PROVEN_DYNAMIC_GAS_KINDS | HOST_GAS_UF_KINDS
 _MANUAL_REJECT_KINDS: frozenset[str] = frozenset()
 
 
+def _format_verdict(message: str, details: list[Tuple[str, str]]) -> str:
+    """把结论的前提排成带标签的缩进多行（沿用 verbose 输出的 ├─/└─ 风格）。
+
+    只在条目**之间**换行，条目内部不折行：调用方与测试是按短语匹配这条消息的
+    （"none exists for CALL in this program" 之类），按列宽硬 wrap 会把短语拦腰切断，
+    让断言随文案长度变化时好时坏。需要按终端宽度排版的话交给展示层。
+    """
+    lines = [message]
+    for i, (label, text) in enumerate(details):
+        connector = "└─" if i == len(details) - 1 else "├─"
+        lines.append(f"  {connector} {label}: {text}")
+    return "\n".join(lines)
+
+
+def _find_unbounded_host_gas_ops(evm_program: EVMProgram) -> Optional[list[str]]:
+    """程序里实际出现的、**没有**协议上界的 host op（去重排序）。
+
+    只用于把结论范围说准：这些 opcode 的 host cost 是完全无约束的 UF，说"受上界约束"
+    就是事实性过度声明。判据由 HOST_GAS_UNBOUNDED_KINDS 派生，与上界表自动保持一致。
+
+    扫不动 IR 时返回 **None**（≠ 空 list），因为二者在这里不是同一件事：空 list 让
+    _annotate_gas_scope 说出"本程序的 host op 全都有界"这句**最强**的话，而 IR 字段改名
+    （ControlFrames 就动过）或调用方传进 duck-typed 对象时，那句话会被静默说出口——正是
+    这段代码要防的过度声明。None ⇒ 覆盖面未知，措辞退到不作声明那一档。
+    """
+    blocks = getattr(evm_program, "blocks", None)
+    if blocks is None:
+        return None
+
+    found = set()
+    for block in blocks:
+        operations = getattr(block, "operations", None)
+        if operations is None:
+            return None
+        for op in operations:
+            kind = getattr(op, "kind", None)
+            if kind is None:
+                return None
+            if kind.upper() in HOST_GAS_UNBOUNDED_KINDS:
+                found.add(kind.upper())
+    return sorted(found)
+
+
 def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram) -> list[str]:
     """扫出程序里必须拒验的动态 gas 指令（返回非空 ⇒ 拒绝受理 gas 检查）。
 
@@ -169,12 +212,14 @@ class ProgramEquivalenceChecker:
                  gas_check: 'GasCheck | str' = GasCheck.OFF):
         """初始化程序等价性检查器。
 
-        gas 检查的结论范围（所有模式适用，按这个口径读 VERIFIED）：
+        gas 检查的结论范围（按这个口径读 VERIFIED）：
 
-        - 验 **x86 可见 gas 计算**：makeStaticUseGas、checkMemoryAndCalcDynamicGas* 的
-          内存扩展/word/log fee、CALL 系 returnGas 链。
-        - host/builtin gas **数额**靠两侧同名 host_gas_uf 相消：证的是「两侧扣同一个数、
-          栈参数一致」（能抓参数传错），host 公式本身是 assume。
+        - 验 **x86 可见 gas 计算**（所有模式）：makeStaticUseGas、
+          checkMemoryAndCalcDynamicGas* 的内存扩展/word/log fee、CALL 系 returnGas 链。
+        - host/builtin gas **数额**靠两侧同名 host_gas_uf 相消 —— **仅 FIXED_BUDGET /
+          FULL**，OFF 不启用 host UF（刻意保留的缺口，见 GasCheck 与 verify_program_pair
+          内的论证）。证的是「两侧扣同一个数、栈参数一致」（能抓参数传错），host 公式
+          本身是 assume；上界只覆盖有界的那批 opcode，CALL/CREATE 系没有。
         - host gas **耗尽后的终止**不在范围内，也不是缺口——那一处没有生成代码。
           理由见 state/host_gas.py 模块 docstring。
 
@@ -388,7 +433,7 @@ class ProgramEquivalenceChecker:
                 x86_reachability_timeout_ms=x86_reachability_timeout_ms,
                 max_depth=max_depth,
             )
-            return verified, self._annotate_gas_scope(verified, message, gas_budget)
+            return verified, self._annotate_gas_scope(verified, message, gas_budget, evm_program)
 
         # 步骤1：公式构建 - EVM（两级路径感知）
         if self.verbose:
@@ -501,7 +546,7 @@ class ProgramEquivalenceChecker:
         if stack_check is None:
             if self.verbose:
                 print("\n[5] Skipping stack equivalence check (debug disabled).")
-            return verified, self._annotate_gas_scope(verified, message, gas_budget)
+            return verified, self._annotate_gas_scope(verified, message, gas_budget, evm_program)
 
         # 步骤5：栈一致性检查（调试用），使用独立 timeout budget
         if self.verbose:
@@ -529,7 +574,7 @@ class ProgramEquivalenceChecker:
                 f"({stack_check_timeout_ms} ms)"
             )
 
-        return verified, self._annotate_gas_scope(verified, message, gas_budget)
+        return verified, self._annotate_gas_scope(verified, message, gas_budget, evm_program)
 
     def _loop_guard_note(self, evm_program: EVMProgram,
                          x86_program: X86Program) -> Optional[str]:
@@ -584,36 +629,58 @@ class ProgramEquivalenceChecker:
         return lines
 
     def _annotate_gas_scope(self, verified: bool, message: Optional[str],
-                            gas_budget: Optional[int]) -> Optional[str]:
+                            gas_budget: Optional[int],
+                            evm_program: EVMProgram) -> Optional[str]:
         """把 gas 结论的适用范围写进成功消息。
 
         库调用方拿不到 CLI 的那行输出，只有这个 message。不写范围的话，
         「FIXED_BUDGET 单点预算下通过」会被读成「所有 gas 下通过」。
+
+        ``evm_program`` 用来把上界覆盖面说准——它决定消息里点名哪些 opcode 无上界，
+        故是必需参数：给它默认值等于给"漏传就少说一截前提"开了口子。
         """
         if not verified or not message:
             return message
         if self.gas_check is GasCheck.OFF:
             # 这个缺口为什么是刻意保留的，见 verify_program_pair 内的论证。
-            return (
-                f"{message} [functional equivalence at the fixed initial gas budget "
-                f"{gas_budget}; host gas is NOT modeled in this mode, so the modelled "
-                "gas runs high by the host cost and any gas-dependent behaviour "
-                "(out-of-gas thresholds, the GAS opcode's value, and branches derived "
-                "from either) is explored over the wrong path set — use "
-                "GasCheck.FIXED_BUDGET or FULL to close that gap]"
-            )
+            return _format_verdict(message, [
+                ("scope", "functional equivalence at the fixed initial gas budget "
+                          f"{gas_budget}"),
+                ("host gas", "NOT modeled in this mode — modelled gas runs high by "
+                             "the host cost"),
+                ("consequence", "OOG thresholds, the GAS opcode's value and branches "
+                                "off them are explored over the wrong path set"),
+                ("to close", "use GasCheck.FIXED_BUDGET or FULL"),
+            ])
         if self.gas_check is GasCheck.FIXED_BUDGET:
             scope = f"gas equivalent for the fixed initial budget {gas_budget}"
         else:
             scope = "gas and OOG paths equivalent over all initial gas values"
-        # 措辞止于"受审计所得上界约束"：上界是 assume，本验证器证不了 host gas 公式，
+        # 上界的覆盖面必须按**本程序**说准：CALL/CREATE 系没有上界，只扣无约束 UF，
+        # 笼统说"host gas 受上界约束"对含它们的程序就是事实性过度声明。
+        uf_prefix = "shared UFs, capped by manually audited upper bounds"
+        unbounded = _find_unbounded_host_gas_ops(evm_program)
+        if unbounded is None:
+            # 扫不动 IR ⇒ 覆盖面未知。这一档存在的唯一意义就是不让"扫不出"伪装成"全有界"。
+            bounds = f"{uf_prefix} — coverage UNKNOWN (IR scan failed)"
+        elif unbounded:
+            bounds = (
+                f"{uf_prefix} — none exists for {', '.join(unbounded)}, "
+                "whose cost stays unconstrained"
+            )
+        else:
+            bounds = f"{uf_prefix} (all bounded here)"
+        # 措辞止于"受审计所得上界约束"，且必须交代上界的外部前提：它是手工同步项，
+        # 没有任何机制核对被验产物是不是同一版编译器产出的（docs/关键问题记录.md #20）。
         # 改强成"按协议扣数"即过度声明（test_gas_modes_do_not_overclaim_bounds 盯着）。
-        return (
-            f"{message} [{scope}; host gas amounts are shared uninterpreted functions "
-            "constrained by externally audited upper bounds — the host gas formulas "
-            "themselves are NOT proven here, and host-exhaustion termination is out "
-            "of scope]"
-        )
+        return _format_verdict(message, [
+            ("scope", scope),
+            ("host gas", bounds),
+            ("bounds", "hand-synced to the compiler version that produced these "
+                       "inputs — nothing checks that"),
+            ("NOT proven here", "the host gas formulas themselves; host-exhaustion "
+                                "termination"),
+        ])
 
     def _verify_program_pair_path_observations(
         self,

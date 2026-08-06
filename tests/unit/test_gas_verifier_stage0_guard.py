@@ -12,6 +12,7 @@ from state.smt_state import SMTState
 from verification.program_verifier import (
     GasCheck,
     ProgramEquivalenceChecker,
+    _find_unbounded_host_gas_ops,
     _find_unsupported_dynamic_gas_ops,
 )
 
@@ -323,3 +324,57 @@ def test_cli_does_not_synthesize_its_own_verdict_text(monkeypatch, capsys):
     assert "Programs are semantically equivalent" not in out, (
         "CLI 又开始自己拼结论文案了"
     )
+
+
+def test_cli_fails_closed_when_success_has_no_scope_message(monkeypatch, capsys):
+    """verified=True 但没有 message ⟹ 拒绝输出结论，退出码非 0。
+
+    那意味着某条成功路径绕过了 `_annotate_gas_scope`，唯一"安全"的补救恰恰是打印一句
+    无前提的 VERIFIED——正是要避免的东西。当前生产路径都带 message，这条是防回归。
+    """
+    code, out = _run_cli(monkeypatch, capsys, ["main.py", "ir.json", "90"], None)
+
+    assert code == 1, "无范围声明的成功不该以 0 退出"
+    assert "INCONCLUSIVE" in out
+    assert "Programs are semantically equivalent" not in out
+
+
+# --- 上界覆盖面：扫不动 IR 不得伪装成"全都有界" ---
+
+
+def test_unbounded_scan_names_the_ops_without_a_bound():
+    """有界的 SLOAD 不进结果，无界的 CALL/CREATE 进（判据派生自上界表）。"""
+    program = _program_with_ops("SLOAD", "CALL", "CREATE", "ADD")
+
+    assert _find_unbounded_host_gas_ops(program) == ["CALL", "CREATE"]
+
+
+def test_unbounded_scan_returns_empty_when_every_host_op_is_bounded():
+    program = _program_with_ops("SLOAD", "SSTORE", "EXP")
+
+    assert _find_unbounded_host_gas_ops(program) == []
+
+
+@pytest.mark.parametrize("broken", [
+    object(),                                       # 连 blocks 都没有
+    type("P", (), {"blocks": [object()]})(),        # block 没有 operations
+    type("P", (), {"blocks": [type("B", (), {"operations": [object()]})()]})(),  # op 没有 kind
+])
+def test_unbounded_scan_fails_closed_when_the_ir_cannot_be_walked(broken):
+    """扫不动 ⇒ None，**不是**空 list。
+
+    两者都写成 `[]` 的话，"本程序 host op 全都有界"这句最强的话会在 IR 字段改名时被
+    静默说出口——那正是这个扫描要防的过度声明。
+    """
+    assert _find_unbounded_host_gas_ops(broken) is None
+
+
+def test_scope_message_says_unknown_when_coverage_cannot_be_determined():
+    """覆盖面未知时，结论必须写 UNKNOWN，不许落到"全都有界"那句。"""
+    checker = ProgramEquivalenceChecker(gas_check=GasCheck.FIXED_BUDGET)
+
+    msg = checker._annotate_gas_scope(True, "✓ VERIFIED", 500000, object())
+
+    assert "UNKNOWN" in msg
+    assert "all bounded here" not in msg
+    assert "none exists for" not in msg, "扫不出来就不能点名，那是编出来的"

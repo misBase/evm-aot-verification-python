@@ -16,11 +16,11 @@ UF，使后继 block 的 `ULT(gas, static_gas)` 不再折得掉、OOG 分支全�
     CErc20 decimals()(723 block)      FIXED_BUDGET    4.9s    5 / 5
     CErc20 decimals()                 FULL            7.6s    18 / 18
     ENSRegistry owner()(127 block)    FIXED_BUDGET    9.3s    11 / 11
-    muti_block(40 block)              FIXED_BUDGET    >25min  未跑完(见文末 skip)
+    muti_block(40 block)              FIXED_BUDGET    41s     30 / 30（上界生效后）
 
-结论:除 muti_block 外膨胀远小于预警量级，FULL（对所有初始 gas 量化 + OOG 路径）在
-723 block 的 CErc20 上也只要 7.6s。muti_block 的差别不在 block 数而在输入形态——
-符号 calldatasize + abstract_calldataload_words 本就撑开路径，再乘上 OOG 分支。
+结论:膨胀远小于预警量级，FULL（对所有初始 gas 量化 + OOG 路径）在 723 block 的
+CErc20 上也只要 7.6s。muti_block 曾是唯一例外（输入形态本就撑开路径，再乘 OOG 分支后
+30→102+、>25min 未跑完），host-gas 协议上界把 OOG 分支压死后回到 30 条 / 41s。
 
 强度边界与 stage0/1/3 相同:正例只说明两侧一致，不排除 gas 根本没进比较，故每条正例
 都断言 message 带 gas scope 后缀，另有三条篡改用例（静态 gas / host UF / 功能 bug）
@@ -207,7 +207,10 @@ def test_perf_erc20_lite_tampered_static_gas_caught():
     )
 
     assert not verified, "tampered static_gas must be caught (false green otherwise)"
-    assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
+    # 必须断言到**反例**，不能只查 "gas" 子串——`GAS CHECK INCOMPLETE`、配置错误等
+    # 非目标失败同样含 "gas"，会让这条测试被它没在验的东西满足。
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
 
 
 def test_perf_erc20_lite_tampered_host_gas_uf_caught(monkeypatch):
@@ -235,7 +238,8 @@ def test_perf_erc20_lite_tampered_host_gas_uf_caught(monkeypatch):
     )
 
     assert not verified, "tampered x86 host-gas UF must be caught"
-    assert "gas" in msg.lower(), f"expected gas counterexample, got: {msg}"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
 
 
 def test_perf_erc20_lite_sbb_bug_still_caught_with_gas():

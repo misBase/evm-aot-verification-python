@@ -548,21 +548,55 @@ def test_off_success_message_discloses_unmodeled_host_gas():
     )
     assert verified, msg
     assert "fixed initial gas budget 555000" in msg
-    assert "host gas is NOT modeled in this mode" in msg
+    assert "host gas: NOT modeled in this mode" in msg
     assert "GasCheck.FIXED_BUDGET or FULL" in msg, "要给出关掉这个缺口的出路"
 
 
-def test_gas_modes_do_not_overclaim_bounds():
-    """比较 gas 的两档不能把"受上界约束"说成"按协议扣数"。
-
-    上界是对 go-hpc-evm 人工审计得来的 assume，不是本验证器证出来的定理。
-    """
-    evm, x86 = _load_pair("gas_sload")
+def _fixed_budget_message(name):
+    evm, x86 = _load_pair(name)
     verified, msg = ProgramEquivalenceChecker(
         timeout_ms=120000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
         evm, x86, SMTState.create_initial_state(), stack_check=None,
     )
     assert verified, msg
-    assert "externally audited upper bounds" in msg
+    return msg
+
+
+def test_gas_modes_do_not_overclaim_bounds():
+    """比较 gas 的两档不能把"受上界约束"说成"按协议扣数"，且必须交代上界的外部前提。
+
+    上界是对 go-hpc-evm **人工审计**得来的 assume，不是本验证器证出来的定理；而且没有
+    任何机制核对被验产物是不是同一版编译器产出的（docs/关键问题记录.md #20）。这两点
+    都得出现在结论里，否则调用方会把它读成"gas 已按协议验过"。
+    """
+    msg = _fixed_budget_message("gas_sload")
+
+    assert "manually audited upper bounds" in msg
+    assert "hand-synced" in msg, "必须交代上界是手工同步的"
+    assert "nothing checks that" in msg, "必须交代没有机制核对编译器版本"
     assert "NOT proven here" in msg
+
+
+def test_scope_message_names_unbounded_host_ops_present():
+    """含无界 host op 的程序，结论必须**点名**它们没有上界。
+
+    CALL/CREATE 系只扣无约束 UF（HOST_GAS_UNBOUNDED_KINDS）。笼统写"host gas 受上界
+    约束"对这类程序是事实性过度声明——`gas_call` 就是反例，所以这条必须用它验，不能只
+    用全都有界的 `gas_sload`。
+    """
+    msg = _fixed_budget_message("gas_call")
+
+    assert "none exists for CALL" in msg, (
+        f"含 CALL 的程序必须点名它无上界，实际消息：{msg}"
+    )
+    assert "unconstrained" in msg
+
+
+def test_scope_message_says_so_when_everything_is_bounded():
+    """反过来，全都有界的程序不该被扣上"有 opcode 没上界"的帽子。"""
+    msg = _fixed_budget_message("gas_sload")
+
+    assert "all bounded here" in msg
+    assert "none exists for" not in msg
+    assert "UNKNOWN" not in msg

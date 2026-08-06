@@ -178,7 +178,15 @@ def main():
         # 无条件原样打印 verifier 的消息：结论的适用范围与强度边界由 _annotate_gas_scope
         # 附在里面。这里一度自己拼结论文案、且只在 --verbose 下打印 message，默认输出因此
         # 不带任何前提。别再加本地拼装的结论文案。
-        print(message or "✓ VERIFIED: Programs are semantically equivalent")
+        #
+        # verified 却没有 message 时 fail-closed：那意味着某条成功路径绕过了范围标注，
+        # 唯一"安全"的补救是打印一句无前提的 VERIFIED——正是要避免的东西。当前生产路径
+        # 都带 message，所以这条不可达；留着是防回归。
+        if not message:
+            print("✗ VERIFICATION INCONCLUSIVE: verifier reported success without a "
+                  "scope-annotated message; refusing to print an unqualified verdict")
+            return 1
+        print(message)
         return 0
     else:
         print("✗ VERIFICATION FAILED")
