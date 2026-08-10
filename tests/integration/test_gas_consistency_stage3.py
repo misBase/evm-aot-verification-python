@@ -31,22 +31,66 @@ def _load_pair(name):
     return evm, x86
 
 
-@pytest.mark.parametrize("name,expected_status", [
-    ("gas_mload", 2),   # 末尾 STOP → stopped(2)
-    ("gas_sha3", 2),    # STOP
-    ("gas_revert", 1),  # REVERT → reverted(1)
-    ("gas_mstore8", 2),
-    ("gas_codecopy", 2),
+def _reachable_evm_status_codes(evm, state):
+    """枚举 EVM 侧可达终止路径的具体 status code。
+
+    `verify_program_pair` 只证明「两侧相等」，不证明「等于几」——两侧一起停在错误的码
+    上它照样绿。配上绝对值断言（EVM 侧终态确定 + 两侧相等 ⟹ x86 侧亦然）才算钉死。
+
+    非常量 status 与 `unknown` 都 fail-closed：两者都是「静默漏掉一条路径 → 集合仍等于
+    期望值 → 假绿」的入口，unknown 尤其不等于「不可达」。
+    """
+    from z3 import Solver, is_bv_value, sat, simplify, unknown
+
+    reachable = set()
+    for obs in evm.to_z3_paths(state, merge_state=False).as_result_dicts():
+        status = simplify(obs["status_code"])
+        assert is_bv_value(status), (
+            f"status_code 没折成具体值（{status}）——跳过会让可达集合看起来仍然正确"
+        )
+        solver = Solver()
+        solver.set("timeout", 10000)
+        solver.add(obs["condition"])
+        result = solver.check()
+        assert result != unknown, (
+            f"status={status} 求解 unknown（{solver.reason_unknown()}）；当成不可达即假绿"
+        )
+        if result == sat:
+            reachable.add(status.as_long())
+    return reachable
+
+
+@pytest.mark.parametrize("name,state_kwargs,expected_status", [
+    ("gas_mload", {}, 2),   # 末尾 STOP → stopped(2)
+    ("gas_sha3", {}, 2),    # STOP
+    ("gas_revert", {}, 1),  # REVERT → reverted(1)
+    ("gas_mstore8", {}, 2),
+    ("gas_codecopy", {}, 2),
+    ("gas_log0", {}, 2),
+    ("gas_log4", {}, 2),
+    # 同一份 fixture 覆盖两条终止路径，终态由 return data 长度决定。
+    ("gas_returndatacopy", {}, 7),                                # ReturnDataOutOfBounds
+    ("gas_returndatacopy", {"return_data_size_bytes": 0x100}, 2),  # STOP
 ])
-def test_status_code_consistency_passes(name, expected_status):
-    """终止路径 status code 两侧一致（gas_check=GasCheck.FIXED_BUDGET 一并验 gas+status）。"""
+def test_status_code_consistency_passes(name, state_kwargs, expected_status):
+    """终止路径 status code 两侧一致**且等于预期值**（FIXED_BUDGET 一并验 gas+status）。
+
+    `expected_status` 一度是死参数——签名收下、函数体从不引用，只验了「两侧相等」。
+    """
     evm, x86 = _load_pair(name)
     verified, msg = ProgramEquivalenceChecker(
         timeout_ms=180000, gas_check=GasCheck.FIXED_BUDGET
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(), stack_check=None
+        evm, x86, SMTState.create_initial_state(**state_kwargs), stack_check=None
     )
     assert verified, f"{name} status code consistency should hold, got: {msg}"
+
+    reachable = _reachable_evm_status_codes(
+        evm, SMTState.create_initial_state(**state_kwargs)
+    )
+    assert reachable == {expected_status}, (
+        f"{name} {state_kwargs}: 期望终态 {expected_status}，实际可达 {sorted(reachable)}"
+    )
 
 
 def test_tampered_status_code_caught(monkeypatch):
@@ -131,24 +175,128 @@ def test_oog_tampered_status_caught(monkeypatch):
 #
 # 注意只有 GasCheck.FULL 能验到它：FIXED_BUDGET 的具体预算会把这些常量 fee 的 OOG
 # 条件在 simplify 阶段折成 False，路径根本不建。
-@pytest.mark.parametrize("name", [
-    "gas_mload",     # 内存扩展（pureMemoryGascost）
-    "gas_mstore8",   # 内存扩展，access_size=1
-    "gas_revert",    # 内存扩展，calcMemSize64(offset, length)
-    "gas_sha3",      # 内存扩展 + Sha3WordGas
-    "gas_codecopy",  # 内存扩展 + CopyGas
-    "gas_mcopy",     # max(dst,src) + CopyGas
-    "gas_log1",      # 内存扩展 + LogGas + TopicGas + 每字节 LogDataGas
+@pytest.mark.parametrize("name,state_kwargs", [
+    ("gas_mload", {}),     # 内存扩展（pureMemoryGascost）
+    ("gas_mstore8", {}),   # 内存扩展，access_size=1
+    ("gas_revert", {}),    # 内存扩展，calcMemSize64(offset, length)
+    ("gas_sha3", {}),      # 内存扩展 + Sha3WordGas
+    ("gas_codecopy", {}),  # 内存扩展 + CopyGas
+    ("gas_mcopy", {}),     # max(dst,src) + CopyGas
+    ("gas_log1", {}),      # 内存扩展 + LogGas + TopicGas + 每字节 LogDataGas
+    ("gas_log0", {}),      # n=0：topic gas 项整个消失
+    ("gas_log4", {}),      # n=4：topic gas 取最大值
+    ("gas_returndatacopy", {}),                                # 内存扩展 + CopyGas，越界终态
+    ("gas_returndatacopy", {"return_data_size_bytes": 0x100}),  # 同上，正常终态
 ])
-def test_dynamic_oog_path_status_consistency(name):
+def test_dynamic_oog_path_status_consistency(name, state_kwargs):
     evm, x86 = _load_pair(name)
     verified, msg = ProgramEquivalenceChecker(
         timeout_ms=180000, gas_check=GasCheck.FULL
     ).verify_program_pair(
-        evm, x86, SMTState.create_initial_state(symbolic_gas=True),
+        evm, x86, SMTState.create_initial_state(symbolic_gas=True, **state_kwargs),
         stack_check=None, path_observations=True,
     )
     assert verified, f"{name} 动态 OOG 路径状态码应一致，got: {msg}"
+
+
+@pytest.mark.parametrize("name,state_kwargs", [
+    ("gas_log0", {}),
+    ("gas_log4", {}),
+    ("gas_returndatacopy", {}),
+    ("gas_returndatacopy", {"return_data_size_bytes": 0x100}),
+])
+def test_dynamic_oog_branch_is_reachable_beyond_static_gas(name, state_kwargs):
+    """上一条返回 VERIFIED 不代表动态 OOG 分支存在——这里证明它真的可达。
+
+    **裸的 `12 in reachable` 证明不了任何事**：每条 fixture 都有 TAG 的 block 入口静态
+    gas 前言，它自己就会产生 OUT_OF_GAS(12)（本文件 `add_with_push` 那条即是——单 block、
+    无任何动态 gas 指令，照样有 status 12 路径），动态分支整个消失它仍为真。
+
+    故压一条 `UGE(initial_gas, static_gas)`：静态前言已过关，剩下的 12 只能来自动态扣费。
+    该约束承重，鉴别力由下面的负对照钉死。
+    """
+    from z3 import BitVecVal, Solver, UGE, is_bv_value, sat, simplify, unknown
+
+    from evm_ir.status_code import EvmStatusCode
+
+    evm, _ = _load_pair(name)
+    state = SMTState.create_initial_state(symbolic_gas=True, **state_kwargs)
+    initial_gas = state.callengine_gas_remaining
+    static_gas = evm.blocks[0].static_gas
+
+    dynamic_oog_found = False
+    for obs in evm.to_z3_paths(state, merge_state=False).as_result_dicts():
+        status = simplify(obs["status_code"])
+        if not is_bv_value(status) or status.as_long() != EvmStatusCode.OUT_OF_GAS.value:
+            continue
+        solver = Solver()
+        solver.set("timeout", 20000)
+        solver.add(
+            obs["condition"],
+            UGE(initial_gas, BitVecVal(static_gas, initial_gas.size())),
+        )
+        result = solver.check()
+        # unknown 不是「不可达」：当成 False 会报成「动态分支不存在」，误导排查。
+        assert result != unknown, (
+            f"{name} {state_kwargs}: 动态 OOG 探针求解 unknown（{solver.reason_unknown()}）"
+        )
+        if result == sat:
+            dynamic_oog_found = True
+            break
+
+    assert dynamic_oog_found, (
+        f"{name} {state_kwargs}: gas >= static_gas={static_gas} 时无可达 OUT_OF_GAS 路径"
+        " —— 动态扣费的 OOG 分支没建出来，上面那条正例是 vacuous 的"
+    )
+
+
+def test_static_oog_alone_does_not_satisfy_the_dynamic_oog_probe():
+    """负对照：上面那条探针的 `UGE(initial_gas, static_gas)` 约束确实承重。
+
+    `add_with_push` 单 block、只有入口静态 gas、无任何动态 gas 指令。同一套探针对它：
+    不加 UGE → status 12 可达（静态 OOG 顶上，断言恒真）；加上 → 不可达。
+
+    约束被削弱时，上面那些 fixture 本来就有动态分支、会继续变绿，只有这条会红。
+    """
+    from z3 import BitVecVal, Solver, UGE, is_bv_value, sat, simplify, unknown
+
+    from evm_ir.status_code import EvmStatusCode
+
+    evm, _ = _load_add_with_push()
+    state = SMTState.create_initial_state(symbolic_gas=True)
+    initial_gas = state.callengine_gas_remaining
+    static_gas = evm.blocks[0].static_gas
+    static_ok = UGE(initial_gas, BitVecVal(static_gas, initial_gas.size()))
+
+    def oog_reachable(extra):
+        # 下面第二条是**负向**断言，unknown 退化成 False 会让超时冒充「不可达」。
+        for obs in evm.to_z3_paths(
+            SMTState.create_initial_state(symbolic_gas=True), merge_state=False
+        ).as_result_dicts():
+            status = simplify(obs["status_code"])
+            if (
+                not is_bv_value(status)
+                or status.as_long() != EvmStatusCode.OUT_OF_GAS.value
+            ):
+                continue
+            solver = Solver()
+            solver.set("timeout", 20000)
+            solver.add(obs["condition"], *extra)
+            result = solver.check()
+            assert result != unknown, (
+                f"负对照探针求解 unknown（{solver.reason_unknown()}）；当成不可达即假绿"
+            )
+            if result == sat:
+                return True
+        return False
+
+    assert oog_reachable([]), (
+        "add_with_push 的静态前言本应产生可达的 OUT_OF_GAS —— 前提没了，本对照失去意义"
+    )
+    assert not oog_reachable([static_ok]), (
+        "静态前言过关后不该再有 OUT_OF_GAS（无动态 gas 指令）；可达说明 UGE 约束没起作用，"
+        "上面那批断言全是恒真的"
+    )
 
 
 def test_dynamic_oog_tampered_status_caught(monkeypatch):

@@ -515,7 +515,11 @@ poetry run pytest tests/unit/*gas* tests/integration/*gas* -q
 - `test_gas_consistency_stage0.py` — 静态 gas 正向 + 篡改 static gas 被抓。
 - `test_gas_consistency_stage1.py` — mstore_return / mload / sha3 / calldatacopy /
   codecopy / mcopy / mstore8 / revert / log1 正向 + 逐项篡改（memory gas、word gas、
-  LOG flat/topic/data gas）+ 并行 path-observations 正反向。
+  LOG flat/topic/data gas）+ 并行 path-observations 正反向；另含
+  **returndatacopy**（越界 / 正常两条终止路径各一格，正向 + copy word gas 3→9 篡改
+  + word 常量 spy）与 **log0 / log4**（正向 + LOG4 的 TopicGas 篡改 + 「topic 数被当成
+  常量 1」篡改 + n_topics 实参 spy）。后者是 topic 数**读取链**的唯一覆盖——n 被写死成
+  常量 1 这类错误在 log1 上没有任何差别。
 - `test_gas_consistency_host_uf.py` — 13 类 host/builtin 正向 + 篡改 opcode 名 / 参数
   次序 / 漏扣 x86 侧 / 篡改 returnGas + 并行正反向；另含 CREATE/CREATE2/EXTCODECOPY
   这一组「可见 fee + host UF 混合」的正向（FIXED_BUDGET × FULL 双模式）、四条篡改
@@ -528,9 +532,23 @@ poetry run pytest tests/unit/*gas* tests/integration/*gas* -q
   `If(cond,1,0)`，合流后两支继续各自递增；序号相同时折成常量（验 `simplify` 没漏）。
   这条路径**现有 fixture 覆盖不到**（实测 perf_erc20_lite 143 次合并只有 6 次多路径，
   且那 6 次两支 gas 逐位相同），只能直接构造状态测合并逻辑。
-- `test_gas_consistency_stage3.py` — status code 逐终止路径一致 + OOG 路径 status 一致
-  + TAG 守卫次序 + 四类入口 fail-closed（模式-gas 错配双向、两侧初始 gas 不一致、
-  可折叠为常量的 gas）+ 成功消息带范围 + 并行跨 context。
+- `test_gas_consistency_stage3.py` — status code 逐终止路径一致**且等于预期值**
+  + OOG 路径 status 一致 + 动态 OOG 分支可达性（见下）+ TAG 守卫次序 + 四类入口
+  fail-closed（模式-gas 错配双向、两侧初始 gas 不一致、可折叠为常量的 gas）+ 成功消息
+  带范围 + 并行跨 context。
+
+  两条与「验没验到」直接相关的机制：
+
+  1. **绝对状态码**。`test_status_code_consistency_passes` 的 `expected_status` 曾是
+     死参数（签名收下、函数体从不引用，全部断言只有 `assert verified`），只验了
+     「两侧相等」——两侧一起停在错误的码上照样绿。现在配 `_reachable_evm_status_codes`
+     枚举 EVM 侧终态并断言绝对值（EVM 侧确定 + 两侧相等 ⟹ x86 侧亦然）。
+  2. **动态 OOG 探针必须排除静态 OOG**。裸的 `12 in reachable` 证明不了动态分支存在：
+     每条 fixture 都有 TAG 的 block 入口静态 gas 前言，它自己就产生 `OUT_OF_GAS(12)`。
+     实测对照——`add_with_push`（单 block、无任何动态 gas 指令）裸探针 12 **可达**，
+     加上 `UGE(initial_gas, static_gas)` 后**不可达**。所以探针一律带该约束，并有
+     `test_static_oog_alone_does_not_satisfy_the_dynamic_oog_probe` 作负对照钉死这个
+     鉴别力：约束被削弱时，有动态分支的 fixture 会继续变绿，只有这条负对照会红。
 - `test_gas_error_codes.py` — `calcMemSize64` 各错误分支、快照类、returnGas 窗口。
 - `test_gas_verifier_stage0_guard.py` — allowlist 三集合（差集为空的不变量、摘掉某个
   已建模 kind 后立刻被拒、人工钩子仍生效）、IR 不变量正负例、CLI 参数、枚举归一化。
@@ -552,6 +570,14 @@ EXTCODECOPY=3）。「VERIFIED」本身不排除「这条指令压根没被执�
 （`GOARCH=amd64 go test -run TestGenGasFixtures`），绑定 go-hpc-evm commit `b3ddbdb`；
 用法、GOARCH 陷阱与每条覆盖点见 `tests/data/README.md`。
 
+生成器**不是上游的 tracked 文件**——2026-08-07 补新 fixture 时发现它已不在 `evm/aot/` 下，
+按原接口重建了一份留在工作区未提交。再生前先确认它是否还在，重建要点（`hostIndex` 必须
+自己建，否则 host op 报 `predefined host "log" is not registered`）见 README。
+
+这三条 fixture 的 PUSH 操作数都是**具体值**，它们是真实 AOT 机器码上的可执行回归证据，
+不是对该 opcode 全部符号操作数的定理；符号操作数是另一档（`gas_create_sym` /
+`gas_extcodecopy_sym`，FULL 模式的 skip 见 §9.2）。
+
 CREATE 系新增的 fixture（操作数取互不相同的可辨识值）：
 
 | fixture | 操作数 | 覆盖点 |
@@ -562,6 +588,18 @@ CREATE 系新增的 fixture（操作数取互不相同的可辨识值）：
 | `gas_extcodecopy` | size=4, offset=7, destOffset=0x20, addr=1 | `calcMemSize64(Back(1),Back(3))` 槽位 + `CopyGas`(3) |
 | `gas_create_sym` / `gas_extcodecopy_sym` | size/offset 来自 CALLDATALOAD | 符号边界，**当前 skip**（见 9.2） |
 | `gas_sload_same_key` | 两次 `SLOAD(0x07)` | 调用序号（§7.1）：同 slot 读两次的 cold→warm 轨迹。现有 `gas_two_sload` 用的是两个**不同** key，验不到这条 |
+
+2026-08-07 补的三条（覆盖 `_DYNAMIC_GAS_KINDS` 里两处「已建模但无 IR↔x86 对照」的缺口）：
+
+| fixture | 操作数 | 覆盖点 |
+| --- | --- | --- |
+| `gas_returndatacopy` | length=4, dataOffset=7, destOffset=0x20 | RETURNDATACOPY 内存扩展 + `CopyGas`(3)；x86 前言 `makeCalcCopyIns(0, 2, 2)` 与 CALLDATACOPY/CODECOPY 逐字同构。一份 fixture 覆盖两条终止路径，用 `create_initial_state(return_data_size_bytes=…)` 切换：默认 0 → 越界(7)，0x100 → STOP(2)。gas 前言在越界 errPoint 之前，故两格都验得到 gas |
+| `gas_log0` | size=0x11, offset=0x20 | LOG n=0：topic gas 项整个消失 |
+| `gas_log4` | topics=0x54/0x53/0x52/0x51, size=0x11, offset=0x20 | LOG n=4：topic gas 最大值 |
+
+取值注意 **`calcMemSize64` 是 `offset + size`、对称**——offset/size 对调不改变内存扩展 fee，
+槽位错误只能靠非对称项（LOG 的 `size*LogDataGas`、COPY 系的 `toWordSize(length)*CopyGas`）
+检出，所以要挑能让这些项变号的值。
 
 ### 9.1 合约级端到端覆盖
 

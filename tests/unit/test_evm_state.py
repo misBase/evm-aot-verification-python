@@ -5,7 +5,7 @@ EVM状态模型的单元测试。
 """
 
 import pytest
-from z3 import BitVec, BitVecVal, IntVal, Solver, UGT, sat, unsat
+from z3 import BitVec, BitVecVal, IntVal, Or, Solver, UGT, sat, unsat
 from state.smt_state import EVMStackState, EVMStorageState, EVMGasState, SMTState
 
 
@@ -124,8 +124,12 @@ class TestEVMStackState:
         assert solver.check() == sat
 
 
-class TestSMTState:
-    """测试统一 SMT 初态的跨 EVM/x86 元数据契约。"""
+class TestSMTInitialState:
+    """测试统一 SMT 初态的跨 EVM/x86 元数据契约。
+
+    别改叫 `TestSMTState`：本文件下方已有同名类，重名时后者静默覆盖前者，这里的用例
+    一条都不会被收集，pytest 不报错。
+    """
 
     def test_initial_calldata_size_is_shared_symbolic_u64(self):
         state = SMTState.create_initial_state()
@@ -177,6 +181,56 @@ class TestSMTState:
                 calldata_size_bytes=2,
                 calldata_size_max_bytes=1,
             )
+
+    # --- return data size：side-channel 字段与 x86_memory 的 limb 必须同值 ---
+    #
+    # 字段是实际被读到的那个（x86 侧读 [R13+0xB8] 走 _maybe_read_callengine_field 的
+    # 快路径直接取它），limb 只是宽度不符时回退内存读用的镜像。
+    #
+    # 只能直接测：把 limb 写死成 0、字段留 0x100，RETURNDATACOPY 的两条终止路径全都
+    # 不变（实测 stage3 九格全绿），集成测试结构上抓不到这条。
+
+    @staticmethod
+    def _x86_return_data_size(state):
+        from state.x86_state import MemoryDomain
+        from x86_64.aot_profile import GO_HPC_EVM_PROFILE
+        from x86_64.models import Register
+
+        r13 = state.x86_registers.get_register(Register.R13)
+        offset = GO_HPC_EVM_PROFILE.offsets["return_data_size"]
+        return state.x86_memory.load_limb(
+            r13 + BitVecVal(offset, 64), domain=MemoryDomain.CALLENGINE
+        )
+
+    def test_return_data_size_defaults_to_zero_on_both_sides(self):
+        state = SMTState.create_initial_state()
+
+        solver = Solver()
+        solver.add(Or(
+            state.callengine_return_data_size_bytes != BitVecVal(0, 64),
+            self._x86_return_data_size(state) != BitVecVal(0, 64),
+        ))
+        assert solver.check() == unsat
+
+    def test_return_data_size_is_written_to_both_sides(self):
+        state = SMTState.create_initial_state(return_data_size_bytes=0x100)
+
+        expected = BitVecVal(0x100, 64)
+        # 两处各读一次——只查一处的话，另一处仍写 0 的回归查不出来。
+        solver = Solver()
+        solver.add(state.callengine_return_data_size_bytes != expected)
+        assert solver.check() == unsat
+
+        solver = Solver()
+        solver.add(self._x86_return_data_size(state) != expected)
+        assert solver.check() == unsat
+
+    def test_return_data_size_must_fit_uint64(self):
+        with pytest.raises(ValueError, match="return_data_size_bytes must be non-negative"):
+            SMTState.create_initial_state(return_data_size_bytes=-1)
+
+        with pytest.raises(ValueError, match="return_data_size_bytes must fit in uint64"):
+            SMTState.create_initial_state(return_data_size_bytes=1 << 64)
 
 
 class TestEVMStorageState:

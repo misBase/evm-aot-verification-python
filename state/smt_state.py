@@ -411,6 +411,7 @@ class SMTState:
         calldata_size_max_bytes: Optional[int] = None,
         symbolic_gas: bool = False,
         gas_budget: Optional[int] = None,
+        return_data_size_bytes: int = 0,
     ) -> 'SMTState':
         """创建具有符号输入的初始SMT状态。
 
@@ -427,13 +428,17 @@ class SMTState:
                 用具体预算（GasCheck.OFF / FIXED_BUDGET 要求）。
             gas_budget: 具体 gas 预算，仅 symbolic_gas=False 时可用；None 表示
                 _DEFAULT_GAS_BUDGET。
+            return_data_size_bytes: 上一次 CALL 的 return data 字节长度，默认 0。
+                不用 Optional/None：这里没有「符号长度」这条路径，None 只会与
+                calldata_size_bytes（None=符号长度）混淆。
 
         Returns:
             具有符号输入的已初始化SMTState
 
         Raises:
             ValueError: 如果num_inputs为负数或过大（>1024）、calldata 长度参数超出
-                uint64、gas_budget 超出 uint64，或 symbolic_gas=True 时同时给了 gas_budget
+                uint64、return_data_size_bytes 为负数或超出 uint64、gas_budget 超出
+                uint64，或 symbolic_gas=True 时同时给了 gas_budget
         """
         # Lazy imports to avoid circular dependencies
         from common.uint256 import Uint256
@@ -475,6 +480,14 @@ class SMTState:
                     "calldata_size_bytes must be <= calldata_size_max_bytes, "
                     f"got {calldata_size_bytes} > {calldata_size_max_bytes}"
                 )
+        if return_data_size_bytes < 0:
+            raise ValueError(
+                f"return_data_size_bytes must be non-negative, got {return_data_size_bytes}"
+            )
+        if return_data_size_bytes > (1 << 64) - 1:
+            raise ValueError(
+                f"return_data_size_bytes must fit in uint64, got {return_data_size_bytes}"
+            )
 
         # 创建基础状态
         initial_state = SMTState()
@@ -548,7 +561,11 @@ class SMTState:
         initial_state.callengine_code_pointer = code_ptr
         initial_state.callengine_code_size_bytes = code_size
         initial_state.callengine_return_data_pointer = return_data_ptr
-        initial_state.callengine_return_data_size_bytes = BitVecVal(0, 64)
+        # 字段与下面 x86_memory 的同 offset limb 共用同一个值。字段是实际被读到的那个
+        # （x86 侧读 [R13+0xB8] 走 _maybe_read_callengine_field 的 side-channel 快路径
+        # 直接取它），limb 只是宽度不符时回退内存读用的镜像；分叉即陈旧值假绿。
+        return_data_size_64 = BitVecVal(return_data_size_bytes, 64)
+        initial_state.callengine_return_data_size_bytes = return_data_size_64
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
             r13 + BitVecVal(callengine_offsets["memory_base"], 64),
             r15,
@@ -626,7 +643,7 @@ class SMTState:
         )
         initial_state.x86_memory = initial_state.x86_memory.store_limb(
             r13 + BitVecVal(callengine_offsets["return_data_size"], 64),
-            BitVecVal(0, 64),
+            return_data_size_64,  # 与上面的字段同值，见那里的注释
             domain=MemoryDomain.CALLENGINE,
         )
 
