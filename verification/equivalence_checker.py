@@ -1,9 +1,9 @@
 """
-用于验证x86和EVM语义之间精化关系的精化检查器。
+用于验证x86和EVM语义之间等价关系的等价性检查器。
 
-验证x86精化EVM：对所有输入，x86_output = EVM_output。
+验证x86 ≡ EVM：对所有输入，x86_output = EVM_output。
 
-``RefinementChecker`` 本身是一个薄门面：它装配共享的 ``_RefinementContext``
+``EquivalenceChecker`` 本身是一个薄门面：它装配共享的 ``_EquivalenceContext``
 以及四个按职责拆分的 check 对象（storage / memory / outputs / paths），并把
 对外的公共方法委托给它们。check 对象之间通过构造期注入显式声明依赖
 （outputs→{storage,memory}，paths→{outputs,storage,memory}），而不是经由
@@ -12,18 +12,18 @@
 
 from typing import Optional, Tuple
 
-from .refinement_context import _RefinementContext
-from .refinement_gas import GasEquivalenceChecks
-from .refinement_memory import MemoryContentChecks
-from .refinement_outputs import OutputRefinementChecks
-from .refinement_paths import PathRefinementChecks, _PathPairChunkCheckResult
-from .refinement_storage import StorageEquivalenceChecks
+from .equivalence_context import _EquivalenceContext
+from .equivalence_gas import GasEquivalenceChecks
+from .equivalence_memory import MemoryContentChecks
+from .equivalence_outputs import OutputEquivalenceChecks
+from .equivalence_paths import PathEquivalenceChecks, _PathPairChunkCheckResult
+from .equivalence_storage import StorageEquivalenceChecks
 
 
-class RefinementChecker:
-    """检查x86和EVM语义之间的精化关系。
+class EquivalenceChecker:
+    """检查x86和EVM语义之间的等价关系。
 
-    验证x86精化EVM：对所有输入，x86_output = EVM_output。
+    验证x86 ≡ EVM：对所有输入，x86_output = EVM_output。
     """
 
     def __init__(
@@ -33,7 +33,7 @@ class RefinementChecker:
         z3_verbose: bool = False,
         check_gas: bool = False,
     ):
-        """初始化精化检查器。
+        """初始化等价性检查器。
 
         Args:
             timeout_ms: SMT求解器超时（毫秒）
@@ -45,16 +45,16 @@ class RefinementChecker:
                 ProgramEquivalenceChecker 按 GasCheck 模式喂入（OFF 以外都为 True），
                 模式语义与结论范围见 verification.GasCheck。
         """
-        self._ctx = _RefinementContext(timeout_ms, verbose, z3_verbose)
+        self._ctx = _EquivalenceContext(timeout_ms, verbose, z3_verbose)
         self._storage = StorageEquivalenceChecks(self._ctx)
         self._memory = MemoryContentChecks(self._ctx)
         # gas 检查默认关闭：check_gas=False 时 _gas=None，所有 gas 检查点
         # （均写了 `if self._gas is not None`）静默跳过。
         self._gas = GasEquivalenceChecks(self._ctx) if check_gas else None
-        self._outputs = OutputRefinementChecks(
+        self._outputs = OutputEquivalenceChecks(
             self._ctx, self._storage, self._memory, self._gas
         )
-        self._paths = PathRefinementChecks(self._ctx, self._outputs)
+        self._paths = PathEquivalenceChecks(self._ctx, self._outputs)
 
     # --- 共享状态的只读转发（外部代码与测试直接读取这些 knob）---
 
@@ -95,8 +95,8 @@ class RefinementChecker:
 
     # --- 对外公共检查方法（委托给各职责对象）---
 
-    def check_refinement(self, evm_result, x86_result, assumptions=None):
-        return self._outputs.check_refinement(evm_result, x86_result, assumptions)
+    def check_equivalence(self, evm_result, x86_result, assumptions=None):
+        return self._outputs.check_equivalence(evm_result, x86_result, assumptions)
 
     def check_stack_equivalence(
         self,
@@ -110,7 +110,7 @@ class RefinementChecker:
             evm_state, x86_state, initial_state, n_elements, deadline,
         )
 
-    def check_refinement_paths(
+    def check_equivalence_paths(
         self,
         evm_results,
         x86_results,
@@ -120,7 +120,7 @@ class RefinementChecker:
         x86_coverage=None,
         coverage_precondition=None,
     ) -> Tuple[bool, Optional[str]]:
-        return self._paths.check_refinement_paths(
+        return self._paths.check_equivalence_paths(
             evm_results,
             x86_results,
             path_pair_workers,
@@ -155,4 +155,4 @@ class RefinementChecker:
         )
 
 
-__all__ = ["RefinementChecker", "_PathPairChunkCheckResult"]
+__all__ = ["EquivalenceChecker", "_PathPairChunkCheckResult"]

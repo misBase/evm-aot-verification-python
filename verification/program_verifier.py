@@ -11,7 +11,7 @@ from typing import Tuple, Optional
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
 from x86_64.summaries import X86SummaryConfig
-from .refinement_checker import RefinementChecker
+from .equivalence_checker import EquivalenceChecker
 from .call_site_mapping import build_call_site_mapping
 from state.host_gas import HOST_GAS_UF_KINDS, HOST_GAS_UNBOUNDED_KINDS
 from state.smt_state import SMTState
@@ -234,7 +234,7 @@ class ProgramEquivalenceChecker:
         # 运行时归一化：类型标注拦不住字符串，而 `self.gas_check is GasCheck.OFF`
         # 这类 identity 判断会把裸字符串 "off" 误当成"已启用 gas 检查"。
         self.gas_check = GasCheck(gas_check)
-        self.refinement_checker = RefinementChecker(
+        self.equivalence_checker = EquivalenceChecker(
             timeout_ms=timeout_ms, verbose=verbose,
             check_gas=self.gas_check is not GasCheck.OFF,
         )
@@ -511,12 +511,12 @@ class ProgramEquivalenceChecker:
         if self.verbose:
             print("\n[4] Checking program equivalence with Z3...")
             print("    ├─ Comparing merged results from all paths (1-to-1 semantic matching)")
-            print(f"    └─ Budget: {self.refinement_checker.timeout_ms} ms")
+            print(f"    └─ Budget: {self.equivalence_checker.timeout_ms} ms")
 
         check_start = time.time()
         # 把 initial_state、evm_state、x86_state 上累积的 assumptions（包括
         # CALLDATALOAD 处的 hi-192==0 等无损先验，以及 caller 设定的 calldatasize
-        # 上界）作为顶层 precondition 传给 refinement check 的 solver。
+        # 上界）作为顶层 precondition 传给 等价性检查的 solver。
         # merged-result 路径没有 path_condition 字段，但 solver 也会以
         # path_condition 形式接收。
         assumptions = _collect_assumptions(initial_state, evm_state, x86_state)
@@ -525,7 +525,7 @@ class ProgramEquivalenceChecker:
             extra_condition = And(BoolVal(True), *assumptions)
         else:
             extra_condition = None
-        verified, message = self.refinement_checker.check_refinement(
+        verified, message = self.equivalence_checker.check_equivalence(
             evm_result, x86_result, assumptions=extra_condition,
         )
         check_time = time.time() - check_start
@@ -534,10 +534,10 @@ class ProgramEquivalenceChecker:
             print(f"    ├─ Check time: {check_time:.3f}s")
             print(f"    └─ Result: {message}")
 
-        if not verified and message == self.refinement_checker._timeout_message():
+        if not verified and message == self.equivalence_checker._timeout_message():
             message = (
-                f"? TIMEOUT: refinement check exceeded overall timeout "
-                f"({self.refinement_checker.timeout_ms} ms)"
+                f"? TIMEOUT: equivalence check exceeded overall timeout "
+                f"({self.equivalence_checker.timeout_ms} ms)"
             )
 
         if not verified:
@@ -555,7 +555,7 @@ class ProgramEquivalenceChecker:
 
         stack_start = time.time()
         stack_deadline = time.time() + (stack_check_timeout_ms / 1000.0)
-        verified, message = self.refinement_checker.check_stack_equivalence(
+        verified, message = self.equivalence_checker.check_stack_equivalence(
             evm_state,
             x86_state,
             initial_state,
@@ -568,7 +568,7 @@ class ProgramEquivalenceChecker:
             print(f"    ├─ Stack check time: {stack_time:.3f}s")
             print(f"    └─ Result: {message}")
 
-        if not verified and message == self.refinement_checker._timeout_message():
+        if not verified and message == self.equivalence_checker._timeout_message():
             message = (
                 f"? TIMEOUT: stack equivalence check exceeded overall timeout "
                 f"({stack_check_timeout_ms} ms)"
@@ -700,7 +700,7 @@ class ProgramEquivalenceChecker:
 
         该路径避免先把所有 terminal states 合并成一个完整 memory Array；
         每条终止路径保留自己的 condition 和 observable，后续做 EVM/x86
-        terminal path pair 的覆盖与精化检查。只有 debug stack_check 需要时，
+        terminal path pair 的覆盖与等价性检查。只有 debug stack_check 需要时，
         才额外要求执行器产出 merged_state 作为栈检查 fallback。
         """
         if self.verbose:
@@ -708,7 +708,7 @@ class ProgramEquivalenceChecker:
 
         evm_start = time.time()
         # stack_check 是调试辅助检查；只有它需要 merged terminal state。
-        # 纯 observable 精化只消费 observations，避免不必要的 Array 合并。
+        # 纯 observable 等价性检查只消费 observations，避免不必要的 Array 合并。
         evm_to_z3_paths_kwargs = {}
         if max_depth is not None:
             evm_to_z3_paths_kwargs["max_depth"] = max_depth
@@ -730,7 +730,7 @@ class ProgramEquivalenceChecker:
         x86_start = time.time()
         call_site_mapping = build_call_site_mapping(evm_program, x86_program)
         # x86 path 构建同样保留 terminal observations；reachability pruning
-        # 只影响路径枚举剪枝，不改变后续 refinement 的证明方式。
+        # 只影响路径枚举剪枝，不改变后续 等价性检查的证明方式。
         x86_to_z3_paths_kwargs = {}
         if max_depth is not None:
             x86_to_z3_paths_kwargs["max_depth"] = max_depth
@@ -767,7 +767,7 @@ class ProgramEquivalenceChecker:
         if self.verbose:
             print("\n[4] Checking program equivalence with Z3...")
             print("    ├─ Comparing terminal path observations without Array-level state merge")
-            print(f"    ├─ Budget: {self.refinement_checker.timeout_ms} ms")
+            print(f"    ├─ Budget: {self.equivalence_checker.timeout_ms} ms")
             print(f"    └─ Path pair workers: {path_pair_workers}")
 
         check_start = time.time()
@@ -792,9 +792,9 @@ class ProgramEquivalenceChecker:
             evm_paths_obs = evm_paths.observations
             x86_paths_obs = x86_paths.observations
 
-        # 串行/并行共用同一个 refinement 入口；并行时只额外传 worker 数。
+        # 串行/并行共用同一个等价性检查入口；并行时只额外传 worker 数。
         if path_pair_workers == 1:
-            verified, message = self.refinement_checker.check_refinement_paths(
+            verified, message = self.equivalence_checker.check_equivalence_paths(
                 evm_paths_obs,
                 x86_paths_obs,
                 skip_feasibility=skip_feasibility,
@@ -803,7 +803,7 @@ class ProgramEquivalenceChecker:
                 coverage_precondition=coverage_precondition,
             )
         else:
-            verified, message = self.refinement_checker.check_refinement_paths(
+            verified, message = self.equivalence_checker.check_equivalence_paths(
                 evm_paths_obs,
                 x86_paths_obs,
                 path_pair_workers=path_pair_workers,
@@ -818,11 +818,11 @@ class ProgramEquivalenceChecker:
             print(f"    ├─ Check time: {check_time:.3f}s")
             print(f"    └─ Result: {message}")
 
-        if not verified and message == self.refinement_checker._timeout_message():
-            # 将底层通用 timeout 文案改写为程序级 refinement timeout，便于定位阶段。
+        if not verified and message == self.equivalence_checker._timeout_message():
+            # 将底层通用 timeout 文案改写为程序级等价性检查 timeout，便于定位阶段。
             message = (
-                f"? TIMEOUT: refinement check exceeded overall timeout "
-                f"({self.refinement_checker.timeout_ms} ms)"
+                f"? TIMEOUT: equivalence check exceeded overall timeout "
+                f"({self.equivalence_checker.timeout_ms} ms)"
             )
 
         if not verified:
@@ -854,7 +854,7 @@ class ProgramEquivalenceChecker:
 
         stack_start = time.time()
         stack_deadline = time.time() + (stack_check_timeout_ms / 1000.0)
-        verified, message = self.refinement_checker.check_stack_equivalence(
+        verified, message = self.equivalence_checker.check_stack_equivalence(
             evm_state,
             x86_state,
             initial_state,
@@ -867,7 +867,7 @@ class ProgramEquivalenceChecker:
             print(f"    ├─ Stack check time: {stack_time:.3f}s")
             print(f"    └─ Result: {message}")
 
-        if not verified and message == self.refinement_checker._timeout_message():
+        if not verified and message == self.equivalence_checker._timeout_message():
             # stack_check 使用独立预算，timeout 文案也按独立阶段改写。
             message = (
                 f"? TIMEOUT: stack equivalence check exceeded overall timeout "

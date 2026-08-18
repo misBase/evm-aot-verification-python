@@ -30,13 +30,13 @@ from utils.z3_helpers import (
     expr_mentions_symbol,
 )
 
-from .refinement_context import _RefinementContext
+from .equivalence_context import _EquivalenceContext
 
 
 class MemoryContentChecks:
     """小具体长度 return-data memory 等价检查。"""
 
-    def __init__(self, ctx: _RefinementContext):
+    def __init__(self, ctx: _EquivalenceContext):
         self._ctx = ctx
 
     @staticmethod
@@ -203,7 +203,7 @@ class MemoryContentChecks:
     def _memory_counterexample_message(context: str, detail: Optional[str] = None):
         """构造 memory 内容不一致的反例消息。"""
         msg = (
-            "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
+            "✗ COUNTEREXAMPLE FOUND: x86 ≢ EVM "
             "(memory contents differ)"
         )
         if context:

@@ -72,7 +72,7 @@ def calldataload_word(
     # ABI 参数 word 则抽象成 word-level 输入。这样 EVM/x86 仍共享同一个 word-level
     # 输入，但不会把 32 个 byte-level calldata guard 拖进 storage proof。
     # 对具体 ABI offset 来说，这是对补零 concrete word 的 over-approximation；
-    # 若能在更大的抽象输入空间证明 refinement，则对具体 calldata 也足够。
+    # 若能在更大的抽象输入空间证明 等价性检查，则对具体 calldata 也足够。
     should_abstract = abstract and (
         concrete_offset is None or concrete_offset >= 4
     )
@@ -87,7 +87,7 @@ def calldataload_word(
         if concrete_offset is not None:
             # 具体 ABI word 读取有意建模为与 calldata size 无关的 word-level 输入。
             # 如果在这个 UF 里保留 CallDataSize，会把无关的 size 依赖泄漏到 storage
-            # key/value 中，迫使后续 refinement 检查按 size 切分。
+            # key/value 中，迫使后续 等价性检查按 size 切分。
             symbolic_word = f(calldata, BitVecVal(0, 64), offset_64)
             loaded_data = symbolic_word
         else:

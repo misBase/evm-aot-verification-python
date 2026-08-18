@@ -2,7 +2,7 @@
 
 from z3 import And, Array, BitVec, BitVecSort, BitVecVal, Bool, Concat, If, Not, Store, UGE, unknown
 
-from verification.refinement_checker import RefinementChecker
+from verification.equivalence_checker import EquivalenceChecker
 
 
 def _storage_array(name: str):
@@ -10,7 +10,7 @@ def _storage_array(name: str):
 
 
 def test_storage_path_aware_fast_path_resolves_merged_if():
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     storage = _storage_array("Storage_path_fast")
     cond = Bool("storage_path_cond")
     written = Store(storage, BitVecVal(0, 256), BitVecVal(1, 256))
@@ -27,7 +27,7 @@ def test_storage_path_aware_fast_path_resolves_merged_if():
 
 
 def test_storage_path_aware_fast_path_does_not_hide_wrong_branch():
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     storage = _storage_array("Storage_path_wrong")
     cond = Bool("storage_wrong_cond")
     written = Store(storage, BitVecVal(0, 256), BitVecVal(1, 256))
@@ -44,7 +44,7 @@ def test_storage_path_aware_fast_path_does_not_hide_wrong_branch():
 
 
 def test_storage_path_aware_fast_path_proves_store_key_expr_equality():
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     storage = _storage_array("Storage_path_key_expr")
     calldata_size = BitVec("CallDataSize", 64)
     derived_zero_key = Concat(BitVecVal(0, 192), calldata_size - calldata_size)
@@ -70,7 +70,7 @@ def test_storage_path_aware_fast_path_proves_store_key_expr_equality():
 
 
 def test_storage_calldatasize_partition_proves_noop_store_under_path():
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     storage = _storage_array("Storage_noop_store")
     calldata_size = BitVec("CallDataSize", 64)
     key = BitVec("storage_noop_key", 256)
@@ -97,7 +97,7 @@ def test_storage_calldatasize_partition_proves_noop_store_under_path():
 
 
 def test_calldatasize_partition_shape_is_exhaustive_tail_split():
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
 
     partitions = list(checker._storage._calldatasize_partitions(ctx=None))
 
@@ -108,7 +108,7 @@ def test_calldatasize_partition_shape_is_exhaustive_tail_split():
 
 
 def test_calldatasize_partition_fast_path_runs_after_exact_substitution(monkeypatch):
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     storage = _storage_array("Storage_partition_exact_fast")
     calldata_size = BitVec("CallDataSize", 64)
     key_via_size = Concat(BitVecVal(0, 192), calldata_size - calldata_size)
@@ -140,7 +140,7 @@ def test_calldatasize_partition_fast_path_runs_after_exact_substitution(monkeypa
 
 
 def test_calldatasize_partition_coalesces_remaining_exact_infeasible_range(monkeypatch):
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     storage = _storage_array("Storage_partition_range")
     calldata_size = BitVec("CallDataSize", 64)
     evm_storage = If(
@@ -187,7 +187,7 @@ def test_calldatasize_partition_coalesces_remaining_exact_infeasible_range(monke
 
 
 def test_storage_quick_unknown_uses_infeasible_path_rescue(monkeypatch):
-    checker = RefinementChecker(timeout_ms=5000)
+    checker = EquivalenceChecker(timeout_ms=5000)
     storage_a = _storage_array("Storage_rescue_a")
     storage_b = _storage_array("Storage_rescue_b")
     guard = Bool("storage_rescue_guard")

@@ -120,7 +120,7 @@ def test_tampered_status_code_caught(monkeypatch):
 # --- 3B: OOG 路径一致性 ---
 
 def _load_add_with_push():
-    from tests.integration.test_refinement_checker import (
+    from tests.integration.test_equivalence_checker import (
         X86_ADD_FULL_HEX_SEQUENCE, X86_ADD_FULL_BASE_ADDR,
     )
     test_dir = os.path.dirname(__file__)

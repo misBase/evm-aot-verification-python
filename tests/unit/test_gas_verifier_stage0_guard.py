@@ -298,7 +298,7 @@ def test_cli_prints_full_scope_message_without_verbose(monkeypatch, capsys):
     "Programs are semantically equivalent"——条件性结论被读成无条件的。
     """
     annotated = (
-        "✓ VERIFIED: x86 refines EVM [functional equivalence at the fixed initial gas "
+        "✓ VERIFIED: x86 ≡ EVM [functional equivalence at the fixed initial gas "
         "budget 555000; host gas is NOT modeled in this mode]"
     )
     code, out = _run_cli(

@@ -1,6 +1,6 @@
 """相等判断借位链桥接的组合证明。
 
-MOD/DIV 的精化验证里，参照模型（common/arithmetic.div_semantics/mod_semantics）
+MOD/DIV 的等价性验证里，参照模型（common/arithmetic.div_semantics/mod_semantics）
 始终用 Uint256.eq_semantics 的 4-limb 直接相等——这是 EVM IR 侧 EQ opcode 的真实
 写法。但 x86 codegen 的 a==b / a<b 路径条件是用 sub/sbb 借位链表达的，与 4-limb
 相等的 AST 不同；Z3 直接做 256-bit 借位↔limb相等的桥接推理会显著拖慢。
@@ -79,7 +79,7 @@ def test_x86_div64_quotient_fits_assumption_is_sound():
 
     x86_div64_quotient_fits_assumption(a,b) =
         (b.z0 != 0 ⟹ Extract(127,64, UDiv(Concat(0,a.z0), ZeroExt(64,b.z0))) == 0)。
-    它是 x86-64 refinement hint，不是 EVM DIV 语义；本测试确认注入后不限制输入。
+    它是 x86-64 等价性检查 hint，不是 EVM DIV 语义；本测试确认注入后不限制输入。
     """
     x = Uint256.symbolic("div64_x")
     y = Uint256.symbolic("div64_y")

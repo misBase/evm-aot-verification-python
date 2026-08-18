@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""刻画 RefinementChecker 当前 return-data 抽象边界的测试。"""
+"""刻画 EquivalenceChecker 当前 return-data 抽象边界的测试。"""
 
 from z3 import Array, BitVec, BitVecSort, BitVecVal, BoolVal, K, Store
 
 from evm_ir.status_code import EvmStatusCode
-from verification.refinement_checker import RefinementChecker
+from verification.equivalence_checker import EquivalenceChecker
 
 
-def _make_checker() -> RefinementChecker:
-    return RefinementChecker(timeout_ms=10000, verbose=False)
+def _make_checker() -> EquivalenceChecker:
+    return EquivalenceChecker(timeout_ms=10000, verbose=False)
 
 
 def _make_result(
@@ -65,7 +65,7 @@ def test_return_and_revert_with_same_return_data_are_equivalent_under_current_ab
         has_return_data=True,
     )
 
-    verified, msg = checker.check_refinement(evm_result, x86_result)
+    verified, msg = checker.check_equivalence(evm_result, x86_result)
 
     assert verified, msg
 
@@ -93,7 +93,7 @@ def test_stop_and_zero_length_return_are_equivalent_under_current_abstraction():
         has_return_data=False,
     )
 
-    verified, msg = checker.check_refinement(evm_result, x86_result)
+    verified, msg = checker.check_equivalence(evm_result, x86_result)
 
     assert verified, msg
 
@@ -118,7 +118,7 @@ def test_zero_length_fast_path_still_checks_return_presence():
         has_return_data=True,
     )
 
-    verified, msg = checker.check_refinement(evm_result, x86_result)
+    verified, msg = checker.check_equivalence(evm_result, x86_result)
 
     assert not verified
     assert "Non-empty return-data conditions differ" in msg
@@ -151,7 +151,7 @@ def test_symbolic_later_store_alias_is_not_hidden_by_memory_select_cache():
         has_return_data=True,
     )
 
-    verified, msg = checker.check_refinement(
+    verified, msg = checker.check_equivalence(
         evm_result,
         x86_result,
         assumptions=symbolic_offset == zero,
@@ -185,7 +185,7 @@ def test_status_code_mismatch_is_counterexample():
         memory=memory, base_addr=0, status_code=EvmStatusCode.STOPPED
     )
 
-    verified, msg = checker.check_refinement(evm_result, x86_result)
+    verified, msg = checker.check_equivalence(evm_result, x86_result)
 
     assert not verified
     assert "termination status codes differ" in msg
@@ -201,7 +201,7 @@ def test_missing_status_code_is_fail_closed():
         memory=memory, base_addr=0, status_code=EvmStatusCode.RETURNED
     )
 
-    verified, msg = checker.check_refinement(evm_result, x86_result)
+    verified, msg = checker.check_equivalence(evm_result, x86_result)
 
     assert not verified
     assert "cannot verify termination status" in msg
@@ -216,7 +216,7 @@ def test_both_sides_missing_status_code_is_fail_closed():
     evm_result = _zero_length_result(memory=memory, base_addr=None, status_code=None)
     x86_result = _zero_length_result(memory=memory, base_addr=0, status_code=None)
 
-    verified, msg = checker.check_refinement(evm_result, x86_result)
+    verified, msg = checker.check_equivalence(evm_result, x86_result)
 
     assert not verified
     assert "cannot verify termination status" in msg
@@ -235,7 +235,7 @@ def test_status_code_with_wrong_width_is_fail_closed():
     )
     x86_result["status_code"] = BitVecVal(0, 32)
 
-    verified, msg = checker.check_refinement(evm_result, x86_result)
+    verified, msg = checker.check_equivalence(evm_result, x86_result)
 
     assert not verified
     assert "cannot verify termination status" in msg

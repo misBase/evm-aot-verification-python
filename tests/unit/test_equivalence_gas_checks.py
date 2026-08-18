@@ -4,23 +4,23 @@
 `PathObservation` 这个 dataclass（键存在、必填、None 往返），碰不到 checker 本身。而
 `GAS CHECK INCOMPLETE` 与 UNKNOWN 两条 fail-closed 正是防假绿的关键路径。
 
-`_RefinementContext` 无外部依赖，可直接构造，所以这里真调 checker，不用 mock。
+`_EquivalenceContext` 无外部依赖，可直接构造，所以这里真调 checker，不用 mock。
 """
 
 import pytest
 from z3 import BitVec, BitVecSort, BitVecVal, BoolVal, K, Solver
 
-from verification.refinement_checker import RefinementChecker
-from verification.refinement_context import _RefinementContext
-from verification.refinement_gas import GasEquivalenceChecks
+from verification.equivalence_checker import EquivalenceChecker
+from verification.equivalence_context import _EquivalenceContext
+from verification.equivalence_gas import GasEquivalenceChecks
 
 
 def _checks(timeout_ms: int = 5000) -> GasEquivalenceChecks:
-    return GasEquivalenceChecks(_RefinementContext(timeout_ms=timeout_ms))
+    return GasEquivalenceChecks(_EquivalenceContext(timeout_ms=timeout_ms))
 
 
 def _check(checks: GasEquivalenceChecks, evm_gas, x86_gas, solver=None):
-    """按生产调用点（refinement_outputs.py）的形状调用。"""
+    """按生产调用点（equivalence_outputs.py）的形状调用。"""
     return checks._check_gas_equivalence_with_solver(
         solver if solver is not None else checks._ctx.solver,
         evm_gas,
@@ -34,8 +34,8 @@ def _check(checks: GasEquivalenceChecks, evm_gas, x86_gas, solver=None):
 def test_both_sides_missing_gas_is_fail_closed():
     """两侧都没有 gas 观测**不是** skip，是失败。
 
-    走到 checker 就意味着 gas 检查已启用（`RefinementChecker` 只在 check_gas 为真时
-    构造它，`RefinementOutputChecks` 用 `if self._gas is not None` 挡住关闭态）。所以
+    走到 checker 就意味着 gas 检查已启用（`EquivalenceChecker` 只在 check_gas 为真时
+    构造它，`OutputEquivalenceChecks` 用 `if self._gas is not None` 挡住关闭态）。所以
     这个形态不是"本次没建模 gas"，而是观测本该有却丢了——`_PATH_RESULT_KEYS` 漏键、
     并行 worker 跨 Context 翻译丢失、aggregate fallback 掉字段。静默 True 就是假绿。
     """
@@ -156,7 +156,7 @@ def test_unknown_result_is_fail_closed():
 #
 # 漏键的成因分布在不同路径上（_PATH_RESULT_KEYS 白名单、worker 跨 Context 翻译、
 # aggregate fallback 另走一套入口），所以四条各钉一次。它们最终都汇到
-# OutputRefinementChecks._check_state_observables_with_solver，但"汇得到"正是要验的。
+# OutputEquivalenceChecks._check_state_observables_with_solver，但"汇得到"正是要验的。
 
 
 def _result_with_gas(gas):
@@ -177,8 +177,8 @@ def _result_with_gas(gas):
     }
 
 
-def _gas_checker() -> RefinementChecker:
-    return RefinementChecker(timeout_ms=10000, verbose=False, check_gas=True)
+def _gas_checker() -> EquivalenceChecker:
+    return EquivalenceChecker(timeout_ms=10000, verbose=False, check_gas=True)
 
 
 def _assert_gas_incomplete(verified, msg, where):
@@ -187,20 +187,20 @@ def _assert_gas_incomplete(verified, msg, where):
 
 
 def test_merged_path_fails_closed_on_missing_gas():
-    """merged 模式（check_refinement 顶层入口），**两侧同时**缺。
+    """merged 模式（check_equivalence 顶层入口），**两侧同时**缺。
 
     两侧同缺是白名单/翻译漏键的真实形态（同一套 producer，丢就一起丢），也正是旧代码
     skip 成 True 的那条。单侧缺的形态由 serial / aggregate 两条覆盖。
     """
     checker = _gas_checker()
-    verified, msg = checker.check_refinement(
+    verified, msg = checker.check_equivalence(
         _result_with_gas(None), _result_with_gas(None),
     )
     _assert_gas_incomplete(verified, msg, "merged")
 
 
 def test_serial_path_pair_fails_closed_on_missing_gas():
-    """逐路径串行（refinement_paths.py 的 check_observables 调用点）。"""
+    """逐路径串行（equivalence_paths.py 的 check_observables 调用点）。"""
     checker = _gas_checker()
     verified, msg = checker._outputs.check_observables(
         _result_with_gas(BitVecVal(100, 64)), _result_with_gas(None),
@@ -243,7 +243,7 @@ def test_gas_is_in_parallel_translation_whitelist():
     有了上面的 fail-closed 收口，漏键不再假绿而是全量报 GAS CHECK INCOMPLETE；这条锁在
     这里是为了让失败原因一眼可辨，而不是让人去猜为什么每条路径都缺 gas。
     """
-    from verification.refinement_paths import _PATH_RESULT_KEYS
+    from verification.equivalence_paths import _PATH_RESULT_KEYS
 
     assert "gas" in _PATH_RESULT_KEYS
     assert "status_code" in _PATH_RESULT_KEYS

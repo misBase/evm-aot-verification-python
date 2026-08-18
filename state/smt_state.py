@@ -187,13 +187,13 @@ class SMTState:
         # "calldatasize ≤ 2^32-1" 这类无损先验），也可以由语义建模函数在执行
         # 过程中追加（例如 CALLDATALOAD 处的 "offset hi-192 == 0"）。
         # 后续 x86/EVM cfg_executor 在每条路径上把它们注入 world_state.constraints，
-        # refinement_checker 在 final solve 前也会把它们 add 到 solver。
+        # equivalence_checker 在 final solve 前也会把它们 add 到 solver。
         # 默认 None；不影响既有路径。
         self.assumptions: Optional[list] = None
 
         # 默认开启 CALLDATALOAD/CALLDATACOPY 的 offset 高 192-bit == 0 假设。
         # 这条假设在 EVM/x86 两侧都对应 vacuous 同行为分支（两侧 overflow 都返
-        # 回 0），所以对 refinement 无损；但能让 z3 跳过 256-bit carry chain，
+        # 回 0），所以对 等价性无损；但能让 z3 跳过 256-bit carry chain，
         # 大幅压缩 bit-blast 后的搜索空间。需要建模 overflow 行为差异的单测可
         # 以显式把这个字段置 False。
         self.assume_calldata_offset_no_overflow: bool = True
@@ -205,7 +205,7 @@ class SMTState:
         #
         # 这是 gas 相关的唯一开关。曾经的 gas_modeling_enabled / oog_modeling_enabled 都
         # 已删除：它们能关掉本该无条件成立的东西（gas 是决定控制流的内部状态，扣减与 OOG
-        # 分叉都不可关；"终值是否比较"那一层在 RefinementChecker(check_gas=...) 里）。
+        # 分叉都不可关；"终值是否比较"那一层在 EquivalenceChecker(check_gas=...) 里）。
         #
         # 本字段**不**管 host gas 耗尽后的终止——那一处没有生成代码，两侧同构钳零续跑，
         # 属于声明范围之外而非缺口，理由见 state/host_gas.py 模块 docstring。

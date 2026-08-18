@@ -12,7 +12,7 @@ from evm_ir.models import EVMBlock, EvmOperator
 from evm_ir.program import EVMProgram
 from evm_ir.status_code import EvmStatusCode
 from state.smt_state import SMTState
-from verification.refinement_checker import RefinementChecker, _PathPairChunkCheckResult
+from verification.equivalence_checker import EquivalenceChecker, _PathPairChunkCheckResult
 from x86_64.cfg import identify_basic_blocks
 from x86_64.cfg_executor import X86SymbolicExecutor
 from x86_64.disassembler import disassemble_hex
@@ -106,7 +106,7 @@ def test_to_z3_paths_merge_state_can_feed_stack_check():
     assert evm_paths.merged_state is not None
     assert x86_paths.merged_state is not None
 
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     verified, message = checker.check_stack_equivalence(
         evm_paths.merged_state,
         x86_paths.merged_state,
@@ -117,7 +117,7 @@ def test_to_z3_paths_merge_state_can_feed_stack_check():
     assert verified, message
 
 
-def test_refinement_checker_can_check_path_pairs_in_parallel():
+def test_equivalence_checker_can_check_path_pairs_in_parallel():
     state = SMTState.create_initial_state()
     selector = BitVec("parallel_path_selector", 1)
     evm_observations = [
@@ -161,8 +161,8 @@ def test_refinement_checker_can_check_path_pairs_in_parallel():
         )
     ]
 
-    checker = RefinementChecker(timeout_ms=1000)
-    verified, message = checker.check_refinement_paths(
+    checker = EquivalenceChecker(timeout_ms=1000)
+    verified, message = checker.check_equivalence_paths(
         evm_observations,
         x86_observations,
         path_pair_workers=2,
@@ -201,7 +201,7 @@ def test_status_mismatch_survives_aggregate_return_memory_fallback(monkeypatch):
         _status_observation(state, x86=True, status_code=EvmStatusCode.STOPPED)
     ]
 
-    checker = RefinementChecker(timeout_ms=5000)
+    checker = EquivalenceChecker(timeout_ms=5000)
     aggregate_results = []
     original_aggregate = checker._paths._check_evm_path_return_memory_against_x86_union
 
@@ -216,7 +216,7 @@ def test_status_mismatch_survives_aggregate_return_memory_fallback(monkeypatch):
         spying_aggregate,
     )
 
-    verified, message = checker.check_refinement_paths(
+    verified, message = checker.check_equivalence_paths(
         evm_observations,
         x86_observations,
     )
@@ -253,7 +253,7 @@ def test_gas_mismatch_survives_aggregate_return_memory_fallback(
         )
     ]
 
-    checker = RefinementChecker(timeout_ms=5000, check_gas=True)
+    checker = EquivalenceChecker(timeout_ms=5000, check_gas=True)
     aggregate_results = []
     original_aggregate = checker._paths._check_evm_path_return_memory_against_x86_union
 
@@ -268,7 +268,7 @@ def test_gas_mismatch_survives_aggregate_return_memory_fallback(
         spying_aggregate,
     )
 
-    verified, message = checker.check_refinement_paths(
+    verified, message = checker.check_equivalence_paths(
         evm_observations,
         x86_observations,
         path_pair_workers=path_pair_workers,
@@ -291,8 +291,8 @@ def test_status_mismatch_detected_in_parallel_path_pairs():
         _status_observation(state, x86=True, status_code=EvmStatusCode.STOPPED)
     ]
 
-    checker = RefinementChecker(timeout_ms=5000)
-    verified, message = checker.check_refinement_paths(
+    checker = EquivalenceChecker(timeout_ms=5000)
+    verified, message = checker.check_equivalence_paths(
         evm_observations,
         x86_observations,
         path_pair_workers=2,
@@ -310,7 +310,7 @@ def test_translate_path_result_preserves_status_code():
     )
 
     worker_ctx = Context()
-    translated = RefinementChecker(timeout_ms=1000)._paths._translate_path_result(
+    translated = EquivalenceChecker(timeout_ms=1000)._paths._translate_path_result(
         observation, worker_ctx
     )
 
@@ -350,8 +350,8 @@ def test_path_coverage_is_checked_under_precondition():
         )
     ]
 
-    checker = RefinementChecker(timeout_ms=1000)
-    verified, message = checker.check_refinement_paths(
+    checker = EquivalenceChecker(timeout_ms=1000)
+    verified, message = checker.check_equivalence_paths(
         evm_observations,
         x86_observations,
         coverage_precondition=selector == BitVecVal(0, 1),
@@ -384,7 +384,7 @@ def test_path_coverage_failure_reports_incomplete_certificate_reason():
         details=(("terminal_paths", 1), ("depth_pruned_states", 1)),
     )
 
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     verified, message = checker._paths._check_path_coverage(
         observations,
         "x86",
@@ -400,7 +400,7 @@ def test_path_coverage_failure_reports_incomplete_certificate_reason():
 
 
 def test_parallel_path_pair_check_drains_after_failure_and_cancels_workers(monkeypatch):
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     cancelled_worker_started = threading.Event()
     cancelled_worker_saw_cancel = threading.Event()
 
@@ -482,7 +482,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
         ),
     ]
 
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
     direct_calls = []
     aggregate_calls = []
     status_storage_calls = []
@@ -553,7 +553,7 @@ def test_parallel_path_pair_check_uses_aggregate_fallback(monkeypatch):
 
 
 def test_path_coverage_accepts_complete_certificate_without_solver(monkeypatch):
-    checker = RefinementChecker(timeout_ms=1000)
+    checker = EquivalenceChecker(timeout_ms=1000)
 
     def fail_if_called(_deadline):
         raise AssertionError("coverage solver should not run")

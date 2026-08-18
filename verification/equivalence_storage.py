@@ -1,4 +1,4 @@
-"""Storage and transient-storage equivalence helpers for refinement checks."""
+"""Storage and transient-storage equivalence check helpers."""
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -34,7 +34,7 @@ from utils.z3_helpers import (
     expr_mentions_symbol,
 )
 
-from .refinement_context import _RefinementContext
+from .equivalence_context import _EquivalenceContext
 
 
 _STORAGE_FEASIBILITY_RESCUE_LOCK = threading.Lock()
@@ -561,7 +561,7 @@ def _store_chain_lengths_differ(a, b) -> bool:
 
 
 class StorageEquivalenceChecks:
-    def __init__(self, ctx: _RefinementContext):
+    def __init__(self, ctx: _EquivalenceContext):
         self._ctx = ctx
 
     def _make_unsat_oracle(self, _parent_solver, deadline: Optional[float], ctx):

@@ -1,4 +1,4 @@
-"""Timeout and partition knobs shared by refinement sub-checks."""
+"""Timeout and partition knobs shared by equivalence sub-checks."""
 
 from dataclasses import dataclass
 
@@ -21,8 +21,8 @@ _MEMORY_CHUNK_FALLBACK_STREAK_LIMIT = 2
 
 
 @dataclass(frozen=True)
-class _RefinementCheckTuning:
-    """Small timeout and partition knobs used by refinement sub-checks."""
+class _EquivalenceCheckTuning:
+    """Small timeout and partition knobs used by equivalence sub-checks."""
 
     path_pair_feasibility_timeout_ms: int
     path_pair_feasibility_rescue_timeout_ms: int
@@ -42,7 +42,7 @@ class _RefinementCheckTuning:
     memory_chunk_fallback_streak_limit: int
 
     @classmethod
-    def for_timeout(cls, timeout_ms: int) -> "_RefinementCheckTuning":
+    def for_timeout(cls, timeout_ms: int) -> "_EquivalenceCheckTuning":
         storage_quick_timeout_ms = min(timeout_ms, _STORAGE_QUICK_TIMEOUT_CAP_MS)
         return cls(
             path_pair_feasibility_timeout_ms=min(

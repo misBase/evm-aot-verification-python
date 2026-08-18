@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-翻译验证的精化检查器测试。
+翻译验证的等价性检查器测试。
 
-本模块包含使用RefinementChecker验证EVM字节码和AOT编译的x86-64机器码之间
-精化关系的测试。这些测试专注于验证逻辑，包括符号证明和具体值测试。
+本模块包含使用EquivalenceChecker验证EVM字节码和AOT编译的x86-64机器码之间
+等价关系的测试。这些测试专注于验证逻辑，包括符号证明和具体值测试。
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
 from x86_64.summaries import TRUSTED_SUMMARY_CONFIG
-from verification.refinement_checker import RefinementChecker
+from verification.equivalence_checker import EquivalenceChecker
 from verification.program_verifier import ProgramEquivalenceChecker
 from state.smt_state import SMTState
 
@@ -66,15 +66,15 @@ GO_AMD64_MAX_SLICE_LEN = (1 << 63) - 1
 # ===========================
 
 @pytest.fixture
-def refinement_checker() -> RefinementChecker:
-    """提供具有默认超时的精化检查器的测试夹具。"""
-    return RefinementChecker(timeout_ms=10000, verbose=False)
+def equivalence_checker() -> EquivalenceChecker:
+    """提供具有默认超时的等价性检查器的测试夹具。"""
+    return EquivalenceChecker(timeout_ms=10000, verbose=False)
 
 
 @pytest.fixture
-def refinement_checker_verbose() -> RefinementChecker:
-    """提供具有详细输出的精化检查器的测试夹具，用于符号测试。"""
-    return RefinementChecker(timeout_ms=60000, verbose=True)
+def equivalence_checker_verbose() -> EquivalenceChecker:
+    """提供具有详细输出的等价性检查器的测试夹具，用于符号测试。"""
+    return EquivalenceChecker(timeout_ms=60000, verbose=True)
 
 
 def test_verifier_import():
@@ -148,7 +148,7 @@ def test_verify_add_program_pair_full():
     # 允许比较执行过程中写入或仍保持为空理论的符号槽位。
     # 栈一致性检查（step 5）在字节级 Memory Array 上做符号别名分析，
     # 对于含 prologue/epilogue 的完整程序较慢，每个栈槽可能需要数分钟。
-    # 这里显式给 step 5 单独的 600s 预算，避免污染主 refinement timeout 的语义。
+    # 这里显式给 step 5 单独的 600s 预算，避免污染主 equivalence timeout 的语义。
     checker = ProgramEquivalenceChecker(timeout_ms=600000, verbose=True)
     initial_state = SMTState.create_initial_state()
     verified, msg = checker.verify_program_pair(
@@ -172,7 +172,7 @@ def test_verify_mstore_return_program_pair():
     将值 9 写入 memory[0:32]，然后返回 memory[0:32]（值 9 的 256 位表示）。
     所有值为具体常量，无符号输入。
 
-    RefinementChecker 验证三项属性：
+    EquivalenceChecker 验证三项属性：
     1. 返回条件一致（双方都 return）
     2. 返回长度一致（都是 32 字节）
     3. 返回区域的内存内容一致
@@ -210,7 +210,7 @@ def test_verify_sstore_load_program_pair():
     EVM IR 程序：PUSH 199, PUSH 10, SSTORE, PUSH 10, SLOAD, STOP
     将值 199 写入 storage[10]，再从 storage[10] 读回并保留在栈顶。
 
-    RefinementChecker 验证 storage 等可观察状态一致，并额外检查 1 个栈元素。
+    EquivalenceChecker 验证 storage 等可观察状态一致，并额外检查 1 个栈元素。
     """
     test_dir = os.path.dirname(__file__)
     ir_path = os.path.join(test_dir, "..", "data", "sstore_load.json")
@@ -375,7 +375,7 @@ def test_jumpi_2block_ok_program_pair():
 
 
 def test_verify_perf_erc20_lite_program_pair():
-    """验证 perf_erc20_lite 原始 AOT 产物可通过全符号 refinement。
+    """验证 perf_erc20_lite 原始 AOT 产物可通过全符号等价性检查。
 
     该 fixture 覆盖 dispatcher、selector 分支、SHA3 mapping key、SLOAD/SSTORE、
     RETURN/REVERT 等真实合约常见路径。全部输入保持符号化；RETURN 路径
@@ -390,7 +390,7 @@ def test_verify_perf_erc20_lite_program_pair():
     CALLDATALOAD 等高成本片段。
 
     EVM CALLDATALOAD 处的 ``offset 高 192-bit == 0`` 假设通过 SMTState.assumptions
-    在 to_z3 末尾收集，再由 program_verifier 注入到 refinement check 的 path
+    在 to_z3 末尾收集，再由 program_verifier 注入到 等价性检查的 path
     condition，对 vacuous（两侧 overflow 都返 0）分支剪枝以避免 256-bit carry
     chain。详见 tests/support/calldataload_analysis/README.md。
     """

@@ -105,8 +105,8 @@ def test_verify_program_pair_forwards_max_depth_to_evm_and_x86_to_z3(monkeypatch
     monkeypatch.setattr(x86_program, "to_z3", _capturing_x86_to_z3)
     monkeypatch.setattr(program_verifier_module, "build_call_site_mapping", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(
-        checker.refinement_checker,
-        "check_refinement",
+        checker.equivalence_checker,
+        "check_equivalence",
         lambda _evm_result, _x86_result, **_kwargs: (True, "ok"),
     )
 
@@ -146,8 +146,8 @@ def test_verify_program_pair_forwards_max_depth_to_evm_and_x86_to_z3_paths(monke
     monkeypatch.setattr(x86_program, "to_z3_paths", _capturing_x86_to_z3_paths)
     monkeypatch.setattr(program_verifier_module, "build_call_site_mapping", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(
-        checker.refinement_checker,
-        "check_refinement_paths",
+        checker.equivalence_checker,
+        "check_equivalence_paths",
         lambda _evm_results, _x86_results, **_kwargs: (True, "ok"),
     )
 
@@ -174,8 +174,8 @@ def test_verify_program_pair_uses_independent_stack_check_budget(monkeypatch):
     monkeypatch.setattr(program_verifier_module, "build_call_site_mapping", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(program_verifier_module.time, "time", lambda: 1000.0)
     monkeypatch.setattr(
-        checker.refinement_checker,
-        "check_refinement",
+        checker.equivalence_checker,
+        "check_equivalence",
         lambda _evm_result, _x86_result, **_kwargs: (True, "ok"),
     )
 
@@ -184,7 +184,7 @@ def test_verify_program_pair_uses_independent_stack_check_budget(monkeypatch):
         captured["deadline"] = deadline
         return True, "ok"
 
-    monkeypatch.setattr(checker.refinement_checker, "check_stack_equivalence", _fake_stack_check)
+    monkeypatch.setattr(checker.equivalence_checker, "check_stack_equivalence", _fake_stack_check)
 
     verified, msg = checker.verify_program_pair(
         evm_program,
@@ -202,7 +202,7 @@ def test_verify_program_pair_uses_independent_stack_check_budget(monkeypatch):
     assert captured["deadline"] == 1000.456
 
 
-def test_verify_program_pair_rewrites_refinement_timeout_message(monkeypatch):
+def test_verify_program_pair_rewrites_equivalence_timeout_message(monkeypatch):
     checker = ProgramEquivalenceChecker(timeout_ms=123, verbose=False)
     initial_state = SMTState.create_initial_state()
     evm_program = _DummyEVMProgram()
@@ -210,10 +210,10 @@ def test_verify_program_pair_rewrites_refinement_timeout_message(monkeypatch):
 
     monkeypatch.setattr(program_verifier_module, "build_call_site_mapping", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(
-        checker.refinement_checker,
-        "check_refinement",
+        checker.equivalence_checker,
+        "check_equivalence",
         lambda _evm_result, _x86_result, **_kwargs: (
-            False, checker.refinement_checker._timeout_message(),
+            False, checker.equivalence_checker._timeout_message(),
         ),
     )
 
@@ -224,10 +224,10 @@ def test_verify_program_pair_rewrites_refinement_timeout_message(monkeypatch):
     )
 
     assert not verified
-    assert msg == "? TIMEOUT: refinement check exceeded overall timeout (123 ms)"
+    assert msg == "? TIMEOUT: equivalence check exceeded overall timeout (123 ms)"
 
 
-def test_verify_program_pair_rewrites_path_refinement_timeout_message(monkeypatch):
+def test_verify_program_pair_rewrites_path_equivalence_timeout_message(monkeypatch):
     checker = ProgramEquivalenceChecker(timeout_ms=123, verbose=False)
     initial_state = SMTState.create_initial_state()
     evm_program = _DummyEVMProgram()
@@ -235,11 +235,11 @@ def test_verify_program_pair_rewrites_path_refinement_timeout_message(monkeypatc
 
     monkeypatch.setattr(program_verifier_module, "build_call_site_mapping", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(
-        checker.refinement_checker,
-        "check_refinement_paths",
+        checker.equivalence_checker,
+        "check_equivalence_paths",
         lambda _evm_results, _x86_results, **_kwargs: (
             False,
-            checker.refinement_checker._timeout_message(),
+            checker.equivalence_checker._timeout_message(),
         ),
     )
 
@@ -251,4 +251,4 @@ def test_verify_program_pair_rewrites_path_refinement_timeout_message(monkeypatc
     )
 
     assert not verified
-    assert msg == "? TIMEOUT: refinement check exceeded overall timeout (123 ms)"
+    assert msg == "? TIMEOUT: equivalence check exceeded overall timeout (123 ms)"

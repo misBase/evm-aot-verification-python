@@ -226,7 +226,7 @@ class X86Program:
 
         # 收集各终止路径在执行中累积的 SMTState.assumptions（如 CALLDATALOAD
         # 处的 hi-192==0 假设），合并到 merged_state.assumptions 供
-        # program_verifier 注入 refinement solver。
+        # program_verifier 注入 等价性检查 solver。
         from evm_ir.program import _dedup_z3_exprs
         collected = list(getattr(state, 'assumptions', None) or [])
         for gstate in final_global_states:
@@ -239,7 +239,7 @@ class X86Program:
         has_return_data = merged_state.return_length != BitVecVal(0, 64)
 
         # 注意：result['memory'] 是 EVM 256-bit memory Array（R15 域）。
-        # callEngine 与 stack 域只在内部合并；refinement_checker 比对 return data 时只读 evm_mem。
+        # callEngine 与 stack 域只在内部合并；equivalence_checker 比对 return data 时只读 evm_mem。
         # 注意：这里的 has_return_data 是 length-derived（length != 0），
         # 与 x86_64/semantics.py 中 status-derived 的 status_code_has_return_data 不同。
         result = {

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Single-instruction EVM/x86 micro-refinement tests."""
+"""Single-instruction EVM/x86 micro-equivalence tests."""
 
 from __future__ import annotations
 
 import pytest
 
-from tests.support.instruction_refinement import (
-    InstructionRefinementCase,
-    assert_instruction_refines,
+from tests.support.instruction_equivalence import (
+    InstructionEquivalenceCase,
+    assert_instruction_equivalent,
 )
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
 from x86_64.summaries.registry import X86SummaryConfig
@@ -143,7 +143,7 @@ def _address_bytes(base_addr: int, value: int) -> tuple[tuple[int, int], ...]:
 
 ARITHMETIC_0X00_CASES = [
     # IR: ADD, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="ADD",
         evm_kind="ADD",
         arity=2,
@@ -151,7 +151,7 @@ ARITHMETIC_0X00_CASES = [
         base_addr=X86_CORE_BASE_ADDR,
     ),
     # IR: SUB, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SUB",
         evm_kind="SUB",
         arity=2,
@@ -160,7 +160,7 @@ ARITHMETIC_0X00_CASES = [
         evm_operand_indices=(1, 0),
     ),
     # IR: MUL, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MUL",
         evm_kind="MUL",
         arity=2,
@@ -176,9 +176,9 @@ ARITHMETIC_0X00_CASES = [
     # 用逐终止路径比较（x86_compare_terminal_paths）避免 merge 后的大 ITE，
     # 各路径都不再需要 bit-blast 256-bit 除法即可 UNSAT。
     # 相等借位链桥接 assumption 现由 EVM/x86 侧 MOD/DIV 语义经 state.add_assumption
-    # 自动挂上（与主路径统一来源），assert_instruction_refines 会收集注入提速。DIV 另挂
+    # 自动挂上（与主路径统一来源），assert_instruction_equivalent 会收集注入提速。DIV 另挂
     # x86_div64_quotient_fits_assumption 提速 x86 `div r64` guard；它不是 EVM DIV 语义。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="DIV",
         evm_kind="DIV",
         arity=2,
@@ -195,7 +195,7 @@ ARITHMETIC_0X00_CASES = [
     ),
     # IR: MOD, STOP
     # 同 DIV：common/arithmetic.mod_semantics 镜像 holiman 分段实现，逐终止路径比较。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MOD",
         evm_kind="MOD",
         arity=2,
@@ -213,8 +213,8 @@ ARITHMETIC_0X00_CASES = [
     # 分类，绝对值用 0-x（_abs256 用 limb 级带借位减法，对齐 x86 SUBQ/SBBQ），核心复用
     # 已转正的 unsigned div_semantics。x86 codegen（compileEVMSDiv）同构（符号分类树内部调
     # compileEVMDivWithReg）。慢路径靠 _verified_div_bridges 配对两侧 div + 求解器的
-    # simplify+bit-blast tactic（见 _make_refinement_solver）逐终止路径 UNSAT。
-    InstructionRefinementCase(
+    # simplify+bit-blast tactic（见 _make_equivalence_solver）逐终止路径 UNSAT。
+    InstructionEquivalenceCase(
         name="SDIV",
         evm_kind="SDIV",
         arity=2,
@@ -232,9 +232,9 @@ ARITHMETIC_0X00_CASES = [
     # IR: SMOD, STOP
     # 同 SDIV：common/arithmetic.smod_semantics 镜像 holiman Int.SMod（余数符号取被除数
     # x 符号，复用已转正的 unsigned mod_semantics），逐终止路径比较。SMOD 早退路径（如
-    # |x|<|y| → 结果=|x|）x86 不含 div，靠 _make_refinement_solver 的 simplify+bit-blast
+    # |x|<|y| → 结果=|x|）x86 不含 div，靠 _make_equivalence_solver 的 simplify+bit-blast
     # tactic 把取负/分段 ITE 折掉求解（默认 smt 策略会 unknown）。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SMOD",
         evm_kind="SMOD",
         arity=2,
@@ -252,7 +252,7 @@ ARITHMETIC_0X00_CASES = [
     # EVM 侧分段镜像见 common/arithmetic.addmod_semantics。逐终止路径比较
     # （x86_compare_terminal_paths）避免 merge 大 ITE，各路径无需 bit-blast 257-bit 除法
     # 即可 UNSAT；相等借位链桥接 hint 由两侧语义自动挂上，同 MOD 范式。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="ADDMOD",
         evm_kind="ADDMOD",
         arity=3,
@@ -268,7 +268,7 @@ ARITHMETIC_0X00_CASES = [
         solver_timeout_ms=30_000,
     ),
     # IR: MULMOD, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MULMOD",
         evm_kind="MULMOD",
         arity=3,
@@ -280,7 +280,7 @@ ARITHMETIC_0X00_CASES = [
         solver_timeout_ms=15_000,
     ),
     # IR: EXP, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="EXP",
         evm_kind="EXP",
         arity=2,
@@ -295,7 +295,7 @@ ARITHMETIC_0X00_CASES = [
     # 逐终止路径比较（同 SHL/SHR/SAR）：merge 模式即使 30s 仍 unknown（大 ITE 选择困难）。
     # 本 case 曾因 go-hpc-evm amd64 codegen 的 overflow 分支 bug（index ≥ 2^64 不返回原值）
     # 而 xfail——terminal-paths 0.7s 给出 SAT 反例暴露之；go 侧已修复，core hex 仅 1 字节变化。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SIGNEXTEND",
         evm_kind="SIGNEXTEND",
         arity=2,
@@ -312,7 +312,7 @@ ARITHMETIC_0X00_CASES = [
 
 COMPARISON_AND_BITWISE_0X10_CASES = [
     # IR: LT, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="LT",
         evm_kind="LT",
         arity=2,
@@ -323,7 +323,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         solver_timeout_ms=1_000,
     ),
     # IR: GT, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="GT",
         evm_kind="GT",
         arity=2,
@@ -334,7 +334,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         solver_timeout_ms=1_000,
     ),
     # IR: SLT, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SLT",
         evm_kind="SLT",
         arity=2,
@@ -345,7 +345,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         solver_timeout_ms=1_000,
     ),
     # IR: SGT, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SGT",
         evm_kind="SGT",
         arity=2,
@@ -356,7 +356,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         solver_timeout_ms=1_000,
     ),
     # IR: EQ, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="EQ",
         evm_kind="EQ",
         arity=2,
@@ -365,7 +365,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         x86_execution_mode="cfg",
     ),
     # IR: ISZERO, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="ISZERO",
         evm_kind="ISZERO",
         arity=1,
@@ -374,7 +374,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         x86_execution_mode="cfg",
     ),
     # IR: AND, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="AND",
         evm_kind="AND",
         arity=2,
@@ -382,7 +382,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         base_addr=X86_CORE_BASE_ADDR,
     ),
     # IR: OR, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="OR",
         evm_kind="OR",
         arity=2,
@@ -390,7 +390,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         base_addr=X86_CORE_BASE_ADDR,
     ),
     # IR: XOR, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="XOR",
         evm_kind="XOR",
         arity=2,
@@ -398,7 +398,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
         base_addr=X86_CORE_BASE_ADDR,
     ),
     # IR: NOT, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="NOT",
         evm_kind="NOT",
         arity=1,
@@ -407,7 +407,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
     ),
     # IR: BYTE, STOP
     # STOP epilogue 修复后 BYTE 的分支路径可达，Z3 在 ~15s 内可证 UNSAT。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="BYTE",
         evm_kind="BYTE",
         arity=2,
@@ -421,7 +421,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
     # x86 codegen（compileEVMShl）是分段移位（~10 条终止路径的分支密集 CFG），裸 merge
     # 后比较让默认 Solver 在 256-bit 移位大 ITE 上 unknown（30s 不收敛）。改用逐终止路径
     # 比较（x86_compare_terminal_paths），各路径秒级 UNSAT（同 DIV/MOD/BYTE 范式）。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SHL",
         evm_kind="SHL",
         arity=2,
@@ -435,7 +435,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
     ),
     # IR: SHR, STOP
     # 同 SHL：x86 分段逻辑右移（compileEVMShr），逐终止路径比较。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SHR",
         evm_kind="SHR",
         arity=2,
@@ -449,7 +449,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
     # IR: SAR, STOP
     # 同 SHL：x86 分段算术右移（compileEVMSar）按符号位额外分流 fill=0/全 1，路径数翻倍
     # （~20 条），逐终止路径比较，各路径秒级 unsat。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SAR",
         evm_kind="SAR",
         arity=2,
@@ -465,7 +465,7 @@ COMPARISON_AND_BITWISE_0X10_CASES = [
 
 PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
     # IR: PUSH(0x0), STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="PUSH0",
         evm_kind="PUSH",
         arity=0,
@@ -476,7 +476,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
         expected_stack_height=1,
     ),
     # IR: PUSH(0x2a), STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="PUSH1",
         evm_kind="PUSH",
         arity=1,
@@ -487,7 +487,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
         expected_stack_height=2,
     ),
     # IR: PUSH(0xaaaabbbbccccdddd1111222233334444fedcba98765432100123456789abcdef), STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="PUSH32",
         evm_kind="PUSH",
         arity=1,
@@ -498,7 +498,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
         expected_stack_height=2,
     ),
     # IR: DUP 1, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="DUP1",
         evm_kind="DUP",
         arity=1,
@@ -508,7 +508,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
         expected_stack_height=2,
     ),
     # IR: DUP 2, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="DUP2",
         evm_kind="DUP",
         arity=2,
@@ -518,7 +518,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
         expected_stack_height=3,
     ),
     # IR: DUP 16, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="DUP16",
         evm_kind="DUP",
         arity=16,
@@ -528,7 +528,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
         expected_stack_height=17,
     ),
     # IR: SWAP 1, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SWAP1",
         evm_kind="SWAP",
         arity=2,
@@ -538,7 +538,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
         expected_stack_height=2,
     ),
     # IR: SWAP 2, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SWAP2",
         evm_kind="SWAP",
         arity=3,
@@ -548,7 +548,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
         expected_stack_height=3,
     ),
     # IR: SWAP 16, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SWAP16",
         evm_kind="SWAP",
         arity=17,
@@ -562,7 +562,7 @@ PUSH_DUP_SWAP_0X60_0X80_0X90_CASES = [
 
 STORAGE_EXECUTION_0X50_CASES = [
     # IR: POP, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="POP",
         evm_kind="POP",
         arity=2,
@@ -571,7 +571,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         expected_stack_height=1,
     ),
     # IR: MLOAD, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MLOAD",
         evm_kind="MLOAD",
         arity=1,
@@ -582,7 +582,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         expected_stack_height=1,
     ),
     # IR: MSTORE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MSTORE",
         evm_kind="MSTORE",
         arity=2,
@@ -593,7 +593,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         memory_check_offsets=tuple(range(32)),
     ),
     # IR: MSTORE8, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MSTORE8",
         evm_kind="MSTORE8",
         arity=2,
@@ -604,7 +604,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         memory_check_offsets=(0,),
     ),
     # IR: SLOAD, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SLOAD",
         evm_kind="SLOAD",
         arity=1,
@@ -616,7 +616,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: SSTORE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SSTORE",
         evm_kind="SSTORE",
         arity=2,
@@ -631,7 +631,7 @@ STORAGE_EXECUTION_0X50_CASES = [
     # PC is intentionally not covered here: go-hpc-evm amd64 does not emit an
     # AOT core for EVM PC; it is handled by the interpreter path instead.
     # IR: MSIZE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MSIZE",
         evm_kind="MSIZE",
         arity=0,
@@ -642,7 +642,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         expected_stack_height=1,
     ),
     # IR: GAS, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="GAS",
         evm_kind="GAS",
         arity=0,
@@ -653,7 +653,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         expected_stack_height=1,
     ),
     # IR: TLOAD, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="TLOAD",
         evm_kind="TLOAD",
         arity=1,
@@ -665,7 +665,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: TSTORE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="TSTORE",
         evm_kind="TSTORE",
         arity=2,
@@ -678,7 +678,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: MCOPY, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MCOPY",
         evm_kind="MCOPY",
         arity=3,
@@ -692,7 +692,7 @@ STORAGE_EXECUTION_0X50_CASES = [
         x86_max_depth=120,
     ),
     # IR: MCOPY, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="MCOPY_OVERLAP",
         evm_kind="MCOPY",
         arity=3,
@@ -710,7 +710,7 @@ STORAGE_EXECUTION_0X50_CASES = [
 
 CLOSURE_STATE_0X30_CASES = [
     # IR: ADDRESS, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="ADDRESS",
         evm_kind="ADDRESS",
         arity=0,
@@ -722,7 +722,7 @@ CLOSURE_STATE_0X30_CASES = [
         expected_stack_height=1,
     ),
     # IR: BALANCE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="BALANCE",
         evm_kind="BALANCE",
         arity=1,
@@ -734,7 +734,7 @@ CLOSURE_STATE_0X30_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: ORIGIN, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="ORIGIN",
         evm_kind="ORIGIN",
         arity=0,
@@ -746,7 +746,7 @@ CLOSURE_STATE_0X30_CASES = [
         expected_stack_height=1,
     ),
     # IR: CALLER, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CALLER",
         evm_kind="CALLER",
         arity=0,
@@ -758,7 +758,7 @@ CLOSURE_STATE_0X30_CASES = [
         expected_stack_height=1,
     ),
     # IR: CALLVALUE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CALLVALUE",
         evm_kind="CALLVALUE",
         arity=0,
@@ -769,7 +769,7 @@ CLOSURE_STATE_0X30_CASES = [
         expected_stack_height=1,
     ),
     # IR: CALLDATALOAD, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CALLDATALOAD",
         evm_kind="CALLDATALOAD",
         arity=1,
@@ -783,7 +783,7 @@ CLOSURE_STATE_0X30_CASES = [
         x86_max_depth=120,
     ),
     # IR: CALLDATASIZE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CALLDATASIZE",
         evm_kind="CALLDATASIZE",
         arity=0,
@@ -797,7 +797,7 @@ CLOSURE_STATE_0X30_CASES = [
     # 次迭代，depth=120 不足以让唯一那条复制完成的路径走到 ret，会被 cfg_executor 的
     # depth 剪枝丢弃 → to_z3 退化成空 state → 假 SAT。depth=250 给够后逐字节比较 0.2s
     # 全 unsat（EVM/x86 语义本就等价，非 Go codegen bug）。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CALLDATACOPY",
         evm_kind="CALLDATACOPY",
         arity=3,
@@ -812,7 +812,7 @@ CLOSURE_STATE_0X30_CASES = [
         x86_max_depth=250,
     ),
     # IR: CODESIZE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CODESIZE",
         evm_kind="CODESIZE",
         arity=0,
@@ -824,7 +824,7 @@ CLOSURE_STATE_0X30_CASES = [
     # IR: CODECOPY, STOP
     # 同 CALLDATACOPY：逐字节复制循环，length=32 需 depth≥250 才能让复制完成的
     # 路径走到 ret，否则被 depth 剪枝丢弃成假 SAT。给够 depth 后 0.1s 全 unsat。
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CODECOPY",
         evm_kind="CODECOPY",
         arity=3,
@@ -839,7 +839,7 @@ CLOSURE_STATE_0X30_CASES = [
         x86_max_depth=250,
     ),
     # IR: GASPRICE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="GASPRICE",
         evm_kind="GASPRICE",
         arity=0,
@@ -848,7 +848,7 @@ CLOSURE_STATE_0X30_CASES = [
         expected_stack_height=1,
     ),
     # IR: EXTCODESIZE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="EXTCODESIZE",
         evm_kind="EXTCODESIZE",
         arity=1,
@@ -860,7 +860,7 @@ CLOSURE_STATE_0X30_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: EXTCODECOPY, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="EXTCODECOPY",
         evm_kind="EXTCODECOPY",
         arity=4,
@@ -873,7 +873,7 @@ CLOSURE_STATE_0X30_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: RETURNDATASIZE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="RETURNDATASIZE",
         evm_kind="RETURNDATASIZE",
         arity=0,
@@ -883,7 +883,7 @@ CLOSURE_STATE_0X30_CASES = [
         expected_stack_height=1,
     ),
     # IR: RETURNDATACOPY, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="RETURNDATACOPY",
         evm_kind="RETURNDATACOPY",
         arity=3,
@@ -898,7 +898,7 @@ CLOSURE_STATE_0X30_CASES = [
         x86_max_depth=120,
     ),
     # IR: EXTCODEHASH, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="EXTCODEHASH",
         evm_kind="EXTCODEHASH",
         arity=1,
@@ -914,7 +914,7 @@ CLOSURE_STATE_0X30_CASES = [
 
 BLOCK_CONTEXT_0X40_CASES = [
     # IR: BLOCKHASH, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="BLOCKHASH",
         evm_kind="BLOCKHASH",
         arity=1,
@@ -926,7 +926,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: COINBASE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="COINBASE",
         evm_kind="COINBASE",
         arity=0,
@@ -935,7 +935,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         expected_stack_height=1,
     ),
     # IR: TIMESTAMP, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="TIMESTAMP",
         evm_kind="TIMESTAMP",
         arity=0,
@@ -946,7 +946,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         expected_stack_height=1,
     ),
     # IR: NUMBER, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="NUMBER",
         evm_kind="NUMBER",
         arity=0,
@@ -957,7 +957,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         expected_stack_height=1,
     ),
     # IR: DIFFICULTY, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="DIFFICULTY",
         evm_kind="DIFFICULTY",
         arity=0,
@@ -966,7 +966,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         expected_stack_height=1,
     ),
     # IR: GASLIMIT, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="GASLIMIT",
         evm_kind="GASLIMIT",
         arity=0,
@@ -977,7 +977,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         expected_stack_height=1,
     ),
     # IR: CHAINID, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CHAINID",
         evm_kind="CHAINID",
         arity=0,
@@ -986,7 +986,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         expected_stack_height=1,
     ),
     # IR: SELFBALANCE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SELFBALANCE",
         evm_kind="SELFBALANCE",
         arity=0,
@@ -997,7 +997,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: BASEFEE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="BASEFEE",
         evm_kind="BASEFEE",
         arity=0,
@@ -1008,7 +1008,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         expected_stack_height=1,
     ),
     # IR: BLOBHASH, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="BLOBHASH",
         evm_kind="BLOBHASH",
         arity=1,
@@ -1021,7 +1021,7 @@ BLOCK_CONTEXT_0X40_CASES = [
         x86_execution_mode="cfg",
     ),
     # IR: BLOBBASEFEE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="BLOBBASEFEE",
         evm_kind="BLOBBASEFEE",
         arity=0,
@@ -1036,7 +1036,7 @@ BLOCK_CONTEXT_0X40_CASES = [
 
 HASH_0X20_CASES = [
     # IR: SHA3, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SHA3",
         evm_kind="SHA3",
         arity=2,
@@ -1064,7 +1064,7 @@ HASH_0X20_CASES = [
 # （Go 生成的完整程序，含 gas 前言）在 test_gas_consistency_stage1.py 里端到端验证。
 LOG_0XA0_CASES = [
     # IR: LOG0, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="LOG0",
         evm_kind="LOG",
         arity=2,
@@ -1077,7 +1077,7 @@ LOG_0XA0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: LOG1, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="LOG1",
         evm_kind="LOG",
         arity=3,
@@ -1090,7 +1090,7 @@ LOG_0XA0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: LOG2, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="LOG2",
         evm_kind="LOG",
         arity=4,
@@ -1103,7 +1103,7 @@ LOG_0XA0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: LOG3, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="LOG3",
         evm_kind="LOG",
         arity=5,
@@ -1116,7 +1116,7 @@ LOG_0XA0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: LOG4, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="LOG4",
         evm_kind="LOG",
         arity=6,
@@ -1133,7 +1133,7 @@ LOG_0XA0_CASES = [
 
 SYSTEM_0XF0_CASES = [
     # IR: CREATE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CREATE",
         evm_kind="CREATE",
         arity=3,
@@ -1145,7 +1145,7 @@ SYSTEM_0XF0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: CREATE2, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CREATE2",
         evm_kind="CREATE2",
         arity=4,
@@ -1157,7 +1157,7 @@ SYSTEM_0XF0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: CALL, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CALL",
         evm_kind="CALL",
         arity=7,
@@ -1169,7 +1169,7 @@ SYSTEM_0XF0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: CALLCODE, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="CALLCODE",
         evm_kind="CALLCODE",
         arity=7,
@@ -1181,7 +1181,7 @@ SYSTEM_0XF0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: DELEGATECALL, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="DELEGATECALL",
         evm_kind="DELEGATECALL",
         arity=6,
@@ -1193,7 +1193,7 @@ SYSTEM_0XF0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: STATICCALL, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="STATICCALL",
         evm_kind="STATICCALL",
         arity=6,
@@ -1205,7 +1205,7 @@ SYSTEM_0XF0_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: SELFDESTRUCT, STOP
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="SELFDESTRUCT",
         evm_kind="SELFDESTRUCT",
         arity=1,
@@ -1221,7 +1221,7 @@ SYSTEM_0XF0_CASES = [
 
 CONTROL_FLOW_CASES = [
     # IR: STOP (a single-block program containing just STOP).
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="STOP",
         evm_kind="STOP",
         arity=0,
@@ -1234,7 +1234,7 @@ CONTROL_FLOW_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: PUSH1 32, PUSH1 0, RETURN.
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="RETURN",
         evm_kind="RETURN",
         arity=2,
@@ -1250,7 +1250,7 @@ CONTROL_FLOW_CASES = [
         x86_max_depth=200,
     ),
     # IR: PUSH1 32, PUSH1 0, REVERT.
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="REVERT",
         evm_kind="REVERT",
         arity=2,
@@ -1266,7 +1266,7 @@ CONTROL_FLOW_CASES = [
         x86_max_depth=200,
     ),
     # IR: INVALID (the canonical 0xfe opcode).
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="INVALID",
         evm_kind="INVALID",
         arity=0,
@@ -1279,7 +1279,7 @@ CONTROL_FLOW_CASES = [
         x86_enable_go_bridge=True,
     ),
     # IR: PUSH1 3, JUMP, JUMPDEST(@3), STOP -- single-target static jump.
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="JUMP",
         evm_kind="JUMP",
         arity=0,
@@ -1295,7 +1295,7 @@ CONTROL_FLOW_CASES = [
         x86_max_depth=120,
     ),
     # IR: PUSH1 1, PUSH1 6, JUMPI, STOP, JUMPDEST(@6), STOP.
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="JUMPI",
         evm_kind="JUMPI",
         arity=1,
@@ -1314,7 +1314,7 @@ CONTROL_FLOW_CASES = [
     # IR: JUMPDEST, STOP -- standalone JUMPDEST at pc=0.
     # In go-hpc-evm IR the JUMPDEST is folded into the block-leading TAG, so
     # the EVM-side semantics dispatches on "TAG" rather than "JUMPDEST".
-    InstructionRefinementCase(
+    InstructionEquivalenceCase(
         name="JUMPDEST",
         evm_kind="TAG",
         arity=0,
@@ -1349,5 +1349,5 @@ INSTRUCTION_REFINEMENT_CASES = [
     INSTRUCTION_REFINEMENT_CASES,
     ids=lambda case: case.name,
 )
-def test_single_instruction_refinement(case: InstructionRefinementCase):
-    assert_instruction_refines(case)
+def test_single_instruction_equivalence(case: InstructionEquivalenceCase):
+    assert_instruction_equivalent(case)

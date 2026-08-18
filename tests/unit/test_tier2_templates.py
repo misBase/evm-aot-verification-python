@@ -25,7 +25,7 @@ _CERC20_HEX = os.path.join(
     "compound_cerc20", "CErc20.hex",
 )
 
-# compileMakeDataCopy 真实产物（tests/integration/test_single_ins_refinement.py
+# compileMakeDataCopy 真实产物（tests/integration/test_single_ins_equivalence.py
 # 的 X86_CALLDATACOPY_CORE_HEX_SEQUENCE）；循环头 0x41，出口 0x71。
 _CDC_HEX = (
     "498b76c048c7c000000000490b46c8490b46d0490b46d84885c0740748c7c6ffff"

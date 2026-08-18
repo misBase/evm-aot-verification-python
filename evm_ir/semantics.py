@@ -879,7 +879,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         offset_bv, stack_after_pop = state.evm_stack.pop()
         # 全符号验证下的可选优化（默认开启）：把 "offset 高 192 bit ≠ 0 时
         # 返回 0" 这条 vacuous-同行为分支用 path-condition 假设掉。两侧语义
-        # 在 overflow 时都返回 0，所以剪掉这个分支对 refinement 仍 sound；
+        # 在 overflow 时都返回 0，所以剪掉这个分支对 等价性仍成立；
         # 但留着的 If 守卫会让 z3 在 256-bit carry chain 上做大量无用 work。
         # See tests/support/calldataload_analysis/README.md 对此 200× 现象的分析。
         if getattr(state, 'assume_calldata_offset_no_overflow', True) and \
@@ -1492,7 +1492,7 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         semantics_gas.charge_memory_gas_for_return(state, offset_bv, length_bv)
 
         # 在状态中存储返回偏移量和长度
-        # 我们不提取数据 - 我们将在RefinementChecker中直接比较内存
+        # 我们不提取数据 - 我们将在EquivalenceChecker中直接比较内存
         # 注意：RETURN只读取内存，不修改内存或MSize
         state.return_offset = return_offset_64
         state.return_length = return_length_64

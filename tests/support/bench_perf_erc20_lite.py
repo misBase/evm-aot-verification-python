@@ -45,9 +45,9 @@ def main() -> int:
     parser.add_argument("--enable-merge", action="store_true",
                         help="enable x86 confluence-point state merging (CFG path explosion)")
     parser.add_argument("--skip-feasibility", action="store_true",
-                        help="skip path-pair feasibility precheck (sound, refinement check fast-fails on infeasible pairs)")
+                        help="skip path-pair feasibility precheck (sound, equivalence check fast-fails on infeasible pairs)")
     parser.add_argument("--profile-subchecks", action="store_true",
-                        help="enable verbose subcheck timing on the refinement checker")
+                        help="enable verbose subcheck timing on the equivalence checker")
     args = parser.parse_args()
 
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -73,7 +73,7 @@ def main() -> int:
     )
 
     # 可选全局前置条件：约束符号 calldatasize。放在 initial_state 上，
-    # 让后续求解器（可达性检查 + 最终精化检查）都能看到这条断言。
+    # 让后续求解器（可达性检查 + 最终等价性检查）都能看到这条断言。
     if args.calldatasize_max is not None:
         from z3 import BitVecVal, ULE
         bound = BitVecVal(args.calldatasize_max, 64)
@@ -177,19 +177,19 @@ def main() -> int:
             x86_obs = [_dc_replace(o, condition=_And(o.condition, *dedup)) for o in x86_obs]
         t2 = time.time()
         if args.workers == 1:
-            verified, msg = checker.refinement_checker.check_refinement_paths(
+            verified, msg = checker.equivalence_checker.check_equivalence_paths(
                 evm_obs, x86_obs,
                 skip_feasibility=args.skip_feasibility,
             )
         else:
-            verified, msg = checker.refinement_checker.check_refinement_paths(
+            verified, msg = checker.equivalence_checker.check_equivalence_paths(
                 evm_obs, x86_obs,
                 path_pair_workers=args.workers,
                 skip_feasibility=args.skip_feasibility,
             )
         t_check = time.time() - t2
         _flush_print(
-            f"[phase] refinement_paths check wall: {t_check:.3f}s "
+            f"[phase] equivalence_paths check wall: {t_check:.3f}s "
             f"(workers={args.workers})"
         )
     else:
@@ -215,11 +215,11 @@ def main() -> int:
             precondition = And(BoolVal(True), *dedup)
         else:
             precondition = None
-        verified, msg = checker.refinement_checker.check_refinement(
+        verified, msg = checker.equivalence_checker.check_equivalence(
             evm_result, x86_result, assumptions=precondition,
         )
         t_check = time.time() - t2
-        _flush_print(f"[phase] refinement check wall: {t_check:.3f}s")
+        _flush_print(f"[phase] equivalence check wall: {t_check:.3f}s")
 
     total = t_evm + t_x86 + t_check
     _flush_print(f"--- bench done: verified={verified} total={total:.3f}s")

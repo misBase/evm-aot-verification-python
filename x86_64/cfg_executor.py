@@ -535,7 +535,7 @@ class X86SymbolicExecutor:
         # 注入 caller 设定的全局先验（precondition assumptions）。
         # 这些约束在每条路径的 X86Constraints 中作为初始合取项出现，
         # 既让 reachability check 在分支处可以快速剪枝，也保证最终
-        # path_condition 中 carry 这些先验，无需 refinement_checker 重复加。
+        # path_condition 中 carry 这些先验，无需 equivalence_checker 重复加。
         for assumption in getattr(initial_state, 'assumptions', None) or []:
             initial_global_state.world_state.constraints.add(assumption)
 

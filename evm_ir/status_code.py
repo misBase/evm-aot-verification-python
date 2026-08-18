@@ -81,7 +81,7 @@ def set_terminal_status(state: "SMTState", code: EvmStatusCode) -> None:
     这是两者的**唯一**写入点。各写各的会漂（历史上 STOP 曾写成 RETURNED 的
     字面量），做成投影关系后结构上不可能再漂。
 
-    ``error_code`` 是权威值（参与 refinement 比较），``error_string`` 只用于诊断。
+    ``error_code`` 是权威值（参与 等价性比较），``error_string`` 只用于诊断。
     """
     state.error_code = BitVecVal(int(code), 8)
     state.error_string = get_status_message(code)

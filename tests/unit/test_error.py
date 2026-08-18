@@ -1,6 +1,6 @@
 ﻿"""Unit tests: verify IR error_code matches x86 callEngine status_code after instruction execution.
 
-Reuses test case parameters from test_single_ins_refinement, builds both
+Reuses test case parameters from test_single_ins_equivalence, builds both
 EVM IR and x86-64 final states, and cross-validates that the error/status
 codes are consistent across both sides.
 """
@@ -16,7 +16,7 @@ from evm_ir.program import EVMProgram
 from evm_ir.semantics import evm_operator_to_z3
 from evm_ir.status_code import EvmStatusCode
 from state.smt_state import SMTState
-from tests.integration.test_single_ins_refinement import (
+from tests.integration.test_single_ins_equivalence import (
     X86_CONTROL_FLOW_GAS_CONTEXT,
     X86_CORE_BASE_ADDR,
     X86_INVALID_CORE_HEX_SEQUENCE,
@@ -26,8 +26,8 @@ from tests.integration.test_single_ins_refinement import (
     X86_REVERT_CORE_HEX_SEQUENCE,
     X86_STATUS_CODES,
 )
-from tests.support.instruction_refinement import (
-    InstructionRefinementCase,
+from tests.support.instruction_equivalence import (
+    InstructionEquivalenceCase,
     _build_evm_final_state,
     _build_evm_initial_state,
     _build_x86_final_state,
@@ -100,7 +100,7 @@ X86_JUMPI_INVALID_CORE_HEX_SEQUENCE = (
 
 def test_revert_error_code_matches_x86_status_code():
     """Verify REVERT: IR error_code = x86 callEngine status_code = REVERTED."""
-    case = InstructionRefinementCase(
+    case = InstructionEquivalenceCase(
         name="REVERT",
         evm_kind="REVERT",
         arity=2,
@@ -149,7 +149,7 @@ def test_revert_error_code_matches_x86_status_code():
 
 def test_return_error_code_matches_x86_status_code():
     """Verify RETURN: IR error_code = x86 callEngine status_code = RETURNED."""
-    case = InstructionRefinementCase(
+    case = InstructionEquivalenceCase(
         name="RETURN",
         evm_kind="RETURN",
         arity=2,
@@ -198,7 +198,7 @@ def test_return_error_code_matches_x86_status_code():
 
 def test_invalid_error_code_matches_x86_status_code():
     """Verify INVALID: IR error_code = x86 callEngine status_code = INVALID."""
-    case = InstructionRefinementCase(
+    case = InstructionEquivalenceCase(
         name="INVALID",
         evm_kind="INVALID",
         arity=0,
@@ -244,7 +244,7 @@ def test_invalid_error_code_matches_x86_status_code():
 
 def test_stop_error_code_matches_x86_status_code():
     """Verify STOP: IR error_code = x86 callEngine status_code = STOPPED."""
-    case = InstructionRefinementCase(
+    case = InstructionEquivalenceCase(
         name="STOP",
         evm_kind="STOP",
         arity=0,
@@ -297,7 +297,7 @@ def test_jump_to_invalid_dest_error_code():
     """
     code_words = _code_words_from_hex(JUMP_INVALID_CODE_HEX)
 
-    case = InstructionRefinementCase(
+    case = InstructionEquivalenceCase(
         name="JUMP_INVALID",
         evm_kind="JUMP",
         arity=1,
@@ -356,7 +356,7 @@ def test_jumpi_to_invalid_dest_error_code():
     """
     code_words = _code_words_from_hex(JUMPI_INVALID_CODE_HEX)
 
-    case = InstructionRefinementCase(
+    case = InstructionEquivalenceCase(
         name="JUMPI_INVALID",
         evm_kind="JUMPI",
         arity=2,
@@ -413,7 +413,7 @@ def test_jumpi_cond_zero_no_error():
     """
     code_words = _code_words_from_hex(JUMPI_INVALID_CODE_HEX)
 
-    case = InstructionRefinementCase(
+    case = InstructionEquivalenceCase(
         name="JUMPI_COND_ZERO",
         evm_kind="JUMPI",
         arity=2,
@@ -727,7 +727,7 @@ def test_missing_max_depth_defaults_to_go_initial_value():
 # 错误终态的端到端对齐
 #
 # 这些用例证明"错误终态机制本身正确"（两侧都真正产生同一状态码），而不只是
-# "checker 能拒绝不一致"——后者已有覆盖：test_refinement_return_data.py 的
+# "checker 能拒绝不一致"——后者已有覆盖：test_equivalence_return_data.py 的
 # merged 入口 + test_program_path_semantics.py 的串行/并行/aggregate fallback。
 #
 # gas-safe test domain：RETURNDATACOPY 的机器码在 OOB 检查之前先跑
@@ -736,9 +736,9 @@ def test_missing_max_depth_defaults_to_go_initial_value():
 # ---------------------------------------------------------------------------
 
 def _returndatacopy_oob_case(name: str, operand_values: tuple[int, int, int],
-                             return_data_size_bytes: int) -> InstructionRefinementCase:
+                             return_data_size_bytes: int) -> InstructionEquivalenceCase:
     """operand_values 按压栈顺序给出 (length, dataOffset, memOffset)。"""
-    return InstructionRefinementCase(
+    return InstructionEquivalenceCase(
         name=name,
         evm_kind="RETURNDATACOPY",
         arity=3,
@@ -752,7 +752,7 @@ def _returndatacopy_oob_case(name: str, operand_values: tuple[int, int, int],
     )
 
 
-def _both_sides(case: InstructionRefinementCase):
+def _both_sides(case: InstructionEquivalenceCase):
     operands = _operands(case)
     memory_words = _symbolic_memory_words(case)
     readonly_words = _symbolic_readonly_words(case)
@@ -778,7 +778,7 @@ def test_returndatacopy_out_of_bounds_status_matches_x86():
         EvmStatusCode.RETURN_DATA_OUT_OF_BOUNDS, 8))
     assert solver.check() == unsat, "x86 侧应恒为 RETURN_DATA_OUT_OF_BOUNDS"
 
-    # 真正的精化断言：两侧状态码对所有输入相等。
+    # 真正的等价性断言：两侧状态码对所有输入相等。
     solver = Solver()
     solver.add(evm_state.error_code != x86_state.callengine_status_code)
     assert solver.check() == unsat, "两侧终止状态码必须一致"
@@ -956,7 +956,7 @@ def test_mutated_status_immediate_is_detected():
     assert sum(a != b for a, b in zip(mutated, original)) == 1, "只应有一个字符不同"
 
     def status_of(core_hex: str):
-        case = InstructionRefinementCase(
+        case = InstructionEquivalenceCase(
             name="STOP_MUTATION",
             evm_kind="STOP",
             arity=0,
@@ -988,7 +988,7 @@ def test_returndatacopy_symbolic_offset_status_matches_x86_end_to_end():
     EVM 侧必须跑 ``RETURNDATACOPY; STOP`` 而非单 opcode：x86 core 在 OOB 检查后
     还有 STOP exit，单 opcode 在安全输入下停在 RETURNED(0)，比较会得到假反例。
     """
-    case = InstructionRefinementCase(
+    case = InstructionEquivalenceCase(
         name="RDC_SYMBOLIC",
         evm_kind="RETURNDATACOPY",
         arity=3,

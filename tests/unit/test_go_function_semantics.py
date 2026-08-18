@@ -506,14 +506,14 @@ class TestExtractMethods:
 
 
 class TestStorageEquivalence:
-    """测试 RefinementChecker 的 storage 等价检查。"""
+    """测试 EquivalenceChecker 的 storage 等价检查。"""
 
     def test_same_storage_is_equivalent(self):
         """同一个 storage array 应判等价。"""
-        from verification.refinement_checker import RefinementChecker
+        from verification.equivalence_checker import EquivalenceChecker
         from z3 import Array, BitVecSort
 
-        checker = RefinementChecker(timeout_ms=5000)
+        checker = EquivalenceChecker(timeout_ms=5000)
         storage = Array('Storage', BitVecSort(256), BitVecSort(256))
 
         verified, msg = checker._check_storage_equivalence(storage, storage)
@@ -521,10 +521,10 @@ class TestStorageEquivalence:
 
     def test_different_storage_not_equivalent(self):
         """写入不同的 storage array 不应判等价。"""
-        from verification.refinement_checker import RefinementChecker
+        from verification.equivalence_checker import EquivalenceChecker
         from z3 import Array, BitVecSort, Store
 
-        checker = RefinementChecker(timeout_ms=5000)
+        checker = EquivalenceChecker(timeout_ms=5000)
         storage = Array('Storage', BitVecSort(256), BitVecSort(256))
 
         s1 = Store(storage, BitVecVal(0, 256), BitVecVal(1, 256))
@@ -535,10 +535,10 @@ class TestStorageEquivalence:
 
     def test_same_write_is_equivalent(self):
         """写入相同的 storage array 应判等价。"""
-        from verification.refinement_checker import RefinementChecker
+        from verification.equivalence_checker import EquivalenceChecker
         from z3 import Array, BitVecSort, Store
 
-        checker = RefinementChecker(timeout_ms=5000)
+        checker = EquivalenceChecker(timeout_ms=5000)
         storage = Array('Storage', BitVecSort(256), BitVecSort(256))
 
         s1 = Store(storage, BitVecVal(42, 256), BitVecVal(100, 256))

@@ -23,16 +23,16 @@ from z3 import (
 
 # go-hpc-evm 的 builtin div/mod 实际调用 github.com/holiman/uint256 v1.3.2 的
 # Int.Div / Int.Mod，而 amd64 AOT codegen 就是这两个函数的逐分支翻译。两侧若都
-# 建模成裸 z3 bvurem/bvudiv，refinement 公式会让 Z3 bit-blast 256-bit 除法而超时
+# 建模成裸 z3 bvurem/bvudiv，等价性公式会让 Z3 bit-blast 256-bit 除法而超时
 # （实测 192-bit 起就 unknown）。这里改为镜像 holiman 的分段实现：快路径用 limb
 # 比较/64-bit 运算展开（Z3 秒解，且与 x86 codegen 逐路径结构对齐），仅大数 Knuth
 # 长除法路径折成未解释函数。大数路径 x86（经 builtin bridge）与 EVM 参照都调用同一
 # holiman udivrem，折同一 UF 即保证 x86 ≡ EVM（不证 ≡ 数学真值）。
 #
 # Latent gap（当前不可触发）：商和余数是**两个独立 UF**，二者无 q·b+r==a 公理。
-# 单指令 refinement 里 DIV/MOD 各用独立 solver，同一 solver 不会同时出现两个 UF，故
+# 单指令 等价性检查里 DIV/MOD 各用独立 solver，同一 solver 不会同时出现两个 UF，故
 # 当前安全。但若某个多指令程序对同一 (a,b) 同时含 DIV 与 MOD、且 observable 依赖两者，
-# Z3 可取 quotient/remainder 数学不一致的模型而各自 refinement 仍 pass。届时需改为单一
+# Z3 可取 quotient/remainder 数学不一致的模型而各自 等价性检查仍 pass。届时需改为单一
 # udivrem UF 返回 (q,r) 再投影，或补 q·b+r==a 一致性公理。
 _HOLIMAN_UDIVREM_UF = Function(
     "holiman_udivrem", BitVecSort(256), BitVecSort(256), BitVecSort(256)
@@ -74,7 +74,7 @@ def eq_as_borrow_chain(a, b):
 def eq_borrow_chain_assumption(a, b):
     """返回 ground 实例 `eq_semantics(a,b) == eq_as_borrow_chain(a,b)`。
 
-    供 refinement 验证作为 solver assumption 使用（等价性已由 composition lemma
+    供 等价性验证作为 solver assumption 使用（等价性已由 composition lemma
     证明）。a/b 为 BitVec(256)。
     """
     from common.uint256 import Uint256
@@ -113,7 +113,7 @@ def x86_div64_quotient_fits_assumption(a, b):
     当前 x86 后端 64-bit DIV 快路径会生成 `RDX=0; RAX=x.z0; div y.z0`。
     因此 y.z0 != 0 时，q128 高 64 位必为 0，可满足 x86 语义里的 quotient_fits。
 
-    这不是 EVM DIV 语义的一部分，只是 refinement solver hint：避免 Z3 自己证明
+    这不是 EVM DIV 语义的一部分，只是 等价性检查 solver hint：避免 Z3 自己证明
     该 x86 guard，从而提速当前 x86-64 codegen 形状。
 
     守卫只能是 `y.z0 != 0`：q128 只取 x.z0，与 a 高 192 位无关；不可用 IsUint64(a)。
@@ -243,7 +243,7 @@ def smod_semantics(a, b):
 
 
 def sdiv_speedup_assumptions(a, b):
-    """SDIV refinement 的恒真提速 hint（soundness 中性）。
+    """SDIV 等价性检查的恒真提速 hint（soundness 中性）。
 
     SDIV 内部把 (a,b) 取绝对值后喂给 unsigned div_semantics，x86 codegen 同样在
     |a|、|b| 上跑 unsigned DIV codegen。因此 DIV 的两条 ground hint（相等借位链桥接、
@@ -260,7 +260,7 @@ def sdiv_speedup_assumptions(a, b):
 
 
 def smod_speedup_assumptions(a, b):
-    """SMOD refinement 的恒真提速 hint（soundness 中性）。
+    """SMOD 等价性检查的恒真提速 hint（soundness 中性）。
 
     同 sdiv_speedup_assumptions，但 SMOD 内部走 unsigned mod_semantics（无 `div r64`
     快路径商），故只需相等借位链桥接 hint。
@@ -301,7 +301,7 @@ def addmod_semantics(a, b, mod):
     body = If(
         carry == BitVecVal(0, 1),
         # 无溢出：sum_low == a+b，复用 holiman 镜像 Mod，与 x86 compileEVMModWithReg
-        # 逐分支对齐，各路径秒级 UNSAT。若此处也用裸 257-bit URem，refinement 会让 Z3
+        # 逐分支对齐，各路径秒级 UNSAT。若此处也用裸 257-bit URem，等价性检查会让 Z3
         # bit-blast 257-bit 除法而超时。
         mod_semantics(sum_low, mod),
         # 溢出：x86 走 builtin addmod bridge，两侧同为 257-bit URem。
@@ -311,7 +311,7 @@ def addmod_semantics(a, b, mod):
 
 
 def addmod_speedup_assumptions(a, b, mod):
-    """ADDMOD refinement 的恒真提速 hint（soundness 中性）。
+    """ADDMOD 等价性检查的恒真提速 hint（soundness 中性）。
 
     不溢出路径内联跑 holiman Mod(sum_low, mod)，同独立 MOD 需相等借位链桥接。hint 挂在
     (sum_low, mod) 上，因为内联 Mod 的被除数就是 sum_low（=a+b 低 256 位）。

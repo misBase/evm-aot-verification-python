@@ -2,7 +2,7 @@
 
 完整验证链分三段：
 1. unit 测试保证 matcher/apply 能正确实例化 summary；
-2. single-ins refinement 证明 EVM MUL == summary；
+2. single-ins 等价性 证明 EVM MUL == summary；
 3. 本文件补 raw x86 compileEVMMul slice == summary 语义。
 
 第 3 段按 q2/q3/q4 编译期零值分支覆盖 2^3 种 row 形态（固化在
@@ -35,7 +35,7 @@ from z3 import BitVec, Or, Solver, unsat
 
 from common.uint256 import Uint256
 from state.smt_state import SMTState
-from tests.integration.test_single_ins_refinement import X86_MUL_CORE_HEX_SEQUENCE
+from tests.integration.test_single_ins_equivalence import X86_MUL_CORE_HEX_SEQUENCE
 from x86_64.cfg import identify_basic_blocks
 from x86_64.disassembler import disassemble_hex, parse_operands
 from x86_64.models import Register, X86Instruction

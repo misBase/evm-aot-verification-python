@@ -1,4 +1,4 @@
-"""Observable refinement checks for return data, memory, and debug stack slots."""
+"""Observable equivalence checks for return data, memory, and debug stack slots."""
 
 import time
 from typing import TYPE_CHECKING, Optional, Tuple
@@ -20,10 +20,10 @@ from state.smt_state import MemoryDomain
 
 from utils.z3_helpers import get_simplified_bv_const_value
 
-from .refinement_context import _RefinementContext
-from .refinement_gas import GasEquivalenceChecks
-from .refinement_memory import MemoryContentChecks
-from .refinement_storage import StorageEquivalenceChecks
+from .equivalence_context import _EquivalenceContext
+from .equivalence_gas import GasEquivalenceChecks
+from .equivalence_memory import MemoryContentChecks
+from .equivalence_storage import StorageEquivalenceChecks
 
 if TYPE_CHECKING:
     from state.smt_state import SMTState
@@ -34,10 +34,10 @@ if TYPE_CHECKING:
 _STATUS_CODE_BITS = 8
 
 
-class OutputRefinementChecks:
+class OutputEquivalenceChecks:
     def __init__(
         self,
-        ctx: _RefinementContext,
+        ctx: _EquivalenceContext,
         storage: StorageEquivalenceChecks,
         memory: MemoryContentChecks,
         gas: Optional[GasEquivalenceChecks] = None,
@@ -47,15 +47,15 @@ class OutputRefinementChecks:
         self._memory = memory
         self._gas = gas
 
-    def check_refinement(
+    def check_equivalence(
         self,
         evm_result: dict,
         x86_result: dict,
         assumptions=None,
     ) -> Tuple[bool, Optional[str]]:
-        """检查x86是否精化EVM（对所有输入，x86_result = evm_result）。
+        """检查x86 是否与 EVM 等价（对所有输入，x86_result = evm_result）。
 
-        此方法验证精化关系：
+        此方法验证等价关系：
           ∀ inputs. x86_output(inputs) = evm_output(inputs)
 
         Args:
@@ -65,9 +65,9 @@ class OutputRefinementChecks:
                 （例如 calldatasize 上界约束）
 
         Returns:
-            (verified, message)，如果精化关系成立则verified为True
+            (verified, message)，如果等价关系成立则verified为True
         """
-        # 将 timeout_ms 作为整个 refine 检查流程的总预算（而不是每次 check 的预算）。
+        # 将 timeout_ms 作为整个 等价性检查流程的总预算（而不是每次 check 的预算）。
         deadline = time.time() + (self._ctx.timeout_ms / 1000.0)
 
         return self.check_observables(
@@ -246,7 +246,7 @@ class OutputRefinementChecks:
 
         主路径与 pair 的 aggregate fallback 分支都委托到这里，是状态 observable 的
         唯一清单。但只管**编排层**：新增字段还要同步 ``PathObservation`` 与
-        ``refinement_paths._PATH_RESULT_KEYS``（并行翻译白名单，漏键静默失效）。
+        ``equivalence_paths._PATH_RESULT_KEYS``（并行翻译白名单，漏键静默失效）。
         """
         evm_storage = evm_result.get('storage')
         x86_storage = x86_result.get('storage')
@@ -308,7 +308,7 @@ class OutputRefinementChecks:
         logs: Optional[list[str]] = None,
         ctx=None,
     ) -> Tuple[bool, Optional[str]]:
-        """检查终止状态码、return data、memory 与状态 observable 是否精化一致。
+        """检查终止状态码、return data、memory 与状态 observable 是否等价。
 
         状态 observable 各自在两侧都有 observation（gas 还需 checker 启用）时才实际
         检查，故成功消息用 "enabled state observables" 而非逐项枚举。
@@ -409,7 +409,7 @@ class OutputRefinementChecks:
                     return False, msg
 
                 msg = (
-                    "✓ VERIFIED: x86 refines EVM (termination status, non-empty "
+                    "✓ VERIFIED: x86 ≡ EVM (termination status, non-empty "
                     "return-data conditions, lengths, memory contents, and enabled "
                     "state observables are equivalent for all inputs)"
                 )
@@ -459,7 +459,7 @@ class OutputRefinementChecks:
         if result == unsat:
             pass
         elif result == sat:
-            msg = "✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM (memory contents differ)"
+            msg = "✗ COUNTEREXAMPLE FOUND: x86 ≢ EVM (memory contents differ)"
             if context:
                 msg = f"{msg} ({context})"
             self._ctx.emit_solver_log(logs, f"    └─ {msg}")
@@ -484,7 +484,7 @@ class OutputRefinementChecks:
             return False, msg
 
         msg = (
-            "✓ VERIFIED: x86 refines EVM (termination status, non-empty return-data "
+            "✓ VERIFIED: x86 ≡ EVM (termination status, non-empty return-data "
             "conditions, lengths, memory contents, and enabled state observables are "
             "equivalent for all inputs)"
         )
@@ -500,7 +500,7 @@ class OutputRefinementChecks:
         path_condition=None,
         context: str = "",
     ) -> Tuple[bool, Optional[str]]:
-        """通过直接比较 return data 内容检查精化关系。"""
+        """通过直接比较 return data 内容检查等价关系。"""
         return self.check_observables_with_solver(
             self._ctx.solver,
             evm_result,

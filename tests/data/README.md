@@ -80,7 +80,7 @@ for f in "$OUT"/*.hex; do printf '%s %s\n' "$(head -c 8 "$f")" "$f"; done
 
 ## 多块 / 控制流样本
 
-`muti_block`、`muti_block_08`、`two_block`、`three_block`、`jumpi_2block{,_ok,_err}`、`mstore_return`、`sstore_load`、`perf_erc20_lite`（json + hex，部分带 `.txt`）。go-hpc-evm 针对特定控制流 / 存储 / 内存特性编译的靶向小程序，驱动程序级 refinement 与 gas/stage 集成测试；注释自述为 AOT 编译产出，但**未维护再生脚本**，上游变动后需手动重编。
+`muti_block`、`muti_block_08`、`two_block`、`three_block`、`jumpi_2block{,_ok,_err}`、`mstore_return`、`sstore_load`、`perf_erc20_lite`（json + hex，部分带 `.txt`）。go-hpc-evm 针对特定控制流 / 存储 / 内存特性编译的靶向小程序，驱动程序级等价性检查 与 gas/stage 集成测试；注释自述为 AOT 编译产出，但**未维护再生脚本**，上游变动后需手动重编。
 
 几个有专门语义的：
 

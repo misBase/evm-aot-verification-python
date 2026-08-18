@@ -19,7 +19,7 @@ from evm_ir.json_parser import load_ir_from_json
 from evm_ir.program import EVMProgram
 from x86_64.program import X86Program
 from state.smt_state import SMTState
-from tests.integration.test_refinement_checker import (
+from tests.integration.test_equivalence_checker import (
     X86_ADD_FULL_HEX_SEQUENCE,
     X86_ADD_FULL_BASE_ADDR,
 )

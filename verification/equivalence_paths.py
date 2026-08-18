@@ -1,4 +1,4 @@
-"""终止路径 pair 级 refinement 检查编排。"""
+"""终止路径 pair 级 等价性检查编排。"""
 
 import threading
 import time
@@ -30,8 +30,8 @@ from common.path_observation import PathCoverageCertificate
 
 from utils.z3_helpers import expr_mentions_symbol, get_simplified_bv_const_value
 
-from .refinement_context import _RefinementContext
-from .refinement_outputs import OutputRefinementChecks
+from .equivalence_context import _EquivalenceContext
+from .equivalence_outputs import OutputEquivalenceChecks
 
 
 _Z3_TRANSLATE_LOCK = threading.Lock()
@@ -83,7 +83,7 @@ class _PathPairChunkCheckResult:
     logs: list[str] = field(default_factory=list)
 
 
-class PathRefinementChecks:
+class PathEquivalenceChecks:
     """终止路径 pair 的编排层：决定走哪条检查路径。
 
     状态 observable（storage / transient / gas）一律经 outputs 走同一份实现，不再
@@ -94,13 +94,13 @@ class PathRefinementChecks:
 
     def __init__(
         self,
-        ctx: _RefinementContext,
-        outputs: OutputRefinementChecks,
+        ctx: _EquivalenceContext,
+        outputs: OutputEquivalenceChecks,
     ):
         self._ctx = ctx
         self._outputs = outputs
 
-    def check_refinement_paths(
+    def check_equivalence_paths(
         self,
         evm_results: list[dict],
         x86_results: list[dict],
@@ -110,18 +110,18 @@ class PathRefinementChecks:
         x86_coverage: Optional[PathCoverageCertificate] = None,
         coverage_precondition=None,
     ) -> Tuple[bool, Optional[str]]:
-        """直接在终止路径 observations 上检查 refinement。
+        """直接在终止路径 observations 上检查等价性。
 
         该模式避免先合并完整 terminal memory/storage Array。对每个可行的
-        EVM/x86 终止路径交集，证明与 ``check_refinement`` 相同的 observable
-        精化性质。
+        EVM/x86 终止路径交集，证明与 ``check_equivalence`` 相同的 observable
+        等价性质。
 
         Args:
             skip_feasibility: 跳过 ``_check_path_pair_may_be_feasible`` 预检查。
                 在符号 calldata 等场景下，feasibility precheck 自身也要 bit-blast
                 完整 path 谓词但很少能剪枝；跳过它能少做大约 pair_count 次 SAT 调用。
-                refinement check 在 path_condition 为 UNSAT 时返回 unsat（vacuously
-                refined），仍 sound——只是会把统计的 "feasible pair(s)" 计成全部
+                等价性检查在 path_condition 为 UNSAT 时返回 unsat（vacuously
+                equivalent），仍 sound——只是会把统计的 "feasible pair(s)" 计成全部
                 pair_count。
         """
         if path_pair_workers <= 0:
@@ -134,7 +134,7 @@ class PathRefinementChecks:
         if not x86_results:
             return False, "✗ NO TERMINAL PATHS: x86 program produced no terminal state"
 
-        # 先确认各自的 terminal path 条件覆盖所有输入，再做 pairwise refinement。
+        # 先确认各自的 terminal path 条件覆盖所有输入，再做 pairwise 等价性检查。
         verified, msg = self._check_path_coverage(
             evm_results,
             "EVM",
@@ -174,7 +174,7 @@ class PathRefinementChecks:
             return False, failure
 
         msg = (
-            "✓ VERIFIED: x86 refines EVM over terminal path observations "
+            "✓ VERIFIED: x86 ≡ EVM over terminal path observations "
             f"({len(evm_results)} EVM path(s), {len(x86_results)} x86 path(s), "
             f"{checked_pair_count}/{pair_count} feasible pair(s))"
         )
@@ -332,7 +332,7 @@ class PathRefinementChecks:
         会很难判，因为 x86 路径条件含有较大的 merge-origin ``Or/If`` 项。
         这个 fallback 改问对偶问题：在一条 EVM 路径下，是否存在任意 x86
         终止路径产生坏 observable？如果所有这类存在性坏查询都是 UNSAT，则该
-        EVM 路径已被完整的 x86 终止路径集合 refinement，剩余 pairwise 检查可省略。
+        EVM 路径已被完整的 x86 终止路径集合 等价性检查，剩余 pairwise 检查可省略。
         """
         evm_condition = evm_result.get("condition", BoolVal(True, ctx=ctx))
         evm_has_return_data = evm_result.get(

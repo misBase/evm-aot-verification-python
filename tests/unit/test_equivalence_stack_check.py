@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RefinementChecker 固定栈槽检查的回归测试。"""
+"""EquivalenceChecker 固定栈槽检查的回归测试。"""
 
 from z3 import BitVecVal, Select, Store
 
@@ -7,12 +7,12 @@ from state.evm_stack_state import EVMStackState
 from state.smt_state import SMTState
 from state.x86_state import X86MemoryState
 from verification.memory_mapping import StackMemoryMapper
-from verification.refinement_checker import RefinementChecker
+from verification.equivalence_checker import EquivalenceChecker
 from x86_64.models import Register
 
 
-def _make_refinement_checker() -> RefinementChecker:
-    return RefinementChecker(timeout_ms=10000, verbose=False)
+def _make_equivalence_checker() -> EquivalenceChecker:
+    return EquivalenceChecker(timeout_ms=10000, verbose=False)
 
 
 def _rebase_fixed_stack_window(state: SMTState, stack_base_value: int) -> tuple[SMTState, SMTState]:
@@ -40,11 +40,11 @@ def _rebase_fixed_stack_window(state: SMTState, stack_base_value: int) -> tuple[
 
 def test_stack_check_succeeds_without_concrete_host_layout_pins():
     """stack_check 不应依赖旧实现里那组具体 host 地址常量。"""
-    refinement_checker = _make_refinement_checker()
+    equivalence_checker = _make_equivalence_checker()
     base_state = SMTState.create_initial_state(2)
     initial_state, x86_state = _rebase_fixed_stack_window(base_state, 0x00430000)
 
-    verified, msg = refinement_checker.check_stack_equivalence(
+    verified, msg = equivalence_checker.check_stack_equivalence(
         base_state,
         x86_state,
         initial_state,
@@ -56,7 +56,7 @@ def test_stack_check_succeeds_without_concrete_host_layout_pins():
 
 def test_stack_check_reports_real_counterexample_instead_of_vacuous_pass():
     """旧实现会因硬编码 pin 自相矛盾而 vacuous pass；新实现必须报真实差异。"""
-    refinement_checker = _make_refinement_checker()
+    equivalence_checker = _make_equivalence_checker()
     base_state = SMTState.create_initial_state(2)
     initial_state, x86_state = _rebase_fixed_stack_window(base_state, 0x00430000)
 
@@ -66,7 +66,7 @@ def test_stack_check_reports_real_counterexample_instead_of_vacuous_pass():
         sp=evm_state.evm_stack.SP,
     )
 
-    verified, msg = refinement_checker.check_stack_equivalence(
+    verified, msg = equivalence_checker.check_stack_equivalence(
         evm_state,
         x86_state,
         initial_state,

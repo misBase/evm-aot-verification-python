@@ -1,6 +1,6 @@
 """Gas 消耗一致性检查（阶段 0:终值逐路径等式）。
 
-与 storage/transient 检查平级（组合注入到 RefinementChecker / PathRefinementChecks），
+与 storage/transient 检查平级（组合注入到 EquivalenceChecker / PathEquivalenceChecks），
 证明同一符号初始 gas G 下，EVM 侧 evm_gas.Gas 与 x86 侧 callengine_gas_remaining
 在每条终止路径上相等。
 
@@ -10,7 +10,7 @@
 - UNKNOWN→ fail-closed（超时/求解器复杂度，按失败处理，保证 soundness）
 
 status code 一致性**不在这里**：EVM 侧 error_code 与 x86 侧 callengine_status_code
-的比较由 ``RefinementOutputChecks._check_status_code_with_solver`` 负责，它对两侧
+的比较由 ``OutputEquivalenceChecks._check_status_code_with_solver`` 负责，它对两侧
 都做位宽与 Z3 context 校验。本模块只管 gas。
 """
 
@@ -18,16 +18,16 @@ from typing import Optional
 
 from z3 import sat, unsat, BoolVal
 
-from .refinement_context import _RefinementContext
+from .equivalence_context import _EquivalenceContext
 
 
 class GasEquivalenceChecks:
     """EVM↔x86 gas 终值等价检查。
 
-    用组合：接收共享的 _RefinementContext（solver/timeout/日志 helper）。
+    用组合：接收共享的 _EquivalenceContext（solver/timeout/日志 helper）。
     """
 
-    def __init__(self, ctx: _RefinementContext):
+    def __init__(self, ctx: _EquivalenceContext):
         self._ctx = ctx
 
     def _check_gas_equivalence_with_solver(
@@ -45,13 +45,13 @@ class GasEquivalenceChecks:
 
         **任一侧或两侧缺 gas 观测都 fail-closed。** 无法比较不等于已验证。
 
-        走到这里就意味着 gas 检查已启用——``RefinementChecker`` 只在 ``check_gas``
-        为真时才构造本类（``refinement_checker.py``），而 ``RefinementOutputChecks``
+        走到这里就意味着 gas 检查已启用——``EquivalenceChecker`` 只在 ``check_gas``
+        为真时才构造本类（``equivalence_checker.py``），而 ``OutputEquivalenceChecks``
         用 ``if self._gas is not None`` 把关闭态挡在门外。所以"两侧都没有 gas"不是
         "本次没建模 gas"，而是**观测本该有却丢了**：``_PATH_RESULT_KEYS`` 漏键、并行
         worker 跨 Context 翻译丢失、aggregate fallback 掉字段——全是假绿路径。
         status_code 一侧一直是这么处理的（见
-        ``tests/unit/test_refinement_return_data.py`` 的两条 missing 用例），此处对齐。
+        ``tests/unit/test_equivalence_return_data.py`` 的两条 missing 用例），此处对齐。
         """
         if evm_gas is None or x86_gas is None:
             if evm_gas is None and x86_gas is None:

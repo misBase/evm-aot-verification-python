@@ -7,7 +7,7 @@ EVM 固定栈槽位和 x86-64 内存窗口之间的映射。
 - 槽位编号从栈底开始：slot 0 是最底部，slot N-1 是最顶部
 - 当 N = 0 时，没有预填的负偏移槽位；若后续需要定义第一个槽位，其起点是 base + 0
 
-这个约定与 RefinementChecker.check_stack_equivalence() 保持一致：
+这个约定与 EquivalenceChecker.check_stack_equivalence() 保持一致：
 mapper 负责建立/读取初始固定槽位窗口，checker 负责按相同的固定槽位约定比较最终状态。
 二者都不建模运行时随 SP 变化的逻辑栈顶，只关注固定槽位。
 """

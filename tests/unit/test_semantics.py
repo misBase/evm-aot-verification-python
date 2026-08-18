@@ -8,7 +8,7 @@ from evm_ir.status_code import EvmStatusCode, get_status_message, set_terminal_s
 from x86_64.semantics import X86SemanticsModel
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
 from x86_64.models import Register, X86Instruction
-from verification.refinement_checker import RefinementChecker
+from verification.equivalence_checker import EquivalenceChecker
 from state.smt_state import SMTState, EVMMemoryState, MemoryDomain
 from z3 import And, BitVec, BitVecVal, Not, Select, Store, simplify, is_bv, is_true, Solver, sat, unsat
 
@@ -63,8 +63,8 @@ def test_add_semantics():
         f"x86 ADD failed: expected {expected}, got {simplify(x86_result)}"
 
 
-def test_refinement_checker():
-    """使用具体值测试精化检查器。"""
+def test_equivalence_checker():
+    """使用具体值测试等价性检查器。"""
     from z3 import Distinct, Solver
 
     # 使用等价值测试

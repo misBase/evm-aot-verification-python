@@ -136,7 +136,7 @@ evm-aot-verification-python/
 │   └── program.py            # x86程序级模型（整个程序的语义建模）
 │
 ├── verification/              # 验证相关模块
-│   ├── refinement_checker.py # 精化关系检查器（使用Z3验证x86精化EVM）
+│   ├── equivalence_checker.py # 等价性检查器（使用Z3验证x86 ≡ EVM）
 │   └── program_verifier.py   # 程序等价性验证器（主要验证接口）
 │
 ├── tests/                     # 测试目录
@@ -219,7 +219,7 @@ def add_semantics(self, a: BitVec, b: BitVec) -> BitVec:
   - `build_program_semantics_from_limbs()`: Convenience method for 256-bit inputs
 
 #### 4. `verification/` - Verification Engine
-- **`refinement_checker.py`**: Uses Z3 to check refinement relation (x86 refines EVM)
+- **`equivalence_checker.py`**: Uses Z3 to check semantic equivalence (x86 ≡ EVM)
 - **`program_verifier.py`**: **Program-level** verification (MAIN INTERFACE)
   - `ProgramEquivalenceChecker`: Verifies entire programs
   - `verify_program_pair()`: Main verification entry point
@@ -444,7 +444,7 @@ TEST 1: SYMBOLIC VERIFICATION (FORMAL PROOF)
 ======================================================================
 
 === Logical Semantics Verification of ADD ===
-Proving: ∀ a, b ∈ Uint256. x86_ADD(a, b) refines EVM_ADD(a, b)
+Proving: ∀ a, b ∈ Uint256. x86_ADD(a, b) ≡ EVM_ADD(a, b)
 
 [1] Building EVM ADD logical semantics...
     EVM input 1: Uint256(z0=evm_val1_z0, z1=evm_val1_z1, ...)
@@ -456,16 +456,15 @@ Proving: ∀ a, b ∈ Uint256. x86_ADD(a, b) refines EVM_ADD(a, b)
     x86 semantic formula: composed from instruction sequence
       (MOV/ADD/ADC chain with carry propagation)
 
-[3] Checking refinement relation with Z3...
-    Verifying: x86 refines EVM (x86_result = EVM_result for all inputs)
+[3] Checking semantic equivalence with Z3...
+    Verifying: x86 ≡ EVM (x86_result = EVM_result for all inputs)
     Asserting: x86_result ≠ EVM_result
-    If UNSAT, then refinement holds (proven!)
+    If UNSAT, then equivalence holds (proven!)
 
-✓ VERIFIED: x86 refines EVM (semantically equivalent for all inputs)
+✓ VERIFIED: x86 ≡ EVM (semantically equivalent for all inputs)
 
 This is a FORMAL PROOF that:
-  ∀ a, b ∈ Uint256. x86_ADD(a, b) refines EVM_ADD(a, b)
-  (For deterministic ADD, refinement = equivalence)
+  ∀ a, b ∈ Uint256. x86_ADD(a, b) ≡ EVM_ADD(a, b)
 ```
 
 ## Key Design Decisions

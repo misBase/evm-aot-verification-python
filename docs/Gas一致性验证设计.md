@@ -119,12 +119,12 @@ GasCheck.FIXED_BUDGET or FULL to close that gap]
 
 ## 4. 比较语义
 
-`verification/refinement_gas.py::GasEquivalenceChecks`（与 storage/transient 检查平级，
-组合注入 `RefinementChecker` / `PathRefinementChecks` / `RefinementOutputChecks`）：
+`verification/equivalence_gas.py::GasEquivalenceChecks`（与 storage/transient 检查平级，
+组合注入 `EquivalenceChecker` / `PathEquivalenceChecks` / `OutputEquivalenceChecks`）：
 
 - 反例查询 `evm_gas != x86_gas`，`UNSAT` → 等价；`SAT` → 反例；`UNKNOWN` → **fail-closed**。
 - **任一侧或两侧缺 gas 观测都 fail-closed**。走到这个 checker 就意味着 gas 检查已启用
-  （`check_gas=False` 时 `_gas is None`，`RefinementOutputChecks` 直接跳过），所以"两侧
+  （`check_gas=False` 时 `_gas is None`，`OutputEquivalenceChecks` 直接跳过），所以"两侧
   都没有"不是"本次没建模 gas"，而是观测本该有却丢了——`_PATH_RESULT_KEYS` 漏键、并行
   worker 跨 Context 翻译丢失、aggregate fallback 掉字段，全是假绿路径。曾经这里是
   "两侧都无就 skip 成通过"。`PathObservation.gas` 另有必填约束，杜绝生产者静默省略。
@@ -134,7 +134,7 @@ GasCheck.FIXED_BUDGET or FULL to close that gap]
 - 注入 `add_div_bridges`：两侧内存扩展二次项都含 128-bit UDiv，AST 形状不同，直接比较
   会 bit-blast 到 unknown。
 
-status code 一致性**不在本模块**：由 `refinement_outputs._check_status_code_with_solver`
+status code 一致性**不在本模块**：由 `equivalence_outputs._check_status_code_with_solver`
 比较 EVM `error_code` 与 x86 `callengine_status_code`。
 
 ## 5. 静态 gas
@@ -701,7 +701,7 @@ TIMEOUT 失败而非假绿。
 | `evm_ir/semantics.py` | 各 opcode 的扣费点次序（CREATE 系的 add→fee→host→sub 四段） |
 | `evm_ir/cfg_executor.py` | block 入口静态 gas、TAG 守卫内的 OOG 分叉 |
 | `verification/program_verifier.py` | `GasCheck` 模式、allowlist 范围守卫、结论范围标注 |
-| `verification/refinement_gas.py` | gas 终值等价检查 |
+| `verification/equivalence_gas.py` | gas 终值等价检查 |
 | `x86_64/go_function_semantics.py` | builtin memory grow、x86 侧 host gas UF 注入 |
 | `tests/data/README.md` | gas fixture 用法、GOARCH 陷阱与覆盖点，绑定上游 commit |
 

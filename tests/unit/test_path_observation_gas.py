@@ -30,7 +30,7 @@ def test_gas_in_observation_keys():
 def test_gas_is_required_not_defaulted():
     """gas 必填：漏传在构造处就 TypeError，不会漂到 gas 检查里变成静默 skip。
 
-    与 status_code 同规格。给默认值会让漏传的 producer 一路静默到 refinement
+    与 status_code 同规格。给默认值会让漏传的 producer 一路静默到等价性检查
     检查——两侧都缺 gas 时检查直接跳过，那是假绿。
     """
     base = dict(

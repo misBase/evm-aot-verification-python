@@ -10,7 +10,7 @@ Use Poetry consistently; do not mix Python environments.
 poetry install
 poetry run python main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose]
 poetry run pytest
-poetry run pytest tests/integration/test_refinement_checker.py
+poetry run pytest tests/integration/test_equivalence_checker.py
 ```
 
 ## Key External Projects

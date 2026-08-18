@@ -1,4 +1,4 @@
-"""单指令 EVM/x86 微精化测试辅助工具。"""
+"""单指令 EVM/x86 微等价性测试辅助工具。"""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ from state.evm_stack_state import EVMStackState
 from state.smt_state import MemoryDomain, PointerTag, SMTState
 
 # 单指令桩的 gas 起点：远大于任何单指令的动态 fee（最大的内存扩展 fee 也只有几十），
-# 与 test_single_ins_refinement.X86_CONTROL_FLOW_INITIAL_GAS 取同一量级。
+# 与 test_single_ins_equivalence.X86_CONTROL_FLOW_INITIAL_GAS 取同一量级。
 _STUB_INITIAL_GAS = 100_000
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register
@@ -80,7 +80,7 @@ _CALLENGINE_LIMB_ATTRS = {
 
 
 @dataclass(frozen=True)
-class InstructionRefinementCase:
+class InstructionEquivalenceCase:
     """一条 EVM opcode 及其 x86 核心实现。
 
     默认把 case 视为纯栈运算：输入是 256-bit 栈值，输出写回第一个操作数槽。
@@ -128,7 +128,7 @@ class InstructionRefinementCase:
     compare_gas: bool = False
 
 
-def assert_instruction_refines(case: InstructionRefinementCase) -> None:
+def assert_instruction_equivalent(case: InstructionEquivalenceCase) -> None:
     """证明一条 EVM 操作和对应 x86 核心产生相同的可观测效果。
 
     纯结果模式用于 AOT 纯栈计算：操作数是 256-bit 栈值，x86 片段把一个
@@ -155,8 +155,8 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
     # 路径（限制输入空间的）assumption 会越界约束 sibling 路径、藏住其真实 mismatch。
     assumption_states = []
     if not requires_state_comparison:
-        evm_result = _normalize_refinement_bv(_build_evm_result(case, operands))
-        x86_result = _normalize_refinement_bv(
+        evm_result = _normalize_equivalence_bv(_build_evm_result(case, operands))
+        x86_result = _normalize_equivalence_bv(
             _build_x86_result(case, operands, memory_words, readonly_words)
         )
         mismatches = [evm_result != x86_result]
@@ -179,7 +179,7 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
             mismatches = _state_observation_mismatches(case, evm_state, x86_state)
 
     if not mismatches:
-        raise AssertionError(f"{case.name} micro-refinement has no observable checks")
+        raise AssertionError(f"{case.name} micro-equivalence has no observable checks")
 
     assumptions = list(_collect_state_assumptions(assumption_states))
 
@@ -189,14 +189,14 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
     # 155s unknown，逐路径各自秒级~十几秒 unsat）。非 terminal-paths 模式只有少量 mismatch
     # 项，逐项与单 Or 行为一致。
     for mismatch in mismatches:
-        solver = _make_refinement_solver(case)
+        solver = _make_equivalence_solver(case)
         solver.set(timeout=case.solver_timeout_ms)
         for assumption in assumptions:
             solver.add(assumption)
         solver.add(mismatch)
         result = solver.check()
         assert result == unsat, (
-            f"{case.name} micro-refinement failed: "
+            f"{case.name} micro-equivalence failed: "
             f"opcode={case.evm_kind}, base_addr=0x{case.base_addr:x}, "
             f"execution_mode={case.x86_execution_mode}, "
             f"compare_terminal_paths={case.x86_compare_terminal_paths}, "
@@ -204,7 +204,7 @@ def assert_instruction_refines(case: InstructionRefinementCase) -> None:
         )
 
 
-def _make_refinement_solver(case: InstructionRefinementCase):
+def _make_equivalence_solver(case: InstructionEquivalenceCase):
     """构造求解器。terminal-paths 模式用显式 tactic 链，否则用默认 Solver。
 
     SDIV/SMOD 的取负+借位链+holiman 分段 ITE 公式，让 Z3 默认 (smt) 策略在纯
@@ -217,8 +217,8 @@ def _make_refinement_solver(case: InstructionRefinementCase):
 
     NOTE 与生产路径的差异：这里比较的是**裸栈值** `evm_stack[i] != x86_val`，QF_AUFBV
     单独搞不定 SMOD 的取负/ITE（实测 281s 仍有 fail），故需此 bit-blast tactic。生产
-    refinement（verification/）比较的是经 Store/Select 包裹的 memory/storage array 值，
-    QF_AUFBV 的数组理论会先把 Select(Store(...)) 化简，配合 _RefinementContext.add_div_bridges
+    等价性检查（verification/）比较的是经 Store/Select 包裹的 memory/storage array 值，
+    QF_AUFBV 的数组理论会先把 Select(Store(...)) 化简，配合 _EquivalenceContext.add_div_bridges
     注入同一桥接即可秒解（实测 SMOD 早退路径 1.3s），无需此 tactic。两侧差异源于比较表达式
     形态不同，不是重复造轮子。
     """
@@ -233,7 +233,7 @@ def _make_refinement_solver(case: InstructionRefinementCase):
     return Solver()
 
 
-def _normalize_refinement_bv(expr):
+def _normalize_equivalence_bv(expr):
     """把按 byte 存取绕回来的表达式折叠回 word 级表达式。"""
     # x86 侧的 256-bit 值经 byte-array memory store/load 后，常会变成
     # Concat(If(c, 0, Extract(byte, x)), ...)。这里仅把这种严格连续、
@@ -309,7 +309,7 @@ def _try_fold_bytewise_zero_ite_concat(parts):
     return If(condition, BitVecVal(0, total_size), Extract(high, next_low, source))
 
 
-def _operands(case: InstructionRefinementCase) -> list[Uint256]:
+def _operands(case: InstructionEquivalenceCase) -> list[Uint256]:
     if not 0 <= case.arity <= _MAX_SUPPORTED_ARITY:
         raise ValueError(
             f"{case.name}: arity must be between 0 and "
@@ -327,14 +327,14 @@ def _operands(case: InstructionRefinementCase) -> list[Uint256]:
     ]
 
 
-def _symbolic_memory_words(case: InstructionRefinementCase) -> list[Uint256]:
+def _symbolic_memory_words(case: InstructionEquivalenceCase) -> list[Uint256]:
     return [
         Uint256.symbolic(f"{case.name.lower()}_mem{i}")
         for i, _ in enumerate(case.initial_memory_word_offsets)
     ]
 
 
-def _symbolic_readonly_words(case: InstructionRefinementCase) -> dict[str, list[Uint256]]:
+def _symbolic_readonly_words(case: InstructionEquivalenceCase) -> dict[str, list[Uint256]]:
     return {
         "calldata": [
             Uint256.symbolic(f"{case.name.lower()}_calldata{i}")
@@ -528,7 +528,7 @@ def _rewrite_large_bv_ites_under_path(expr, path_conjuncts, oracle, cache):
     return expr
 
 
-def _build_evm_result(case: InstructionRefinementCase, operands: list[Uint256]):
+def _build_evm_result(case: InstructionEquivalenceCase, operands: list[Uint256]):
     op = _evm_operator(case)
     indices = case.evm_operand_indices or tuple(range(case.arity))
     if len(indices) != case.arity:
@@ -606,7 +606,7 @@ def _consume_pending_errors(state: SMTState) -> SMTState:
 
 
 def _build_evm_initial_state(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     operands: list[Uint256],
     memory_words: list[Uint256],
     readonly_words: dict[str, list[Uint256]],
@@ -644,7 +644,7 @@ def _build_evm_initial_state(
 
 
 def _build_evm_final_state(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     operands: list[Uint256],
     memory_words: list[Uint256],
     readonly_words: dict[str, list[Uint256]],
@@ -661,7 +661,7 @@ def _extract_evm_stack_outputs(final_state: SMTState, expected_stack_height: int
 
 
 def _build_x86_result(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     operands: list[Uint256],
     memory_words: list[Uint256],
     readonly_words: dict[str, list[Uint256]],
@@ -671,7 +671,7 @@ def _build_x86_result(
 
 
 def _build_x86_final_state(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     operands: list[Uint256],
     memory_words: list[Uint256],
     readonly_words: dict[str, list[Uint256]],
@@ -682,7 +682,7 @@ def _build_x86_final_state(
 
 
 def _build_x86_final_global_states(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     operands: list[Uint256],
     memory_words: list[Uint256],
     readonly_words: dict[str, list[Uint256]],
@@ -713,7 +713,7 @@ def _build_aot_stack_memory(operands: list[Uint256]):
     return memory
 
 
-def _build_aot_evm_memory(case: InstructionRefinementCase, memory_words: list[Uint256]):
+def _build_aot_evm_memory(case: InstructionEquivalenceCase, memory_words: list[Uint256]):
     memory = {}
     for offset, word in zip(case.initial_memory_word_offsets, memory_words, strict=True):
         value = word.to_bv256()
@@ -728,7 +728,7 @@ def _build_aot_evm_memory(case: InstructionRefinementCase, memory_words: list[Ui
 
 
 def _execute_x86_core(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     initial_memory,
     initial_evm_memory,
     readonly_words: dict[str, list[Uint256]],
@@ -746,7 +746,7 @@ def _execute_x86_core(
 
 
 def _build_x86_initial_state(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     initial_memory,
     initial_evm_memory,
     readonly_words: dict[str, list[Uint256]],
@@ -781,7 +781,7 @@ def _build_x86_initial_state(
 
 def _initialize_evm_readonly_sources(
     state: SMTState,
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     readonly_words: dict[str, list[Uint256]],
 ) -> None:
     state.calldata = _store_words_in_byte_array(
@@ -807,7 +807,7 @@ def _initialize_evm_readonly_sources(
         state.callengine_return_data_size_bytes = BitVecVal(case.return_data_size_bytes, 64)
 
 
-def _initialize_evm_context_values(state: SMTState, case: InstructionRefinementCase) -> None:
+def _initialize_evm_context_values(state: SMTState, case: InstructionEquivalenceCase) -> None:
     for field_name, value in case.evm_context_values:
         if field_name == "gas":
             state.evm_gas.Gas = BitVecVal(value, 64)
@@ -819,7 +819,7 @@ def _initialize_evm_context_values(state: SMTState, case: InstructionRefinementC
 
 def _initialize_x86_readonly_sources(
     state: SMTState,
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     readonly_words: dict[str, list[Uint256]],
 ) -> None:
     state.calldata = _store_words_in_byte_array(
@@ -856,7 +856,7 @@ def _initialize_x86_readonly_sources(
 
 def _initialize_x86_callengine_limb_values(
     state: SMTState,
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
 ) -> None:
     for offset, value in case.x86_callengine_limb_values:
         value_bv = BitVecVal(value, 64)
@@ -868,7 +868,7 @@ def _initialize_x86_callengine_limb_values(
 
 def _initialize_x86_stack_byte_values(
     state: SMTState,
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
 ) -> None:
     for offset, value in case.x86_stack_byte_values:
         state.x86_memory = state.x86_memory.store_byte(
@@ -878,7 +878,7 @@ def _initialize_x86_stack_byte_values(
         )
 
 
-def _initialize_calldata_size(state: SMTState, case: InstructionRefinementCase):
+def _initialize_calldata_size(state: SMTState, case: InstructionEquivalenceCase):
     """返回 EVM 视图和 x86 callEngine 视图共用的 calldata size。"""
     if case.calldata_size_bytes is None:
         return state.calldatasize
@@ -908,14 +908,14 @@ def _store_callengine_limb(state: SMTState, offset: int, value) -> None:
     )
 
 
-def _execute_x86_core_linear(case: InstructionRefinementCase, state: SMTState) -> SMTState:
+def _execute_x86_core_linear(case: InstructionEquivalenceCase, state: SMTState) -> SMTState:
     for instruction in disassemble_hex(case.x86_core_hex, base_addr=case.base_addr):
         state = instruction.to_z3(state)
 
     return state
 
 
-def _execute_x86_core_cfg(case: InstructionRefinementCase, state: SMTState) -> SMTState:
+def _execute_x86_core_cfg(case: InstructionEquivalenceCase, state: SMTState) -> SMTState:
     program = X86Program.from_hex(case.x86_core_hex, base_addr=case.base_addr)
     # 走 to_z3_paths 而非 to_z3，是为了拿到 coverage 证书：to_z3 在所有终止路径都被
     # depth 剪枝时会静默退化成 _empty_result（初始 state，EVM memory 全 0），让逐项检查
@@ -935,7 +935,7 @@ def _execute_x86_core_cfg(case: InstructionRefinementCase, state: SMTState) -> S
     return paths.merged_state
 
 
-def _execute_x86_core_cfg_global_states(case: InstructionRefinementCase, state: SMTState):
+def _execute_x86_core_cfg_global_states(case: InstructionEquivalenceCase, state: SMTState):
     program = X86Program.from_hex(case.x86_core_hex, base_addr=case.base_addr)
     paths = program.to_z3_paths(
         state,
@@ -950,7 +950,7 @@ def _execute_x86_core_cfg_global_states(case: InstructionRefinementCase, state: 
     return paths.global_states
 
 
-def _raise_no_terminal_paths(case: InstructionRefinementCase, coverage) -> None:
+def _raise_no_terminal_paths(case: InstructionEquivalenceCase, coverage) -> None:
     """终止路径为空时 fail-closed 报错，并区分 depth 剪枝与真不可达。
 
     coverage 不完整且含 depth-pruned，说明唯一的终止路径在走到 ret 前就被
@@ -976,7 +976,7 @@ def _raise_no_terminal_paths(case: InstructionRefinementCase, coverage) -> None:
 
 
 def _state_observation_mismatches(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     evm_state: SMTState,
     x86_state: SMTState,
 ):
@@ -1008,7 +1008,7 @@ def _state_observation_mismatches(
 
 
 def _path_observation_mismatches(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     evm_state: SMTState,
     x86_global_states,
 ):
@@ -1104,7 +1104,7 @@ def _path_observation_mismatches(
     return mismatches
 
 
-def _memory_mismatches(case: InstructionRefinementCase, evm_state: SMTState, x86_state: SMTState):
+def _memory_mismatches(case: InstructionEquivalenceCase, evm_state: SMTState, x86_state: SMTState):
     return [
         Select(evm_state.evm_memory.Memory, BitVecVal(offset, 64))
         != x86_state.x86_memory.load_byte(BitVecVal(offset, 64), domain=MemoryDomain.EVM)
@@ -1112,7 +1112,7 @@ def _memory_mismatches(case: InstructionRefinementCase, evm_state: SMTState, x86
     ]
 
 
-def _storage_mismatches(case: InstructionRefinementCase, evm_state: SMTState, x86_state: SMTState):
+def _storage_mismatches(case: InstructionEquivalenceCase, evm_state: SMTState, x86_state: SMTState):
     return [
         evm_state.evm_storage.sload(BitVecVal(key, 256))
         != x86_state.evm_storage.sload(BitVecVal(key, 256))
@@ -1121,7 +1121,7 @@ def _storage_mismatches(case: InstructionRefinementCase, evm_state: SMTState, x8
 
 
 def _transient_storage_mismatches(
-    case: InstructionRefinementCase,
+    case: InstructionEquivalenceCase,
     evm_state: SMTState,
     x86_state: SMTState,
 ):
@@ -1132,7 +1132,7 @@ def _transient_storage_mismatches(
     ]
 
 
-def _evm_operator(case: InstructionRefinementCase) -> EvmOperator:
+def _evm_operator(case: InstructionEquivalenceCase) -> EvmOperator:
     return EvmOperator(
         kind=case.evm_kind,
         pc=case.evm_pc,

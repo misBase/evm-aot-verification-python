@@ -2,7 +2,7 @@ from z3 import BitVecVal, Solver, unsat
 
 from common.uint256 import Uint256
 from state.smt_state import MemoryDomain, SMTState
-from tests.integration.test_single_ins_refinement import X86_MUL_CORE_HEX_SEQUENCE
+from tests.integration.test_single_ins_equivalence import X86_MUL_CORE_HEX_SEQUENCE
 from x86_64.cfg import identify_basic_blocks
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register

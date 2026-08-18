@@ -47,7 +47,7 @@ from z3 import (
 
 
 def _make_solver(timeout_ms: int):
-    """归纳查询统一用 QF_AUFBV（对齐 refinement_context 与 div_bridge 先例：
+    """归纳查询统一用 QF_AUFBV（对齐 equivalence_context 与 div_bridge 先例：
     复杂 Store/Select 公式在默认 Solver 下容易 unknown）。"""
     solver = SolverFor("QF_AUFBV")
     solver.set("timeout", timeout_ms)

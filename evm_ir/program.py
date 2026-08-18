@@ -145,7 +145,7 @@ class EVMProgram:
 
         # 收集各终止路径在执行中累积的 SMTState.assumptions（CALLDATALOAD 等
         # 处追加的 hi-192==0 之类无损先验），合并到 merged_state.assumptions
-        # 供 program_verifier 取出后注入 refinement solver。
+        # 供 program_verifier 取出后注入 等价性检查 solver。
         collected = list(getattr(state, 'assumptions', None) or [])
         for gstate in final_global_states:
             for a in (getattr(gstate.mstate, 'assumptions', None) or []):
@@ -212,9 +212,9 @@ class EVMProgram:
         """Extract the observable result of one terminal EVM path.
 
         把 mstate.assumptions（CALLDATALOAD 处累积的 hi-192==0 等无损先验）
-        And 进 path condition，保证 path_observations 模式下的 refinement
+        And 进 path condition，保证 path_observations 模式下的等价性检查
         check 也看到这些 precondition——否则 drop 掉的 If(offset_overflow,...)
-        守卫会让 refinement 在 hi-192!=0 分支下 unsound（EVM 返 0，x86 返
+        守卫会让等价性检查在 hi-192!=0 分支下 unsound（EVM 返 0，x86 返
         byte-wrap 值，必定 SAT 反例）。
         """
         from z3 import And

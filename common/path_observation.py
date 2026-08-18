@@ -31,7 +31,7 @@ class PathObservation:
     transient_storage: Any
     # status_code 与 gas 都**不给默认值**：值可以是 None（表示本次运行没建模它），
     # 但那必须是显式表态，不能是 producer 忘了传。有默认值时漏传会一路静默漂到
-    # refinement 检查里变成 skip = 假绿；无默认值则在构造处就 TypeError。
+    # 等价性检查里变成 skip = 假绿；无默认值则在构造处就 TypeError。
     # gas 来源：EVM 侧 evm_gas.Gas / x86 侧 callengine_gas_remaining。
     status_code: Any
     gas: Any
@@ -48,7 +48,7 @@ class PathObservation:
         return getattr(self, key)
 
     def as_dict(self) -> dict[str, Any]:
-        """返回 ``RefinementChecker`` 仍在使用的旧 dict 形状。"""
+        """返回 ``EquivalenceChecker`` 仍在使用的旧 dict 形状。"""
         return {
             "condition": self.condition,
             "offset": self.offset,

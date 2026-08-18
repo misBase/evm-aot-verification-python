@@ -1,6 +1,6 @@
-"""Shared infrastructure for refinement sub-checks.
+"""Shared infrastructure for equivalence sub-checks.
 
-``_RefinementContext`` 持有所有 refinement check 共用的状态（solver、预算、
+``_EquivalenceContext`` 持有所有 等价性检查共用的状态（solver、预算、
 verbose、tuning、oracle 缓存）以及消息格式化、求解器预算管理和日志 helper。
 
 三个 check 类（storage / outputs / paths）通过组合持有同一个 context 实例，
@@ -18,11 +18,11 @@ from z3 import SolverFor, set_option
 
 from common.div_bridge import verified_div_bridges
 
-from .refinement_tuning import _RefinementCheckTuning
+from .equivalence_tuning import _EquivalenceCheckTuning
 
 
-class _RefinementContext:
-    """三个 refinement check 类共享的状态与协作 helper。"""
+class _EquivalenceContext:
+    """三个 等价性检查类共享的状态与协作 helper。"""
 
     def __init__(
         self,
@@ -32,7 +32,7 @@ class _RefinementContext:
     ):
         self.timeout_ms = timeout_ms
         self.verbose = verbose
-        self.tuning = _RefinementCheckTuning.for_timeout(timeout_ms)
+        self.tuning = _EquivalenceCheckTuning.for_timeout(timeout_ms)
 
         # NOTE: Z3 set_option 是全局设置。这里显式在每个实例中设置，避免
         # 前一个 verbose=True 的测试污染后续 verbose=False 的测试。
@@ -63,10 +63,10 @@ class _RefinementContext:
     def unknown_message_for_solver(solver, timeout_ms: int) -> str:
         reason = solver.reason_unknown()
         if reason == "timeout":
-            return _RefinementContext.timeout_message_for(timeout_ms)
+            return _EquivalenceContext.timeout_message_for(timeout_ms)
         if reason:
-            return f"? UNKNOWN: Solver could not determine refinement (reason: {reason})"
-        return "? UNKNOWN: Solver could not determine refinement"
+            return f"? UNKNOWN: Solver could not determine equivalence (reason: {reason})"
+        return "? UNKNOWN: Solver could not determine equivalence"
 
     def unknown_message(self) -> str:
         return self.unknown_message_for_solver(self.solver, self.timeout_ms)
@@ -82,7 +82,7 @@ class _RefinementContext:
         detail: str = "",
     ) -> str:
         msg = (
-            f"✗ COUNTEREXAMPLE FOUND: x86 does not refine EVM "
+            f"✗ COUNTEREXAMPLE FOUND: x86 ≢ EVM "
             f"({observable_name} differs)"
         )
         qualifiers = [part for part in (context, detail) if part]
@@ -118,7 +118,7 @@ class _RefinementContext:
         deadline: Optional[float],
         cap_ms: Optional[int],
     ) -> bool:
-        if not _RefinementContext.reset_solver_with_budget_for(solver, timeout_ms, deadline):
+        if not _EquivalenceContext.reset_solver_with_budget_for(solver, timeout_ms, deadline):
             return False
         if cap_ms is not None and cap_ms > 0:
             now = time.time()
@@ -134,7 +134,7 @@ class _RefinementContext:
         """重置共享求解器并为本次 check 设置剩余预算。"""
         return self.reset_solver_with_budget_for(self.solver, self.timeout_ms, deadline)
 
-    # --- SDIV/SMOD 除法桥接（refinement 提速，soundness 中性） ---
+    # --- SDIV/SMOD 除法桥接（等价性检查提速，soundness 中性） ---
 
     def add_div_bridges(
         self,

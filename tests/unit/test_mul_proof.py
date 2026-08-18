@@ -5,7 +5,7 @@ import dataclasses
 import pytest
 from z3 import BitVec, BitVecVal, unknown
 
-from tests.integration.test_single_ins_refinement import X86_MUL_CORE_HEX_SEQUENCE
+from tests.integration.test_single_ins_equivalence import X86_MUL_CORE_HEX_SEQUENCE
 from x86_64.cfg import identify_basic_blocks
 from x86_64.disassembler import disassemble_hex
 from x86_64.models import Register

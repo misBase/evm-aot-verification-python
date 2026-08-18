@@ -1,4 +1,4 @@
-"""回归测试：terminal-paths 单指令精化里 x86 path-local assumption 必须 path-guard。
+"""回归测试：terminal-paths 单指令等价性里 x86 path-local assumption 必须 path-guard。
 
 背景：x86 CFG 分叉后，每条终止路径有各自独立的 `mstate.assumptions`
 （分叉走 `X86GlobalState.__deepcopy__` → `mstate.copy()` 深拷贝 assumptions list）。
@@ -8,7 +8,7 @@
 （限制输入空间的）assumption 会越界约束 sibling 路径，把 sibling 路径在被排除输入区
 的真实 mismatch 藏成假绿。
 
-本测试用最小桩 monkeypatch 掉 EVM/x86 状态构建，跑真实的 `assert_instruction_refines`
+本测试用最小桩 monkeypatch 掉 EVM/x86 状态构建，跑真实的 `assert_instruction_equivalent`
 端到端装配（mismatch 收集 + assumption 注入 + solver 求解），复现并锁定该机制：
 
 构造（与已验证的 POC 同构）：
@@ -18,17 +18,17 @@
 - path B：condition Not(C)，无 assumption，且在被 A 的 assumption 排除的输入区
   （`Extract(255,64,sym)!=0`）存在 storage mismatch。
 
-正确行为：`assert_instruction_refines` 必须捕获 path B 的反例并抛 AssertionError。
+正确行为：`assert_instruction_equivalent` 必须捕获 path B 的反例并抛 AssertionError。
 旧的无条件全局实现会让 path A 的 `Extract(255,64,sym)==0` 越界，把这个反例藏掉
-→ `assert_instruction_refines` 不抛（假绿）。
+→ `assert_instruction_equivalent` 不抛（假绿）。
 """
 
 from z3 import BitVec, BitVecVal, Concat, Extract
 
-from tests.support import instruction_refinement
-from tests.support.instruction_refinement import (
-    InstructionRefinementCase,
-    assert_instruction_refines,
+from tests.support import instruction_equivalence
+from tests.support.instruction_equivalence import (
+    InstructionEquivalenceCase,
+    assert_instruction_equivalent,
 )
 
 
@@ -74,7 +74,7 @@ class _StubGlobalState:
 def _case():
     # storage_check_keys 触发 _storage_mismatches（requires_state_comparison=True）；
     # expected_stack_height=None 保证 evm_state 只经 storage 被访问（不碰栈/SP）。
-    return InstructionRefinementCase(
+    return InstructionEquivalenceCase(
         name="PATH_ASSUMPTION_GUARD",
         evm_kind="STOP",
         arity=0,
@@ -112,22 +112,22 @@ def test_path_local_assumption_does_not_leak_to_sibling_path(monkeypatch):
     )
 
     monkeypatch.setattr(
-        instruction_refinement,
+        instruction_equivalence,
         "_build_evm_final_state",
         lambda *a, **k: evm_state,
     )
     monkeypatch.setattr(
-        instruction_refinement,
+        instruction_equivalence,
         "_build_x86_final_global_states",
         lambda *a, **k: [path_a, path_b],
     )
 
     try:
-        assert_instruction_refines(case)
+        assert_instruction_equivalent(case)
     except AssertionError:
         return  # 正确：path B 的反例被捕获
 
     raise AssertionError(
         "path B 的真实 mismatch 被藏成假绿：path A 的 path-local 限制 assumption "
-        "越界约束了 sibling 路径，assert_instruction_refines 未能捕获反例。"
+        "越界约束了 sibling 路径，assert_instruction_equivalent 未能捕获反例。"
     )
