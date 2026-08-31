@@ -68,19 +68,9 @@ HOST_GAS_BUILTIN_KINDS = frozenset({
 # 所有需要 host-gas UF 兜底的指令。
 HOST_GAS_UF_KINDS = HOST_GAS_HOST_KINDS | HOST_GAS_BUILTIN_KINDS
 
-# 带 access-list 依赖的指令：UF 额外吃一个「调用序号」参数。
-#
-# 它们的 Go gas 函数读并**修改** access list，同参调用两次成本不同（SLOAD 首次
-# ColdSloadCostEIP2929=2100、之后 WarmStorageReadCostEIP2929=100）。Z3 的 Function
-# 同参必然同值，不带序号就只能表示 `(c, c)`，真实的 `(2100, 100)` 轨迹不在验证域内。
-#
-# ⚠️ seq 只是**调用事件的区分符**，不是 access list 的状态模型：它保证不同次调用*可以*
-# 取不同值，不表达"第一次必 cold"。详见 docs/Gas一致性验证设计.md §7.1。
-#
-# 收录判据是**该 opcode 的 AOT host 函数**是否读写 access list，逐条核对过 evm/host.go
-# （不是 gas_table.go，理由见下面上界表的警告）。不收的三个都不碰 access list：
-# SELFDESTRUCT（host.go:328 连 gas 都不扣）、EXP（engine_evm.go:785，纯函数）、
-# CREATE/CREATE2（host.go:361/398 只做 GetRemainingGas → gas−gas/64 → UseGas）。
+# cost 依赖 UF 实参之外状态的指令额外传入调用序号，避免同参调用被强制等价。
+# 当前隐藏依赖包括 access-list 状态和 gas ledger。seq 只区分调用事件，
+# 不建模隐藏状态及其与 cost 的函数关系；详见设计文档 §7.1。
 HOST_GAS_SEQ_KINDS = frozenset({
     "SLOAD",            # host.go:71   SlotInAccessList / AddSlotToAccessList
     "BALANCE",          # host.go:312 → gasCostWithEip2929AccountCheck host.go:880
@@ -96,6 +86,9 @@ HOST_GAS_SEQ_KINDS = frozenset({
     "CALLCODE",
     "DELEGATECALL",
     "STATICCALL",
+    # cost 依赖未包含在显式实参中的剩余 gas。
+    "CREATE",
+    "CREATE2",
 })
 
 # host-gas UF 的协议上界（64-bit gas）。值是 **host 动态部分**的最大可能值，不含已由
@@ -157,7 +150,8 @@ HOST_GAS_UPPER_BOUNDS: dict[str, int] = {
 #                累加三项：CallNewAccountGas(25000, protocol_params.go:43)、内存扩展
 #                (memoryGasCostCopy, host.go:847)、63/64 转发额度。头一项是常数，后两项
 #                无界——AOT 侧没有可见 fee 可减，内存二次项整个在 host 内。
-#   CREATE/CREATE2  host.go:361/398 只做 GetRemainingGas → gas − gas/64 → UseGas。
+#   CREATE/CREATE2  host.go:361/398 的 `gas − gas/64` 以运行时剩余 gas 为界，没有协议常量
+#                   可写（同一个 gas 依赖也是它们进 HOST_GAS_SEQ_KINDS 的理由）。
 HOST_GAS_UNBOUNDED_KINDS = HOST_GAS_UF_KINDS - frozenset(HOST_GAS_UPPER_BOUNDS)
 
 
@@ -211,8 +205,8 @@ def host_gas_uf(opcode: str, stack_args: Sequence[BitVecRef],
     # 函数符号——两侧都误用旧接口时照样相消，seq 静默失效而测试全绿。
     if opcode in HOST_GAS_SEQ_KINDS and seq is None:
         raise ValueError(
-            f"{opcode} 依赖 access list，host_gas_uf 必须带 seq（见 HOST_GAS_SEQ_KINDS）；"
-            "漏传会退化成一元 UF 并静默失去调用间的区分度"
+            f"{opcode} 的 cost 不是实参的纯函数，host_gas_uf 必须带 seq"
+            "（见 HOST_GAS_SEQ_KINDS）；漏传会退化成少一元的 UF 并静默失去调用间的区分度"
         )
     args = [_normalize_uf_arg(a) for a in stack_args]
     if seq is not None:

@@ -733,6 +733,58 @@ def test_x86_ret_invalid_has_no_return_data():
     assert solver.check() == sat, "x86 RET(INVALID) should not expose return data"
 
 
+def test_msize_returns_word_rounded_length():
+    """MSTORE8(0) 将 mem.Len() 扩展到 32，后续 MSIZE 必须返回 32。"""
+    from evm_ir.models import EVMBlock
+
+    block = EVMBlock(pc=0, stack_depth=0, min_depth=0, max_depth=1024,
+                     static_gas=0, is_jump_target=False,
+                     is_inner_block=False, is_stop=False)
+    state = SMTState.create_initial_state()
+
+    # MSTORE8(offset=0, value=0xab)：requested=1 → 1 word → mem.Len()=32
+    state.evm_stack = state.evm_stack.push(BitVecVal(0xab, 256))
+    state.evm_stack = state.evm_stack.push(BitVecVal(0, 256))
+    state = evm_operator_to_z3(EvmOperator(kind="MSTORE8", pc=0, block=block), state)
+    state.pending_errors = []
+    state.pending_constraints = []
+
+    assert simplify(state.evm_memory.MSize).eq(BitVecVal(32, 64)), (
+        "MSTORE8(0) 后 mem.Len() 应为 32（1 word），不是字节数 1"
+    )
+
+    state = evm_operator_to_z3(EvmOperator(kind="MSIZE", pc=1, block=block), state)
+    pushed, _ = state.evm_stack.pop()
+    assert simplify(pushed).eq(BitVecVal(32, 256)), (
+        "MSIZE 必须压 32；压 1 说明按字节记高水位的旧模型被改回来了"
+    )
+
+
+def test_zero_length_mcopy_does_not_grow_msize():
+    """MCOPY(dst=64, length=0) 不扩展内存，后续 MSIZE 必须返回 0。"""
+    from evm_ir.models import EVMBlock
+
+    block = EVMBlock(pc=0, stack_depth=0, min_depth=0, max_depth=1024,
+                     static_gas=0, is_jump_target=False,
+                     is_inner_block=False, is_stop=False)
+    state = SMTState.create_initial_state()
+
+    # 栈：length, srcOffset, memOffset(栈顶)
+    for value in (0, 0, 64):
+        state.evm_stack = state.evm_stack.push(BitVecVal(value, 256))
+    state = evm_operator_to_z3(EvmOperator(kind="MCOPY", pc=0, block=block), state)
+    state.pending_errors = []
+    state.pending_constraints = []
+
+    assert simplify(state.evm_memory.MSize).eq(BitVecVal(0, 64)), (
+        "MCOPY(dst=64, len=0) 不得扩内存；MSize=64 说明 charge_dynamic_gas 之外又有人写它"
+    )
+
+    state = evm_operator_to_z3(EvmOperator(kind="MSIZE", pc=1, block=block), state)
+    pushed, _ = state.evm_stack.pop()
+    assert simplify(pushed).eq(BitVecVal(0, 256)), "MSIZE 必须压 0"
+
+
 def test_mstore8_opcode():
     """测试MSTORE8写低8位 + 256位offset截断。"""
     op = EvmOperator(kind="MSTORE8", pc=0)
@@ -746,7 +798,8 @@ def test_mstore8_opcode():
 
     solver = Solver()
     solver.add(result_state.evm_memory.get_byte(BitVecVal(5, 64)) == BitVecVal(0x34, 8))
-    solver.add(result_state.evm_memory.MSize == BitVecVal(6, 64))
+    # MSize = mem.Len()，按 32 字节字取整：requested=6 → 1 word → 32
+    solver.add(result_state.evm_memory.MSize == BitVecVal(32, 64))
     assert solver.check() == sat
 
     # case2: 256位offset截断到64位
@@ -758,7 +811,8 @@ def test_mstore8_opcode():
 
     solver2 = Solver()
     solver2.add(result_state2.evm_memory.get_byte(BitVecVal(3, 64)) == BitVecVal(0xCD, 8))
-    solver2.add(result_state2.evm_memory.MSize == BitVecVal(4, 64))
+    # requested=4 → 1 word → 32
+    solver2.add(result_state2.evm_memory.MSize == BitVecVal(32, 64))
     assert solver2.check() == sat
 
 
@@ -781,7 +835,8 @@ def test_calldatacopy_zero_padding_and_stack_order():
     solver = Solver()
     solver.add(Select(result_state.evm_memory.Memory, BitVecVal(10, 64)) == BitVecVal(0xAA, 8))
     solver.add(Select(result_state.evm_memory.Memory, BitVecVal(11, 64)) == BitVecVal(0, 8))
-    solver.add(result_state.evm_memory.MSize == BitVecVal(12, 64))
+    # requested=10+2=12 → 1 word → 32
+    solver.add(result_state.evm_memory.MSize == BitVecVal(32, 64))
     assert solver.check() == sat
 
 
@@ -994,7 +1049,8 @@ def test_extcodecopy_symbolically_writes_memory():
     assert solver_outside.check() == unsat
 
     solver_msize = Solver()
-    solver_msize.add(result_state.evm_memory.MSize == BitVecVal(0x22, 64))
+    # requested=0x20+2=0x22 → 2 words → 0x40
+    solver_msize.add(result_state.evm_memory.MSize == BitVecVal(0x40, 64))
     assert solver_msize.check() == sat
 
 

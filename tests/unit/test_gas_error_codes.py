@@ -166,7 +166,7 @@ class TestChargeDynamicGasNormalPath:
             "E4 已把 gas 不足分叉出去，正常路径必须是纯减法（不再 If 钳零）"
         )
         assert not state.pending_errors
-        assert simplify(state.callengine_memory_size_bytes).eq(BitVecVal(32, 64))
+        assert simplify(state.evm_memory.MSize).eq(BitVecVal(32, 64))
         assert simplify(state.callengine_memory_gas_used).eq(BitVecVal(3, 64))
 
     def test_second_expansion_charges_delta_only(self):
@@ -188,7 +188,7 @@ class TestChargeDynamicGasNormalPath:
         solver.add(state.evm_gas.Gas != gas_before - BitVecVal(6, 64))
         assert solver.check() == unsat, "合计应扣 3 + (6-3) = 6"
         assert simplify(state.callengine_memory_gas_used).eq(BitVecVal(6, 64))
-        assert simplify(state.callengine_memory_size_bytes).eq(BitVecVal(64, 64))
+        assert simplify(state.evm_memory.MSize).eq(BitVecVal(64, 64))
 
     def test_word_fee_folded_into_total(self):
         """SHA3(offset=0, len=32) = memFee(3) + wordFee(1 word × Sha3WordGas 6)。"""
@@ -237,7 +237,8 @@ class TestGasStateEvolvesInAllModes:
             x86.callengine_builtin_arg0 = BitVecVal(rounded, 64)
             x86 = sem._handle_builtin_memory_grow(sp=0, mstate=x86)
 
-        assert simplify(ir.callengine_memory_size_bytes).eq(BitVecVal(64, 64))
+        # 两侧独立计算 mem.Len()，结果应一致。
+        assert simplify(ir.evm_memory.MSize).eq(BitVecVal(64, 64))
         assert simplify(x86.callengine_memory_size_bytes).eq(BitVecVal(64, 64)), (
             "x86 侧 memory size 必须与 IR 侧一致（不再 <<5）"
         )
@@ -589,7 +590,8 @@ class TestChargeDynamicGasE4:
         assert simplify(snapshot.callengine_memory_gas_used).eq(BitVecVal(3, 64)), (
             "lastGasCost 必须已更新"
         )
-        assert simplify(snapshot.callengine_memory_size_bytes).eq(BitVecVal(0, 64)), (
+        # callengine 字段不再由 IR 更新；断言它会使该检查失去作用。
+        assert simplify(snapshot.evm_memory.MSize).eq(BitVecVal(0, 64)), (
             "mem_size 必须未更新"
         )
 

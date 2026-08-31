@@ -160,12 +160,12 @@ def charge_memory_expansion_gas(state, requested_size_64):
     生产路径走 evm_ir.semantics_gas.charge_dynamic_gas（累加总额后判一次 OOG 并挂错误
     分支）；本函数只剩单测在用。
 
-    side-channel 字段语义：
-    - callengine_memory_size_bytes  = [R13+0x18] = mem.Len()（rounded byte size）
-    - callengine_memory_gas_used    = [R13+0x20] = mem.lastGasCost
+    字段语义（与生产路径同源，分层理由见 semantics_gas.charge_dynamic_gas）：
+    - evm_memory.MSize            = mem.Len()（rounded byte size）
+    - callengine_memory_gas_used  = mem.lastGasCost
 
     Args:
-        state: SMTState；就地更新 evm_gas 与两个 callengine 字段。
+        state: SMTState；就地更新 evm_gas、evm_memory.MSize 与 lastGasCost。
         requested_size_64: 64-bit BitVec，本次访问触及的最高字节+1。
 
     Returns:
@@ -178,12 +178,17 @@ def charge_memory_expansion_gas(state, requested_size_64):
     # 把同一边界建成了真实的 OUT_OF_GAS 终态分支。别在新代码里调用本函数。
     state.add_assumption(ULE(requested_size_64, BitVecVal(0x1FFFFFFFE0, 64)))
 
+    from state.evm_memory_state import EVMMemoryState
+
     fee, new_mem_size, new_last_gas = memory_expansion_fee(
-        state.callengine_memory_size_bytes,
+        state.evm_memory.MSize,
         state.callengine_memory_gas_used,
         requested_size_64,
     )
-    state.callengine_memory_size_bytes = new_mem_size
+    state.evm_memory = EVMMemoryState(
+        memory_array=state.evm_memory.Memory,
+        msize=new_mem_size,
+    )
     state.callengine_memory_gas_used = new_last_gas
     state.evm_gas = state.evm_gas.consume_dynamic(fee)
     return state

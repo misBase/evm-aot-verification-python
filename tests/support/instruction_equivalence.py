@@ -636,6 +636,7 @@ def _build_evm_initial_state(
             BitVecVal(offset, 64),
             word.to_bv256(),
         )
+    _initialize_evm_mem_len(state, case)
     _initialize_evm_readonly_sources(state, case, readonly_words)
     _initialize_evm_context_values(state, case)
     if case.evm_valid_jump_targets is not None:
@@ -852,6 +853,20 @@ def _initialize_x86_readonly_sources(
         size = BitVecVal(case.return_data_size_bytes, 64)
         state.callengine_return_data_size_bytes = size
         _store_callengine_limb(state, 0xB8, size)
+
+
+def _initialize_evm_mem_len(
+    state: SMTState,
+    case: InstructionEquivalenceCase,
+) -> None:
+    """用 x86 `[R13+0x18]` 的种子值初始化 IR 侧 mem.Len()。"""
+    for offset, value in case.x86_callengine_limb_values:
+        if offset != 0x18:
+            continue
+        state.evm_memory = EVMMemoryState(
+            memory_array=state.evm_memory.Memory,
+            msize=BitVecVal(value, 64),
+        )
 
 
 def _initialize_x86_callengine_limb_values(

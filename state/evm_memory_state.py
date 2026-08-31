@@ -10,7 +10,10 @@ class EVMMemoryState:
     """EVM内存状态表示。
 
     使用Z3 Array对EVM内存建模：Memory : Array[BitVec[64], BitVec[8]]
-    内存大小：MSize : BitVec[64]（跟踪最大访问地址）
+
+    MSize : BitVec[64] 建模 Go `Memory.Len()`；有效执行状态下按 32 字节取整。
+    opcode 正常执行路径上的扩展由 `semantics_gas.charge_dynamic_gas` 统一处理，
+    本类的原始读写方法只修改 Memory，不修改 MSize。
 
     注意：虽然EVM理论上支持256位地址，但在实践中
     AOT编译的代码使用64位地址，实际的EVM程序从不
@@ -32,7 +35,7 @@ class EVMMemoryState:
         else:
             self.Memory = memory_array
 
-        # MSize : BitVec[64] - 跟踪最大访问地址（内存大小）
+        # MSize : BitVec[64] - mem.Len()（取整后的活跃内存长度）
         # 初始内存为空，因此 MSize 从 0 开始。
         if msize is None:
             self.MSize = BitVecVal(0, 64)
@@ -49,9 +52,9 @@ class EVMMemoryState:
             offset: 64位或256位BitVec内存偏移量（256位将被截断）
 
         Returns:
-            (256位值, 具有更新MSize的新状态)元组
+            (256位值, 新状态)元组。**MSize 不变**（见类 docstring）。
         """
-        from z3 import Concat, If, UGE, Extract as Z3Extract
+        from z3 import Concat, Extract as Z3Extract
 
         # 如果偏移量是256位，截断为64位（取低64位）
         if offset.size() == 256:
@@ -70,12 +73,7 @@ class EVMMemoryState:
         # 连接：[byte0|byte1|...|byte31] = 256位值
         value = Concat(*bytes_list)
 
-        # 更新MSize：MSize' = If(offset + 32 > MSize, offset + 32, MSize)
-        new_msize = If(UGE(offset + BitVecVal(32, 64), self.MSize),
-                       offset + BitVecVal(32, 64),
-                       self.MSize)
-
-        new_state = EVMMemoryState(memory_array=self.Memory, msize=new_msize)
+        new_state = EVMMemoryState(memory_array=self.Memory, msize=self.MSize)
         return value, new_state
 
     def store_256bit(self, offset: BitVec, value: BitVec) -> 'EVMMemoryState':
@@ -89,9 +87,9 @@ class EVMMemoryState:
             value: 要存储的256位BitVec值
 
         Returns:
-            具有更新Memory和MSize的新EVMMemoryState
+            具有更新 Memory 的新 EVMMemoryState。**MSize 不变**（见类 docstring）。
         """
-        from z3 import Extract, If, UGE, Extract as Z3Extract
+        from z3 import Extract, Extract as Z3Extract
 
         if value.size() != 256:
             raise ValueError(f"Value must be 256 bits, got {value.size()}")
@@ -111,12 +109,7 @@ class EVMMemoryState:
             byte_offset = offset + BitVecVal(i, 64)
             new_memory = Store(new_memory, byte_offset, byte_val)
 
-        # 更新MSize：MSize' = If(offset + 32 > MSize, offset + 32, MSize)
-        new_msize = If(UGE(offset + BitVecVal(32, 64), self.MSize),
-                       offset + BitVecVal(32, 64),
-                       self.MSize)
-
-        new_state = EVMMemoryState(memory_array=new_memory, msize=new_msize)
+        new_state = EVMMemoryState(memory_array=new_memory, msize=self.MSize)
         return new_state
 
     def get_byte(self, offset: BitVec) -> BitVec:
@@ -146,9 +139,9 @@ class EVMMemoryState:
             value: 8位BitVec值
 
         Returns:
-            具有更新Memory和MSize的新EVMMemoryState
+            具有更新 Memory 的新 EVMMemoryState。**MSize 不变**（见类 docstring）。
         """
-        from z3 import If, UGE, Extract as Z3Extract
+        from z3 import Extract as Z3Extract
 
         if value.size() != 8:
             raise ValueError(f"Memory byte must be 8 bits, got {value.size()}")
@@ -161,12 +154,7 @@ class EVMMemoryState:
 
         new_memory = Store(self.Memory, offset, value)
 
-        # 更新MSize：MSize' = If(offset + 1 > MSize, offset + 1, MSize)
-        new_msize = If(UGE(offset + BitVecVal(1, 64), self.MSize),
-                       offset + BitVecVal(1, 64),
-                       self.MSize)
-
-        new_state = EVMMemoryState(memory_array=new_memory, msize=new_msize)
+        new_state = EVMMemoryState(memory_array=new_memory, msize=self.MSize)
         return new_state
 
     def copy(self) -> 'EVMMemoryState':

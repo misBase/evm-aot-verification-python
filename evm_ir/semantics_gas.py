@@ -13,6 +13,7 @@ from z3 import And, BitVecVal, If, Not, UGT, ULT, is_false, simplify
 
 import state.evm_gas_state as gas_state
 from evm_ir.status_code import EvmStatusCode
+from state.evm_memory_state import EVMMemoryState
 from common.u64 import split_u64
 from state.smt_state import PendingErrorBranch
 
@@ -147,14 +148,18 @@ def charge_dynamic_gas(state, requested_64, mem_size_branches, extra_fees=()):
     `CompileRegisterToRegister(CMPQ, from, to)` 语义是 `from - to`，由
     makeSafeMulWithOverFlow:304、memoryGasCost:516、:548 三处注释交叉印证。
 
+    opcode 正常执行路径上的内存扩展在这里统一更新 MSize；原始内存读写只修改 Memory。
+
     Args:
-        state: SMTState；就地追加 pending_errors 并演化 gas/side-channel。
+        state: SMTState；就地追加 pending_errors 并演化 gas / MSize / lastGasCost。
         requested_64: 本次访问的 requested memory size（64-bit）。
         mem_size_branches: `calc_mem_size_64*` 返回的有序分支列表。
         extra_fees: 叠加在内存扩展之上的 word/log fee（64-bit BitVec 序列）。
     """
+    # mem.Len() 属于 EVM 可见内存状态；lastGasCost 是内存扩展的内部记账，
+    # 后续扩展会读取它以计算增量费用。
     fee, new_mem_size, new_last_gas = gas_state.memory_expansion_fee(
-        state.callengine_memory_size_bytes,
+        state.evm_memory.MSize,
         state.callengine_memory_gas_used,
         requested_64,
     )
@@ -201,7 +206,12 @@ def charge_dynamic_gas(state, requested_64, mem_size_branches, extra_fees=()):
                                terminal_state=e4_snapshot)
         )
 
-    state.callengine_memory_size_bytes = new_mem_size
+    # new_mem_size 已按字取整。必须在错误分支快照之后更新，
+    # 使错误终态保留扩展前的 mem.Len()。
+    state.evm_memory = EVMMemoryState(
+        memory_array=state.evm_memory.Memory,
+        msize=new_mem_size,
+    )
     state.callengine_memory_gas_used = new_last_gas
     state.evm_gas = gas_state.EVMGasState(initial_gas=state.evm_gas.Gas - total_fee)
     return state

@@ -61,7 +61,11 @@ def _write_call_return_data(memory_state: EVMMemoryState,
                             return_byte_fn,
                             effect_id: int,
                             should_copy=None) -> EVMMemoryState:
-    """Apply symbolic call return-data writes to EVM memory."""
+    """Apply symbolic call return-data writes without changing MSize.
+
+    当前模型不包含 host 内部的 CALL 内存扩展，因此两侧均保持 MSize；
+    将 host 内存副作用纳入验证时必须同步更新这里。
+    """
     return _write_symbolic_memory_slice(
         memory_state,
         ret_offset_bv,
@@ -78,7 +82,10 @@ def _write_symbolic_memory_slice(memory_state: EVMMemoryState,
                                  byte_fn,
                                  effect_tag: str,
                                  should_copy=None) -> EVMMemoryState:
-    """Apply a symbolic byte slice write to EVM memory."""
+    """Apply a symbolic byte-slice write while preserving MSize.
+
+    内存扩展由调用方负责建模。
+    """
     dest_offset_64 = truncate_to_64(dest_offset_bv)
     size_64 = truncate_to_64(size_bv)
     zero_64 = BitVecVal(0, 64)
@@ -92,14 +99,7 @@ def _write_symbolic_memory_slice(memory_state: EVMMemoryState,
     write_cond = in_range if should_copy is None else And(should_copy, in_range)
     updated_memory = Lambda(idx, If(write_cond, byte_fn(relative), Select(memory_state.Memory, idx)))
 
-    end_offset = dest_offset_64 + size_64
-    grown_msize = If(
-        And(size_64 != zero_64, UGE(end_offset, memory_state.MSize)),
-        end_offset,
-        memory_state.MSize,
-    )
-    updated_msize = grown_msize if should_copy is None else If(should_copy, grown_msize, memory_state.MSize)
-    return EVMMemoryState(memory_array=updated_memory, msize=updated_msize)
+    return EVMMemoryState(memory_array=updated_memory, msize=memory_state.MSize)
 
 
 class EVMOperationSemantics:
@@ -1063,22 +1063,17 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # source/dest 较大者），copy word gas 用 length(CopyGas=3)。
         semantics_gas.charge_mcopy_gas(state, dst_offset_bv, src_offset_bv, length_bv)
 
-        dst_offset_64 = truncate_to_64(dst_offset_bv)
         src_offset_64 = truncate_to_64(src_offset_bv)
-        length_64 = truncate_to_64(length_bv)
         old_memory = state.evm_memory.Memory
 
+        # charge_mcopy_gas 已更新取整后的 MSize，并在 length == 0 时保持不变；
+        # 这里仅写入 Memory。
         state.evm_memory = _write_symbolic_memory_slice(
             state.evm_memory,
             dst_offset_bv,
             length_bv,
             lambda relative_index: Select(old_memory, src_offset_64 + relative_index),
             effect_tag=f"mcopy_idx_{op.pc}",
-        )
-        copied_end = dst_offset_64 + length_64
-        state.evm_memory = EVMMemoryState(
-            memory_array=state.evm_memory.Memory,
-            msize=If(UGE(copied_end, state.evm_memory.MSize), copied_end, state.evm_memory.MSize),
         )
         state.evm_stack = stack_after_pop3
         return state

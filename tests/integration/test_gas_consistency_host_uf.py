@@ -335,24 +335,29 @@ def test_host_gas_seq_kinds_is_locked():
     """锁定 HOST_GAS_SEQ_KINDS 的**精确**集合。
 
     `host_gas_uf` 的 fail-closed 守卫只拦「在集合里却漏传 seq」，拦不住反方向——某个
-    opcode 被移出后两侧都退回一元 UF、照样相消、测试全绿而序号静默失效。改这张表前先
-    回答：该 opcode 的 Go gas 函数依赖 access list 吗？依据见 host_gas.py 与设计文档 §7.1。"""
+    opcode 被移出后两侧都退回少一元的 UF、照样相消、测试全绿而序号静默失效。改这张表前
+    先回答：**该 opcode 的 cost 是 UF 实参的纯函数吗？** 不是就必须加 seq，不论非纯的来源
+    是 access list 还是 gas ledger。依据见 host_gas.py 与设计文档 §7.1。"""
     from state.host_gas import HOST_GAS_SEQ_KINDS, HOST_GAS_UF_KINDS
 
     assert HOST_GAS_SEQ_KINDS == frozenset({
-        # EIP-2929 冷热：gas 函数读写 access list
+        # 非纯来源之一：EIP-2929 冷热，gas 函数读写 access list
         "SLOAD", "SSTORE", "BALANCE",
         "EXTCODESIZE", "EXTCODEHASH", "EXTCODECOPY",
         "CALL", "CALLCODE", "DELEGATECALL", "STATICCALL",
-    }), "HOST_GAS_SEQ_KINDS 变了；确认新成员的 Go gas 函数真的依赖 access list"
+        # 非纯来源之二：cost 读 gas ledger 当前值（host.go Create/Create2 的 gas−gas/64）
+        "CREATE", "CREATE2",
+    }), "HOST_GAS_SEQ_KINDS 变了；确认新成员的 cost 真的不是实参的纯函数"
 
-    # 明确排除的三个，各有依据，别顺手加回来
-    assert "SELFDESTRUCT" not in HOST_GAS_SEQ_KINDS, "host.go:328 Suicide 连 gas 都不扣"
-    assert "EXP" not in HOST_GAS_SEQ_KINDS, "50*byteLen(exponent)+10 是纯函数"
+    # 排除的两个都确认过是纯函数，别顺手加回来
+    assert "SELFDESTRUCT" not in HOST_GAS_SEQ_KINDS, "host.go:328 Suicide 连 gas 都不扣，恒 0"
+    assert "EXP" not in HOST_GAS_SEQ_KINDS, "50*byteLen(exponent)+10 是 exponent 的纯函数"
+
+    # CREATE 系曾按旧判据被排除（确实不碰 access list，但 cost 依赖 gas ledger）。
+    # 单钉这条，防判据退回去。
     for kind in ("CREATE", "CREATE2"):
-        assert kind not in HOST_GAS_SEQ_KINDS, (
-            f"{kind} 不依赖 access list；它的隐藏依赖是 GetRemainingGas 的具体数值，"
-            "要靠 gas_before 进签名，序号不对症"
+        assert kind in HOST_GAS_SEQ_KINDS, (
+            f"{kind} 的 cost = gas − gas/64 不在实参里；不带 seq 就是强制两次同参调用等价"
         )
 
     # 序号集合必须是 UF 集合的子集——不在 UF 里的 opcode 压根不会走到取号那一步
@@ -375,6 +380,7 @@ def test_host_gas_seq_kinds_is_locked():
     "gas_create",            # 内存扩展 + InitCodeWordGas(2)，returnGas=0
     "gas_create_returngas",  # 同上但 returnGas=13：可见 fee 落在 add/sub 窗口内
     "gas_create2",           # word 常量是 InitCodeWordGas+Sha3WordGas(8)
+    "gas_create_same_args",  # 同实参 CREATE 两次：序号让两次 host UF 仍逐站点相消
     "gas_extcodecopy",       # calcMemSize64(Back(1),Back(3)) + CopyGas(3)
 ])
 @pytest.mark.parametrize("mode", [GasCheck.FIXED_BUDGET, GasCheck.FULL])
@@ -477,6 +483,71 @@ def test_create_tampered_return_gas_caught(monkeypatch):
 
     verified, msg = _verify("gas_create_returngas")
     assert not verified, "tampered CREATE returnGas must be caught"
+    assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
+    assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
+
+
+def test_create_ledger_trajectory_is_in_the_verification_domain():
+    """真实的 `(g−g/64, g₂−g₂/64)` 轨迹现在可满足——CREATE 加序号的直接证据。
+
+    同 test_cold_warm_trajectory_is_in_the_verification_domain，只是非纯来源换成 gas
+    ledger：host.go Create 的 `gas -= gas/64` 让第二次看到已被扣小的 ledger，两次成本
+    必然不同。带对照组坐实"改之前那条轨迹确实不可达"，而非 docstring 声称。"""
+    from z3 import BitVecSort, BitVecVal, Function, Solver, sat, unsat
+
+    from state.host_gas import host_gas_uf
+
+    # fixture gas_create_same_args 的两次 CREATE 实参完全相同
+    args = [BitVecVal(7, 256), BitVecVal(0x40, 256), BitVecVal(0x20, 256)]
+
+    # 一条具体的真实轨迹（g 取 1_000_000）：
+    g1 = 1_000_000
+    cost1 = g1 - g1 // 64            # 984375
+    g2 = g1 - cost1                  # 15625（可见 fee 略去，不影响 cost1 != cost2）
+    cost2 = g2 - g2 // 64            # 15381
+    assert cost1 != cost2, "取的 g 让两次成本恰好相等，换一个"
+
+    first = host_gas_uf("CREATE", args, BitVecVal(0, 256))
+    second = host_gas_uf("CREATE", args, BitVecVal(1, 256))
+    solver = Solver()
+    solver.add(first == BitVecVal(cost1, 64), second == BitVecVal(cost2, 64))
+    assert solver.check() == sat, (
+        "真实的 gas-ledger 轨迹必须在验证域内；UNSAT 说明 CREATE 的序号没生效"
+    )
+
+    # 对照（= 改之前的形态）：无序号时两次是同一个 term，不可能取两个不同的成本
+    ternary = Function(
+        "host_gas_create_unseq_control",
+        BitVecSort(256), BitVecSort(256), BitVecSort(256), BitVecSort(64),
+    )
+    control = Solver()
+    control.add(ternary(*args) == BitVecVal(cost1, 64),
+                ternary(*args) == BitVecVal(cost2, 64))
+    assert control.check() == unsat, (
+        "对照组必须 UNSAT，否则这条测试证明不了序号带来的差别"
+    )
+
+
+def test_tampered_x86_create_seq_offset_caught(monkeypatch):
+    """防假绿：**只**把 x86 侧 CREATE 的序号推快一格 → 不相消 → SAT。
+
+    正向用例全绿不排除序号根本没接进 CREATE 的签名（没接上时两侧同退三元 UF、照样相消）。
+    必须单侧篡改：双侧一起偏移仍相消。"""
+    from z3 import BitVecVal
+
+    import x86_64.go_function_semantics as gfs
+
+    orig = gfs.GoFunctionSemantics._deduct_host_gas_uf
+
+    def tampered(self, mstate, opcode, args):
+        if opcode == "CREATE":
+            cur = mstate.host_gas_seq.get(opcode, BitVecVal(0, 256))
+            mstate.host_gas_seq[opcode] = cur + BitVecVal(1, 256)
+        return orig(self, mstate, opcode, args)
+
+    monkeypatch.setattr(gfs.GoFunctionSemantics, "_deduct_host_gas_uf", tampered)
+    verified, msg = _verify("gas_create_same_args")
+    assert not verified, "x86 侧 CREATE 序号偏移必须被抓到"
     assert "COUNTEREXAMPLE FOUND" in msg, f"expected a counterexample, got: {msg}"
     assert "gas differs" in msg, f"expected the gas observable to differ, got: {msg}"
 

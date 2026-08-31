@@ -34,12 +34,14 @@ go-hpc-evm 真实编译产出：同一段 EVM 字节码同时导出 IR JSON 与 
 
 生成器 `TestGenGasFixtures` 是 go-hpc-evm 仓库 `evm/aot` 包内的 in-package 测试（依赖同包的 `registerBuiltinHostsInOrder` / `NewEnginEVM` / `engineEVM` / `dealWithEvmHostFunc`）。
 
-**它不是上游的 tracked 文件。** 2026-08-07 补 `gas_returndatacopy` / `gas_log0` / `gas_log4` 时发现 `evm/aot/` 下已经没有这个文件（全仓库 `grep TestGenGasFixtures` 零命中），当时按下面的接口重建了一份 `evm/aot/gen_gas_fixtures_test.go`，留在工作区未提交。所以**再生前先确认该文件是否还在**，不在就照下面重建。
+**它不是上游的 tracked 文件，而且反复消失**：2026-08-07 补 `gas_returndatacopy` / `gas_log0` / `gas_log4` 时是第一次（`grep TestGenGasFixtures` 全仓库零命中），2026-08-28 补 `gas_create_same_args` 时又一次。所以**再生前先确认该文件是否还在**，不在就照下面重建。
 
 重建时有两个必须踩对的点，都不会给出有意义的报错：
 
 1. **`MarshalJSON` 必须排在 `compileEvmFunction` 之后**（详见下一节第 2 条）。
-2. **`hostIndex` 要自己建**。它只在 `CompileEVM`（`engine_evm.go:305-320`）里构建，而生成器为了拿到 `irResult` 指针必须自己调 `ir.CompileEVM` + `compileEvmFunction`、绕过了它，结果是 host op 在 `setHostParam` 处报 `predefined host "log" is not registered`。照上游那段逐字复制即可（按预定义 catalog 而非 map 迭代，以固定 host id）。注意**非 host op 的 fixture 不受影响**，只生成 RETURNDATACOPY 这类指令时不会暴露，容易漏。
+2. **`hostIndex` 要自己建**。它只在 `CompileEVM`（`engine_evm.go:305` 起）里构建，而生成器为了拿到 `irResult` 指针必须自己调 `ir.CompileEVM` + `compileEvmFunction`、绕过了它，结果是 host op 在 `setHostParam` 处报 `predefined host "log" is not registered`。照上游那段逐字复制即可——遍历 `DefaultHostSpecs()` 这个预定义 catalog 而非 map，以固定 host id（in-package 的 `registerBuiltinHostsInOrder` 可直接复用来建 `EvmHosts`）。注意**非 host op 的 fixture 不受影响**，只生成 RETURNDATACOPY 这类指令时不会暴露，容易漏。
+
+**重建后先做一次自校验**：让生成器顺带重新生成一条**已 checked-in** 的 fixture（如 `gas_create`），与仓库里的 `.json`/`.hex` 逐字节比对。相同才说明重建版走的是与基线同一条 codegen 路径；不同就先查生成器，别急着拷贝新产物。校验通过后**只拷新增的那条**，不覆盖既有 fixture。
 
 **必须 `GOARCH=amd64`**：开发机是 darwin/arm64，直接 `go test` 会写进 ARM64 机器码，而 Python 侧用 x86 反汇编器读它，表现为乱码指令或 `ADD only supports 64-bit operands`，且**不会**有任何 arch 错误提示（这个坑真实发生过，fixture 被静默覆盖成 arm64）。交叉编译安全——生成器只导出 `codeSegment` bytes，从不执行编译产物。
 
@@ -58,7 +60,7 @@ for f in "$OUT"/*.hex; do printf '%s %s\n' "$(head -c 8 "$f")" "$f"; done
 
    取值时注意 **`calcMemSize64` 是 `offset + size`、对称**：offset/size 对调后内存扩展 fee 不变（`0x20+0x11` 与 `0x11+0x20` 同样是 2 words），槽位错误只能靠**非对称**费用项检出——LOG 的 `size*LogDataGas`、COPY 系的 `toWordSize(length)*CopyGas`。所以要挑能让这些项变号的值（`gas_log0` 的 `0x11*8=136` vs 对调后 `0x20*8=256`）。
 2. **IR 的 `MarshalJSON` 必须在 `compileEvmFunction` 之后**——后者原地填 host op 的 `Param` 为 host function index；先 marshal 会导出 `Param=0` 的残缺 IR，Python 侧解析出的 host 调用点全部错位。
-3. **要验 host-gas 调用序号就得用同一个 key/地址调两次**。`gas_two_sload` 读的是两个**不同** slot，两次调用本来就是不同 UF term，验不到序号机制；`gas_sload_same_key` 才是那条（同 slot 读两次 → 真实 cold 2100 然后 warm 100，见 `docs/Gas一致性验证设计.md` §7.1）。
+3. **要验 host-gas 调用序号就得用完全相同的实参调两次**。`gas_two_sload` 读的是两个**不同** slot，两次调用本来就是不同 UF term，验不到序号机制。真正管用的是同参重复：`gas_sload_same_key`（同 slot 读两次 → 真实 cold 2100 然后 warm 100）与 `gas_create_same_args`（同实参 CREATE 两次 → 真实成本因 `gas − gas/64` 递减而不同）。两者对应 §7.1 收录判据的两类非纯来源——判据是「cost 是否为 UF 实参的纯函数」，**不是**旧版的「碰不碰 access list」（CREATE 就是照旧判据漏掉的）。
 
 ### 2026-08-07 新增的三条
 
@@ -71,6 +73,10 @@ for f in "$OUT"/*.hex; do printf '%s %s\n' "$(head -c 8 "$f")" "$f"; done
 | `gas_log4` | topics=0x54/0x53/0x52/0x51, size=0x11, offset=0x20 | LOG n=4：topic gas 取最大值 |
 
 两个 LOG fixture 的价值不在 `LogTopicGas` 常量本身（`gas_log1` 已经在验），而在 **topic 数的读取链**：把 EVM 侧 n 写死成常量 1 这类错误在 n=1 上没有任何差别，`gas_log1` 结构上抓不到。配上 n=0/4 后 0/1/4 三点还能钉死 `gas = 常量 + n*TopicGas` 的线性关系。
+
+### 2026-08-28 新增的一条
+
+`gas_create_same_args`：`PUSH 0x20/0x40/0x07 → CREATE → POP` 重复两遍。两次实参**刻意完全相同**——这正是触发条件。CREATE 的 host cost 是 `gas − gas/64`，取决于 gas ledger 而非实参，不带调用序号时两次会折成同一个 UF term 被强制等价（详见 `docs/Gas一致性验证设计.md` §7.1 的判据更正）。第二次内存不再扩展，可见 fee 天然不同，host UF 是唯一被考察的量。
 
 `gas_returndatacopy` 一份 fixture 覆盖两条终止路径，靠 `SMTState.create_initial_state(return_data_size_bytes=...)` 切换：默认 0 时 length=4 必然越界（status 7 `ReturnDataOutOfBounds`），给 0x100 才走到正常复制后的 STOP（status 2）。两格都验 gas——x86 的 gas 前言（`impl_amd64.go:3124`）排在 `popUint256` 与越界 errPoint（`:3148`）**之前**，所以越界退出时 gas 也已经扣过了。
 

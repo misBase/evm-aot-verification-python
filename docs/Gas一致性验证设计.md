@@ -321,20 +321,28 @@ return params.WarmStorageReadCostEIP2929, nil   // 100
 - SSTORE 除序号外还吃 slot 的**写入前**值（`host.go:255` 的档位取决于 current 值）。
   两侧都必须在 `sstore` 之前取，写完再取只会拿回 `val` 本身。
 
-**收录判据**是「**该 opcode 的 AOT host 函数**是否读写 access list」，逐条核对过
-`evm/host.go`（不是 `gas_table.go`，理由见 §7.2 的警告）。明确**不收**的三个：
+**收录判据**是「**cost 是否为 UF 实参的纯函数**」——不是就必须加序号，不论非纯的来源
+是哪一种。逐条核对过 `evm/host.go` 与 `evm/aot/*`（不是 `gas_table.go`，理由见 §7.2 的
+警告）。目前见到两类非纯来源：
+
+| 非纯来源 | opcode | 依据 |
+| --- | --- | --- |
+| 读写 access list（EIP-2929 冷热） | SLOAD / SSTORE / BALANCE / EXTCODESIZE / EXTCODEHASH / EXTCODECOPY / CALL 四件套 | `host.go` 各自的 gas 函数，见 `HOST_GAS_SEQ_KINDS` 的逐条行号注释 |
+| 读 gas ledger 当前值 | CREATE / CREATE2 | `host.go:361/398` `GetRemainingGas → gas−gas/64 → UseGas`；gas 不在实参 `(value, offset, size[, salt])` 里 |
+
+明确**不收**的两个，都确认是纯函数：
 
 | opcode | 为什么不加 |
 | --- | --- |
-| SELFDESTRUCT | `host.go:328` `Suicide` 整个函数不扣 gas、不碰 access list |
+| SELFDESTRUCT | `host.go:328` `Suicide` 函数体只有 `return nil, nil`，恒 0 |
 | EXP | `engine_evm.go:785` `aotGasExpEIP158` 是 exponent 的纯函数，加序号只会丢掉「同参必同价」这条正确信息 |
-| CREATE / CREATE2 | `host.go:361/398` 只做 `GetRemainingGas → gas−gas/64 → UseGas`，全函数不碰 access list |
 
-**仍未覆盖的隐藏依赖**：CALL 系的 63/64 转发与 CREATE/CREATE2 的
-`GetRemainingGas`（`evm/host.go:369/406` 的 `gas -= gas/64`）取决于 gas 的**具体数值**
-而非调用次序，序号代理不了。要表达它们得把 `gas_before` 加进 UF 签名——那是独立的一件
-事，且**与「给 UF 加协议上界」不是同一件事**：加参数修的是 UF identity 缺 gas 状态，
-加上界（注入 `ULE(...)` 之类）才是剪枝，后者需要前者但不会由前者自动产生。
+> ⚠️ 旧判据「是否读写 access list」遗漏了 CREATE/CREATE2：它们的 cost 依赖 gas ledger，
+> 同参调用同样不能被强制等价。新增 host opcode 时应统一使用上述纯函数判据。
+
+**仍未覆盖的隐藏依赖**：序号只能区分调用事件，不能表达 CALL 系的 63/64 转发及
+CREATE/CREATE2 的 cost 与具体 gas 值之间的关系。完整建模需要把 `gas_before` 加入 UF
+签名；协议上界仅用于剪枝，不能替代这一关系。
 
 **强度边界的变化**：约束从「同参必同价」松成「同参 + 同次序必同价」。这是**放松**，
 方向安全（自由度只增不减），代价是不再断言"两次同参调用等价"。
@@ -520,14 +528,9 @@ poetry run pytest tests/unit/*gas* tests/integration/*gas* -q
   + word 常量 spy）与 **log0 / log4**（正向 + LOG4 的 TopicGas 篡改 + 「topic 数被当成
   常量 1」篡改 + n_topics 实参 spy）。后者是 topic 数**读取链**的唯一覆盖——n 被写死成
   常量 1 这类错误在 log1 上没有任何差别。
-- `test_gas_consistency_host_uf.py` — 13 类 host/builtin 正向 + 篡改 opcode 名 / 参数
-  次序 / 漏扣 x86 侧 / 篡改 returnGas + 并行正反向；另含 CREATE/CREATE2/EXTCODECOPY
-  这一组「可见 fee + host UF 混合」的正向（FIXED_BUDGET × FULL 双模式）、四条篡改
-  （InitCodeWordGas 2→9 / CREATE2 word 8→2 / copy word 3→9 / returnGas +1）与三条
-  **可达性**用例（见下）；调用序号（§7.1）另有 `gas_sload_same_key` 双模式正向、
-  cold/warm 轨迹可满足性（含一元 UF 对照组必须 UNSAT）、序号递增与 per-path 隔离、
-  x86 单侧序号偏移（workers 1/2 × enable_merge）、EVM 单侧序号冻结、
-  `HOST_GAS_SEQ_KINDS` 精确集合锁定，以及 SSTORE old_val 取错时机篡改。
+- `test_gas_consistency_host_uf.py` — host/builtin 正向与单侧篡改；CREATE/CREATE2/
+  EXTCODECOPY 的可见 fee + host UF 混合路径；同参 SLOAD/CREATE 的轨迹可达性、单侧序号
+  篡改、递增与 per-path 隔离，以及 `HOST_GAS_SEQ_KINDS` 精确集合锁定。
 - `test_host_gas_seq_merge.py` — 合流点分歧合并：一支执行过 SLOAD、一支没有时序号合成
   `If(cond,1,0)`，合流后两支继续各自递增；序号相同时折成常量（验 `simplify` 没漏）。
   这条路径**现有 fixture 覆盖不到**（实测 perf_erc20_lite 143 次合并只有 6 次多路径，

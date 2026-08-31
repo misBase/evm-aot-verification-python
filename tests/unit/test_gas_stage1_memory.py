@@ -126,8 +126,8 @@ class TestMemoryExpansionGasHelper:
         solver.add(UGE(gas_before, BitVecVal(1000, 64)))  # gas 充足
         solver.add(state.evm_gas.Gas != gas_before - BitVecVal(3, 64))
         assert solver.check() == unsat, "first 32B expansion should charge 3 gas"
-        # side-channel: memory size → 32, last_gas_cost → 3
-        assert simplify(state.callengine_memory_size_bytes).eq(BitVecVal(32, 64))
+        # bookkeeping: mem.Len() → 32, last_gas_cost → 3
+        assert simplify(state.evm_memory.MSize).eq(BitVecVal(32, 64))
         assert simplify(state.callengine_memory_gas_used).eq(BitVecVal(3, 64))
 
     def test_second_same_range_charges_zero(self):
