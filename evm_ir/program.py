@@ -81,16 +81,27 @@ class EVMProgram:
         strategy_cls: type = DFSStrategy,
         max_depth: int = 100,
         use_reachability_check: bool = True,
-    ) -> Tuple[List[GlobalState], PathCoverageCertificate]:
-        """Execute the EVM CFG, return terminal states and coverage certificate."""
+        stop_pcs: Optional[set] = None,
+    ) -> Tuple[List[GlobalState], PathCoverageCertificate, List[GlobalState]]:
+        """Execute the EVM CFG, return terminal states, coverage and cut states.
+
+        ``stop_pcs`` 非空时启用 cutpoint 截断（循环折叠，§4.7）：到达这些 pc 的
+        非入口状态不再展开，收进第三个返回值。**截断态不是 terminal path**，
+        调用方必须另行核对它们被证书覆盖。
+        """
         executor = SymbolicExecutor(
             blocks=self.blocks,
             strategy_cls=strategy_cls,
             max_depth=max_depth,
             use_reachability_check=use_reachability_check,
+            stop_pcs=stop_pcs,
         )
         final_states = executor.execute(state)
-        return final_states, executor.path_coverage_certificate()
+        return (
+            final_states,
+            executor.path_coverage_certificate(),
+            list(executor.cut_states),
+        )
 
     def to_z3(self, state: SMTState,
              strategy_cls: type = DFSStrategy,
@@ -116,7 +127,9 @@ class EVMProgram:
             - final_state: 程序执行后的最终SMT状态（从所有路径合并）
             - result_dict: 包含合并返回值的字典（offset, length, memory, has_return_data）
         """
-        final_global_states, coverage = self._execute_paths(
+        # merged 模式不支持 cutpoint 折叠：它把所有路径合并成一个公式，截断态
+        # 无处安放。折叠只在 path_observations 模式下可用（§4.7）。
+        final_global_states, coverage, _cut = self._execute_paths(
             state,
             strategy_cls=strategy_cls,
             max_depth=max_depth,
@@ -180,17 +193,23 @@ class EVMProgram:
         max_depth: int = 100,
         use_reachability_check: bool = True,
         merge_state: bool = False,
+        stop_pcs: Optional[set] = None,
     ) -> PathSemantics:
         """Build terminal path observations for the EVM program.
 
         Unlike ``to_z3()``, this keeps terminal paths separate and only builds a
         merged state when explicitly requested for debug-only stack checks.
+
+        ``stop_pcs``：cutpoint 截断集合（循环折叠，§4.7）。到达这些 pc 的状态
+        进 ``PathSemantics.cut_states`` 而不是 observations——它们由 Tier-1
+        证书覆盖，**调用方必须核对**(`loop_folding.verify_cut_coverage`)。
         """
-        final_global_states, coverage = self._execute_paths(
+        final_global_states, coverage, cut_states = self._execute_paths(
             state,
             strategy_cls=strategy_cls,
             max_depth=max_depth,
             use_reachability_check=use_reachability_check,
+            stop_pcs=stop_pcs,
         )
         observations = [
             self._path_observation(gstate)
@@ -206,6 +225,7 @@ class EVMProgram:
             observations=observations,
             merged_state=merged_state,
             coverage=coverage,
+            cut_states=cut_states,
         )
 
     def _path_observation(self, gstate: GlobalState) -> PathObservation:

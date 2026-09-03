@@ -6,6 +6,7 @@
 """
 
 import time
+from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple, Optional
 from evm_ir.program import EVMProgram
@@ -205,6 +206,36 @@ def _find_unsupported_dynamic_gas_ops(evm_program: EVMProgram) -> list[str]:
 # `ULT(budget, cost)` 在 simplify 阶段就折死，不必每个 block 一次可达性查询。
 
 
+# --- §6 结构守卫的 enforcement ---
+#
+# 判据本身在 verification/loop_pairing.analyze_program_pair 里（dynamic_unresolved 跳转、
+# 越表跳转目标、x86 静态不可解析跳转、无 Tier-1 配对且无 Tier-2 引理的 x86 循环、无 x86
+# 对应物的 EVM 循环）。这里只负责"跑不跑、跑砸了怎么办"，**不复制也不放宽任何判据**。
+
+@dataclass(frozen=True)
+class _LoopGuardOutcome:
+    """守卫的 enforcement 结果。
+
+    与 ``LoopGuardReport`` 的区别是这里带"是否启用"：守卫默认关闭，而关闭这件事
+    必须写进结论（``lines``），否则读者会把一条没查过循环结构的 VERIFIED 当成查过。
+    """
+
+    enforced: bool
+    #: 非 None ⇒ 验证必须失败（守卫拒绝，或守卫开着却分析不出结果）
+    failure: Optional[str]
+    #: 附到最终报告的声明行（结论范围 + LoopGuardReport.notes 这类信息性观察）
+    lines: list[str]
+
+
+# 守卫关闭时写进每条成功消息的声明。措辞要点：说清**没查什么**，而不是含糊地说"未启用"。
+_LOOP_GUARD_DISABLED_NOTICE = (
+    "  loop guard: NOT ENFORCED — the §6 structural guard was not run "
+    "(pass loop_guard=True). Unresolved JUMP/JUMPI, x86 jumps without static "
+    "targets, and x86 natural loops lacking a Tier-1 pair or a proven Tier-2 "
+    "lemma were NOT checked; this result asserts nothing about loop structure"
+)
+
+
 class ProgramEquivalenceChecker:
     """验证EVM和x86程序之间的等价性。"""
 
@@ -252,7 +283,9 @@ class ProgramEquivalenceChecker:
                            skip_feasibility: bool = False,
                            summary_config: Optional[X86SummaryConfig] = None,
                            x86_reachability_timeout_ms: Optional[int] = 50,
-                           max_depth: Optional[int] = None) -> Tuple[bool, Optional[str]]:
+                           max_depth: Optional[int] = None,
+                           loop_guard: bool = False,
+                           fold_loops: bool = False) -> Tuple[bool, Optional[str]]:
         """验证EVM程序和x86程序在语义上等价。
 
         默认使用旧的 merged-result 检查路径，保持原有 Alive2 风格的
@@ -282,6 +315,12 @@ class ProgramEquivalenceChecker:
                 两侧 to_z3/to_z3_paths 的默认值。大合约需要更深搜索时
                 （避免触发 coverage-incomplete）应显式传入更大的值，而不是
                 依赖全局默认值。
+            loop_guard: 是否 enforce §6 结构守卫（见 _evaluate_loop_guard）。
+                默认 **False**：守卫拒绝的形态（dynamic_unresolved 跳转、无 Tier-1
+                配对且无已证 Tier-2 引理的 x86 循环）现在只是"证不了"，而证书消费端
+                尚未落地，默认开会把一批本来靠有界展开 + coverage 证书正常通过的
+                合约变成拒验。关闭时**不静默**：每条成功消息都会带上
+                _LOOP_GUARD_DISABLED_NOTICE，声明循环结构未查。
 
         Returns:
             (verified, message)，如果程序等价则verified为True
@@ -419,6 +458,27 @@ class ProgramEquivalenceChecker:
             print(f"┌─ EVM Program: {evm_program}")
             print(f"└─ x86 Program: {x86_program}")
 
+        # §6 结构守卫：必须在**任何**路径枚举之前。下面两条分支都会立刻开始符号执行。
+        guard = self._evaluate_loop_guard(evm_program, x86_program, loop_guard)
+        if guard.failure is not None:
+            if self.verbose:
+                print(f"\n[0] Loop guard: {guard.failure}")
+            return False, guard.failure
+        if self.verbose:
+            for line in guard.lines:
+                print(f"\n[0]{line}")
+
+        if fold_loops and not path_observations:
+            # merged 模式把所有路径合成一个公式，cutpoint 截断态无处安放。
+            # 静默改走 path_observations 会让调用方以为自己验的还是 merged 语义，
+            # 所以这里直接拒绝而不是自动切换（对比上面 gas 那处：那是同一语义下
+            # 的等价重写，这里不是）。
+            return False, (
+                "✗ LOOP FOLDING UNSUPPORTED: fold_loops requires "
+                "path_observations=True; the merged-result path collapses every "
+                "path into one formula and has nowhere to put cut states"
+            )
+
         if path_observations:
             verified, message = self._verify_program_pair_path_observations(
                 evm_program,
@@ -432,8 +492,9 @@ class ProgramEquivalenceChecker:
                 summary_config=summary_config,
                 x86_reachability_timeout_ms=x86_reachability_timeout_ms,
                 max_depth=max_depth,
+                fold_loops=fold_loops,
             )
-            return verified, self._annotate_gas_scope(verified, message, gas_budget, evm_program)
+            return verified, self._finalize_message(verified, message, gas_budget, evm_program, guard)
 
         # 步骤1：公式构建 - EVM（两级路径感知）
         if self.verbose:
@@ -546,7 +607,7 @@ class ProgramEquivalenceChecker:
         if stack_check is None:
             if self.verbose:
                 print("\n[5] Skipping stack equivalence check (debug disabled).")
-            return verified, self._annotate_gas_scope(verified, message, gas_budget, evm_program)
+            return verified, self._finalize_message(verified, message, gas_budget, evm_program, guard)
 
         # 步骤5：栈一致性检查（调试用），使用独立 timeout budget
         if self.verbose:
@@ -574,27 +635,143 @@ class ProgramEquivalenceChecker:
                 f"({stack_check_timeout_ms} ms)"
             )
 
-        return verified, self._annotate_gas_scope(verified, message, gas_budget, evm_program)
+        return verified, self._finalize_message(verified, message, gas_budget, evm_program, guard)
+
+    @staticmethod
+    def _x86_static_blocks(x86_program: X86Program) -> list:
+        """取 x86 侧静态块表，口径与 ``X86Program.to_z3``/``to_z3_paths`` 逐字一致。
+
+        **不能只读 ``x86_program.blocks``**：``from_hex`` 构造的程序（生产与测试的
+        主用法）该字段恒为空，块表是执行时才由 ``identify_basic_blocks`` 现算的。
+        只读 blocks 会让守卫对这类程序永远"无块可查"，而"查不了就放行"正是 fail-open。
+        """
+        from x86_64.cfg import identify_basic_blocks
+
+        instructions = list(getattr(x86_program, "instructions", None) or [])
+        if not instructions:
+            for block in getattr(x86_program, "blocks", None) or []:
+                instructions.extend(block.instructions)
+        if not instructions:
+            return []
+        return list(identify_basic_blocks(instructions))
+
+    def _analyze_loop_guard(self, evm_program: EVMProgram,
+                            x86_program: X86Program):
+        """跑 §6 结构守卫分析，返回 ``LoopGuardReport``；两侧缺静态块表时返回 None。
+
+        诊断附注与 enforcement 共用这一个入口，**tier2_matcher 的传法只有这一处**：
+        两条路径若各自构造 matcher，一处忘了 ``require_proven_lemma`` 默认值就会出现
+        "附注说没问题、守卫说有问题"（或更糟，反过来）的错位。
+        """
+        from x86_64.loop_templates import make_tier2_matcher
+        from .loop_pairing import analyze_program_pair
+
+        x86_blocks = self._x86_static_blocks(x86_program)
+        evm_blocks = getattr(evm_program, "blocks", None) or []
+        if not x86_blocks or not evm_blocks:
+            return None
+        by_addr = {b.start_addr: b for b in x86_blocks}
+        return analyze_program_pair(
+            evm_blocks,
+            x86_blocks,
+            tier2_matcher=make_tier2_matcher(by_addr),
+        )
+
+    def _evaluate_loop_guard(self, evm_program: EVMProgram,
+                             x86_program: X86Program,
+                             enabled: bool) -> _LoopGuardOutcome:
+        """在**路径枚举之前**执行 §6 结构守卫（docs/循环处理增强方案.md §6）。
+
+        必须早于枚举，因为守卫的输出决定哪些循环头是 cutpoint、哪些 Tier 2 summary
+        可在执行期启用；枚举跑完再判等于让不该展开的循环先展开了一遍。
+
+        守卫开启后一切"分析不出结果"都算失败：拿不到静态块表、分析抛异常，都意味着
+        守卫判据根本没有机会作用，此时放行与守卫的目的正相反（fail-closed）。
+        """
+        if not enabled:
+            return _LoopGuardOutcome(
+                enforced=False, failure=None,
+                lines=[_LOOP_GUARD_DISABLED_NOTICE],
+            )
+
+        try:
+            report = self._analyze_loop_guard(evm_program, x86_program)
+        except Exception as exc:
+            return _LoopGuardOutcome(
+                enforced=True, lines=[],
+                failure=_format_verdict(
+                    "✗ LOOP GUARD UNAVAILABLE: the §6 structural guard is enabled but "
+                    "its analysis failed, so no loop structure was checked",
+                    [("error", f"{type(exc).__name__}: {exc}")],
+                ),
+            )
+        if report is None:
+            return _LoopGuardOutcome(
+                enforced=True, lines=[],
+                failure=(
+                    "✗ LOOP GUARD UNAVAILABLE: the §6 structural guard is enabled but "
+                    "one side carries no static block table (EVM blocks / x86 blocks), "
+                    "so unpaired loops and unresolved jumps cannot be ruled out "
+                    "(fail-closed)"
+                ),
+            )
+
+        # notes() 是信息性的（如 immediate_set 过近似造成的残环），不参与结论，
+        # 但必须随结论一起呈现——它们正是"守卫为什么放行"的旁证。
+        lines = [f"  loop guard note: {note}" for note in report.notes()]
+
+        reasons = report.reasons()
+        if reasons:
+            failure = _format_verdict(
+                "✗ LOOP GUARD REJECTED: the (EVM IR, x86) pair fails the §6 structural "
+                "guard, so its loops are outside what this pipeline can prove",
+                [("reason", reason) for reason in reasons],
+            )
+            return _LoopGuardOutcome(
+                enforced=True,
+                failure="\n".join([failure, *lines]),
+                lines=lines,
+            )
+
+        # 措辞只到"结构层通过"为止：守卫证明的是两侧循环可配对/有已证 Tier 2 引理，
+        # **不是**循环体已被归纳证明。证书消费端（§8 路线图第 9 项）尚未落地，循环体
+        # 仍由有界展开 + coverage 证书兜底，把这句说强了就是过度声明。
+        summary = (
+            "  loop guard: ENFORCED (structural) — "
+            f"{len(report.evm_analysis.loops)} EVM natural loop(s), "
+            f"{len(report.x86_analysis.loops)} x86 natural loop(s), "
+            f"{len(report.pairs)} Tier-1 pair(s); every x86 loop is Tier-1 paired or "
+            "covered by a proven Tier-2 lemma, and every jump resolves statically. "
+            "Loop bodies themselves are still discharged by bounded unrolling + the "
+            "coverage certificate, not by induction certificates"
+        )
+        return _LoopGuardOutcome(
+            enforced=True, failure=None, lines=[summary, *lines],
+        )
+
+    def _finalize_message(self, verified: bool, message: Optional[str],
+                          gas_budget: Optional[int], evm_program: EVMProgram,
+                          guard: _LoopGuardOutcome) -> Optional[str]:
+        """成功消息的统一出口：gas 结论范围 + 循环守卫结论范围。
+
+        两段范围都只挂在成功消息上——失败消息自带原因，再追加前提只会淹没它。
+        """
+        message = self._annotate_gas_scope(verified, message, gas_budget, evm_program)
+        if not verified or not message or not guard.lines:
+            return message
+        return "\n".join([message, *guard.lines])
 
     def _loop_guard_note(self, evm_program: EVMProgram,
                          x86_program: X86Program) -> Optional[str]:
         """coverage 失败时的循环守卫附注（§6 降级路径的可行动信息）。
 
-        失败容忍：守卫分析自身出错不能掩盖原始失败消息。
+        失败容忍：守卫分析自身出错不能掩盖原始失败消息。这是**诊断**，与
+        ``_evaluate_loop_guard`` 的 fail-closed 语义刻意不同。
         """
         try:
-            from x86_64.loop_templates import make_tier2_matcher
-            from .loop_pairing import analyze_program_pair
-
-            x86_blocks = getattr(x86_program, "blocks", None) or []
-            if not x86_blocks or not evm_program.blocks:
+            report = self._analyze_loop_guard(evm_program, x86_program)
+            if report is None:
                 return None
-            by_addr = {b.start_addr: b for b in x86_blocks}
-            report = analyze_program_pair(
-                evm_program.blocks,
-                x86_blocks,
-                tier2_matcher=make_tier2_matcher(by_addr),
-            )
             lines = [
                 "  loop guard: "
                 f"{len(report.evm_analysis.loops)} EVM natural loop(s), "
@@ -606,6 +783,56 @@ class ProgramEquivalenceChecker:
             return "\n".join(lines)
         except Exception as exc:  # pragma: no cover - 诊断附注不阻塞主流程
             return f"  loop guard: analysis unavailable ({exc})"
+
+    def _check_fold_coverage(self, plan, evm_paths, x86_paths) -> Optional[str]:
+        """核对每个截断态都落在某张证书的适用域内（§4.7 消费第 2–3 步）。
+
+        返回 None 表示覆盖完整；否则返回 fail-closed 的失败消息。
+
+        栈深取不出具体值时**不猜**：`verify_cut_coverage` 会把 ``None`` 当作
+        "符号栈深"直接拒绝。证书按具体深度类实例化，符号深度不在任何定理的
+        适用域内，放行等于把定理用到证明域之外。
+        """
+        from z3 import simplify
+
+        from .loop_folding import verify_cut_coverage
+
+        evm_cut_depths = []
+        for gstate in evm_paths.cut_states:
+            node = getattr(gstate, "node", None)
+            if node is None:
+                return (
+                    "✗ LOOP FOLDING FAILED: an EVM cut state carries no CFG node, "
+                    "so it cannot be matched against a certificate (fail-closed)"
+                )
+            try:
+                depth = simplify(gstate.mstate.evm_stack.SP).as_long()
+            except (AttributeError, TypeError):
+                depth = None
+            evm_cut_depths.append((node.pc, depth))
+
+        x86_cut_headers = []
+        for gstate in x86_paths.cut_states:
+            node = getattr(gstate, "node", None)
+            if node is None:
+                return (
+                    "✗ LOOP FOLDING FAILED: an x86 cut state carries no CFG node, "
+                    "so it cannot be matched against a certificate (fail-closed)"
+                )
+            x86_cut_headers.append(node.address)
+
+        result = verify_cut_coverage(
+            plan,
+            evm_cut_depths=evm_cut_depths,
+            x86_cut_headers=x86_cut_headers,
+        )
+        if result.ok:
+            return None
+        return _format_verdict(
+            "✗ LOOP FOLDING FAILED: some execution stopped at a cutpoint that no "
+            "certificate covers, so those paths were neither proved nor explored",
+            [("uncovered", reason) for reason in result.reasons[:6]],
+        )
 
     def _estimate_formula_size(self, result: dict) -> str:
         """估算公式大小（表达式数量）。"""
@@ -695,6 +922,7 @@ class ProgramEquivalenceChecker:
         summary_config: Optional[X86SummaryConfig] = None,
         x86_reachability_timeout_ms: Optional[int] = 50,
         max_depth: Optional[int] = None,
+        fold_loops: bool = False,
     ) -> Tuple[bool, Optional[str]]:
         """用终止路径 observations 直接验证程序等价。
 
@@ -702,7 +930,51 @@ class ProgramEquivalenceChecker:
         每条终止路径保留自己的 condition 和 observable，后续做 EVM/x86
         terminal path pair 的覆盖与等价性检查。只有 debug stack_check 需要时，
         才额外要求执行器产出 merged_state 作为栈检查 fallback。
+
+        ``fold_loops`` 打开循环折叠（§4.7）：先为每个配对循环头生成 Tier-1
+        证书，再把循环头设为 cutpoint 让两侧执行在那里截断，最后核对每个截断
+        态都落在证书适用域内。折叠**只在这条路径上可用**——merged 模式把所有
+        路径合成一个公式，截断态无处安放。
         """
+        folding_lines: List[str] = []
+        evm_stop_pcs: Optional[set] = None
+        x86_stop_addrs: Optional[set] = None
+        folding_plan = None
+        if fold_loops:
+            from .loop_folding import plan_loop_folding
+
+            fold_start = time.time()
+            if self.verbose:
+                print("\n[0] Planning loop folding (Tier-1 certificates)...")
+            # 复用 `_analyze_loop_guard` 这个**唯一**的守卫入口（它同时是
+            # tier2_matcher 的唯一传法），避免折叠与 enforcement/诊断附注对
+            # 同一程序给出不一致的结构结论。
+            folding_plan = plan_loop_folding(
+                getattr(evm_program, "blocks", None) or [],
+                self._x86_static_blocks(x86_program) or [],
+                initial_state,
+                guard_report=self._analyze_loop_guard(evm_program, x86_program),
+                summary_config=summary_config,
+                max_depth=max_depth or 400,
+                compare_terminal_gas=self.gas_check is not GasCheck.OFF,
+                host_gas_uf_enabled=self.gas_check is not GasCheck.OFF,
+            )
+            folding_lines = folding_plan.describe()
+            if self.verbose:
+                for line in folding_lines:
+                    print(f"    {line}")
+                print(f"    └─ ✓ Planned in {time.time() - fold_start:.3f}s")
+            if not folding_plan.ok:
+                # fail-closed：折叠计划不成立就不能假装折叠过。这里**不静默回退**
+                # 到不折叠——调用方显式要了折叠，拿不到就该知道。
+                return False, _format_verdict(
+                    "✗ LOOP FOLDING FAILED: no Tier-1 certificate covers every "
+                    "paired loop, so the proof cannot fold them away",
+                    [("blocked", r) for r in folding_plan.reasons[:6]],
+                )
+            evm_stop_pcs = set(folding_plan.evm_stop_pcs) or None
+            x86_stop_addrs = set(folding_plan.x86_stop_addrs) or None
+
         if self.verbose:
             print("\n[1] Building EVM terminal path observations...")
 
@@ -715,6 +987,7 @@ class ProgramEquivalenceChecker:
         evm_paths = evm_program.to_z3_paths(
             initial_state,
             merge_state=stack_check is not None,
+            stop_pcs=evm_stop_pcs,
             **evm_to_z3_paths_kwargs,
         )
         evm_build_time = time.time() - evm_start
@@ -741,10 +1014,23 @@ class ProgramEquivalenceChecker:
             enable_merge=enable_merge,
             summary_config=summary_config,
             reachability_timeout_ms=x86_reachability_timeout_ms,
+            stop_addrs=x86_stop_addrs,
             **x86_to_z3_paths_kwargs,
         )
         x86_build_time = time.time() - x86_start
         x86_state = x86_paths.merged_state
+
+        if folding_plan is not None:
+            # §4.7 消费第 2 步：截断态必须落在某张证书的适用域内。**不能**因为
+            # "执行确实停在 cutpoint 上"就放行——证书按深度类实例化，落在未登记
+            # 深度类或符号栈深上的到达状态不在任何定理的适用域内。
+            coverage = self._check_fold_coverage(folding_plan, evm_paths, x86_paths)
+            if coverage is not None:
+                return False, coverage
+            folding_lines.append(
+                f"  folded away {len(evm_paths.cut_states)} EVM / "
+                f"{len(x86_paths.cut_states)} x86 cut state(s)"
+            )
 
         if self.verbose:
             print(f"    ├─ Terminal paths: {len(x86_paths.observations)}")

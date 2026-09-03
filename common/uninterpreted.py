@@ -319,3 +319,120 @@ def static_call_return_byte(gas: BitVecRef, addr: BitVecRef,
                  memory.sort(), BitVecSort(64),
                  BitVecSort(8))
     return f(gas, addr, args_offset, args_size, ret_offset, ret_size, memory, byte_index)
+
+
+# ---------------------------------------------------------------------------
+# host 调用的**实际返回长度**
+# ---------------------------------------------------------------------------
+#
+# 为什么需要独立的 UF：`retSize` 是**调用方给出的输出缓冲区长度**，而 RETURNDATASIZE
+# 读到的是**被调用方实际返回的长度** `len(res)`。两者在协议上是不同的量——host 完全
+# 可以返回比 retSize 更短或更长的数据（自动拷贝只搬 min(retSize, len(res)) 字节，
+# 但 RETURNDATA* 看到的是完整的 len(res)）。
+#
+# 把 return-data size 钉成 `retSize` 会让"真实返回长度"整个落在量化域之外：两侧模型
+# 都只允许 size == retSize，于是一个**混淆返回长度与输出缓冲区长度**的 codegen 缺陷
+# 会被两侧的共同错误掩盖 —— 那是假绿。改用同名 UF 后，两侧取到同一个符号值、照常
+# 相消，而错误的实现会因为取值不同而被抓住。
+
+def call_return_size(gas: BitVecRef, addr: BitVecRef, value: BitVecRef,
+                     args_offset: BitVecRef, args_size: BitVecRef,
+                     ret_offset: BitVecRef, ret_size: BitVecRef,
+                     memory, effect_id: Optional[int] = None) -> BitVecRef:
+    """CALL: host 实际返回的数据长度（`len(res)`），64-bit。"""
+    f = Function(_scoped_name('evm_call_ret_size', effect_id),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 memory.sort(),
+                 BitVecSort(64))
+    return f(gas, addr, value, args_offset, args_size, ret_offset, ret_size, memory)
+
+
+def callcode_return_size(gas: BitVecRef, addr: BitVecRef, value: BitVecRef,
+                         args_offset: BitVecRef, args_size: BitVecRef,
+                         ret_offset: BitVecRef, ret_size: BitVecRef,
+                         memory, effect_id: Optional[int] = None) -> BitVecRef:
+    """CALLCODE: host 实际返回的数据长度，64-bit。"""
+    f = Function(_scoped_name('evm_callcode_ret_size', effect_id),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 memory.sort(),
+                 BitVecSort(64))
+    return f(gas, addr, value, args_offset, args_size, ret_offset, ret_size, memory)
+
+
+def delegate_call_return_size(gas: BitVecRef, addr: BitVecRef,
+                              args_offset: BitVecRef, args_size: BitVecRef,
+                              ret_offset: BitVecRef, ret_size: BitVecRef,
+                              memory, effect_id: Optional[int] = None) -> BitVecRef:
+    """DELEGATECALL: host 实际返回的数据长度，64-bit。"""
+    f = Function(_scoped_name('evm_delegatecall_ret_size', effect_id),
+                 BitVecSort(256), BitVecSort(256),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 memory.sort(),
+                 BitVecSort(64))
+    return f(gas, addr, args_offset, args_size, ret_offset, ret_size, memory)
+
+
+def static_call_return_size(gas: BitVecRef, addr: BitVecRef,
+                            args_offset: BitVecRef, args_size: BitVecRef,
+                            ret_offset: BitVecRef, ret_size: BitVecRef,
+                            memory, effect_id: Optional[int] = None) -> BitVecRef:
+    """STATICCALL: host 实际返回的数据长度，64-bit。"""
+    f = Function(_scoped_name('evm_staticcall_ret_size', effect_id),
+                 BitVecSort(256), BitVecSort(256),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 memory.sort(),
+                 BitVecSort(64))
+    return f(gas, addr, args_offset, args_size, ret_offset, ret_size, memory)
+
+
+# CREATE/CREATE2 同样刷新 returndata：成功时 host 返回 nil、engine 把长度刷成 0
+# （engine_evm.go 的 returndata 复位）；失败（revert）时则是 revert reason。
+#
+# **不把 size 钉成 0**：那只覆盖成功路径，会把 revert 路径排除在量化域外。用 UF
+# 表示"CREATE 之后的 returndata"同时覆盖两种情况，两侧同名同参 ⇒ 相消。相比之下
+# "什么都不做"（保留旧 returndata）是**不可能的真实状态**——真实执行中 CREATE 必然
+# 刷新它，保留旧值会让"错误保留旧 returndata"的编译产物被判等价。
+
+def create_return_size(value: BitVecRef, offset: BitVecRef, size: BitVecRef,
+                       memory, effect_id: Optional[int] = None) -> BitVecRef:
+    """CREATE: 调用后 returndata 的长度，64-bit。"""
+    f = Function(_scoped_name('evm_create_ret_size', effect_id),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 memory.sort(),
+                 BitVecSort(64))
+    return f(value, offset, size, memory)
+
+
+def create_return_byte(value: BitVecRef, offset: BitVecRef, size: BitVecRef,
+                       memory, byte_index: BitVecRef,
+                       effect_id: Optional[int] = None) -> BitVecRef:
+    """CREATE: 调用后 returndata 在 byte_index 处的字节。"""
+    f = Function(_scoped_name('evm_create_ret_byte', effect_id),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 memory.sort(), BitVecSort(64),
+                 BitVecSort(8))
+    return f(value, offset, size, memory, byte_index)
+
+
+def create2_return_size(value: BitVecRef, offset: BitVecRef, size: BitVecRef,
+                        salt: BitVecRef, memory,
+                        effect_id: Optional[int] = None) -> BitVecRef:
+    """CREATE2: 调用后 returndata 的长度，64-bit。"""
+    f = Function(_scoped_name('evm_create2_ret_size', effect_id),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 BitVecSort(256), memory.sort(),
+                 BitVecSort(64))
+    return f(value, offset, size, salt, memory)
+
+
+def create2_return_byte(value: BitVecRef, offset: BitVecRef, size: BitVecRef,
+                        salt: BitVecRef, memory, byte_index: BitVecRef,
+                        effect_id: Optional[int] = None) -> BitVecRef:
+    """CREATE2: 调用后 returndata 在 byte_index 处的字节。"""
+    f = Function(_scoped_name('evm_create2_ret_byte', effect_id),
+                 BitVecSort(256), BitVecSort(256), BitVecSort(256),
+                 BitVecSort(256), memory.sort(), BitVecSort(64),
+                 BitVecSort(8))
+    return f(value, offset, size, salt, memory, byte_index)

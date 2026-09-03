@@ -117,3 +117,98 @@ def test_strict_matcher_accepts_all_cerc20_loops():
     _, by_addr, loops = _loops_with_bodies(open(_CERC20_HEX).read().strip())
     matcher = make_tier2_matcher(by_addr)
     assert sum(1 for loop, _ in loops if matcher(loop)) == 39
+
+
+# ---------------------------------------------------------------------------
+# FromLow 分派条件：引理与 runtime summary 的单点定义（§5.1）
+# ---------------------------------------------------------------------------
+
+class TestMcopyLowDispatchPremise:
+    """守 `mcopy_low_dispatch_premise` 的覆盖域。
+
+    这是"引理证的域"与"runtime 折叠的域"之间的唯一接缝：codegen 的真实分派
+    条件是 `dst ≤ src ∨ size ≤ 8`，若引理只证前一支而 runtime 按真实条件放行，
+    就会折叠一段引理从未证明过的行为——假绿。
+    """
+
+    def test_covers_forward_direction_for_any_size(self):
+        from z3 import BitVec, BitVecVal, Not, Solver, ULE, unsat
+
+        from verification.tier2_lemmas import mcopy_low_dispatch_premise
+
+        d0, s0, size0 = (BitVec(n, 64) for n in ("d0", "s0", "size0"))
+        solver = Solver()
+        solver.add(ULE(d0, s0))
+        solver.add(Not(mcopy_low_dispatch_premise(d0, s0, size0)))
+        assert solver.check() == unsat
+
+    def test_covers_reverse_overlap_when_size_fits_one_qword(self):
+        """`dst > src` 但 `size ≤ 8` 必须落在域内。
+
+        这一格正是历史上引理漏证、而 codegen 会走进来的那一格。
+        """
+        from z3 import BitVec, BitVecVal, Not, Solver, UGT, ULE, unsat
+
+        from verification.tier2_lemmas import mcopy_low_dispatch_premise
+
+        d0, s0, size0 = (BitVec(n, 64) for n in ("d0", "s0", "size0"))
+        solver = Solver()
+        solver.add(UGT(d0, s0))                      # 反向重叠
+        solver.add(ULE(size0, BitVecVal(8, 64)))     # 单 qword
+        solver.add(Not(mcopy_low_dispatch_premise(d0, s0, size0)))
+        assert solver.check() == unsat, (
+            "反向重叠的小拷贝不在引理前提域内——runtime 会折叠未证行为"
+        )
+
+    def test_excludes_reverse_overlap_with_large_size(self):
+        """`dst > src` 且 `size > 8` 必须**在域外**（那是 FromHigh 的活）。
+
+        前提不是恒真式——它真的排除掉了不该覆盖的那一格。若这条变绿失败，
+        说明前提被放得过宽，引理会声称覆盖 FromHigh 才安全的状态。
+        """
+        from z3 import BitVec, BitVecVal, Solver, UGT, unsat
+
+        from verification.tier2_lemmas import mcopy_low_dispatch_premise
+
+        d0, s0, size0 = (BitVec(n, 64) for n in ("d0", "s0", "size0"))
+        solver = Solver()
+        solver.add(UGT(d0, s0))
+        solver.add(UGT(size0, BitVecVal(8, 64)))
+        solver.add(mcopy_low_dispatch_premise(d0, s0, size0))
+        assert solver.check() == unsat, "前提过宽：覆盖了 FromHigh 的域"
+
+    def test_composition_variant_additionally_requires_zero_copied(self):
+        """复合路径上反向重叠支必须额外要求 `copied == 0`。
+
+        `size ≤ 8` 时 word 循环一轮不跑，故进复合路径时尚未拷过字节；缺这条，
+        "反向重叠且源区间已被部分覆写"的状态就会落进引理适用域。
+        """
+        from z3 import BitVec, BitVecVal, Solver, UGT, ULE, unsat
+
+        from verification.tier2_lemmas import mcopy_low_dispatch_premise
+
+        d0, s0, size0, c = (
+            BitVec(n, 64) for n in ("d0", "s0", "size0", "c")
+        )
+        solver = Solver()
+        solver.add(UGT(d0, s0))                      # 反向重叠
+        solver.add(ULE(size0, BitVecVal(8, 64)))     # 单 qword
+        solver.add(c != BitVecVal(0, 64))            # 但已拷过字节
+        solver.add(mcopy_low_dispatch_premise(d0, s0, size0, copied=c))
+        assert solver.check() == unsat, (
+            "复合变体漏了 copied == 0：源区间已被覆写的状态落进了适用域"
+        )
+
+    def test_composition_variant_still_covers_the_zero_copied_case(self):
+        """但 `copied == 0` 的反向重叠小拷贝仍必须在域内（否则过窄）。"""
+        from z3 import BitVec, BitVecVal, Not, Solver, UGT, ULE, unsat
+
+        from verification.tier2_lemmas import mcopy_low_dispatch_premise
+
+        d0, s0, size0 = (BitVec(n, 64) for n in ("d0", "s0", "size0"))
+        zero = BitVecVal(0, 64)
+        solver = Solver()
+        solver.add(UGT(d0, s0))
+        solver.add(ULE(size0, BitVecVal(8, 64)))
+        solver.add(Not(mcopy_low_dispatch_premise(d0, s0, size0, copied=zero)))
+        assert solver.check() == unsat

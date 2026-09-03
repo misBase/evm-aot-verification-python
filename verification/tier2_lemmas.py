@@ -67,6 +67,17 @@ from common.store_forwarding import forward_selects
 from state.smt_state import SMTState
 from state.x86_state import PointerTag
 from x86_64.models import Register, X86Block
+from x86_64.tier2_semantics import (
+    # 闭式语义下沉到共享模块：Tier 2 的 **runtime summary 与这里的引理必须用
+    # 同一个闭式表达式**。各写一份迟早漂移，届时 runtime 折叠的行为与引理证明
+    # 的行为就不是一回事了——那是假绿。保留旧私有名作别名，调用点不动。
+    byte_of as _byte_of,
+    copy_region_byte as _copy_region_byte,
+    getdata_byte as _getdata_byte,
+    mcopy_no_wrap_premises as _mcopy_no_wrap_premises,
+    overlay_byte as _overlay_byte,
+    qword_le as _qword_le,
+)
 
 BV64 = BitVecSort(64)
 BV8 = BitVecSort(8)
@@ -184,18 +195,6 @@ def _read_mem_at(state: SMTState, r15, w):
     return Select(state.x86_memory.evm_mem, r15 + w)
 
 
-def _byte_of(qword, k):
-    """qword（64bit，little-endian 内存序）第 k 字节（k 为 64bit 符号项）。"""
-    return Extract(7, 0, LShR(qword, BitVecVal(8, 64) * k))
-
-
-def _qword_le(mem_offset_space, off):
-    """从 offset 空间数组读 little-endian qword（mov reg,[mem] 的值）。"""
-    from z3 import Concat
-    bytes_ = [Select(mem_offset_space, off + BitVecVal(k, 64)) for k in range(8)]
-    return Concat(*reversed(bytes_))
-
-
 def _reg(state: SMTState, name64: str):
     return state.x86_registers.get_register(Register(name64))
 
@@ -283,15 +282,6 @@ def prove_shr_align(blocks: Sequence[X86Block], header: int, exit_addr: int,
     return ctx.result()
 
 
-def _overlay_byte(tmp0, m1, dt0, count, w):
-    """tail 覆盖的逐点值：[dt0, dt0+count) 内取 tmp0 的对应字节，否则 m1。"""
-    return If(
-        And(ULE(dt0, w), ULT(w, dt0 + count)),
-        _byte_of(tmp0, w - dt0),
-        Select(m1, w),
-    )
-
-
 def prove_byte_tail(blocks: Sequence[X86Block], header: int, exit_addr: int,
                     binding: Dict[str, object], timeout_ms: int = 60000) -> LemmaResult:
     """mcopy-byte-tail：Inv(j) ≜ mem = overlay(TMP0 前 j 字节 @ DT0, M1)
@@ -359,21 +349,32 @@ def prove_byte_tail(blocks: Sequence[X86Block], header: int, exit_addr: int,
     return ctx.result()
 
 
-def _copy_region_byte(m0, d0, s0, copied, w):
-    """word 拷贝已完成区间的逐点值：[d0, d0+copied) 内取源字节，否则 m0。"""
-    return If(
-        And(ULE(d0, w), ULT(w, d0 + copied)),
-        Select(m0, w - d0 + s0),
-        Select(m0, w),
-    )
+def mcopy_low_dispatch_premise(d0, s0, size0, copied=None):
+    """FromLow 分派条件（§5.1）——**引理与 runtime summary 的单点定义**。
 
+    codegen 的真实条件是 `dst ≤ src ∨ size ≤ 8`：
 
-def _mcopy_no_wrap_premises(d0, s0, size0):
-    return [
-        ULT(size0, BitVecVal(1 << 63, 64)),      # signed jl/jle 与 unsigned 一致
-        ULE(d0, d0 + size0),                     # dst 区间不回绕
-        ULE(s0, s0 + size0),                     # src 区间不回绕
-    ]
+    - `dst ≤ src`：升序方向保证尚未读取的源区间完好；
+    - `size ≤ 8`：即使反向重叠，整个拷贝也在任何写入**之前**一次性载入那唯一
+      的 qword（`compileEVMMCOPY` 在 `size ≤ 8` 时不看方向直接走 FromLow）。
+
+    **为什么必须单点定义**：runtime summary 按真实分派条件折叠循环，而引理只
+    在自己的前提域内成立。两者一旦漂移——典型是引理只写 `dst ≤ src` 而 runtime
+    按真实条件放行——runtime 就会折叠一段**引理从未证明过**的行为，那是假绿。
+    新增引用方请调用本函数，不要就地重写这个析取。
+
+    Args:
+        copied: 复合路径上的已拷字节数。给出时，反向重叠支额外要求它为 0
+            ——`size ≤ 8` 时 word 循环的 `jl` 一轮都不跑就跳 tail，故进复合
+            路径时必然尚未拷过任何字节。缺这一条会让反向重叠下 `copied > 0`
+            的状态（源区间已被覆写）落进引理的适用域。
+    """
+    reverse_overlap_ok = ULE(size0, BitVecVal(8, 64))
+    if copied is not None:
+        reverse_overlap_ok = And(
+            reverse_overlap_ok, copied == BitVecVal(0, 64)
+        )
+    return Or(ULE(d0, s0), reverse_overlap_ok)
 
 
 def prove_low_word(blocks: Sequence[X86Block], header: int, exit_addr: int,
@@ -382,8 +383,16 @@ def prove_low_word(blocks: Sequence[X86Block], header: int, exit_addr: int,
     """mcopy-low-word：Inv(C) ≜ mem = F(C)（升序已拷 C 字节）
     ∧ DST = r15+D0+C ∧ SRC = r15+S0+C ∧ S = SIZE0-C。
 
-    前提含 FromLow 分派方向 D0 ≤ S0（保证尚未读取的源区间未被覆写，
-    §5.1 快照相对不变式的关键）。
+    前提含 FromLow 的**完整**分派条件 `D0 ≤ S0 ∨ SIZE0 ≤ 8`（§5.1）：
+
+    - `D0 ≤ S0`：升序方向保证尚未读取的源区间未被覆写；
+    - `SIZE0 ≤ 8`：即使 `D0 > S0`（反向重叠），整个拷贝也会在任何写入**之前**
+      一次性载入那唯一的 qword，因此仍然安全。
+
+    **为什么必须是 `Or` 而不是只有前一支**：codegen 的真实分派条件就是这个析取
+    （`compileEVMMCOPY` 在 `size ≤ 8` 时走 FromLow 而不看方向）。若引理只证
+    `D0 ≤ S0` 这一支，而 runtime summary 按真实分派条件在 `D0 > S0 ∧ SIZE0 ≤ 8`
+    上也折叠循环，就会折叠一段**引理从未证明过的**行为——那是假绿。
     """
     ctx = _ProofContext("mcopy-low-word", timeout_ms)
     reg_dst, reg_src = binding["DST"], binding["SRC"]
@@ -404,7 +413,10 @@ def prove_low_word(blocks: Sequence[X86Block], header: int, exit_addr: int,
     _set_reg(state, reg_src, r15 + s0 + c, PointerTag.EVM_PTR)
     _set_reg(state, reg_s, size0 - c)
 
-    premises = [ULE(c, size0), ULE(d0, s0)] + _mcopy_no_wrap_premises(d0, s0, size0)
+    premises = [
+        ULE(c, size0),
+        mcopy_low_dispatch_premise(d0, s0, size0),
+    ] + _mcopy_no_wrap_premises(d0, s0, size0)
 
     paths, defects = _run_segment(
         blocks, state.copy(), header, {header, exit_addr, tail_addr}
@@ -544,11 +556,6 @@ def prove_high_word(blocks: Sequence[X86Block], header: int, exit_addr: int,
               _reg(tp.state, reg_src) == r15 + s0 + (s - 8) - 8)
     ctx.prove("③ jl 出口 s' = s-8", pre, _reg(tp.state, reg_s) == s - 8)
     return ctx.result()
-
-
-def _getdata_byte(source, off, length, k):
-    """getData 语义：源越界补 0。"""
-    return If(ULT(off + k, length), Select(source, off + k), BitVecVal(0, 8))
 
 
 def _prove_byte_copy_common(
@@ -721,7 +728,12 @@ def prove_mcopy_low_composition(
 
     rem = size0 - c
     premises = (
-        [ULE(c, size0), ULE(d0, s0), ULT(rem, BitVecVal(8, 64))]
+        [
+            ULE(c, size0),
+            # 复合路径上反向重叠支额外要求 C == 0，理由见函数 docstring
+            mcopy_low_dispatch_premise(d0, s0, size0, copied=c),
+            ULT(rem, BitVecVal(8, 64)),
+        ]
         + _mcopy_no_wrap_premises(d0, s0, size0)
         # 跨界 qword 读窗不回绕
         + [ULE(s0 + c, s0 + c + BitVecVal(8, 64))]

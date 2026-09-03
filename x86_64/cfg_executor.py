@@ -16,7 +16,11 @@ from .cfg_structures import X86DynamicCFG, X86EdgeType
 from .cfg_state import X86GlobalState, X86WorldState
 from .cfg_strategies import X86DFSStrategy, X86TopologicalStrategy
 from .disassembler import parse_operands
-from .summaries.base import X86Summary, X86SummaryRuntime
+from .summaries.base import (
+    SummaryPreconditionError,
+    X86Summary,
+    X86SummaryRuntime,
+)
 from common.path_observation import PathCoverageCertificate
 from state.smt_state import SMTState, PointerTag
 
@@ -722,7 +726,27 @@ class X86SymbolicExecutor:
         while instruction_index < len(block.instructions):
             summary = self.summary_runtime.get(block.start_addr, instruction_index)
             if summary is not None:
-                new_mstate = self.summary_runtime.apply(summary, new_mstate)
+                # prove-or-reject：summary 的适用前提必须由当前 path condition
+                # 证明。被拒时按策略要么整体失败，要么**原样逐指令执行本循环**
+                # ——后者语义与不启用 summary 完全一致，因此是健全的降级。
+                try:
+                    new_mstate = self.summary_runtime.apply(
+                        summary,
+                        new_mstate,
+                        path_condition=global_state.get_constraints().as_bool(),
+                    )
+                except SummaryPreconditionError as error:
+                    self.summary_runtime.record_precondition_failure(error)
+                    if not self.summary_runtime.should_fallback_on_precondition(
+                        summary.kind
+                    ):
+                        raise
+                    # 不推进 instruction_index、不改 new_mstate，落到下面的
+                    # insn.to_z3 逐条执行原指令。
+                    insn = block.instructions[instruction_index]
+                    new_mstate = insn.to_z3(new_mstate)
+                    instruction_index += 1
+                    continue
 
                 if summary.is_cross_block:
                     return self._continue_after_cross_block_summary(

@@ -306,6 +306,68 @@ def match_body_blocks_exact(
 
 
 # ---------------------------------------------------------------------------
+# MCOPY 复合 summary 的构造级直线段（非 natural-loop，不进 TEMPLATES/
+# PROVEN_TIER2_LEMMAS）。FromHigh 四块对应复合引理
+# prove_mcopy_high_composition 实跑的 preamble/align/glue 字节。
+# ---------------------------------------------------------------------------
+
+MCOPY_HIGH_BLOCK_TEMPLATES: Dict[str, Tuple[Tuple[str, str], ...]] = {
+    # 防御分支块：size<8 直落 glue2（分派已保证 size>8，该边不可达）
+    "mcopy-high-preamble": (
+        ("cmp", "{S}, 8"),
+        ("jl", "{@GLUE}"),
+    ),
+    # 指针对齐块：DST/SRC 推进到区间高端最后一个 qword
+    "mcopy-high-align": (
+        ("add", "{DST}, {S}"),
+        ("add", "{SRC}, {S}"),
+        ("sub", "{SRC}, 8"),
+        ("sub", "{DST}, 8"),
+    ),
+    # glue1（word 的 @EXIT2）：DST 回退到区间起点
+    "mcopy-high-glue1": (
+        ("sub", "{DST}, {S}"),
+    ),
+    # glue2：跨界 qword 载入 + SRC 寄存器改写为移位计数 8-S'
+    "mcopy-high-glue2": (
+        ("mov", "{T}, qword ptr [{SRC}]"),
+        ("mov", "{SRC}, 8"),
+        ("sub", "{SRC}, {S}"),
+    ),
+}
+
+# FromLow 的 glue（进尾字节循环前的跨界 qword 载入）
+MCOPY_LOW_GLUE_TEMPLATE: Tuple[Tuple[str, str], ...] = (
+    ("mov", "{T}, qword ptr [{SRC}]"),
+)
+
+
+def match_straightline_exact(
+    insns: Sequence,
+    pattern: Tuple[Tuple[str, str], ...],
+    binding: Dict[str, object],
+) -> Optional[Dict[str, object]]:
+    """逐指令精确匹配直线段块（nop 剥除；整块指令数必须耗尽）。
+
+    在传入 ``binding`` 基础上增量统一：已绑定的寄存器占位符必须与
+    块内寄存器一致（保证直线段与 word 循环的寄存器角色对齐），新出现
+    的标签占位符（如 ``{@GLUE}``）绑定进返回的新 binding。不修改入参。
+    """
+    meaningful = [x for x in insns if x.mnemonic != "nop"]
+    if len(meaningful) != len(pattern):
+        return None
+    out = dict(binding)
+    for insn, (mnemonic, op_pattern) in zip(meaningful, pattern):
+        if insn.mnemonic != mnemonic:
+            return None
+        if not _match_operands(op_pattern, insn.op_str, out):
+            return None
+    return out
+
+
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # v1：形状特征匹配（仅配对实验/统计，不作最终守卫）
 # ---------------------------------------------------------------------------
 

@@ -10,6 +10,7 @@ from x86_64.models import X86Block
 
 from .base import X86SummaryPlugin, X86SummaryRuntime, X86SummarySpec
 from .calldataload import CALLDATALOAD_SUMMARY_KIND, CallDataLoadSummarySpec
+from .copy_loop import COPY_LOOP_SUMMARY_KIND, CopyLoopSummarySpec
 from .mul import MUL_SUMMARY_KIND, MulSummarySpec
 
 
@@ -17,6 +18,7 @@ from .mul import MUL_SUMMARY_KIND, MulSummarySpec
 # mode 是注册期策略，统一在组装 plugin 时附加，不由 spec 自己关心。
 BUILTIN_SUMMARY_SPECS: Mapping[str, Callable[[], X86SummarySpec]] = {
     CALLDATALOAD_SUMMARY_KIND: CallDataLoadSummarySpec,
+    COPY_LOOP_SUMMARY_KIND: CopyLoopSummarySpec,
     MUL_SUMMARY_KIND: MulSummarySpec,
 }
 
@@ -69,6 +71,20 @@ class X86SummaryConfig:
 TRUSTED_SUMMARY_CONFIG = X86SummaryConfig.enabled(
     calldataload="fallback",
     mul="fallback",
+)
+
+# 追加 Tier 2 copy-loop 折叠的配置。**默认配置刻意不含它**：copy-loop 会把整个
+# 拷贝循环换成闭式语义，是比 CALLDATALOAD/MUL 大得多的一步，先让调用方显式选择，
+# 也让既有全量回归保持在原基线上。
+#
+# 折叠是否安全的依据在 docs/循环处理增强方案.md §5：这四条 opcode
+# （CALLDATACOPY/CODECOPY/RETURNDATACOPY/MCOPY）的 gas 全部在**循环之外**由
+# `checkMemoryAndCalcDynamicGas*` 前言扣完，循环体内一条 gas 指令都没有，因此
+# 跳过循环体不会让两侧 gas 分叉。
+TRUSTED_SUMMARY_CONFIG_WITH_TIER2 = X86SummaryConfig.enabled(
+    calldataload="fallback",
+    mul="fallback",
+    copy_loop="fallback",
 )
 
 

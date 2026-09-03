@@ -51,3 +51,4 @@ htmlcov/
 # Visualization dot files
 *.dot
 .codegraph/
+tmp

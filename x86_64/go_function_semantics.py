@@ -214,9 +214,21 @@ class GoFunctionSemantics:
         ):
             mstate.x86_registers.clear_pointer_tag(reg)
 
-    def _update_return_data_source(self, mstate: SMTState, ret_size: BitVec,
+    def _update_return_data_source(self, mstate: SMTState, return_size: BitVec,
                                    byte_fn, effect_tag: str) -> SMTState:
-        size_64 = truncate_to_64(ret_size)
+        """host 调用后刷新 RETURNDATA 源（内容 + pointer + size）。
+
+        `return_size` 必须是 host **实际返回的数据长度**（`len(res)`），**不是**
+        调用方给出的输出缓冲区长度 `retSize`。两者在协议上是不同的量：自动拷贝
+        只搬 min(retSize, len(res)) 字节，而 RETURNDATASIZE/RETURNDATACOPY 看到
+        的是完整的 len(res)。
+
+        曾经这里直接传 `ret_size`，于是两侧模型都只允许 size == retSize，真实
+        返回长度整个落在量化域之外——一个混淆这两个量的 codegen 缺陷会被两侧的
+        共同错误掩盖（假绿）。现在两侧改传同名的 `*_return_size` UF，取值相同
+        故照常相消，而错误实现会因取值不同被抓住。
+        """
+        size_64 = truncate_to_64(return_size)
         idx = BitVec(f"{effect_tag}_returndata_idx", 64)
         old_return_data = mstate.return_data
         mstate.return_data = Lambda(
@@ -590,12 +602,25 @@ class GoFunctionSemantics:
         value, sp, mstate = self._pop_uint256(sp, mstate)
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
-        result = uninterpreted.create_semantics(value, offset, size, mstate.x86_memory.evm_mem, effect_id=effect_id)
+        old_memory = mstate.x86_memory.evm_mem
+        result = uninterpreted.create_semantics(value, offset, size, old_memory, effect_id=effect_id)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         # host gas UF，与 EVM 侧同参 [value, offset, size] 相消。returnGas 链与
         # CREATE 内存扩展是另外的可见机器码（已由反汇编建模），此 UF 只承载 host cost。
         self._deduct_host_gas_uf(mstate, "CREATE", [value, offset, size])
+        # CREATE 同样刷新 returndata（成功→空，revert→reason）；与 EVM 侧同名
+        # 同参 UF 相消。不刷新会保留调用前的旧数据，那是不可能的真实状态。
+        mstate = self._update_return_data_source(
+            mstate,
+            uninterpreted.create_return_size(
+                value, offset, size, old_memory, effect_id=effect_id,
+            ),
+            lambda byte_index: uninterpreted.create_return_byte(
+                value, offset, size, old_memory, byte_index, effect_id=effect_id,
+            ),
+            effect_tag=f"create_{effect_id}",
+        )
         return mstate
 
     def _handle_create2(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
@@ -605,13 +630,25 @@ class GoFunctionSemantics:
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
         salt, sp, mstate = self._pop_uint256(sp, mstate)
+        old_memory = mstate.x86_memory.evm_mem
         result = uninterpreted.create2_semantics(
-            value, offset, size, salt, mstate.x86_memory.evm_mem, effect_id=effect_id
+            value, offset, size, salt, old_memory, effect_id=effect_id
         )
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
         # host gas UF，与 EVM 侧同参 [value, offset, size, salt] 相消（同 CREATE）。
         self._deduct_host_gas_uf(mstate, "CREATE2", [value, offset, size, salt])
+        mstate = self._update_return_data_source(
+            mstate,
+            uninterpreted.create2_return_size(
+                value, offset, size, salt, old_memory, effect_id=effect_id,
+            ),
+            lambda byte_index: uninterpreted.create2_return_byte(
+                value, offset, size, salt, old_memory, byte_index,
+                effect_id=effect_id,
+            ),
+            effect_tag=f"create2_{effect_id}",
+        )
         return mstate
 
     def _handle_call(self, sp: int, mstate: SMTState, evm_pc: Optional[int] = None) -> SMTState:
@@ -631,7 +668,10 @@ class GoFunctionSemantics:
         effect_suffix = effect_id
         mstate = self._update_return_data_source(
             mstate,
-            ret_size,
+            uninterpreted.call_return_size(
+                gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+                old_memory, effect_id=effect_id,
+            ),
             lambda byte_index: uninterpreted.call_return_byte(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
                 old_memory, byte_index, effect_id=effect_id,
@@ -679,7 +719,10 @@ class GoFunctionSemantics:
         effect_suffix = effect_id
         mstate = self._update_return_data_source(
             mstate,
-            ret_size,
+            uninterpreted.callcode_return_size(
+                gas, addr, value, args_offset, args_size, ret_offset, ret_size,
+                old_memory, effect_id=effect_id,
+            ),
             lambda byte_index: uninterpreted.callcode_return_byte(
                 gas, addr, value, args_offset, args_size, ret_offset, ret_size,
                 old_memory, byte_index, effect_id=effect_id,
@@ -725,7 +768,10 @@ class GoFunctionSemantics:
         effect_suffix = effect_id
         mstate = self._update_return_data_source(
             mstate,
-            ret_size,
+            uninterpreted.delegate_call_return_size(
+                gas, addr, args_offset, args_size, ret_offset, ret_size,
+                old_memory, effect_id=effect_id,
+            ),
             lambda byte_index: uninterpreted.delegate_call_return_byte(
                 gas, addr, args_offset, args_size, ret_offset, ret_size,
                 old_memory, byte_index, effect_id=effect_id,
@@ -771,7 +817,10 @@ class GoFunctionSemantics:
         effect_suffix = effect_id
         mstate = self._update_return_data_source(
             mstate,
-            ret_size,
+            uninterpreted.static_call_return_size(
+                gas, addr, args_offset, args_size, ret_offset, ret_size,
+                old_memory, effect_id=effect_id,
+            ),
             lambda byte_index: uninterpreted.static_call_return_byte(
                 gas, addr, args_offset, args_size, ret_offset, ret_size,
                 old_memory, byte_index, effect_id=effect_id,

@@ -288,12 +288,111 @@ class TestCallFamilyEffects:
         solver.add(ptr_from_mem != state.callengine_return_data_pointer)
         assert solver.check() == unsat
 
+        # size 必须来自 host 的**实际返回长度** UF，而不是调用方给的 retSize(=2)。
+        # 钉成 retSize 会把真实返回长度排除在量化域外（见
+        # `_update_return_data_source` 的 docstring）。
         solver = Solver()
-        solver.add(size_from_mem != BitVecVal(2, 64))
-        assert solver.check() == unsat
+        solver.add(size_from_mem != state.callengine_return_data_size_bytes)
+        assert solver.check() == unsat  # 字段与 limb 镜像一致
+
+        assert "evm_staticcall_ret_size_" in str(
+            simplify(state.callengine_return_data_size_bytes)
+        ), "return-data size 没有走实际返回长度 UF"
 
         first_byte = simplify(state.return_data[BitVecVal(0, 64)])
         assert "evm_static_call_ret_byte_" in str(first_byte)
+
+    @pytest.mark.parametrize(
+        "kind,func_index,host_name,stack_values",
+        [
+            # 栈按 push 顺序给出，最后一个是栈顶。
+            # CALL/CALLCODE  pop: gas, addr, value, argsOff, argsSize, retOff, retSize
+            ("CALL", 3, "call", [2, 0x40, 4, 0, 7, 0x1234, 1000]),
+            ("CALLCODE", 6, "callCode", [2, 0x40, 4, 0, 7, 0x1234, 1000]),
+            # DELEGATECALL/STATICCALL pop: gas, addr, argsOff, argsSize, retOff, retSize
+            ("DELEGATECALL", 7, "delegateCall", [2, 0x40, 4, 0, 0x1234, 1000]),
+            ("STATICCALL", 5, "staticCall", [2, 0x40, 4, 0, 0x1234, 1000]),
+        ],
+    )
+    def test_evm_and_x86_call_family_agree_on_return_data_source(
+        self, kind, func_index, host_name, stack_values
+    ):
+        """CALL 族必须让两侧的 RETURNDATA **源** 一致（内容 + size + pointer）。
+
+        回归：EVM 侧此前只经 `_write_call_return_data` 写 `evm_memory`（CALL 的自动
+        拷贝语义），从不更新 `state.return_data` / `callengine_return_data_size_bytes`
+        ——而 RETURNDATASIZE/RETURNDATACOPY 读的正是后面这一对。x86 侧四个 host-call
+        handler 都更新它们，于是 `CALL; RETURNDATASIZE` 两侧分叉。
+
+        现有 fixture 全都用 `create_initial_state(return_data_size_bytes=…)` 预设初值、
+        没有"CALL 之后再读"的组合，所以这条缺口一直没被任何测试覆盖。
+        """
+        from z3 import Select
+        from evm_ir.models import EvmOperator
+        from evm_ir.semantics import evm_operator_to_z3
+
+        pc = 0x21
+
+        profile = _make_profile_with_host({func_index: host_name})
+        sem = GoFunctionSemantics(profile)
+        x86_state, sp = _make_state_with_stack(stack_values)
+        x86_state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        x86_state = sem.apply(4, func_index, sp, x86_state, evm_pc=pc)
+
+        # EVM 侧同样的栈；两侧初始 memory 与 return_data 是同一批 Z3 常量
+        # （`K(BitVec(64),0)` 与 `ReturnData`），故 return-byte UF 的实参天然对齐。
+        evm_state = SMTState()
+        evm_state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        for value in stack_values:
+            evm_state.evm_stack = evm_state.evm_stack.push(BitVecVal(value, 256))
+        evm_state = evm_operator_to_z3(EvmOperator(kind=kind, pc=pc), evm_state)
+
+        solver = Solver()
+        solver.add(
+            evm_state.callengine_return_data_size_bytes
+            != x86_state.callengine_return_data_size_bytes
+        )
+        assert solver.check() == unsat, f"{kind}: return-data size 两侧不一致"
+
+        solver = Solver()
+        solver.add(
+            evm_state.callengine_return_data_pointer
+            != x86_state.callengine_return_data_pointer
+        )
+        assert solver.check() == unsat, f"{kind}: return-data pointer 两侧不一致"
+
+        probe = BitVec("returndata_probe_idx", 64)
+        solver = Solver()
+        solver.add(
+            Select(evm_state.return_data, probe)
+            != Select(x86_state.return_data, probe)
+        )
+        assert solver.check() == unsat, f"{kind}: return-data 内容两侧不一致"
+
+    def test_evm_call_return_data_source_is_not_left_at_initial_value(self):
+        """反向哨兵：EVM 侧 CALL 后 return-data 源必须真的变过。
+
+        若 `_update_call_return_data_source` 被摘掉，size 会停在
+        `create_initial_state` 的初值上 —— 上面那条跨侧测试在两侧**同时**退化时
+        仍可能变绿，所以这里单独钉住"EVM 侧确实更新了"。
+        """
+        from evm_ir.models import EvmOperator
+        from evm_ir.semantics import evm_operator_to_z3
+
+        state = SMTState()
+        initial_size = state.callengine_return_data_size_bytes
+        for value in [2, 0x40, 4, 0, 0x1234, 1000]:
+            state.evm_stack = state.evm_stack.push(BitVecVal(value, 256))
+        state = evm_operator_to_z3(EvmOperator(kind="STATICCALL", pc=0x21), state)
+
+        assert not state.callengine_return_data_size_bytes.eq(initial_size)
+        # size 来自实际返回长度 UF，**不是** 栈上的 retSize(=2)
+        assert "evm_staticcall_ret_size_" in str(
+            simplify(state.callengine_return_data_size_bytes)
+        )
+        assert "evm_static_call_ret_byte_" in str(
+            simplify(state.return_data[BitVecVal(0, 64)])
+        )
 
     def test_apply_clears_caller_saved_pointer_tags(self):
         profile = _make_profile_with_host({5: "staticCall"})
@@ -862,3 +961,145 @@ class TestLog:
 
         with pytest.raises(GoFunctionSemanticsError, match="invalid evm_immediate"):
             sem.apply(4, 17, sp, state, evm_immediate=5)
+
+    @pytest.mark.parametrize(
+        "kind,func_index,host_name,stack_values",
+        [
+            # CREATE  pop: value, offset, size
+            ("CREATE", 8, "create", [0x20, 0x40, 7]),
+            # CREATE2 pop: value, offset, size, salt
+            ("CREATE2", 9, "create2", [0x7b, 0x20, 0x40, 7]),
+        ],
+    )
+    def test_evm_and_x86_create_family_agree_on_return_data_source(
+        self, kind, func_index, host_name, stack_values
+    ):
+        """CREATE/CREATE2 也必须刷新 returndata，且两侧一致。
+
+        真实执行里 CREATE 一定会刷新 returndata：成功时 host 返回 nil、engine
+        把长度刷成 0；revert 时是 revert reason。**保留调用前的旧 returndata 是
+        不可能的真实状态** —— 两侧一起保留旧值，会让"错误保留旧 returndata"的
+        编译产物被判等价（假绿）。
+
+        这里不把 size 钉成 0：那只覆盖成功路径，会把 revert 路径排除在量化域外。
+        用 UF 同时覆盖两种情况。
+        """
+        from z3 import Select
+        from evm_ir.models import EvmOperator
+        from evm_ir.semantics import evm_operator_to_z3
+
+        pc = 0x31
+
+        profile = _make_profile_with_host({func_index: host_name})
+        sem = GoFunctionSemantics(profile)
+        x86_state, sp = _make_state_with_stack(stack_values)
+        x86_state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        x86_state = sem.apply(4, func_index, sp, x86_state, evm_pc=pc)
+
+        evm_state = SMTState()
+        evm_state.x86_registers.set_register(Register.R15, BitVecVal(0, 64))
+        for value in stack_values:
+            evm_state.evm_stack = evm_state.evm_stack.push(BitVecVal(value, 256))
+        evm_state = evm_operator_to_z3(EvmOperator(kind=kind, pc=pc), evm_state)
+
+        solver = Solver()
+        solver.add(
+            evm_state.callengine_return_data_size_bytes
+            != x86_state.callengine_return_data_size_bytes
+        )
+        assert solver.check() == unsat, f"{kind}: return-data size 两侧不一致"
+
+        probe = BitVec("create_returndata_probe", 64)
+        solver = Solver()
+        solver.add(
+            Select(evm_state.return_data, probe)
+            != Select(x86_state.return_data, probe)
+        )
+        assert solver.check() == unsat, f"{kind}: return-data 内容两侧不一致"
+
+    def test_create_does_not_leave_stale_return_data(self):
+        """反向哨兵：CREATE 后 returndata 必须真的变过，不能沿用旧值。"""
+        from evm_ir.models import EvmOperator
+        from evm_ir.semantics import evm_operator_to_z3
+
+        state = SMTState()
+        stale = state.return_data
+        stale_size = state.callengine_return_data_size_bytes
+        for value in [0x20, 0x40, 7]:
+            state.evm_stack = state.evm_stack.push(BitVecVal(value, 256))
+        state = evm_operator_to_z3(EvmOperator(kind="CREATE", pc=0x31), state)
+
+        assert not state.return_data.eq(stale)
+        assert not state.callengine_return_data_size_bytes.eq(stale_size)
+        assert "evm_create_ret_size_" in str(
+            simplify(state.callengine_return_data_size_bytes)
+        )
+
+    def test_return_data_size_is_not_the_caller_supplied_ret_size(self):
+        """returndata 长度不能是调用方给的 `retSize`（codex review 的阻塞项 1）。
+
+        `retSize` 是**输出缓冲区**长度，`len(res)` 是**实际返回**长度。两侧一起
+        钉成 retSize 会把真实返回长度排除在量化域外，混淆这两个量的 codegen
+        缺陷就会被共同错误掩盖。
+        """
+        from z3 import BitVecVal as BV, Solver as S, sat
+        from evm_ir.models import EvmOperator
+        from evm_ir.semantics import evm_operator_to_z3
+
+        state = SMTState()
+        # retSize = 2（栈上最深的值）
+        for value in [2, 0x40, 4, 0, 0x1234, 1000]:
+            state.evm_stack = state.evm_stack.push(BV(value, 256))
+        state = evm_operator_to_z3(EvmOperator(kind="STATICCALL", pc=0x21), state)
+
+        # 必须**可能**不等于 retSize —— 若被钉成 2，这条会 unsat
+        solver = S()
+        solver.add(state.callengine_return_data_size_bytes != BV(2, 64))
+        assert solver.check() == sat, (
+            "return-data size 被钉成了 retSize，真实返回长度不在量化域内"
+        )
+
+    def test_return_data_uf_needs_matching_memory_coordinate_systems(self):
+        """已知边界:return-data UF 的两侧实参用的是**不同坐标系的内存数组**。
+
+        EVM 侧传 offset-space 的 `evm_memory.Memory`,x86 侧传 absolute-space
+        的 `x86_memory.evm_mem`。内存为空时两侧都是零数组 `K(BitVec(64),0)`,
+        平移后仍相同,所以 UF 照常相消——本文件其它跨侧用例正处在这一格。
+
+        但内存**已有写入**且 R15 ≠ 0 时,两个数组只满足平移关系、不是同一个
+        表达式,UF 便可以取到不同的值。
+
+        方向是**降级**不是假绿:含 CALL 族的循环会无谓 inconclusive,不会把
+        不等价判成等价。彻底修法是把两侧统一到 offset-space,那要改动所有既有
+        host UF 的实参(call_semantics / *_return_byte / *_should_copy…),影响面
+        远超本次改动,故先固化边界。
+        """
+        from z3 import BitVec, Solver, Store, sat
+
+        from common import uninterpreted
+
+        # 两个平移关系的内存数组：offset-space 的 m 与 absolute-space 的 m'
+        r15 = BitVec("r15_base", 64)
+        offset_space = Store(
+            SMTState().evm_memory.Memory, BitVecVal(5, 64), BitVecVal(0xAA, 8)
+        )
+        absolute_space = Store(
+            SMTState().x86_memory.evm_mem, r15 + BitVecVal(5, 64),
+            BitVecVal(0xAA, 8),
+        )
+
+        args = [BitVecVal(v, 256) for v in (1000, 0x1234, 0, 4, 0x40, 2)]
+        evm_side = uninterpreted.static_call_return_size(
+            *args, offset_space, effect_id=0x41
+        )
+        x86_side = uninterpreted.static_call_return_size(
+            *args, absolute_space, effect_id=0x41
+        )
+
+        solver = Solver()
+        solver.add(r15 != BitVecVal(0, 64))
+        solver.add(evm_side != x86_side)
+        assert solver.check() == sat, (
+            "若这里变成 unsat，说明坐标系问题已被解决，可以删掉本测试并把"
+            "边界说明从文档里移除"
+        )

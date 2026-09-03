@@ -102,6 +102,12 @@ class PathSemantics:
     coverage: PathCoverageCertificate = field(
         default_factory=PathCoverageCertificate.unknown
     )
+    # 在 cutpoint 处被截断的状态（循环折叠模式，docs/循环处理增强方案.md §4.7）。
+    # 它们**不是** terminal path，不参与 observable 等价检查——覆盖它们的是
+    # Tier-1 证书。留空即未启用折叠。调用方必须对每个截断态核对证书适用域
+    # （`verification.loop_folding.verify_cut_coverage`）；只截断不核对，等于
+    # 把没验过的路径当成已验。
+    cut_states: list[Any] = field(default_factory=list)
 
     def as_result_dicts(self) -> list[dict[str, Any]]:
         """以旧 result-dict 形状返回 observation。"""

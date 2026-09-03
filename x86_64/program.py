@@ -271,11 +271,17 @@ class X86Program:
         call_site_mapping=None,
         merge_state: bool = False,
         summary_config: Optional[X86SummaryConfig] = None,
+        stop_addrs: Optional[set] = None,
     ) -> PathSemantics:
         """为 x86 程序构造终止路径 observation。
 
         这里沿用 ``to_z3()`` 的执行选项，但保留独立终止路径；除非调试用
         stack check 显式请求 ``merge_state``，否则不合并整块 memory array。
+
+        ``stop_addrs``：cutpoint 截断集合（循环折叠，§4.7）。到达这些地址的
+        状态进 ``PathSemantics.cut_states`` 而不是 observations——它们由
+        Tier-1 证书覆盖，**调用方必须核对**
+        (`loop_folding.verify_cut_coverage`)。
         """
         self._clear_summary_stats()
         instructions_to_execute = self._get_instructions()
@@ -325,6 +331,7 @@ class X86Program:
             call_site_mapping=call_site_mapping,
             aot_profile=self.aot_profile,
             summary_runtime=summary_runtime,
+            stop_addrs=stop_addrs,
         )
 
         final_global_states = executor.execute(state)
@@ -343,6 +350,7 @@ class X86Program:
             observations=observations,
             merged_state=merged_state,
             coverage=executor.path_coverage_certificate(),
+            cut_states=list(getattr(executor, "cut_states", ()) or ()),
         )
 
     def _build_summary_runtime(

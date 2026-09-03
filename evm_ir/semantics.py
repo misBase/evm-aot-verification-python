@@ -76,6 +76,47 @@ def _write_call_return_data(memory_state: EVMMemoryState,
     )
 
 
+def _update_call_return_data_source(state: SMTState,
+                                    return_size_bv: BitVecRef,
+                                    return_byte_fn,
+                                    effect_tag: str) -> None:
+    """CALL 族执行后更新 RETURNDATA **源**（内容 Array + pointer + size）。
+
+    与 x86 侧 `go_function_semantics._update_return_data_source` 逐字对应：同一个
+    return-byte UF、同一个 `effect_tag` ⇒ 两侧 Lambda 体与 `*_returndata_ptr` 自由
+    符号同名同参，Z3 里相消。
+
+    **为什么必须有**：`_write_call_return_data` 只把返回字节拷进 `evm_memory` 的
+    `[retOffset, retOffset+retSize)`，那是 CALL 的自动拷贝语义；而 RETURNDATASIZE
+    与 RETURNDATACOPY 读的是 `callengine_return_data_size_bytes` / `state.return_data`
+    这一对**独立**字段。x86 侧四个 host-call handler 都更新它们，EVM 侧此前完全不更新
+    ——于是 `CALL; RETURNDATASIZE` 两侧分叉（EVM 停在初始值，x86 已更新）。现有
+    fixture 都用 `create_initial_state(return_data_size_bytes=…)` 预设初值、没有
+    "CALL 之后再读" 的组合，所以这条缺口一直没被测到。
+
+    与 `_write_call_return_data` 的分工：那个写 **memory**（拷贝目的地），这个写
+    **return-data 源**（后续 RETURNDATA* 的读取对象），两者都要做。
+
+    **`return_size_bv` 必须是 host 实际返回的长度 `len(res)`，不是调用方给的
+    `retSize`**：自动拷贝只搬 min(retSize, len(res)) 字节，而 RETURNDATASIZE
+    看到的是完整的 len(res)。直接用 retSize 会让两侧同时把真实返回长度排除在
+    量化域外，混淆这两个量的 codegen 缺陷就会被共同错误掩盖。两侧取同名
+    `uninterpreted.*_return_size` UF ⇒ 取值相同、照常相消。
+    """
+    size_64 = truncate_to_64(return_size_bv)
+    idx = BitVec(f"{effect_tag}_returndata_idx", 64)
+    old_return_data = state.return_data
+    state.return_data = Lambda(
+        idx,
+        If(ULT(idx, size_64), return_byte_fn(idx), Select(old_return_data, idx)),
+    )
+    # pointer 是 host 返回的不透明地址：两侧取同名自由符号即可相等，语义上不被读。
+    state.callengine_return_data_pointer = BitVec(
+        f"{effect_tag}_returndata_ptr", 64
+    )
+    state.callengine_return_data_size_bytes = size_64
+
+
 def _write_symbolic_memory_slice(memory_state: EVMMemoryState,
                                  dest_offset_bv: BitVecRef,
                                  size_bv: BitVecRef,
@@ -1268,6 +1309,20 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # 下面没有任何比较指令。它与 host gas 耗尽同类：Go host 内 error 终止、不回写
         # native status，没有 x86 行为可以不一致（论证见 state/host_gas.py 模块 docstring）。
         charge_host_gas_uf(state, "CREATE", [value_bv, offset_bv, size_bv])
+        # CREATE 同样刷新 returndata（成功→空，revert→reason）。不刷新会保留
+        # 调用前的旧数据，那是不可能的真实状态。
+        _update_call_return_data_source(
+            state,
+            uninterpreted.create_return_size(
+                value_bv, offset_bv, size_bv,
+                state.evm_memory.Memory, effect_id=op.pc,
+            ),
+            lambda byte_index: uninterpreted.create_return_byte(
+                value_bv, offset_bv, size_bv,
+                state.evm_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_tag=f"create_{op.pc}",
+        )
         sub_return_gas(state, return_gas)
         return state
 
@@ -1292,6 +1347,18 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
         # 可见 fee + host UF 的分工同 CREATE（含 MAX_INIT_CODE_SIZE 的核对结论）。
         # fixture: gas_create2。
         charge_host_gas_uf(state, "CREATE2", [value_bv, offset_bv, size_bv, salt_bv])
+        _update_call_return_data_source(
+            state,
+            uninterpreted.create2_return_size(
+                value_bv, offset_bv, size_bv, salt_bv,
+                state.evm_memory.Memory, effect_id=op.pc,
+            ),
+            lambda byte_index: uninterpreted.create2_return_byte(
+                value_bv, offset_bv, size_bv, salt_bv,
+                state.evm_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_tag=f"create2_{op.pc}",
+        )
         sub_return_gas(state, return_gas)
         return state
 
@@ -1324,6 +1391,21 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             ),
             effect_id=op.pc,
             should_copy=should_copy,
+        )
+        # RETURNDATA 源与 memory 拷贝是两件事，两者都要做（见函数 docstring）。
+        _update_call_return_data_source(
+            state,
+            uninterpreted.call_return_size(
+                gas_bv, addr_bv, value_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, effect_id=op.pc,
+            ),
+            lambda byte_index: uninterpreted.call_return_byte(
+                gas_bv, addr_bv, value_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_tag=f"call_{op.pc}",
         )
         state.evm_stack = stack7.push(result)
         # host UF（依赖 7 个栈参数）+ 镜像 x86 host 调用前后的 dealWithAddGas/SubGas
@@ -1366,6 +1448,20 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             effect_id=op.pc,
             should_copy=should_copy,
         )
+        _update_call_return_data_source(
+            state,
+            uninterpreted.callcode_return_size(
+                gas_bv, addr_bv, value_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, effect_id=op.pc,
+            ),
+            lambda byte_index: uninterpreted.callcode_return_byte(
+                gas_bv, addr_bv, value_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_tag=f"callcode_{op.pc}",
+        )
         state.evm_stack = stack7.push(result)
         # 同 CALL：host UF（7 个栈参数）+ returnGas 链镜像。
         from state.host_gas import charge_host_gas_uf_with_return_gas
@@ -1404,6 +1500,20 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
             effect_id=op.pc,
             should_copy=should_copy,
         )
+        _update_call_return_data_source(
+            state,
+            uninterpreted.delegate_call_return_size(
+                gas_bv, addr_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, effect_id=op.pc,
+            ),
+            lambda byte_index: uninterpreted.delegate_call_return_byte(
+                gas_bv, addr_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_tag=f"delegatecall_{op.pc}",
+        )
         state.evm_stack = stack6.push(result)
         # 同 CALL：host UF + returnGas 链镜像，6 个栈参数（无 value）。
         from state.host_gas import charge_host_gas_uf_with_return_gas
@@ -1435,6 +1545,20 @@ def evm_operator_to_z3(op: EvmOperator, state: SMTState) -> SMTState:
                 old_memory.Memory, byte_index, effect_id=op.pc,
             ),
             effect_id=op.pc,
+        )
+        _update_call_return_data_source(
+            state,
+            uninterpreted.static_call_return_size(
+                gas_bv, addr_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, effect_id=op.pc,
+            ),
+            lambda byte_index: uninterpreted.static_call_return_byte(
+                gas_bv, addr_bv,
+                args_offset_bv, args_size_bv, ret_offset_bv, ret_size_bv,
+                old_memory.Memory, byte_index, effect_id=op.pc,
+            ),
+            effect_tag=f"staticcall_{op.pc}",
         )
         state.evm_stack = stack6.push(result)
         # 同 CALL：host UF + returnGas 链镜像，6 个栈参数（无 value）。
