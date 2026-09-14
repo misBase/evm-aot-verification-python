@@ -71,6 +71,7 @@ from z3 import (
     Lambda,
     Or,
     Select,
+    Store,
     ULE,
     simplify,
 )
@@ -212,6 +213,51 @@ def memory_coupling_condition(evm_state: SMTState, x86_state: SMTState,
     return evm_state.evm_memory.Memory == x86_memory_as_evm_view(x86_state)
 
 
+# Solidity 的 free memory pointer 常驻 `mem[0x40:0x60]`（32 字节大端）。
+FREE_MEMORY_POINTER_OFFSET = 0x40
+EVM_WORD_BYTES = 32
+
+
+def _read_evm_word(memory_view, offset: int):
+    """按 EVM 大端序从字节数组视图读一个 32 字节 word。
+
+    `Concat` 的首个参数是最高位，而 EVM 内存是大端 —— `offset+0` 就是最高
+    字节，所以这里的顺序**不能**反过来写。
+    """
+    return Concat(
+        *[
+            Select(memory_view, BitVecVal(offset + i, 64))
+            for i in range(EVM_WORD_BYTES)
+        ]
+    )
+
+
+def read_evm_memory_word(state: SMTState, offset: int):
+    """从 EVM 侧内存读一个 word。"""
+    return _read_evm_word(state.evm_memory.Memory, offset)
+
+
+def read_x86_memory_word(state: SMTState, offset: int):
+    """从 x86 侧读同一个 EVM 内存 word（经 R15 平移到 EVM offset 空间）。"""
+    return _read_evm_word(x86_memory_as_evm_view(state), offset)
+
+
+def write_evm_word(memory_array, offset: int, value: int):
+    """把一个 32 字节大端 word 写进 EVM 字节内存数组，返回新数组。
+
+    专门化 free memory pointer 时用。**调用方必须让两侧共用返回的这个数组**：
+    x86 侧的 `evm_mem` 是 `Lambda(a, Select(snapshot, a - r15))`，引用的是构造
+    时那个 array 变量；只改 EVM 侧会让两侧指向不同数组，`R` 的 memory 分量被
+    悄悄破坏（假绿方向）。
+    """
+    for i in range(EVM_WORD_BYTES):
+        byte = (value >> (8 * (EVM_WORD_BYTES - 1 - i))) & 0xFF
+        memory_array = Store(
+            memory_array, BitVecVal(offset + i, 64), BitVecVal(byte, 8)
+        )
+    return memory_array
+
+
 def host_gas_seq_of(state: SMTState, opcode: str):
     """取该 opcode 在 state 上的调用序号，缺键返回 0。
 
@@ -336,6 +382,11 @@ class RelationContext:
     bound_components: Tuple[str, ...]
     memory_snapshot: object
     stack_depth: int
+    # 块级 lock-step 的另两个专门化参数（方案 §2.3）。`None` = 不专门化，该量
+    # 保持自由符号。三者共同构成 theorem key —— 按一组参数证出的定理只能应用到
+    # 同组参数的到达状态上，这由 (H1)(H2)(H3) 三条闭包义务保证。
+    memory_size: Optional[int] = None
+    free_memory_pointer: Optional[int] = None
     notes: Tuple[str, ...] = ()
     # havoc 时注入的**域约束**（如 `MSize ≤ 4MiB`、32 字节对齐）。
     #
@@ -372,6 +423,12 @@ class CutpointRelationSchema:
         "live_stack_prefix",
         "memory",
         "memory_size",
+        # free memory pointer 专门化（docs/块级lockstep等价验证方案.md §4.1）。
+        # 它与 `memory_size` 必须**联合**注入：只钉 MSize 时块内的 `MLOAD(0x40)`
+        # 读的仍是被 havoc 的内存数组，free pointer 还是自由符号，
+        # `checkMemoryAndCalcDynamicGas` 的溢出检查链照样泡开。实测 CErc20
+        # pc=5343 只注 MSize 仍然 TIMEOUT，联合注入后 42.5s 收敛。
+        "free_memory_pointer",
         "memory_gas",
         "gas",
         "host_gas_seq",
@@ -512,6 +569,8 @@ class CutpointRelationSchema:
         host_gas_uf_enabled: bool = False,
         abstract_calldataload_words: bool = False,
         assume_calldata_offset_no_overflow: bool = True,
+        memory_size: Optional[int] = None,
+        free_memory_pointer: Optional[int] = None,
     ) -> RelationContext:
         """构造 havoc 后的 cutpoint 状态（§4.3）。
 
@@ -531,6 +590,11 @@ class CutpointRelationSchema:
                 循环体含 SLOAD/CALL/CREATE 等 host-gas opcode 时，归纳定理就
                 会在"完全不扣 host cost"的语义上证明——那与真实执行的路径集
                 不同，可能漏掉 host 参数传错、OOG 阈值偏移与 gas 终值差异。
+            memory_size: 入口 MSize 的专门化值；`None` 保持自由符号。给具体值
+                时**必须**同时给 `free_memory_pointer`（方案 §4.1 实测：单注
+                MSize 救不了 CErc20 pc=5343）。
+            free_memory_pointer: 入口 `mem[0x40]` 的专门化值；`None` 保持
+                havoc。它写在 memory 快照上，因此两侧天然共用同一数组。
 
         Returns:
             RelationContext，其中 `bound_components` 必须与 `_COMPONENTS` 一致。
@@ -624,6 +688,14 @@ class CutpointRelationSchema:
         memory_snapshot = _Array(
             f"{prefix}_evm_mem0", BitVecSort(64), BitVecSort(8)
         )
+        # free memory pointer 专门化必须发生在**建 x86 视图之前**：视图是
+        # `Lambda(a, Select(snapshot, a - r15))`，捕获的是此刻这个数组。先写后
+        # 建，两侧天然共用同一数组；反过来先建视图再改 EVM 侧，两侧就指向不同
+        # 数组而 `memory` 分量的等式仍然"成立"——那是假绿（方案 §4.1）。
+        if free_memory_pointer is not None:
+            memory_snapshot = write_evm_word(
+                memory_snapshot, FREE_MEMORY_POINTER_OFFSET, free_memory_pointer
+            )
         state.evm_memory.Memory = memory_snapshot
         r15 = state.callengine_memory_base
         addr = BitVec(f"{prefix}_mem_addr", 64)
@@ -631,8 +703,25 @@ class CutpointRelationSchema:
             [addr], Select(memory_snapshot, addr - r15)
         )
         bound.append("memory")
+        bound.append("free_memory_pointer")
 
-        mem_size = BitVec(f"{prefix}_memory_size_bytes", 64)
+        if memory_size is None:
+            mem_size = BitVec(f"{prefix}_memory_size_bytes", 64)
+        else:
+            # 专门化值必须自己落在域内，否则 `add_assumption` 会让整个 havoc
+            # 状态 unsat，任何义务都"证得过"——那是最危险的 vacuous 假绿。
+            # 这里当场拒绝，让调用方降级而不是放宽边界。
+            if memory_size > self.max_memory_size_bytes:
+                raise CutpointModelRangeError(
+                    f"specialized memory size 0x{memory_size:x} exceeds the "
+                    f"schema bound 0x{self.max_memory_size_bytes:x}"
+                )
+            if memory_size & 0x1F:
+                raise CutpointModelRangeError(
+                    f"specialized memory size 0x{memory_size:x} is not "
+                    "32-byte aligned"
+                )
+            mem_size = BitVecVal(memory_size, 64)
         # **这两条是定理的适用域，不是免费简化**：Base/application 必须在实际
         # 到达状态上重新证明它们（见 RelationContext.domain_predicate）；②
         # 还要在回边/出口处证明它们**闭合**（域内进、域内出）。上界取协议 cap
@@ -790,6 +879,8 @@ class CutpointRelationSchema:
             bound_components=tuple(bound),
             memory_snapshot=memory_snapshot,
             stack_depth=stack_depth,
+            memory_size=memory_size,
+            free_memory_pointer=free_memory_pointer,
             notes=notes,
             domain_constraints=tuple(domain_constraints),
             domain_predicate=_domain_predicate,
@@ -876,30 +967,70 @@ class CutpointRelationSchema:
         *,
         context: Optional[RelationContext] = None,
         memory_snapshot=None,
+        memory_size: Optional[int] = None,
+        free_memory_pointer: Optional[int] = None,
+        site: str = "entry",
     ) -> Tuple[RelationGoal, ...]:
         """产出与 `_COMPONENTS` 一一对应的 R 证明义务。
+
+        `site` 区分义务求在**块入口**还是**块出口**（块级 lock-step 需要，
+        循环归纳的 cutpoint 一律是入口）：
+
+        - `"entry"`：完整的 `stack_geometry`，含 `R14 == 栈基 + byte_offset`；
+        - `"exit"`：**省略 R14 那一项**。x86 在块内不维护 R14 与
+          `[R13+0x30]` 的同步，出口时 R14 仍是入口值；后继块的 TAG 序言
+          无条件执行 `mov r14,[r13+0x38]; add r14,[r13+0x30]` 把它重建
+          （`compileEVMTag`，impl_amd64.go:4283-4285）。因此只要 `byte_offset`
+          在出口正确（这仍是义务），R14 在后继块入口就必然正确。
+          **这是 codegen 的结构性质，不是假设**——但它依赖"后继块一定以 TAG
+          序言开头"，所以只对**块转移边**适用，terminal 路径不得使用。
 
         `context` 只在**归纳步**（对 havoc 状态求义务）传：它触发分量对称性
         断言。Base 与 certificate application 是对**实际到达状态**重新证明
         R（§4.3），那里没有 havoc 绑定可比，应改传 `memory_snapshot`——伪造
         一个"全绑定"的 context 会让守卫恒过，等于把它关掉。
+
+        `memory_size` / `free_memory_pointer` 是块级 lock-step 的专门化参数
+        （方案 §2.3）。传 `context` 时从它取，**调用方不得再显式传**——两处
+        给出不同的值意味着义务与 havoc 绑定不一致，那正是"定理证在 A 上、
+        应用到 B 上"的形态，所以这里当场拒绝而不是取其一。
         """
+        if site not in ("entry", "exit"):
+            raise ValueError(
+                f"unknown relation site {site!r}; expected 'entry' or 'exit'"
+            )
         if context is not None and memory_snapshot is not None:
             raise ValueError("context 与 memory_snapshot 互斥：前者已含快照")
         if context is not None:
+            if memory_size is not None or free_memory_pointer is not None:
+                raise ValueError(
+                    "context 已携带专门化参数，不得再显式传 memory_size / "
+                    "free_memory_pointer"
+                )
             memory_snapshot = context.memory_snapshot
+            memory_size = context.memory_size
+            free_memory_pointer = context.free_memory_pointer
         r14 = x86_state.x86_registers.get_register(Register.R14)
         r15 = x86_state.x86_registers.get_register(Register.R15)
 
         goals: Dict[str, object] = {
-            "stack_geometry": And(
-                evm_state.evm_stack.SP == IntVal(stack_depth),
-                x86_state.callengine_stack_byte_offset
-                == BitVecVal(stack_depth * STACK_ELEMENT_SIZE, 64),
-                r14
-                == x86_state.callengine_stack_base
-                + x86_state.callengine_stack_byte_offset,
-                r15 == x86_state.callengine_memory_base,
+            "stack_geometry": _and_all(
+                [
+                    evm_state.evm_stack.SP == IntVal(stack_depth),
+                    x86_state.callengine_stack_byte_offset
+                    == BitVecVal(stack_depth * STACK_ELEMENT_SIZE, 64),
+                    r15 == x86_state.callengine_memory_base,
+                    # R14 只在入口断言 —— 出口时它尚未被重建，见 docstring。
+                    *(
+                        []
+                        if site == "exit"
+                        else [
+                            r14
+                            == x86_state.callengine_stack_base
+                            + x86_state.callengine_stack_byte_offset
+                        ]
+                    ),
+                ]
             ),
             "live_stack_prefix": _and_all(
                 evm_state.evm_stack.peek(index)
@@ -909,9 +1040,41 @@ class CutpointRelationSchema:
             "memory": memory_coupling_condition(
                 evm_state, x86_state, memory_snapshot
             ),
-            "memory_size": (
-                evm_state.evm_memory.MSize
-                == x86_state.callengine_memory_size_bytes
+            "memory_size": _and_all(
+                [
+                    evm_state.evm_memory.MSize
+                    == x86_state.callengine_memory_size_bytes,
+                    # 专门化时**两侧各自**都要钉到具体值。只写"两侧相等"会让
+                    # 定理在任意 MSize 上成立，却被应用到按具体值证出的结论上
+                    # ——专门化参数必须自己进义务，否则 (H1) 到达覆盖形同虚设。
+                    *(
+                        []
+                        if memory_size is None
+                        else [
+                            evm_state.evm_memory.MSize
+                            == BitVecVal(memory_size, 64),
+                            x86_state.callengine_memory_size_bytes
+                            == BitVecVal(memory_size, 64),
+                        ]
+                    ),
+                ]
+            ),
+            # 未专门化时恒真：`memory` 分量已保证两侧内存数组相等，此时这条
+            # 不携带额外信息。专门化时它是 (H1) 的一半——到达状态的 free
+            # pointer 必须真的是那个值，两侧各自证。
+            "free_memory_pointer": (
+                BoolVal(True)
+                if free_memory_pointer is None
+                else And(
+                    read_evm_memory_word(
+                        evm_state, FREE_MEMORY_POINTER_OFFSET
+                    )
+                    == BitVecVal(free_memory_pointer, 256),
+                    read_x86_memory_word(
+                        x86_state, FREE_MEMORY_POINTER_OFFSET
+                    )
+                    == BitVecVal(free_memory_pointer, 256),
+                )
             ),
             # 两侧 lastGasCost 相等 **且** 各自是 MSize 的函数。只证两侧相等是
             # 健全性最低要求；补上派生不变式才能让 havoc 不过近似（§4.1）。
