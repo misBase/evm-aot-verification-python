@@ -45,6 +45,11 @@ def _probe(kind, fn):
         result = fn(*args, **kwargs)
         caller = sys._getframe(1).f_code.co_name
         hit = result is not None
+        if len(args) > 3 and isinstance(args[3], dict):  # unsat_core outcome: sat / unknown / unsat
+            kind_answer = args[3].get("answer", "?")
+            entry = PROBES.setdefault(f"{kind}:{kind_answer}", {"n": 0, "s": 0.0})
+            entry["n"] += 1
+            entry["s"] += monotonic() - started
         route = STACK[-1].route if STACK else "-"
         entry = PROBES.setdefault(f"{kind}<{caller}@{route}", {"hit": 0, "miss": 0, "hit_s": 0.0, "miss_s": 0.0})
         entry["hit" if hit else "miss"] += 1
