@@ -44,8 +44,6 @@ CFG 用**上下文敏感**版本（返回地址影子栈）。裸的 ``build_evm
 
 from __future__ import annotations
 
-import os
-import sys
 from collections import Counter
 from dataclasses import dataclass
 from typing import (
@@ -61,6 +59,11 @@ from typing import (
 )
 
 from evm_ir.models import EVMBlock, EvmOperator
+from tools.call_provenance import (
+    CallProvenanceError,
+    ReturnAwareCfg,
+    build_return_aware_cfg,
+)
 from verification.loop_pairing import _evm_control_op
 
 
@@ -776,26 +779,17 @@ def _returned_address(block: EVMBlock, state: _AbstractState) -> object:
 # ---------------------------------------------------------------------------
 
 
-def _load_call_provenance_module():
-    """加载返回地址影子栈所需的 CFG 构造。
+def _build_return_aware_cfg(blocks: Sequence[EVMBlock]) -> ReturnAwareCfg:
+    """返回地址影子栈所需的 CFG（``by_pc / succs / pads / ret_points / entry``）。
 
-    TODO(阶段 0): 目前直接用原型 ``tmp/prov_common.py``；方案 §3.2 的
-    ``tools/call_provenance.py`` 固化完成后切过去（只需要 ``Prog`` 的
-    ``by_pc / succs / pads / ret_points / entry`` 五个字段），并删掉这里的路径注入。
+    取自 ``tools/call_provenance.py``（方案 §3.2），与深度类分析同源同口径。其
+    结构性拒绝（未解析动态跳转、JUMPI 返回形态等）转成 :class:`MSizeAnalysisError`，
+    保持本模块"只抛一种异常"的 fail-closed 约定。
     """
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    prototype_dir = os.path.join(repo_root, "tmp")
-    if prototype_dir not in sys.path:
-        # 追加而非插到最前：tmp 里全是原型脚本，让它优先于项目包解析 import 会
-        # 埋下难查的模块遮蔽。
-        sys.path.append(prototype_dir)
     try:
-        import prov_common  # type: ignore[import-not-found]
-    except ImportError as exc:  # pragma: no cover - 环境损坏时的 fail-closed
-        raise MSizeAnalysisError(
-            f"无法加载返回地址影子栈的 CFG 构造（{prototype_dir}/prov_common.py）：{exc}"
-        ) from exc
-    return prov_common
+        return build_return_aware_cfg(blocks)
+    except CallProvenanceError as exc:
+        raise MSizeAnalysisError(f"无法建立返回地址影子栈的 CFG：{exc}") from exc
 
 
 def _pads_pushed(block: EVMBlock, pads: Set[int]) -> Tuple[int, ...]:
@@ -966,8 +960,7 @@ def analyze_memory_size(
                 f"（{len(mismatches)} 块），前几处：{mismatches[:5]}"
             )
 
-    provenance = _load_call_provenance_module()
-    graph = provenance.Prog(blocks)
+    graph = _build_return_aware_cfg(blocks)
     by_pc, succs = graph.by_pc, graph.succs
     push_map = {b.pc: _pads_pushed(b, graph.pads) for b in blocks}
 

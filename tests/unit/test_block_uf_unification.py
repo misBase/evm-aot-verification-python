@@ -19,6 +19,20 @@ def answer(formula):
     return solver.check()
 
 
+# Deterministic budget for queries too heavy for answer()'s 3s wall clock.
+# z3 4.15.4: the 8-store offset-view rewrite check costs ~13-15M rlimit
+# (2.5-3.3s unloaded), the step-lemma re-check ~1-2M; 200M leaves >10x margin
+# and does not depend on machine load.
+_RLIMIT = 200_000_000
+
+
+def answer_rlimit(formula, rlimit=_RLIMIT):
+    solver = Solver()
+    solver.set(rlimit=rlimit)
+    solver.add(formula)
+    return solver.check()
+
+
 def test_entailed_argument_equality_is_merged():
     c = BitVec("unify_c", 64)
     formula = And(c != 0, h(If(c == 0, 5, c + 1)) != h(c + 1))
@@ -354,14 +368,14 @@ def _step_lemma_chain(prefix, address=lambda r15, p, k: r15 + p + k, index=lambd
 def test_offset_view_step_lemma_proves_the_rewrite_without_per_read_queries(monkeypatch):
     M, p, q, old = _step_lemma_chain("sl")
     new = simplify(be._offset_view_select(old), bv_sort_ac=True)
-    assert answer(Not(old == new)) == unsat                       # the rewrite is right
+    assert answer_rlimit(Not(old == new)) == unsat                # the rewrite is right
     monkeypatch.setattr(be, "_offset_view_identity", lambda *a: pytest.fail("per-read solver proof used"))
     proof = be._identity_proof(old, new)
     assert [l.name for l in proof] == ["offset_view_step_lemma"] and proof[0].answer == "unsat"
     from z3 import Array, parse_smt2_string
     decls = {f"ov_step_{n}": BitVec(f"ov_step_{n}", 64) for n in "boi"}
     decls.update(ov_step_v=BitVec("ov_step_v", 8), ov_step_Y=Array("ov_step_Y", BitVecSort(64), BitVecSort(8)))
-    assert answer(parse_smt2_string(f"(assert {proof[0].formula})", decls=decls)[0]) == unsat  # recorded lemma re-checked
+    assert answer_rlimit(parse_smt2_string(f"(assert {proof[0].formula})", decls=decls)[0]) == unsat  # recorded lemma re-checked
     # The rewrite's normalisation record carries the lemma it rests on.
     _, lemmas = be.normalize_word_arith(old == 0)
     assert any(l.lemmas and l.lemmas[0].name == "offset_view_step_lemma" and l.proved for l in lemmas)
