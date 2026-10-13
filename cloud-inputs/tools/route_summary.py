@@ -48,7 +48,7 @@ def main():
             if per:
                 part = frame["name"].rsplit("_goal_", 1)[-1] if "_goal_" in frame["name"] else "-"
                 print(f"   part {part}: won by {winner and winner[0]} ({winner and winner[1]}s) after {before:.1f}s"
-                      f" of failed stages; marks: " + " ".join(f"{l}={a and a[0]}{s}" for l, a, s in frame["marks"]
+                      f" of failed stages; marks: " + " ".join(f"{l}={a and a[:3]}:{s}" for l, a, s in frame["marks"]
                                                             if l not in ("gap", "pre-normalize")))
         if per and data.get("probes"):
             print("   probes:", json.dumps(data["probes"]))
