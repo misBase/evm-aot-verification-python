@@ -18,7 +18,7 @@
 6. 两个上下文最后卡住的 `pair_63_10`（a）和 `pair_68_8`（b）**都不是 "all" 行产生的义务**：
    - 它们是 P4 给出映射的行（a 的第 10 行映射到 EVM 63，b 的第 8 行映射到 EVM 68）。对应的 `x86_maps_j_*` 都已证明，这就是该行唯一的 pair 义务。
    - 卡住的原因是 terminal pair 本身难证，和 correspondence 无关：同一个 `pair_63_10` 在 b 里 1139s 就证出来了，`pair_68_8` 在 a 里 1429s 证出来了。
-   - 所以不存在需要通用修复的"P4 没给出映射"问题。剩下的缺口属于任务 A（pair58 的 light-premise 修法）的范围；离线结果见第 4 节。
+   - 所以不存在需要通用修复的"P4 没给出映射"问题。剩下的缺口属于任务 A（pair58 的 light-premise 修法）的范围：离线重跑时，r37c 加上 A 的修法后 `pair_63_10` 801s、`pair_68_8` 976s 均证出，不加则两条都是 unknown（见第 4 节）。
 
 ## 1. 改动位置
 
@@ -166,7 +166,22 @@ opt = r37c（snap-r35b + P1–P6），`stage-*`；base = snap-r35b，`base-*`。
 
 ## 4. 离线验证数据
 
-（见下方"离线检查"小节，运行完后填写。）
+用 `cloud-inputs/tools/check_obligation.py`（生产 `_check`，每条查询 30s，每个义务 1800s）在本地重跑 r37c 两个上下文里卡住的 SMT2：
+
+- 环境：4 核 Linux；4 个任务同时跑，每个占一个核；
+- 两份代码：本分支的代码副本（"r37c"），以及在它上面再打 `cloud-inputs/pair58/fix.diff`（任务 A 的 light-premise 修法，3 个 hunk 都能干净应用，只有行号偏移）的副本（"r37c+A"）。
+
+| 义务 | 服务器 r37c（3 worker 节点内） | 本地 r37c | 本地 r37c+A |
+|---|---|---|---|
+| a `pair_63_10_f768074e3e1a` | unknown 2988s | unknown 1457s（3 个 lemma；所有路由都试过后放弃） | **proved 801s**（7 个 lemma） |
+| b `pair_68_8_ade8b21d7787` | unknown 3486s | unknown 1436s（3 个 lemma） | **proved 976s**（7 个 lemma） |
+
+结论：
+
+- 卡住的原因不是 P1–P6。不加 A 的修法，本地同样证不出；加上之后两条都在 1000s 内证出。
+- 所以 5377 剩下的缺口就是 pair 义务的求解难度，任务 A 的修法正好对症。
+- 下一步：在服务器上用 r37c+A（等于本分支加上任务 A 的分支）全量重跑 5377 的 a、b 两个上下文。
+- 本地只验证了这两条义务。同一节点其他 pair 义务在 r37c+A 下是否有回归，需要看任务 A 的回归数据（`reg_patched.log` 对 `reg_base.log`）和服务器全量结果。
 
 ## 5. 测试结果
 
