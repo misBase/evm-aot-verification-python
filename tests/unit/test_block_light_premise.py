@@ -59,7 +59,7 @@ def test_light_premise_keeps_conjuncts_under_a_binder():
 def test_prove_equal_light_proof_transfers_to_premises_with_other_heavy_conjuncts():
     cache = {}
     assert be._prove_equal(And(a == b, x * y == w), a, b, 2000, None, cache) is not None
-    (used, _), = cache[tuple(sorted((a.get_id(), b.get_id())))]
+    (used, _, _), = cache[tuple(sorted((a.get_id(), b.get_id())))]
     assert used == frozenset({(a == b).get_id()})
     assert be._prove_equal(And(a == b, x * y == w + 1), a, b, 2000, None, cache) is not None
     # Soundness: equal only through the products, so the light route finds nothing.
