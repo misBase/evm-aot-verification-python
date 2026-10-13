@@ -20,9 +20,9 @@ def answer(formula):
 
 
 # Deterministic budget for queries too heavy for answer()'s 3s wall clock.
-# z3 4.15.4: the 8-store offset-view rewrite check costs ~13-15M rlimit
-# (2.5-3.3s unloaded), the step-lemma re-check ~1-2M; 200M leaves >10x margin
-# and does not depend on machine load.
+# z3 4.15.4, unloaded: the 8-store offset-view rewrite check costs ~13-15M
+# rlimit (2.5-3.3s), the second telescope identity 3-7M (1.8-5.5s); 200M leaves
+# >10x margin and does not depend on machine load.
 _RLIMIT = 200_000_000
 
 
@@ -311,7 +311,7 @@ def test_div_quotient_axioms_are_valid_and_guarded():
     x, y = BitVec("dq_x", 64), BitVec("dq_y", 64)
     q = UDiv(Concat(BitVecVal(0, 64), x), ZeroExt(64, y))
     (axiom,) = be.div_quotient_axioms([q == 0])
-    assert answer(Not(axiom)) == unsat
+    assert answer_rlimit(Not(axiom)) == unsat
     assert be.div_quotient_axioms([UDiv(Concat(y, x), ZeroExt(64, y)) == 0]) == ()  # dividend may exceed 2^64
 
 
@@ -610,7 +610,7 @@ def test_telescope_step_is_an_identity():
     for t in (If(c == 1, BitVecVal(0, 64), x - y + 3 * z), If(ULE(c, x), x - 5 * y, BitVecVal(0, 64))):
         t = simplify(t)
         new = be._telescope_step(t)
-        assert new is not None and answer(Not(t == new)) == unsat
+        assert new is not None and answer_rlimit(Not(t == new)) == unsat
     assert be._telescope_step(simplify(If(c == 1, BitVecVal(0, 64), x + y))) is None  # nothing subtracted
 
 
