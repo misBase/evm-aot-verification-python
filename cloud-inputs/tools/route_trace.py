@@ -29,7 +29,7 @@ PROBES = {}
 
 class Frame:
     def __init__(self, name):
-        self.name, self.marks, self.last = name, [], monotonic()
+        self.name, self.marks, self.last, self.route = name, [], monotonic(), "pre"
         FRAMES.append(self)
 
     def mark(self, label, answer=None):
@@ -44,7 +44,8 @@ def _probe(kind, fn):
         result = fn(*args, **kwargs)
         caller = sys._getframe(1).f_code.co_name
         hit = result is not None
-        entry = PROBES.setdefault(f"{kind}<{caller}", {"hit": 0, "miss": 0, "hit_s": 0.0, "miss_s": 0.0})
+        route = STACK[-1].route if STACK else "-"
+        entry = PROBES.setdefault(f"{kind}<{caller}@{route}", {"hit": 0, "miss": 0, "hit_s": 0.0, "miss_s": 0.0})
         entry["hit" if hit else "miss"] += 1
         entry["hit_s" if hit else "miss_s"] += monotonic() - started
         return result
@@ -65,9 +66,12 @@ def _instrumented_check():
 
     insert("started = monotonic()", "_tr = _Frame(name); _STACK.append(_tr)")
     insert("answer = solve_query(simplify(formula), min(timeout, _QUICK_EXACT_MS))", "_tr.mark('quick0', answer)")
-    insert("proved, answer, lemmas = self._retry_over_lia(formula)", "_tr.mark('pin', answer)", after=False, up=1)
-    insert("proved, answer, lemmas = self._retry_over_lia(formula)", "_tr.mark('lia', answer)")
-    insert("for index, (route, norm) in enumerate(routes):", "_tr.mark('gap')")
+    if any("proved, answer, lemmas = self._retry_over_lia(formula)" in l for l in lines):  # LIA before the route loop
+        insert("proved, answer, lemmas = self._retry_over_lia(formula)", "_tr.mark('pin', answer)", after=False, up=1)
+        insert("proved, answer, lemmas = self._retry_over_lia(formula)", "_tr.mark('lia', answer)")
+    else:  # LIA is a route of the loop (marked there)
+        insert("# Same routes either way", "_tr.mark('pin', answer)", after=False, up=1)
+    insert("for index, (route, norm) in enumerate(routes):", "_tr.mark('gap'); _tr.route = route + ('*' if norm else '')")
     insert("continue  # nothing rewritten", "_tr.mark('skip:' + route)", after=False)
     insert("ours = self._potential_pending", "_tr.mark(route + ('*' if norm else ''), answer)", after=False)
     insert("record = Obligation(name, proved.sexpr(), answer, expected, monotonic() - started,",
