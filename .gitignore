@@ -52,3 +52,6 @@ htmlcov/
 *.dot
 .codegraph/
 tmp
+# one-off diagnostic scripts and run reports
+tmp_*.py
+docs/reports/
