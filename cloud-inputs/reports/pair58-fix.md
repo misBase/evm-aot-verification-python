@@ -7,7 +7,7 @@
 - `cloud-inputs/pair58/fix.diff` 的修法已正式实现到 `verification/block_equivalence.py`，并补了 7 条单元测试。实现与补丁只有一处不同：补丁里的 2s 探针没有受节点 deadline 约束，现在加了约束，剩余预算 ≤0 时直接跳过（z3 的 timeout=0 表示不限时，不加这个检查会失控）。
 - 健全性：修法只会去掉一部分合取项。去掉合取项只会增加模型，所以只有 UNSAT 能传回原式；SAT 或 unknown 都退回原路线，不产生任何结论。
 - 回归（服务器 reg_base 对比 reg_patched，共 22 条义务）：没有 unsat 变成别的答案，也没有 sat 变成 unsat。共 4 条答案变化，都能用时间预算解释（见 §5）。
-- 离线验证（云端 4 核，4 路并行，每条 1800s）：修法后 `pair_58_13`、`pair_58_12`、`pair_63_10`、`pair_68_8` 均 proved，其中 `pair_58_13`、`pair_63_10`、`pair_68_8` 修法前都是 unknown；`pair_58_12` 修法前离线也能证（620s）。`pair_68_9` 在并行负载下修法前后都是 unknown，单独重跑的结果见 §6。
+- 离线验证（云端 4 核，4 路并行，每条 1800s）：修法后 `pair_58_13`、`pair_58_12`、`pair_63_10`、`pair_68_8` 均 proved，其中 `pair_58_13`、`pair_63_10`、`pair_68_8` 修法前都是 unknown；`pair_58_12` 修法前离线也能证（620s）。`pair_68_9` 在 4 路并行下修法前后都是 unknown，修法后单独重跑 proved 930.7s（服务器 833s），说明并行时的 unknown 来自 CPU 争用。
 - 全量快测：1579 passed，2 skipped，35 failed。35 条失败全部是已知例外 `test_msize_absint`（依赖被忽略的 `tmp/prov_common.py`），除此之外没有失败。
 
 ## 2. 根因
@@ -69,7 +69,7 @@
 |---|---|---|
 | cap5377d30-local `pair_58_13_82bafc15a954` (a) | unknown 1402.7s | **proved 813.1s** (lemmas=7) |
 | cap5377d30-local `pair_58_12_7495947f8f3d` (b) | proved 619.7s | proved 808.2s |
-| cap5377d30-local `pair_68_9_bceb041a18a6` (a) | unknown 1434.4s | unknown 1570.3s（4 路并行）；单独重跑：SOLO_68_9 |
+| cap5377d30-local `pair_68_9_bceb041a18a6` (a) | unknown 1434.4s | unknown 1570.3s（4 路并行）；单独重跑（无并行）：**proved 930.7s** (lemmas=7) |
 | r37c `smt2-a/pair_63_10_f768074e3e1a` (a) | unknown 1427.6s | **proved 795.4s** |
 | r37c `smt2-b/pair_68_8_ade8b21d7787` (b) | unknown 1435.3s | **proved 1009.6s** |
 
@@ -87,7 +87,7 @@
 
 ## 8. 未解决的问题
 
-- `pair_68_9`：在云端 4 路并行下修法前后都是 unknown，单独重跑的结论见 §6 表格。服务器上它在 833s 内 proved，靠的是 unify 路线里的 `opaque_array_uf_light`。如果服务器全量跑时它仍然卡住，就是节点预算分摊问题（P1–P6 提速，即任务 B 的范围），不是本修法的问题。
+- `pair_68_9`：在云端 4 路并行下修法前后都是 unknown，修法后单独重跑 proved 930.7s，离 1800s 上限不远，说明它对 CPU 争用敏感；修法前没有单独重跑（基线并行时 unknown 1434s）。服务器上它在 833s 内 proved，靠的是 unify 路线里的 `opaque_array_uf_light`。如果服务器全量跑时它仍然卡住，就是节点预算分摊问题（P1–P6 提速，即任务 B 的范围），不是本修法的问题。
 - 成本：每次不命中的 `_prove_equal` 多 0.2–0.5s（一次化简加一次短求解）。回归里 pair_52_16、pair_67_9 明显变慢，但答案没变。如有需要，可以在前提中没有重项时跳过化简（现在已经是"无可去项直接返回"，开销主要来自 `_heavy` 的遍历和查询本身）。
 - 补丁的轻前提没有对 light 合取项做 hide（与 unsat_core 路线不一致）。为了与服务器验证过的行为保持一致，这里没有改；两种写法都健全。
 - 本地数据只覆盖上面 5 条义务和服务器回归的 22 条义务，两个上下文的全量节点验证需要在服务器上跑。
