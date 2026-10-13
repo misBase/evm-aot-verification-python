@@ -1845,11 +1845,17 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
 
     `cache` (optional dict) reuses a refutation found under conjuncts Q ⊆ the
     current premise's conjuncts: P ⊇ Q, so P ∧ x≠y is UNSAT too. Failures are
-    only reused for premises no stronger than the failed one (time saving)."""
+    only reused for premises no stronger than the failed one (time saving).
+
+    Keys and conjunct sets are AST ids, and the cache outlives the formulas
+    they came from: a proof entry keeps x, y and its conjuncts alive (third
+    field), so none of its ids can be recycled for another term while cached
+    (a recycled one could match a premise that does not imply x = y). A
+    failure entry holds nothing: a false match there only costs a miss."""
     conjuncts = frozenset(c.get_id() for c in _conjuncts(premise))
     key = tuple(sorted((x.get_id(), y.get_id())))
     if cache is not None:
-        for used, proofs in cache.get(key, ()):
+        for used, proofs, _alive in cache.get(key, ()):
             if proofs is not None and used <= conjuncts:
                 return proofs
             if proofs is None and conjuncts <= used:
@@ -1860,25 +1866,26 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     light_ms = min(budget_ms, _LIGHT_MS)
     if deadline is not None:
         light_ms = min(light_ms, int((deadline - monotonic()) * 1000))
-    proofs = _refute_over_light_premise(_conjuncts(premise), hide(differ), light_ms)
+    parts = _conjuncts(premise)
+    proofs = _refute_over_light_premise(parts, hide(differ), light_ms)
     if proofs is not None:
         if cache is not None:
-            cache.setdefault(key, []).append((proofs[1], proofs[0]))
+            kept = [c for c in parts if c.get_id() in proofs[1]]
+            cache.setdefault(key, []).append((proofs[1], proofs[0], (x, y, *kept)))
         return proofs[0]
     if cache is not None:
         # Cache only the conjuncts the refutation used (unsat core), so the
         # lemma transfers to sibling pairs whose path conditions differ.
-        parts = _conjuncts(premise)
         started = monotonic()
         used = unsat_core([hide(c) for c in parts], hide(differ), min(budget_ms, 2000))
         if used is not None:
             used = [parts[i] for i in used]
             proofs = [(And(*(hide(c) for c in used), hide(differ)), monotonic() - started)]
-            cache.setdefault(key, []).append((frozenset(c.get_id() for c in used), proofs))
+            cache.setdefault(key, []).append((frozenset(c.get_id() for c in used), proofs, (x, y, *used)))
             return proofs
     proofs = _refute_by_cases(hide(premise), hide(differ), budget_ms, deadline)
     if cache is not None:
-        cache.setdefault(key, []).append((conjuncts, proofs))
+        cache.setdefault(key, []).append((conjuncts, proofs, () if proofs is None else (x, y, *parts)))
     return proofs
 
 
