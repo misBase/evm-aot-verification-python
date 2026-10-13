@@ -176,7 +176,13 @@ new 两个上下文合计，unsat_core 探针 1023 次：sat 765 次（这些 ca
 
 ## 5. 测试结果
 
-TBD
+- 全量快测：`PYTHONPATH=. poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider -n 2 -rf`（与 A/B 的 base 进程同时跑，未加 `-x`，否则会停在第一个已知失败上）：**1609 passed、2 skipped、35 failed，747s**。35 条失败**全部**是已知例外 `tests/unit/test_msize_absint.py::*`（依赖被忽略的 `tmp/prov_common.py`），除此之外没有失败。
+- `test_block_uf_unification.py::test_offset_view_step_lemma_proves_the_rewrite_without_per_read_queries` 在开发中、机器上同时有 5 个求解进程时失败过一次（`assert unknown == unsat`，测试内部 3s 超时，b3b-port 报告里也记录过同一现象）；全量快测和按节点 ID 重跑都通过。
+- 新测试按节点 ID 逐个跑过（`-v`），14 个全部被收集到，全部 passed，没有同名覆盖：
+  - `tests/unit/test_block_route_order.py`（8 个）：类别划分；没有统计时顺序不变；按每秒证出数排序；赢家对同类兄弟提前、对别的类别不提前；`BLOCK_ROUTE_ORDER=static` 保持原表；被提前的路由失败后其余路由按原序全部尝试；没有路由成功时仍是 unknown；被提前的路由拿 1/2 剩余时间。
+  - `tests/unit/test_block_prove_equal_sat.py`（6 个）：core 为 sat 时跳过 case tree 并登记失败；没有缓存时 case tree 照常跑；core unknown 时 case tree 照常跑并能证出；被蕴含的等式仍然证出；缓存条目持有项；`_heavy`、`_no_binder` 的缓存版本与遍历版本一致。
+- 变异测试：把 `if outcome.get("answer") == "sat":` 改成 `if False:`，`test_satisfiable_difference_skips_the_case_tree` 失败。用 `BLOCK_ROUTE_ORDER=static` 关闭排序后，`test_route_that_refuted_a_class_goes_first_for_its_siblings`、`test_promoted_route_failing_falls_back_to_every_other_route`、`test_promoted_route_gets_half_of_what_is_left` 这 3 个失败，其余 5 个照常通过（它们本来就不依赖排序）。
+- 现有测试的两处适配（只改桩，不改断言）：`test_block_uf_unification.py:77` 的 `unsat_core` 桩加上可选参数 `outcome=None`；`test_block_light_premise.py:62` 按三元组解包缓存条目。
 
 ## 6. 未解决的问题
 
