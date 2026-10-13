@@ -2963,7 +2963,9 @@ class BlockEquivalenceProver:
                 budget = min(budget, int((self.deadline - monotonic()) * 1000))
             if budget <= 0:
                 raise ProofBudgetExceeded("proof wall budget exhausted")
-            answer = prefix.check([premise, *_ordered_conjuncts(x.condition)], budget, "correspondence")
+            # Wall clock = the budget, as the fresh per-row solver had (not the
+            # reachability 10x safety net): a row must not overrun the node deadline.
+            answer = prefix.check([premise, *_ordered_conjuncts(x.condition)], budget, "correspondence", budget)
             if answer not in (sat, unsat):
                 unknown.append(j)
             if answer == unsat:

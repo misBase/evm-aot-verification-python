@@ -32,12 +32,16 @@ REACHABILITY_RLIMIT_PER_MS = 10000
 REACHABILITY_WALL_SAFETY_FACTOR = 10
 
 
-def _bounded_check(solver, timeout_ms, tag):
-    """solver.check() under the reachability budget; any non-UNSAT keeps the path."""
+def _bounded_check(solver, timeout_ms, tag, wall_ms=None):
+    """solver.check() under the reachability budget; any non-UNSAT keeps the path.
+
+    `wall_ms` replaces the wall-clock safety net (timeout_ms x the factor) for
+    callers whose budget is a wall-clock budget against a deadline."""
     if timeout_ms is not None and timeout_ms > 0:
         cap = 2**32 - 1  # both are unsigned-int Z3 params
+        wall = timeout_ms * REACHABILITY_WALL_SAFETY_FACTOR if wall_ms is None else max(wall_ms, 1)
         solver.set("rlimit", min(timeout_ms * REACHABILITY_RLIMIT_PER_MS, cap))
-        solver.set("timeout", min(timeout_ms * REACHABILITY_WALL_SAFETY_FACTOR, cap))
+        solver.set("timeout", min(wall, cap))
     stats = os.environ.get("REACH_STATS_FILE")
     if not stats:
         return solver.check()
@@ -77,7 +81,7 @@ class PrefixSolver:
         self.solver.reset()
         self.stack = []
 
-    def check(self, conjuncts, timeout_ms, tag="incremental"):
+    def check(self, conjuncts, timeout_ms, tag="incremental", wall_ms=None):
         if self.solver.num_scopes() != len(self.stack):
             self.reset()
         common = 0
@@ -96,7 +100,7 @@ class PrefixSolver:
         except BaseException:
             self.reset()
             raise
-        return _bounded_check(self.solver, timeout_ms, tag)
+        return _bounded_check(self.solver, timeout_ms, tag, wall_ms)
 
 
 class X86Constraints:
