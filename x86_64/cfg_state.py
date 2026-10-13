@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import time
 from typing import List, Optional, Dict, TYPE_CHECKING
-from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, is_true, And
+from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, unknown, is_true, And
 
 from state.smt_state import SMTState
 
@@ -50,6 +50,53 @@ def _bounded_check(solver, timeout_ms, tag):
     with open(stats, "a") as log:
         log.write(f"{tag} {result} {time.monotonic() - started:.4f} {spent}\n")
     return result
+
+
+class PrefixSolver:
+    """One incremental solver, one push scope per conjunct.
+
+    A query pops back to the longest common prefix (by AST id) with the
+    previous query and pushes the rest, so sibling and descendant paths reuse
+    the internalized terms and learned clauses (Safe 5377: 958 reachability
+    queries 482s -> 86s). At every check the assertions are exactly
+    `conjuncts`: pop retracts a scope's assertion together with every clause
+    learned from it, so UNSAT here is UNSAT of the conjunction. The asserted
+    ASTs are kept in `stack`, which keeps their ids from being reused.
+
+    That needs scope k to hold exactly stack[k]. An exception between push,
+    add and append (an interrupt, a Z3 error) could break it and leave an
+    assertion no query asked for, so any failure while syncing resets the
+    solver, and a scope count off from `stack` resets it before the check.
+    """
+
+    def __init__(self, solver=None):
+        self.solver = solver if solver is not None else SolverFor("QF_AUFBV")
+        self.stack: List[BoolRef] = []
+
+    def reset(self):
+        self.solver.reset()
+        self.stack = []
+
+    def check(self, conjuncts, timeout_ms, tag="incremental"):
+        if self.solver.num_scopes() != len(self.stack):
+            self.reset()
+        common = 0
+        for old, new in zip(self.stack, conjuncts):
+            if old.get_id() != new.get_id():
+                break
+            common += 1
+        try:
+            if len(self.stack) > common:
+                self.solver.pop(len(self.stack) - common)
+                del self.stack[common:]
+            for conjunct in conjuncts[common:]:
+                self.solver.push()
+                self.stack.append(conjunct)
+                self.solver.add(conjunct)
+        except BaseException:
+            self.reset()
+            raise
+        return _bounded_check(self.solver, timeout_ms, tag)
 
 
 class X86Constraints:
@@ -121,11 +168,14 @@ class X86Constraints:
         """约束数量。"""
         return len(self._constraints)
 
-    def is_possible(self, solver_timeout: Optional[int] = None) -> bool:
+    def is_possible(self, solver_timeout: Optional[int] = None,
+                    prefix_solver: Optional[PrefixSolver] = None) -> bool:
         """检查约束是否可满足（可达性检查）。
 
         Args:
             solver_timeout: 求解器超时时间（毫秒）
+            prefix_solver: 执行器持有的增量 solver（见 PrefixSolver）；None
+                时每次新建 solver
 
         Returns:
             如果约束可满足则返回 True
@@ -138,6 +188,27 @@ class X86Constraints:
         if self._witness is not None and is_true(
                 self._witness.eval(self.as_bool(), model_completion=True)):
             return True
+        timeout_ms = (
+            solver_timeout
+            if solver_timeout is not None
+            else DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS
+        )
+        from verification.block_equivalence import abstract_nonlinear_mul  # lazy: layer cycle
+        if prefix_solver is not None:
+            # Exact query first, incrementally (same rlimit budget). Only an
+            # unknown pays for the bvmul->UF probe on a fresh solver: its UNSAT
+            # is exact UNSAT (see below); anything else keeps the path.
+            conjuncts = list(self._constraints) + list(self.flag_constraints.values())
+            result = prefix_solver.check(conjuncts, timeout_ms)
+            self._witness = prefix_solver.solver.model() if result == sat else None
+            if result != unknown:
+                return result == sat
+            relaxed, changed = abstract_nonlinear_mul(self.as_bool())
+            if changed:
+                probe = SolverFor("QF_AUFBV")
+                probe.add(relaxed)
+                return _bounded_check(probe, timeout_ms, "probe") != unsat
+            return True
         # 全符号场景下，calldata/storage 是 Z3 Array，约束含 Array Select。默认的
         # 通用 Solver() 会尝试组合多种理论，bit-blast 慢；QF_AUFBV 直接走 array
         # + bit-vector + uninterpreted-function tactic，对我们用到的形式更快。
@@ -147,18 +218,11 @@ class X86Constraints:
         for flag_cond in self.flag_constraints.values():
             solver.add(flag_cond)
 
-        timeout_ms = (
-            solver_timeout
-            if solver_timeout is not None
-            else DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS
-        )
-
         # Symbolic memory-expansion gas (words*words) puts 64-bit multipliers
         # in the path condition. Refute first with bvmul abstracted to a UF:
         # every real model extends to the abstraction, so its UNSAT is exact
         # UNSAT (2-4x faster on those paths); SAT/unknown there proves nothing
         # and falls through to the exact query below.
-        from verification.block_equivalence import abstract_nonlinear_mul  # lazy: layer cycle
         relaxed, changed = abstract_nonlinear_mul(self.as_bool())
         if changed:
             probe = SolverFor("QF_AUFBV")

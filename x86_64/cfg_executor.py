@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 from .aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 from .models import Register, X86Block, X86Instruction
 from .cfg_structures import X86DynamicCFG, X86EdgeType
-from .cfg_state import X86GlobalState, X86WorldState
+from .cfg_state import PrefixSolver, X86GlobalState, X86WorldState
 from .cfg_strategies import X86DFSStrategy, X86TopologicalStrategy
 from .disassembler import parse_operands
 from .summaries.base import (
@@ -113,6 +113,10 @@ class X86SymbolicExecutor:
         self.reachability_call_count = 0
         self.reachability_total_wall = 0.0
         self.reachability_pruned_count = 0
+        # One incremental solver for all reachability checks of this run (see
+        # PrefixSolver): DFS order makes consecutive path conditions share
+        # long prefixes.
+        self._prefix_solver = PrefixSolver()
 
         # 终止状态列表
         self.final_states: List[X86GlobalState] = []
@@ -173,7 +177,8 @@ class X86SymbolicExecutor:
         t0 = _t.time()
         try:
             result = state.get_constraints().is_possible(
-                solver_timeout=self.reachability_timeout_ms
+                solver_timeout=self.reachability_timeout_ms,
+                prefix_solver=self._prefix_solver,
             )
         finally:
             self.reachability_total_wall += _t.time() - t0
@@ -748,6 +753,7 @@ class X86SymbolicExecutor:
                         summary,
                         new_mstate,
                         path_condition=global_state.get_constraints().as_bool(),
+                        witness=global_state.get_constraints()._witness,
                     )
                 except SummaryPreconditionError as error:
                     self.summary_runtime.record_precondition_failure(error)
@@ -838,7 +844,8 @@ class X86SymbolicExecutor:
         if not is_true(guard) and feasible(fast):
             try:
                 applied = self.summary_runtime.apply(
-                    summary, new_mstate, path_condition=fast.get_constraints().as_bool())
+                    summary, new_mstate, path_condition=fast.get_constraints().as_bool(),
+                    witness=fast.get_constraints()._witness)
             except SummaryPreconditionError as error:
                 self.summary_runtime.record_precondition_failure(error)
                 if not self.summary_runtime.should_fallback_on_precondition(summary.kind):

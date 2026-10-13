@@ -35,6 +35,7 @@ from common.store_forwarding import _memoized, _subtract_base_term, forward_sele
 from verification.alpha_canon import binder_capture_risk, canon_binders
 from verification.loop_induction import run_evm_segment, run_x86_segment, terminal_observable_conditions
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
+from x86_64.cfg_state import PrefixSolver
 
 
 def _semantic_sources_digest():
@@ -2132,6 +2133,46 @@ def discharge_maps_by_prefix(premise, x86_conditions, jobs, timeout_ms, deadline
     return done
 
 
+def _ordered_conjuncts(condition):
+    """Top-level conjuncts of a path condition in execution order (as_bool)."""
+    return list(condition.children()) if is_and(condition) else [condition]
+
+
+def disjoint_groups(premise, conditions):
+    """[(pairs, formula)]: every (i, k), i < k, in exactly one group.
+
+    Path conditions are And(conjuncts in execution order). If those of i and
+    k first differ at position L, with edges a and b, then
+    premise ∧ prefix_L ∧ a ∧ b is a sub-conjunction of premise ∧ e_i ∧ e_k,
+    so its UNSAT refutes the pair, and every pair diverging at the same
+    (prefix, a, b) shares it (Safe 5377: 3655 pairs, 322 groups). Executor
+    paths diverge at the two edges of one branch; complementary ones
+    (x and Not(x), or simplify(a ∧ b) false) need only a ∧ b. A pair where
+    one condition is a prefix of the other keeps its own full query. A group
+    may fail where its pairs hold (edges that exclude each other only with
+    later conjuncts): the caller then checks those pairs' full queries.
+    """
+    paths = [_ordered_conjuncts(c) for c in conditions]
+    out, shared = [], {}
+    for i in range(len(paths)):
+        for k in range(i + 1, len(paths)):
+            a, b, size = paths[i], paths[k], 0
+            while size < min(len(a), len(b)) and a[size].eq(b[size]):
+                size += 1
+            if size == len(a) or size == len(b):
+                out.append(([(i, k)], And(premise, conditions[i], conditions[k])))
+                continue
+            key = (tuple(c.get_id() for c in a[:size]), a[size].get_id(), b[size].get_id())
+            if key not in shared:
+                x, y = a[size], b[size]
+                complementary = ((is_not(x) and x.arg(0).eq(y)) or (is_not(y) and y.arg(0).eq(x))
+                                 or is_false(simplify(And(x, y))))
+                shared[key] = ([], And(x, y) if complementary else And(premise, *a[:size], x, y))
+                out.append(shared[key])
+            shared[key][0].append((i, k))
+    return out
+
+
 def propose_from_siblings(correspondence, x86):
     """Replace "all" by the EVM index every mapped sibling (same kind and
     location) agrees on. Only a proposal: if any of its obligations fails,
@@ -2747,27 +2788,55 @@ class BlockEquivalenceProver:
         n, m = len(evm), len(x86)
         if n < 2 or n * m <= n * (n - 1) // 2 + 2 * m:
             return ()
-        disjoint = [(f"evm_disjoint_{i}_{k}", And(premise, evm[i].condition, evm[k].condition), "")
-                    for i in range(n) for k in range(i + 1, n)]
-        trial = []
-        checks = self._check_all(disjoint, trial)
+        def full(i, k):
+            return And(premise, evm[i].condition, evm[k].condition)
+        # One proof per divergence group (disjoint_groups), recorded under
+        # every pair name it covers. A group refuted only with more of the
+        # path (edges that do not exclude each other on their own) falls back
+        # to its pairs' full queries; any failure there is an overlap.
+        groups, proofs, trial = disjoint_groups(premise, [e.condition for e in evm]), {}, []
+        checks = self._check_all([("evm_disjoint_%d_%d" % pairs[0], formula, "") for pairs, formula in groups], trial)
         try:
-            if not all(checks):
-                return ()
+            for (pairs, formula), proved in zip(groups, checks):
+                if proved:
+                    proofs.update((f"evm_disjoint_{i}_{k}", replace(trial[-1], name=f"evm_disjoint_{i}_{k}"))
+                                  for i, k in pairs)
+                    continue
+                if len(pairs) == 1 and formula.eq(full(*pairs[0])):
+                    return ()
+                sub = []
+                inner = self._check_all([(f"evm_disjoint_{i}_{k}", full(i, k), "") for i, k in pairs], sub)
+                try:
+                    if not all(inner):
+                        return ()
+                finally:
+                    inner.close()
+                proofs.update((r.name, r) for r in sub)
         finally:
             checks.close()
-        records.extend(trial)
+        records.extend(proofs[f"evm_disjoint_{i}_{k}"] for i in range(n) for k in range(i + 1, n))  # manifest order
         correspondence, unknown = [], []
+        # Mapping proposals. First the executor's last model of the path, if it
+        # still satisfies premise ∧ x_j (170 of 171 rows on Safe 5377); else one
+        # incremental solver over [premise, conjuncts of x_j]: rows share long
+        # prefixes (Safe 5377: 300s, 44 unknown -> 62s, 2 unknown, every decided
+        # row the same). Either way only a proposal (see above).
+        logic = _bv_array_formula(And(premise, *(x.condition for x in x86)))
+        prefix = PrefixSolver(SolverFor("QF_AUFBV") if logic else Solver())
         for j, x in enumerate(x86):
+            witness = getattr(x, "witness", None)
+            if witness is not None and is_true(witness.eval(And(premise, x.condition), model_completion=True)):
+                hits = [i for i, e in enumerate(evm)
+                        if is_true(witness.eval(e.condition, model_completion=True))]
+                if len(hits) == 1:
+                    correspondence.append(hits[0])
+                    continue
             budget = min(_QUICK_EXACT_MS, self.timeout_ms)
             if self.deadline is not None:
                 budget = min(budget, int((self.deadline - monotonic()) * 1000))
             if budget <= 0:
                 raise ProofBudgetExceeded("proof wall budget exhausted")
-            query = And(premise, x.condition)
-            solver = _solver(budget, query)
-            solver.add(query)
-            answer = solver.check()
+            answer = prefix.check([premise, *_ordered_conjuncts(x.condition)], budget, "correspondence")
             if answer not in (sat, unsat):
                 unknown.append(j)
             if answer == unsat:
@@ -2775,7 +2844,7 @@ class BlockEquivalenceProver:
                 continue
             target = "all"
             if answer == sat:
-                model = solver.model()
+                model = prefix.solver.model()
                 hits = [i for i, e in enumerate(evm)
                         if is_true(model.eval(e.condition, model_completion=True))]
                 if len(hits) == 1:
@@ -3283,5 +3352,14 @@ class BlockEquivalenceProver:
                     if not self._check(f"{label}_assumption_{len(justified)}", goal, records):
                         raise ValueError(f"{label}: unproved execution assumption")
                     justified.add(assumption.get_id())
-            if not self._check(f"{label}_coverage", And(premise, Not(Or(*(p.condition for p in paths)))), records):
+            name, coverage = f"{label}_coverage", And(premise, Not(Or(*(p.condition for p in paths))))
+            # The bvmul->UF route (_retry_over_nonlinear_mul: abstraction UNSAT
+            # is exact UNSAT) before _check's cascade: symbolic memory gas makes
+            # the exact coverage query slow (Safe 5377 x86: 251s -> 11s). A miss
+            # costs at most one query budget and falls through unchanged.
+            started = monotonic()
+            proved, answer, _ = self._retry_over_nonlinear_mul(coverage, "unknown")
+            if answer == "unsat":
+                records.append(Obligation(name, proved.sexpr(), "unsat", "unsat", monotonic() - started))
+            elif not self._check(name, coverage, records):
                 raise ValueError(f"{label}: outcome guards do not cover the entry domain")

@@ -353,6 +353,9 @@ class SegmentPath:
     location: Optional[int]  # latch/exit：到达的 pc/addr；terminal：None
     condition: object  # 路径条件（BoolRef）
     state: SMTState
+    # x86：执行器在这条路径上最后一次可达性检查的模型（可能已不满足
+    # condition，使用方须先 eval 核对）；只用于提议，不参与任何证明。
+    witness: object = field(default=None, compare=False, repr=False)
 
 
 # ---------------------------------------------------------------------------
@@ -532,6 +535,7 @@ def run_x86_segment(
                 location=addr,
                 condition=gstate.get_constraints().as_bool(),
                 state=gstate.mstate,
+                witness=gstate.get_constraints()._witness,
             )
         )
     for gstate in final_states:
@@ -550,6 +554,7 @@ def run_x86_segment(
                 location=gstate.node.address if gstate.node else None,
                 condition=gstate.get_constraints().as_bool(),
                 state=gstate.mstate,
+                witness=gstate.get_constraints()._witness,
             )
         )
     return paths, defects, notes

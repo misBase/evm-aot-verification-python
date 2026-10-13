@@ -15,7 +15,7 @@ from hashlib import sha256
 from time import monotonic
 
 from z3 import (And, Not, Or, BoolVal, Extract, ULE, UGT, is_expr, is_const, Z3_OP_UNINTERPRETED, substitute,
-                is_bv_value, simplify, is_store, Store, FreshConst, Select, is_eq, is_array, Const)
+                is_bv_value, simplify, is_store, Store, FreshConst, Select, is_eq, is_array, Const, is_and, is_true)
 
 from verification.block_equivalence import (Obligation, ProofBudgetExceeded, solve_query, digest,
                                              state_digest, abstract_nonlinear_mul, _conjuncts)
@@ -24,7 +24,7 @@ from verification.loop_induction import run_x86_segment
 from x86_64.disassembler import parse_operands
 from x86_64.models import Register
 from x86_64.summaries import build_x86_summary_runtime
-from x86_64.summaries.base import SummaryPreconditionError
+from x86_64.summaries.base import SummaryPreconditionError, refuted_by_complement
 from x86_64.summaries.div_proof import DivProofError
 
 
@@ -848,6 +848,12 @@ class VerifiedSummaryRuntime:
             if timeout <= 0:
                 raise ProofBudgetExceeded("summary proof deadline exhausted")
         self.proof_queries += 1
+        # premise ∧ goal (the exit guard check of _apply_div, which the
+        # executor's split already negated on this path): see
+        # refuted_by_complement; a miss runs the unchanged query below.
+        if (expected == "unsat" and is_and(formula) and formula.num_args() >= 2
+                and refuted_by_complement(And(*formula.children()[:-1]), formula.arg(formula.num_args() - 1))):
+            return Obligation(name, formula.sexpr(), "unsat", expected, monotonic() - started)
         query = simplify(formula, expand_select_store=True)
         answer = solve_query(query, timeout)
         if answer == "unknown" and expected == "unsat":
@@ -889,7 +895,7 @@ class VerifiedSummaryRuntime:
         proof_cache.record_lemma(key)
         return replace(certificate, obligations=tuple(solved))
 
-    def apply(self, summary, state, path_condition=None):
+    def apply(self, summary, state, path_condition=None, witness=None):
         # Kept for diagnostics: a rejected hit still shows which obligation failed.
         records = self.last_records = []
         def check(name, formula, expected="unsat"):
@@ -917,7 +923,18 @@ class VerifiedSummaryRuntime:
                 if instance is not None:
                     return instance
             try:
-                check("entry", premise, "sat")
+                # A model of the path (the executor's last reachability witness)
+                # that also satisfies the premise is itself the SAT certificate:
+                # eval with model completion rewrites the premise under one total
+                # assignment, and only a result that is literally true counts
+                # (a quantifier it cannot reduce stays symbolic, so it is a miss).
+                # Otherwise (or for a generic-mode statement) solve as before.
+                if (witness is not None and not self._generic_mode
+                        and is_true(witness.eval(premise, model_completion=True))):
+                    self.proof_queries += 1
+                    records.append(Obligation("entry", premise.sexpr(), "sat", "sat"))
+                else:
+                    check("entry", premise, "sat")
                 required = ["entry"]
             except ValueError:
                 from verification.mcopy_induction import dead_hit
