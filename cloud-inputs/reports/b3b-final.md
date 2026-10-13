@@ -8,7 +8,13 @@
 | `6b86b26` | merge cloud/test-hygiene（无冲突） |
 | `81d767b` | merge cloud/pair-throughput（`_prove_equal` 冲突，见 §1） |
 | `aab1c19` | correspondence 墙钟 = 预算；合并后缓存的新测试；轻前提预算的守护测试 |
-| 本提交 | 报告 |
+| `0182c45` | 报告草稿 |
+| `3dc1fe1` | merge origin/cloud/b3b-merged（7f94f0b），见下方说明 |
+| 本提交 | 报告定稿 |
+
+关于基点的说明：分支最初是从本地一个过期的 `cloud/b3b-merged`（be4dfc7）建的，而 origin 上是 7f94f0b。两者只在 `cloud-inputs/` 下有差别（任务 E、F 的说明和 r37d 计时数据），代码完全相同；pair-throughput 的合并已经带进了 3c87bd6。
+
+修正方式是 `3dc1fe1` 合并 origin 的 7f94f0b。force-push 被环境拒绝了，所以没有改写已推送的历史。我在本地另外从 7f94f0b 干净地重建了一遍分支，与本分支的树逐字节相同（`git diff` 为空）。
 
 ## 结论
 
@@ -17,7 +23,8 @@
 - review-3b 的两条"建议修"，pair-throughput 都没有处理：
   - **correspondence 墙钟上限**：已按建议修复，墙钟与原来的 timeout（= 预算）对齐（§3.1），附测试。
   - **`_retry_with_uf_unification` 轻前提查询改用 `_LIGHT_MS`**：**没有照做**。pair-throughput 的路由剖析数据显示，在 5377 的 16 条慢 pair 上（base 和 new 两次序列运行，共 32 次），这条查询**每次都命中**，而且正是证出内存目标的那一步，耗时 3.2–20.0s；从未出现过不命中。改成 2s 上限会让这 32 次全部变成不命中，回退到带 gas 的 `opaque_array_uf`（pair58-fix 报告实测 60s 以上，超过 30s 单查询预算）。这会让 pair58-fix 修好的义务重新卡住。审查报告原文也写了"或者设一个单独的上限"；但任何低于 20s 的上限都会切掉实测的命中，而现在的上限（单查询预算 30s）只比它高 1.5 倍，所以保持不变。我加了一条守护测试，防止以后有人按字面"修"掉它（§3.2）。**需要你确认是否接受这个偏离。**
-- 全量快测：**见 §5**。block 相关集成测试：**见 §5**。
+- 全量快测：**1661 passed、2 skipped、0 failed**。
+- block 相关集成测试（9 个文件）：**107 passed、1 failed**。失败的是 slow 测试 `test_muti_block_verifies_with_fewer_proofs`，pc=385 H2 预算耗尽。合并前的 b3b-merged 和批次 3B 之前的 a84f7d4 在同一台机器上都以同样的方式失败，所以与本次合并无关（§5.2）。
 
 ## 1. 合并冲突及处理：`_prove_equal` 缓存
 
@@ -146,7 +153,55 @@
 
 ## 5. 测试结果
 
-（待填）
+### 5.1 全量快测
+
+命令：`PYTHONPATH=. poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider -rf`（串行，不加 `-x`），在云端 4 核、无 `tmp/` 目录的干净工作区下运行。
+
+**1661 passed、2 skipped、10 deselected、0 failed，1192s。**
+
+- 1661 条的构成：test-hygiene 报告的 1630 条，加上 review-3b 的 12 条、pair-throughput 的 14 条、本任务的 5 条。
+- msize_absint 的 42 条已经全部通过（test-hygiene 去掉了对 tmp 的依赖），不再是已知例外。
+- 2 个 skip 是原本就有的。
+
+新测试 `tests/unit/test_block_b3b_final.py` 按节点 ID 用 `-v` 单独跑过：5 条都被收集到，都通过，没有同名覆盖。合并相关的测试文件也单独跑过，33 passed：
+- `test_block_prove_equal_sat.py`
+- `test_block_lemma_cache_ids.py`
+- `test_block_light_premise.py`
+- `test_block_route_order.py`
+- `test_block_review_3b.py`
+
+### 5.2 block 相关集成测试
+
+命令：`PYTHONPATH=. poetry run pytest tests/integration/test_block_*.py -q -p no:cacheprovider -rfs`，共 9 个文件，不按 slow 过滤。
+
+**107 passed、1 failed，1286s。**
+
+| 文件 | 结果 |
+|---|---|
+| test_block_closure_guards.py | 6 passed |
+| test_block_constant_insensitive.py | 21 passed、1 failed |
+| test_block_environment.py | 4 passed |
+| test_block_equivalence.py | 12 passed |
+| test_block_host_memory.py | 6 passed |
+| test_block_parallel.py | 7 passed |
+| test_block_program.py | 24 passed |
+| test_block_scheduling.py | 4 passed |
+| test_block_symbolic_loops.py | 23 passed |
+
+失败的是 `test_block_constant_insensitive.py::test_muti_block_verifies_with_fewer_proofs`，这条标了 `@pytest.mark.slow`，用 2 个 worker 跑 muti_block 全程序。结果是 `INCONCLUSIVE: local pc=385 … stack_depth=1, memory_size=96 …: H2 budget exhausted (solver=unknown)`。
+
+为了确认是否与合并有关，在同一台机器上单独重跑了这条测试（每次只跑这一条）：
+
+| 代码 | 结果 |
+|---|---|
+| 本分支（b3b-final） | failed，pc=385 H2 budget exhausted，870s |
+| `cloud/b3b-merged`（r37d，合并前） | failed，pc=385 H2 budget exhausted，865s |
+| `a84f7d4`（批次 3B 之前） | failed，**pc=892** H2 c0_budget exhausted，**以及** pc=385，903s |
+
+结论：
+- 这条失败在批次 3B 之前就存在，不是本次合并造成的，也不是批次 3B 造成的。批次 3B 之前还多一个 pc=892 证不出，3B 之后只剩 pc=385。
+- 测试注释写的是"约 11 分钟、2 workers、47 contexts"，测量时间是 2026-10-03，测量环境应该是本地或服务器。云端 4 核上 pc=385 的 H2 预算不够，属于环境或预算问题。
+- 请在服务器上确认这条测试在本分支上是否通过。
 
 ## 6. 离线验证数据
 
