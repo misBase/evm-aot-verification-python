@@ -5,17 +5,17 @@
 ## 1. 结论
 
 - **路由剖析**（16 条慢义务，r37d 原码，每条单独一个进程）：每条 pair 都被 goal split 成 7 个部分（`pair_85_6` 是 2 个）。7 部分里第 0、1、3、4、5 部分在开头的 quick0 就证出；**真正花时间的只有第 2 部分（内存/sha3 目标）和第 6 部分**：
-  - 第 2 部分（2 部分形状下是第 0 部分）**16/16 由 `unify*`（normalize 之后的合一路由）证出**，但在它之前要先跑完 lia、quick*、blast*、alias*、potential*、bvabs*、bvabs、exact*、mul、mul*，这些路由**在 16 条里一次也没有成功过**，每条花费 357–617s（平均约 450s，占义务总时间的 55%）。
+  - 第 2 部分（2 部分形状下是第 0 部分）**16/16 由 `unify*`（normalize 之后的合一路由）证出**，但在它之前要先跑完 lia、quick*、blast*、alias*、potential*、bvabs*、bvabs、exact*、mul、mul*，这些路由**在第 2 部分上一次也没有成功过**。连同 quick0、normalize，每条在 unify* 之前花费 357–617s（平均约 453s，占义务总时间的 57%）。
   - 第 6 部分 14/14 由 `quick*` 证出（normalize 之后的 3s 精确查询，0.0s），但在它前面的 lia 每次空跑 20–40s。
-  - `pair_85_6` 的第 1 部分由 lia 证出（17s）。lia 在 34 次尝试中只赢了这 2 次。
-- **轻前提探针不命中的开销**：16 条共 680 次 `_prove_equal` 轻前提探针，命中 16 次；不命中 664 次共 731s（每次约 1.1s）。其中实际求解只有约 0.2s（结果都是 sat），**约 0.7s 花在对约 195 个前提合取项逐个做 `_heavy`、`_no_binder` 遍历**，每个候选对都重做一遍。不命中之后，unsat_core 探针（664 次，878s）和 case tree（664 次，1280s）也全部失败。
+  - `pair_85_6` 的第 1 部分由 lia 证出（17s）。lia 在 32 次尝试中只赢了这 2 次。
+- **轻前提探针不命中的开销**：16 条共 1375 次 `_prove_equal` 轻前提探针，命中 44 次；不命中 1331 次共 1372s（每次约 1.0s）。其中实际求解只有约 0.2s（单独抽查的都是 sat），**约 0.7s 花在对约 195 个前提合取项逐个做 `_heavy`、`_no_binder` 遍历**，每个候选对都重做一遍。不命中之后，unsat_core 探针（1331 次，1661s）全部失败，case tree（1331 次，2581s）只成功 2 次。
 - **实现了 3 项通用改进**（只改顺序、预算和缓存，不改变"哪个公式被证"）：
   1. **按义务类别把赢过的路由提前**（winner-first）：类别 = 名字去掉路径编号、保留 goal 部分（`pair_67_9_goal_2_of_7` → `pair_goal_2_of_7`）。赢过的路由按"每秒证出数"排在前面，其余路由保持原表顺序。LIA 改为路由表里的一项，参与排序。
   2. **`_prove_equal` 在 unsat_core 探针得到 SAT 时跳过 case tree**：case tree 反驳的正是同一个公式，公式可满足时它不可能成功。
   3. **`_heavy` / `_no_binder` 按项缓存**（`_memoized`，持有项引用）。
   
   另外顺手加固了一个健全性隐患：`_prove_equal` 的缓存原来只存 AST id，没有持有项；z3 会回收被释放项的 id，id 可能被别的项复用。现在缓存条目持有 x、y 和前提合取项。
-- **离线 A/B**（模拟一个 pair worker：同一进程、同一 prover，按行顺序依次跑每个上下文的 8 条慢 pair，每条 3600s；4 个进程同时跑，base 和 new 负载相同）：**答案 16/16 一致，全部 proved**。总耗时 a：TBD → 2240s，b：TBD → 2192s。从第 3 条起，类别已有统计，每条 62–307s（base TBD）。
+- **离线 A/B**（模拟一个 pair worker：同一进程、同一 prover，按行顺序依次跑每个上下文的 8 条慢 pair，每条 3600s；4 个进程同时跑，base 和 new 负载相同）：**答案 16/16 一致，全部 proved**。总耗时 a：5600s → 2240s（2.50×），b：5388s → 2192s（2.46×）。从第 3 条起类别已有统计，new 每条 62–307s，base 365–908s；这 6 条合计 a 3637s → 996s（3.65×），b 3496s → 913s（3.83×）。
 
 ## 2. 路由剖析（任务第 1 步）
 
@@ -74,9 +74,9 @@
 | case tree @unify* / @blast* / @potential* | 2 / 0 / 0 | 467 / 99 / 99 | 21.2s | 1030.0s / 150.1s / 120.9s |
 | 轻前提 @`_retry_with_uf_unification`（opaque 查询） | 9 | 0 | 109.8s | 0 |
 
-（blast* 和 potential* 的 `_prove_equal` 来自 `_retry_over_potential` 里的 `unify_potential_arguments`。前 6 条义务是在给 trace 加路由归类之前启动的，它们的探针只计入不分路由的合计：轻前提命中 16 / 不命中 664 / 730.5s，unsat_core 0 / 664 / 877.7s，case tree 0 / 664 / 1280.0s。）
+（blast* 和 potential* 的 `_prove_equal` 来自 `_retry_over_potential` 里的 `unify_potential_arguments`。较早启动的几条义务是在给 trace 加路由归类之前跑的，它们的探针只计入不分路由的合计：轻前提命中 16 / 不命中 664 / 730.5s，unsat_core 0 / 664 / 877.7s，case tree 0 / 664 / 1280.0s。）
 
-- **轻前提探针不命中的开销**：每次约 1.1s。对 a pair_67_9 第 2 部分的单独测量（`light_cost.py`，195 个无 binder 合取项）：`_heavy` 遍历 0.48s，`_no_binder` 遍历 0.25s，构造查询约 0s，求解 0.15s（sat）。也就是说，探针约 70% 的开销是对同一批合取项反复做遍历，每个候选对一次。命中只发生在 unify 路由里（每条 pair 1–3 次），恰好是证明需要的那几次，所以探针本身应保留，只需要降低它不命中时的成本。
+- **轻前提探针不命中的开销**：每次约 1.0s。对 a pair_67_9 第 2 部分的单独测量（会话内脚本，未提交；195 个无 binder 合取项）：`_heavy` 遍历 0.48s，`_no_binder` 遍历 0.25s，构造查询约 0s，求解 0.15s（sat）。也就是说，探针约 70% 的开销是对同一批合取项反复做遍历，每个候选对一次。命中（unify 里每条 pair 1–3 次，加上 blast* 里 potential 参数合并的命中）恰好是证明需要的那几次，所以探针本身应保留，只需要降低它不命中时的成本。
 - **unsat_core 探针**：在这些义务上从未命中。改动后（§4）统计它的求解结果：new 两个上下文 1023 次探针中 765 次是 **sat**，258 次是 unknown。
 - **case tree**：在 unify* 里 469 次只成功 2 次。按 §3.2 的论证，这 2 次的 unsat_core 不可能是 sat（公式可满足时 case tree 不可能成功），只能是 unknown。
 
@@ -149,30 +149,42 @@
 
 | 上下文 | 义务 | base | new | 说明 |
 |---|---|---|---|---|
-| a | pair_85_6 | TBD | 711.3s | 首条，无统计；节省来自 §3.2/§3.3 |
-| a | pair_72_7 | TBD | 533.7s | `pair_goal_2_of_7` 类首条（85_6 是 2 部分形状） |
-| a | pair_68_8 | TBD | 307.4s | 起 unify* 直接排第一 |
-| a | pair_67_9 | TBD | 116.2s | |
-| a | pair_63_10 | TBD | 223.9s | |
-| a | pair_58_12 | TBD | 168.0s | |
-| a | pair_53_14 | TBD | 118.0s | |
-| a | pair_43_18 | TBD | 62.0s | |
-| **a 合计** | | **TBD** | **2240.5s** | |
-| b | pair_85_6 | TBD | 755.7s | |
-| b | pair_72_7 | TBD | 522.9s | |
-| b | pair_68_8 | TBD | 270.5s | |
-| b | pair_63_10 | TBD | 216.3s | |
-| b | pair_58_12 | TBD | 159.5s | |
-| b | pair_57_13 | TBD | 73.2s | |
-| b | pair_53_14 | TBD | 113.6s | |
-| b | pair_48_16 | TBD | 80.1s | |
-| **b 合计** | | **TBD** | **2191.8s** | |
+| a | pair_85_6 | 1185.6s | 711.3s | 首条，无统计；节省来自 §3.2/§3.3 |
+| a | pair_72_7 | 777.1s | 533.7s | `pair_goal_2_of_7` 类首条（85_6 是 2 部分形状） |
+| a | pair_68_8 | 907.9s | 307.4s | 起 unify* 直接排第一 |
+| a | pair_67_9 | 511.6s | 116.2s | |
+| a | pair_63_10 | 741.4s | 223.9s | |
+| a | pair_58_12 | 625.6s | 168.0s | |
+| a | pair_53_14 | 485.8s | 118.0s | |
+| a | pair_43_18 | 364.7s | 62.0s | |
+| **a 合计** | | **5599.7s** | **2240.5s** | **2.50×** |
+| b | pair_85_6 | 1133.0s | 755.7s | |
+| b | pair_72_7 | 759.6s | 522.9s | |
+| b | pair_68_8 | 784.5s | 270.5s | |
+| b | pair_63_10 | 664.2s | 216.3s | |
+| b | pair_58_12 | 615.0s | 159.5s | |
+| b | pair_57_13 | 418.7s | 73.2s | |
+| b | pair_53_14 | 480.2s | 113.6s | |
+| b | pair_48_16 | 533.2s | 80.1s | |
+| **b 合计** | | **5388.4s** | **2191.8s** | **2.46×** |
 
-**答案**：new 16/16 proved，base TBD。没有 unsat 变成其他答案，也没有出现新的 sat。
+**答案**：base 16/16 proved，new 16/16 proved，逐条一致。没有 unsat 变成其他答案，也没有出现新的 sat。
 
 new 中有统计之后的阶段（a pair_68_8 第 2 部分）：`quick0 3.5s → pin 0.3s → normalize 15.7s → unify* 264.5s`。第 6 部分：`quick0 3.2s → pin 0.2s → normalize 14.4s → quick* 0.0s`。lia、blast*、potential*、exact*、mul 都不再在前面空跑。
 
-new 两个上下文合计，unsat_core 探针 1023 次：sat 765 次（这些 case tree 被跳过），unknown 258 次。轻前提不命中 1005 次共 232s（每次约 0.23s，base 约 1.1s）。
+**节省来自哪里**（a；b 的比例相同）：
+
+| | base | new | 节省 | 来源 |
+|---|---|---|---|---|
+| 失败路由（不含 normalize、quick0、pin） | 约 2937s（potential* 1339、blast* 832、lia 514、bvabs* + bvabs 101、exact* + mul + mul* 123、其他 27） | 约 778s（几乎全部在前 2 条，还没有统计时） | 约 2160s | §3.1 winner-first |
+| 胜出路由 unify* | 2360s | 1143s | 约 1220s | §3.2 跳过 case tree、§3.3 缓存（unify* 内部 `_prove_equal` 的失败变便宜） |
+| normalize、quick0、pin | 271s | 286s | – | 未改 |
+
+base 的序列运行本身已经带上了原有的 `_node_needed_unification`（第一条 unify 赢了之后换第二张表，把 unify* 排到 exact* 之前），所以 base 的 exact*、mul 只在第 1 条出现。即使这样，base 每条 pair 仍要在 unify* 之前先跑 lia、blast*、potential*、bvabs，合计约 360–440s。
+
+**换算到 r37d 节点**：r37d a 的前 1.75 小时里，30 条 pair 共 7628s，占 worker 时间的一半。如果其余 pair 的形状相同（第 2 部分要 unify*），pair 部分预计降到原来的约 1/3 到 2/5，pair 阶段整体（x86_maps 部分不变）约降到原来的 2/3，即每个上下文从约 9 小时降到约 6 小时。要进一步缩短，需要处理 x86_maps（§3.5 第 5 条）。这只是推算，以服务器全量为准。
+
+new 两个上下文合计，unsat_core 探针 1023 次：sat 765 次（这些 case tree 被跳过），unknown 258 次。轻前提不命中 1023 次共 232s（每次约 0.23s，base 约 1.1s）。
 
 ## 5. 测试结果
 
