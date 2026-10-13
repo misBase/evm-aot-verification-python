@@ -170,7 +170,38 @@ opt = r37c（snap-r35b + P1–P6），`stage-*`；base = snap-r35b，`base-*`。
 
 ## 5. 测试结果
 
-（运行完后填写。）
+### 全量快测
+
+命令：`PYTHONPATH=. poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider -n 4`（Linux，4 核）。没加 `-x`，因为加了会停在第一个 msize_absint 已知失败上，后面的测试就跑不到了。
+
+- **结果：1587 passed、36 failed、2 skipped，用时 452s。**
+- **35 个是已知例外**：全部是 `tests/unit/test_msize_absint.py::*`，原因是 `ModuleNotFoundError: No module named 'prov_common'`（依赖被忽略的 `tmp/prov_common.py`）。这与 `b3b/unit.log`（snap-r37c，35 failed）一致。
+- **另外 1 个**：`tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_proves_the_rewrite_without_per_read_queries`。
+  - 失败形式：`assert unknown == unsat`，即测试内部的 solver 查询在 4 进程并行负载下超时；
+  - 单独按节点 ID 重跑：本分支 passed（3.3s），基线 a84f7d4 也 passed（3.2s）；
+  - 这个测试不经过 P1–P6 的代码，判定为负载引起的偶发失败。
+
+### 新测试
+
+按节点 ID 单独跑过（`-v`），16 个都被收集到，全部 passed，没有同名覆盖。`tests/unit/test_block_correspondence.py` 的 10 个也全部通过。
+
+| 测试 | 覆盖 |
+|---|---|
+| `test_prefix_solver_matches_fresh_solver_across_pops` | P1：手写序列，包括 pop 回公共前缀、回到空前缀 |
+| `test_prefix_solver_matches_fresh_solver_on_random_dfs`（新） | P1：150 次随机 DFS 式查询，每次与新建 solver 的答案一致；断言 pop 深度覆盖 0–3 |
+| `test_prefix_unknown_pruned_only_by_probe_unsat`（新） | P1：精确结果为 unknown 时，只有探针 UNSAT 才剪；探针抽象 SAT 或没有 bvmul 时都保留路径 |
+| `test_prefix_solver_recovers_from_failure_mid_sync`（新） | P1 修正：add 中途抛异常后不残留断言；被外部多 push 一层时，check 前能检测出来 |
+| `test_is_possible_with_prefix_solver_agrees_and_keeps_witness`、`test_prefix_unknown_keeps_path_unless_probe_refutes` | P1 |
+| `test_summary_entry_answered_by_path_witness`、`test_summary_entry_solved_when_witness_misses` | P2 |
+| `test_disjoint_groups_cover_every_pair_once_and_weaken_it`、`test_correspondence_records_and_mapping` | P3、P4 |
+| `test_disjoint_dedup_keeps_names_and_coverage`（新） | P3：记录名与清单的 `evm_disjoint_*` 一致，顺序相同且全部 proved；组查询数少于对数；每条记录的公式是它所属组的子合取式 |
+| `test_disjoint_group_failure_falls_back_to_full_pair_queries`（新） | P3：分歧边本身不互斥时，组查询失败后改用整对原式证明 |
+| `test_disjoint_overlap_gives_full_product`（新） | P3：EVM 路径真有重叠时返回 `()`，并且不留下任何记录 |
+| `test_coverage_refuted_over_mul_abstraction_first` | P5 |
+| `test_complement_refutation_hit_and_miss`（新增 2 个断言） | P6：命中（互补、simplify 为 false、嵌套 And）；不命中（只是蕴含而非语法互补、在窗口外、与路径一致） |
+| `test_summary_solve_skips_solver_on_complement` | P6 |
+
+变异测试：去掉 P1 修正（作用域数核对和异常时 reset）之后，`test_prefix_solver_recovers_from_failure_mid_sync` 失败。
 
 ## 6. 未解决的问题
 
