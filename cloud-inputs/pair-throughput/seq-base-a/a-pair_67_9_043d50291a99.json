@@ -1,0 +1,341 @@
+{
+ "name": "pair_67_9",
+ "file": "a-pair_67_9_043d50291a99.smt2",
+ "answer": "proved",
+ "seconds": 511.6,
+ "frames": [
+  {
+   "name": "pair_67_9",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.56
+    ],
+    [
+     "split",
+     "unsat",
+     506.15
+    ]
+   ]
+  },
+  {
+   "name": "pair_67_9_goal_0_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.02
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "pair_67_9_goal_1_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.01
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "pair_67_9_goal_2_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.4
+    ],
+    [
+     "pin",
+     "unknown",
+     0.16
+    ],
+    [
+     "lia",
+     "unknown",
+     33.01
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "pre-normalize",
+     null,
+     0.0
+    ],
+    [
+     "normalize",
+     null,
+     13.95
+    ],
+    [
+     "quick*",
+     "unknown",
+     3.22
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "blast*",
+     "unknown",
+     53.19
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "alias*",
+     "unknown",
+     0.23
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "potential*",
+     "unknown",
+     159.02
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs*",
+     "unknown",
+     2.69
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs",
+     "unknown",
+     7.76
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "unify*",
+     "unsat",
+     186.45
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "pair_67_9_goal_3_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.07
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "pair_67_9_goal_4_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.05
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "pair_67_9_goal_5_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.01
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "pair_67_9_goal_6_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.23
+    ],
+    [
+     "pin",
+     "unknown",
+     0.11
+    ],
+    [
+     "lia",
+     "unknown",
+     27.61
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "pre-normalize",
+     null,
+     0.0
+    ],
+    [
+     "normalize",
+     null,
+     11.54
+    ],
+    [
+     "quick*",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "probes": {
+  "light<_prove_equal@blast*": {
+   "hit": 1,
+   "miss": 11,
+   "hit_s": 0.93,
+   "miss_s": 11.43
+  },
+  "unsat_core<_prove_equal@blast*": {
+   "hit": 0,
+   "miss": 11,
+   "hit_s": 0.0,
+   "miss_s": 8.68
+  },
+  "cases<_prove_equal@blast*": {
+   "hit": 0,
+   "miss": 11,
+   "hit_s": 0.0,
+   "miss_s": 10.59
+  },
+  "light<_prove_equal@potential*": {
+   "hit": 0,
+   "miss": 11,
+   "hit_s": 0.0,
+   "miss_s": 10.31
+  },
+  "unsat_core<_prove_equal@potential*": {
+   "hit": 0,
+   "miss": 11,
+   "hit_s": 0.0,
+   "miss_s": 8.55
+  },
+  "cases<_prove_equal@potential*": {
+   "hit": 0,
+   "miss": 11,
+   "hit_s": 0.0,
+   "miss_s": 10.81
+  },
+  "cases<_retry_over_nonlinear_mul@mul*": {
+   "hit": 0,
+   "miss": 0,
+   "hit_s": 0.0,
+   "miss_s": 0.0
+  },
+  "light<_prove_equal@unify*": {
+   "hit": 1,
+   "miss": 66,
+   "hit_s": 1.24,
+   "miss_s": 64.19
+  },
+  "unsat_core<_prove_equal@unify*": {
+   "hit": 0,
+   "miss": 66,
+   "hit_s": 0.0,
+   "miss_s": 34.76
+  },
+  "cases<_prove_equal@unify*": {
+   "hit": 0,
+   "miss": 66,
+   "hit_s": 0.0,
+   "miss_s": 71.98
+  },
+  "light<_retry_with_uf_unification@unify*": {
+   "hit": 1,
+   "miss": 0,
+   "hit_s": 6.22,
+   "miss_s": 0.0
+  }
+ }
+}

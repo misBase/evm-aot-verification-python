@@ -111,26 +111,32 @@ def _solve_query(formula, timeout_ms):
     return answer
 
 
-def unsat_core(assertions, goal, timeout_ms):
-    """Indices of `assertions` in an unsat core of assertions ∧ goal, or None."""
+def unsat_core(assertions, goal, timeout_ms, outcome=None):
+    """Indices of `assertions` in an unsat core of assertions ∧ goal, or None.
+    `outcome` (optional dict) gets the solver's answer as "answer"."""
     key = proof_cache.query_key("core", *assertions, goal) if proof_cache.enabled() else None
     if key is not None:
         cached = proof_cache.lookup(key)
         if isinstance(cached, list):
+            if outcome is not None:
+                outcome["answer"] = "unsat"
             return cached
-    core = _unsat_core(assertions, goal, timeout_ms)
+    core = _unsat_core(assertions, goal, timeout_ms, outcome)
     if key is not None and core is not None:
         proof_cache.store(key, core)
     return core
 
 
-def _unsat_core(assertions, goal, timeout_ms):
+def _unsat_core(assertions, goal, timeout_ms, outcome=None):
     solver = _solver(timeout_ms, And(*assertions, goal))
     tracks = [FreshConst(BoolVal(True).sort(), "core") for _ in assertions]
     for assertion, track in zip(assertions, tracks):
         solver.assert_and_track(assertion, track)
     solver.add(goal)
-    if solver.check() != unsat:
+    answer = solver.check()
+    if outcome is not None:
+        outcome["answer"] = str(answer)
+    if answer != unsat:
         return None
     core = {t.get_id() for t in solver.unsat_core()}
     return [i for i, t in enumerate(tracks) if t.get_id() in core]
@@ -1493,6 +1499,32 @@ def _goal_split(formula):
 
 
 _GOAL_NAME = re.compile(r"_goal_(\d+)_of_(\d+)$")
+# Diagnostic / A-B switch: BLOCK_ROUTE_ORDER=static keeps the fixed route table.
+_ROUTE_ORDER_STATIC = __import__("os").environ.get("BLOCK_ROUTE_ORDER") == "static"
+
+
+def _route_class(name):
+    """Obligations whose routes behave alike: the name without its path
+    indices, goal-split parts kept apart (pair_67_9_goal_2_of_7 ->
+    pair_goal_2_of_7, x86_maps_3_5 -> x86_maps). Siblings of one node share
+    the relation goals, so part k of every pair has the same shape."""
+    m = _GOAL_NAME.search(name)
+    base = name[:m.start()] if m else name
+    return re.sub(r"(_\d+)+$", "", base) + (m.group(0) if m else "")
+
+
+def _winners_first(routes, stats):
+    """`routes` with those that refuted an obligation of this class before
+    first (most refutations per second spent on the route, wins and misses,
+    first); the rest keep their order. `stats`: route -> (wins, seconds).
+
+    Only the order changes: every route is still tried until one refutes F.
+    Safe 5377 d30 pairs: the memory goal part is refuted only by normalised
+    unification, after ~400-470s of routes that never refute it.
+    """
+    won = sorted((r for r in routes if stats.get(r, (0, 0.0))[0]),
+                 key=lambda r: -stats[r][0] / max(stats[r][1], 1e-3))
+    return won + [r for r in routes if r not in won]
 
 
 def _array_disequality(term):
@@ -1699,6 +1731,13 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
 
 
 def _no_binder(term):
+    # Memoized per term (pure; _memoized keeps the term alive, so its id stays its own):
+    # unify_uf_arguments and the light-premise probe ask it of every premise conjunct per
+    # candidate pair (Safe 5377 d30: ~195 conjuncts, 0.25s per pass, ~100 passes per pair).
+    return _memoized("no_binder", (term,), lambda: _no_binder_uncached(term))
+
+
+def _no_binder_uncached(term):
     seen, work = set(), [term]
     while work:
         t = work.pop()
@@ -1798,7 +1837,12 @@ def _differ(x, y):
 def _heavy(term):
     """True if `term` has a product of non-literals or a UF application (the
     multiplication abstraction's products, host results): the gas sums over
-    symbolic memory sizes, which dominate bit-blasting."""
+    symbolic memory sizes, which dominate bit-blasting. Memoized as _no_binder
+    (0.5s per pass over a Safe 5377 d30 premise, once per candidate pair)."""
+    return _memoized("heavy", (term,), lambda: _heavy_uncached(term))
+
+
+def _heavy_uncached(term):
     if _nonlinear_mul_terms(term):
         return True
     seen, work = set(), [term]
@@ -1849,10 +1893,12 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
 
     Keys and conjunct sets are AST ids, and the cache outlives the formulas
     they came from: a proof entry keeps x, y and its conjuncts alive (third
-    field), so none of its ids can be recycled for another term while cached
-    (a recycled one could match a premise that does not imply x = y). A
-    failure entry holds nothing: a false match there only costs a miss."""
-    conjuncts = frozenset(c.get_id() for c in _conjuncts(premise))
+    field, flat: x, y, *conjuncts), so none of its ids can be recycled for
+    another term while cached (a recycled one could match a premise that does
+    not imply x = y). A failure entry holds nothing: a false match there only
+    costs a miss."""
+    parts = _conjuncts(premise)
+    conjuncts = frozenset(c.get_id() for c in parts)
     key = tuple(sorted((x.get_id(), y.get_id())))
     if cache is not None:
         for used, proofs, _alive in cache.get(key, ()):
@@ -1866,7 +1912,6 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     light_ms = min(budget_ms, _LIGHT_MS)
     if deadline is not None:
         light_ms = min(light_ms, int((deadline - monotonic()) * 1000))
-    parts = _conjuncts(premise)
     proofs = _refute_over_light_premise(parts, hide(differ), light_ms)
     if proofs is not None:
         if cache is not None:
@@ -1876,13 +1921,20 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     if cache is not None:
         # Cache only the conjuncts the refutation used (unsat core), so the
         # lemma transfers to sibling pairs whose path conditions differ.
-        started = monotonic()
-        used = unsat_core([hide(c) for c in parts], hide(differ), min(budget_ms, 2000))
+        started, outcome = monotonic(), {}
+        used = unsat_core([hide(c) for c in parts], hide(differ), min(budget_ms, 2000), outcome)
         if used is not None:
             used = [parts[i] for i in used]
             proofs = [(And(*(hide(c) for c in used), hide(differ)), monotonic() - started)]
             cache.setdefault(key, []).append((frozenset(c.get_id() for c in used), proofs, (x, y, *used)))
             return proofs
+        if outcome.get("answer") == "sat":
+            # hide(premise) ∧ hide(differ) has a model: the case tree below refutes
+            # exactly that formula, so it cannot succeed (Safe 5377 d30 pairs: ~100
+            # such candidates per pair, 1.5-2.3s of case tree each). A failure
+            # entry, recorded under the full premise as a case-tree failure is.
+            cache.setdefault(key, []).append((conjuncts, None, ()))
+            return None
     proofs = _refute_by_cases(hide(premise), hide(differ), budget_ms, deadline)
     if cache is not None:
         cache.setdefault(key, []).append((conjuncts, proofs, () if proofs is None else (x, y, *parts)))
@@ -2445,6 +2497,7 @@ class BlockEquivalenceProver:
         # same terms keep the same ids and _prove_equal's cache hits.
         self._mul_functions, self._lemma_cache = {}, {}
         self._node_needed_unification = False
+        self._route_stats = {}  # _route_class -> {route: (wins, seconds)}, see _winners_first
         self._potential_pending = None  # (input, target, lemmas): a capped potential solve that ran out
         self.node_timeout_seconds = node_timeout_seconds
         self.max_path_pairs = max_path_pairs
@@ -2548,8 +2601,6 @@ class BlockEquivalenceProver:
                 left = timeout if self.deadline is None else int((self.deadline - monotonic()) * 1000)
                 answer = solve_query(simplify(formula), min(left, _QUICK_EXACT_MS)) if left > 0 else "unknown"
         if expected == "unsat" and answer == "unknown":
-            proved, answer, lemmas = self._retry_over_lia(formula)
-        if expected == "unsat" and answer == "unknown":
             # Same routes either way; once a sibling pair needed unification
             # it goes first, sparing the abstraction attempt that rarely yields.
             # "norm" routes run on normalize_word_arith(F), an equivalent formula
@@ -2572,11 +2623,20 @@ class BlockEquivalenceProver:
             # store chains). One per-query budget only: it wins fast or not at all.
             # "potential" (telescoped memory charges, _retry_over_potential) next:
             # it returns at once unless memory-cost sums are present.
-            routes = ([("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
+            # "lia" (_retry_over_lia, own caps, no share) first: the LIA reading of
+            # product limbs, before the SAT routes.
+            routes = ([("lia", False), ("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
                        ("mul", False), ("mul", True), ("unify", True), ("unify", False)]
                       if not self._node_needed_unification else
-                      [("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("unify", True),
+                      [("lia", False), ("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("unify", True),
                        ("exact", True), ("unify", False), ("mul", True), ("mul", False)])
+            # Routes that refuted this class of obligation before go first (_winners_first);
+            # with no history the table above is unchanged.
+            stats = self._route_stats.setdefault(_route_class(name), {})
+            promoted = 0
+            if not _ROUTE_ORDER_STATIC:
+                routes = _winners_first(routes, stats)
+                promoted = sum(1 for r in routes if stats.get(r, (0, 0.0))[0])
             normalized = None
             node_deadline = self.deadline
             pending, self._potential_pending = None, None
@@ -2590,10 +2650,16 @@ class BlockEquivalenceProver:
                         continue  # nothing rewritten: the plain route covers it
                 # Each route gets an equal share of what is left (the direct
                 # query below keeps one share), so no route starves the rest.
-                if node_deadline is not None:
-                    self.deadline = monotonic() + (node_deadline - monotonic()) / (len(routes) - index + 1)
+                # A promoted route (it refuted this class before) gets half: it is
+                # expected to need what it needed there (Safe 5377 unify: 190-320s).
+                if node_deadline is not None and route != "lia":
+                    shares = 1 if index < promoted else sum(1 for r, _ in routes[index:] if r != "lia")
+                    self.deadline = monotonic() + (node_deadline - monotonic()) / (shares + 1)
+                route_started = monotonic()
                 try:
-                    if route == "quick":
+                    if route == "lia":
+                        proved, answer, lemmas = self._retry_over_lia(target)
+                    elif route == "quick":
                         # Quick exact on F' first: once guards are decided both sides often
                         # agree syntactically (CErc20 10233 x86_maps_1_19: 0.5s; potential 127s).
                         budget = min(_QUICK_EXACT_MS, int((self.deadline - monotonic()) * 1000)
@@ -2654,6 +2720,8 @@ class BlockEquivalenceProver:
                     proved, answer, lemmas = formula, "unknown", ()
                 finally:
                     self.deadline = node_deadline
+                wins, seconds = stats.get((route, norm), (0, 0.0))
+                stats[(route, norm)] = (wins + (answer == "unsat"), seconds + monotonic() - route_started)
                 ours = self._potential_pending
                 if pending is None and ours is not None and ours[0].eq(target):
                     pending = (ours[1], ours[2], rewrites)
@@ -3287,6 +3355,7 @@ class BlockEquivalenceProver:
         runtime = None
         result = BlockProofResult(spec)
         self._node_needed_unification = False
+        self._route_stats = {}
         program_deadline = self.deadline
         if self.node_timeout_seconds is not None:
             node_deadline = started + self.node_timeout_seconds
