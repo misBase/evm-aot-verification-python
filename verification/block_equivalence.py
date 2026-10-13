@@ -1795,6 +1795,50 @@ def _differ(x, y):
     return x != y
 
 
+def _heavy(term):
+    """True if `term` has a product of non-literals or a UF application (the
+    multiplication abstraction's products, host results): the gas sums over
+    symbolic memory sizes, which dominate bit-blasting."""
+    if _nonlinear_mul_terms(term):
+        return True
+    seen, work = set(), [term]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen or not is_app(t):
+            continue
+        seen.add(t.get_id())
+        if t.decl().kind() == Z3_OP_UNINTERPRETED and t.num_args() > 0:
+            return True
+        work.extend(t.children())
+    return False
+
+
+# ponytail: fixed 2s cap (the unsat_core probe's); the light queries measured 0.3-0.5s.
+_LIGHT_MS = 2000
+
+
+def _refute_over_light_premise(parts, goal, budget_ms):
+    """([(query, seconds)], kept conjunct ids) refuting `parts` without their
+    binder-free _heavy conjuncts, ∧ goal; or None.
+
+    Dropping conjuncts only weakens a conjunction (every model of all parts is
+    one of the kept ones), so UNSAT of kept ∧ goal is UNSAT of parts ∧ goal;
+    SAT/unknown proves nothing and the caller goes on with every conjunct.
+    Only tried when something is dropped. Conjuncts under a binder (memory
+    goals) stay. Safe 5377 d30 pair_58_13: the two sha3 memory arguments are
+    equal under 8 linear conjuncts (0.3s); with all ~200 (gas sums of symbolic
+    msize) the query needs ~47s and the 2s-probe case tree gives up.
+    """
+    light = [c for c in parts if not (_no_binder(c) and _heavy(c))]
+    if len(light) == len(parts) or budget_ms <= 0:
+        return None
+    started = monotonic()
+    query = simplify(And(*light, goal))
+    if solve_query(query, budget_ms) != "unsat":
+        return None
+    return [(query, monotonic() - started)], frozenset(c.get_id() for c in light)
+
+
 def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     """Refuted queries showing premise ⊨ x = y, or None. UF applications are
     made opaque (only adds models), which keeps memory arrays out.
@@ -1813,6 +1857,14 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     differ = _differ(x, y)
     opaque = _uf_app_constants(premise, differ)
     hide = (lambda t: substitute(t, *opaque)) if opaque else (lambda t: t)
+    light_ms = min(budget_ms, _LIGHT_MS)
+    if deadline is not None:
+        light_ms = min(light_ms, int((deadline - monotonic()) * 1000))
+    proofs = _refute_over_light_premise(_conjuncts(premise), hide(differ), light_ms)
+    if proofs is not None:
+        if cache is not None:
+            cache.setdefault(key, []).append((proofs[1], proofs[0]))
+        return proofs[0]
     if cache is not None:
         # Cache only the conjuncts the refutation used (unsat core), so the
         # lemma transfers to sibling pairs whose path conditions differ.
@@ -3045,6 +3097,14 @@ class BlockEquivalenceProver:
             budget = self.timeout_ms if self.deadline is None else min(
                 self.timeout_ms, int((self.deadline - started) * 1000))
             query = simplify(substitute(unified, *opaque))
+            # Gas sums out first (Safe 5377 d30 pair_68_9: 10s here, 60s+ with them).
+            light = _refute_over_light_premise(_conjuncts(query), BoolVal(True), budget)
+            if light is not None:
+                (light_query, seconds), = light[0]
+                return light_query, "unsat", lemmas + (
+                    Obligation("opaque_array_uf_light", light_query.sexpr(), "unsat", elapsed_seconds=seconds),)
+            if self.deadline is not None:
+                budget = min(budget, int((self.deadline - monotonic()) * 1000))
             if budget > 0 and solve_query(query, budget) == "unsat":
                 return query, "unsat", lemmas + (
                     Obligation("opaque_array_uf", query.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
