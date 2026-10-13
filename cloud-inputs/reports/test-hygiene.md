@@ -9,18 +9,21 @@
    - 没有任何测试需要 skip。
 2. **`test_offset_view_step_lemma_proves_the_rewrite_without_per_read_queries` 改为不依赖墙钟。** 原测试里的两条自检查询走 `answer()`（3s timeout）。实测其中"改写正确"那条（8 个 store 的 offset-view 链）在空载机器上就要 **2.5–3.3s**，本来就贴着 3s 的边。现在这两条查询改用确定性的 rlimit 预算（2 亿，约为实测消耗的 13 倍），仍然断言答案是 `unsat`。
    - 高负载复现（4 核机器，12 个 `yes` 忙循环）：原测试 **3/3 失败**，失败信息是 `assert unknown == unsat`（就是那条 3s 查询超时）；新测试 **5/5 通过**（每次约 11s）。空载时原测试 3/3 通过（3.1–3.4s），和任务描述一致。
-3. 全量快测：见第 4 节。
+3. **同类问题还有一条，一并修了。** 第一次跑全量快测（`-x`）时，在 `test_telescope_step_is_an_identity` 上停下，失败信息同样是 `assert unknown == unsat`。我统计了这个文件里所有 `answer()` 查询的耗时，发现 telescope 的第二条恒等式即使在空载下也要 **1.8–5.5s**（rlimit 3–7M），所以不需要负载就会超过 3s。这条也改用了 `answer_rlimit()`。另外 `test_div_quotient_axioms_are_valid_and_guarded` 那条需要 0.5–0.75s，是剩下的查询里最慢的，余量只有约 4 倍，所以也顺手改了。这个文件里其余 `answer()` 查询都在 0.2s 以内，没有动。
+4. **全量快测 0 失败**：`1630 passed, 2 skipped, 10 deselected`，串行跑和 `-n 4` 并行跑都是这个结果。2 个 skip 是原本就有的，与本任务无关（见第 4 节）。
 
 ## 1. 改动位置
 
 | 文件:行 | 内容 |
 |---|---|
-| `tools/call_provenance.py:389-421` | 新增公开的 `ReturnAwareCfg`（字段 `entry/by_pc/succs/pads/ret_points`）和 `build_return_aware_cfg(blocks)`，内部直接调用已有的 `_collect_facts(blocks, DEFAULT_OPTIONS)`，不新增分析逻辑 |
+| `tools/call_provenance.py:389-420` | 新增公开的 `ReturnAwareCfg`（字段 `entry/by_pc/succs/pads/ret_points`）和 `build_return_aware_cfg(blocks)`，内部直接调用已有的 `_collect_facts(blocks, DEFAULT_OPTIONS)`，不新增分析逻辑 |
 | `tools/msize_absint.py:62-66` | 改为从 `tools.call_provenance` 导入；删掉不再使用的 `import os` / `import sys` |
-| `tools/msize_absint.py:782-793` | `_load_call_provenance_module()`（往 `sys.path` 注入 `tmp/` 再 `import prov_common`）替换为 `_build_return_aware_cfg()`；`CallProvenanceError` 转换成 `MSizeAnalysisError` |
+| `tools/msize_absint.py:782-792` | `_load_call_provenance_module()`（往 `sys.path` 注入 `tmp/` 再 `import prov_common`）替换为 `_build_return_aware_cfg()`；`CallProvenanceError` 转换成 `MSizeAnalysisError` |
 | `tools/msize_absint.py:963` | `provenance.Prog(blocks)` → `_build_return_aware_cfg(blocks)` |
 | `tests/unit/test_block_uf_unification.py:22-33` | 新增 `answer_rlimit()`（只设 `rlimit`，不设 timeout）及预算依据的注释 |
-| `tests/unit/test_block_uf_unification.py:371,378` | 该测试的两条自检查询从 `answer()` 改为 `answer_rlimit()`，断言仍然是 `== unsat` |
+| `tests/unit/test_block_uf_unification.py:371,378` | step-lemma 测试的两条自检查询从 `answer()` 改为 `answer_rlimit()`，断言仍然是 `== unsat` |
+| `tests/unit/test_block_uf_unification.py:613` | `test_telescope_step_is_an_identity` 的恒等式检查改为 `answer_rlimit()`，断言不变 |
+| `tests/unit/test_block_uf_unification.py:314` | `test_div_quotient_axioms_are_valid_and_guarded` 的公理有效性检查改为 `answer_rlimit()`，断言不变 |
 
 ## 2. 重建依据（逐字段）
 
@@ -51,7 +54,11 @@
 - `tests/unit/test_msize_absint.py`：42 passed（`--collect-only` 显示收集到 42 条）。
 - `tests/unit/test_msize_absint.py` + `test_call_provenance.py` + `test_block_specialization.py`：94 passed（60s）。
 - `tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_proves_the_rewrite_without_per_read_queries`：按节点 ID 单独跑通过；高负载下 5/5 通过。
-- 全量快测 `poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider -x`：FULL_SUITE_RESULT
+- 改过的三条（step-lemma、telescope、div_quotient）一起按节点 ID 跑，在 12 个忙循环的负载下 3/3 轮全部通过（每轮约 24s）。
+- 全量快测 `poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider`（不存在 `tmp/` 目录）：**1630 passed, 2 skipped, 10 deselected, 0 failed**（串行 1153s；`-n 4` 并行 485s，结果相同）。
+  - 2 个 skip 都是原有的 `tests/unit/test_copy_loop_summary.py:194` 和 `:713`：relational memory 抽象在 develop 上未启用，与本任务无关。
+  - 修 telescope 之前那次 `-x` 运行的结果是 `1 failed, 302 passed`，停在 `test_telescope_step_is_an_identity`（`unknown == unsat`）。
+- COMMON.md 里列的已知例外"msize_absint 依赖 tmp/prov_common.py"已经不存在了，不需要再忽略。
 
 ## 5. 离线验证数据
 
@@ -60,9 +67,20 @@
 | 空载 | 3/3 通过，每次 3.1–3.4s | 通过 |
 | 4 核机器 + 12 个 `yes` 忙循环 | 3/3 失败，`assert unknown == unsat` | 5/5 通过，每次 10.5–12.4s |
 
-rlimit 实测（z3 4.15.4）：改写查询每次 check 约 13.0–15.4M，用时 2.5–3.3s；引理回读每次约 1.0–2.2M，用时约 0.2s。
+rlimit 实测（z3 4.15.4，空载，每次 check 的增量）：
+
+| 查询 | rlimit | 用时 |
+|---|---|---|
+| step-lemma：改写正确性 | 13.0–15.4M | 2.5–3.3s |
+| step-lemma：引理回读 | 1.0–2.2M | ~0.2s |
+| telescope 第 1 条 | 1.0–1.3M | 0.4–0.6s |
+| telescope 第 2 条 | 2.9–6.9M | 1.8–5.5s |
+| div_quotient | 2.0–2.1M | 0.5–0.75s |
+
+预算统一为 200M，比最大观测值（15.4M）多 13 倍。
 
 ## 6. 未解决的问题
 
-- `rlimit` 的计数在不同 Z3 版本之间不保证一致。预算是按 `poetry.lock` 锁定的 z3-solver 4.15.4 定的，并留了 13 倍余量；以后升级 Z3 时，如果这条测试变成 `unknown`，应该先重测消耗再调预算，而不是改断言。
-- 同文件里其他测试仍然用 `answer()`（3s）。这次只处理了任务点名的那一条。其余用 `answer()` 的查询在本机都是亚秒级，目前没有观察到负载敏感的失败，所以没有动。
+- `rlimit` 的计数在不同 Z3 版本之间不保证一致。预算是按 `poetry.lock` 锁定的 z3-solver 4.15.4 定的；以后升级 Z3 时，如果这几条测试变成 `unknown`，应该先重测消耗再调预算，而不是改断言。
+- 同一查询的 rlimit 消耗在多次运行之间也会波动（telescope 第 2 条在 2.9M 到 6.9M 之间），推测与项 id/哈希顺序有关。200M 的余量足以覆盖这种波动。
+- **另一类"依赖被忽略文件"的测试（不在快测里，没有修）**：`.gitignore` 里有 `*.smt2`，所以 `tests/data/block_obligations/` 从没提交过。依赖它的两条测试 `test_safe_9733_mcopy_gas_obligation_is_refuted` 和 `test_safe_11803_mcopy_gas_map_is_refuted_by_potential`（都在 `tests/unit/test_block_uf_unification.py`）在干净克隆中会报 `Z3Exception: file access error`。它们标了 `@pytest.mark.slow`，`-m "not slow"` 不会跑到，所以不影响本任务的验收。要修需要在本地找到 `safe9733_x86_maps_22_29.smt2`、`safe11803_x86_maps_0_0.smt2`，用 `git add -f` 提交，或者给 `.gitignore` 加 `!tests/data/**/*.smt2` 例外。用 `capture_probe.py` 重新抓取也可以，但需要原始节点上下文（stack_depth/stack_constants），云端没有这些信息，所以没有伪造。
