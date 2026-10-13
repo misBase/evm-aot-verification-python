@@ -1,0 +1,274 @@
+1 (let ((a!1 (or (not (= ((_ extract 63 7) memory_size_bytes)
+                       #b000000000000000000000000000000000000000000000000000000000))
+               (bvule #b1100000
+                      ((_ extract 6 0) memory_size_bytes))))
+      (a!2 ((_ extract 63 9)
+             (bvmul (concat #b00000
+                            ((_ extract 63 5)
+                              memory_size_bytes))
+                    (concat #b00000
+                            ((_ extract 63 5)
+                              memory_size_bytes)))))
+      (a!4 (bvmul #xfffffffffffffff7
+                  (concat #b00000
+                          ((_ extract 63 5)
+                            (bvadd #x000000000000001f
+                                   stack_19_z0)))))
+      (a!5 (concat (select evm_mem0 #x0000000000000058)
+                   (select evm_mem0 #x0000000000000059)
+                   (select evm_mem0 #x000000000000005a)
+                   (select evm_mem0 #x000000000000005b)
+                   (select evm_mem0 #x000000000000005c)
+                   (select evm_mem0 #x000000000000005d)
+                   (select evm_mem0 #x000000000000005e)
+                   (select evm_mem0 #x000000000000005f))))
+(let ((a!3 (bvadd #x0000000000000009
+                  (bvmul #xfffffffffffffffd
+                         (concat #b00000
+                                 ((_ extract 63 5)
+                                   memory_size_bytes)))
+                  (bvmul #xffffffffffffffff (concat #b000000000 a!2))))
+      (a!6 (bvmul #x0000000000000020
+                  (concat #b00000
+                          ((_ extract 63 5)
+                            (bvadd #x000000000000001f
+                                   stack_19_z0
+                                   a!5)))))
+      (a!10 (bvadd (bvmul #x0000000000000003
+                          (concat #b00000
+                                  ((_ extract 63 5)
+                                    memory_size_bytes)))
+                   (concat #b000000000 a!2)))
+      (a!16 (bvmul #x0000000000000020
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000003f a!5)))))
+      (a!23 (bvadd #x000000000000003f
+                   (concat ((_ extract 63 8) (bvadd #x0000000000000020 a!5))
+                           (bvadd #x20
+                                  (select evm_mem0
+                                          #x000000000000005f)))))
+      (a!29 (bvadd #x000000000000003f
+                   (concat ((_ extract 63 8) (bvadd #x0000000000000040 a!5))
+                           (bvadd #x40
+                                  (select evm_mem0
+                                          #x000000000000005f)))))
+      (a!37 (bvadd #x000000000000003f
+                   (concat ((_ extract 63 8) (bvadd #x0000000000000060 a!5))
+                           (bvadd #x60
+                                  (select evm_mem0
+                                          #x000000000000005f)))))
+      (a!46 (bvadd #x0000
+
+131 (let ((a!1 (concat (select evm_mem0 #x0000000000000058)
+                   (select evm_mem0 #x0000000000000059)
+                   (select evm_mem0 #x000000000000005a)
+                   (select evm_mem0 #x000000000000005b)
+                   (select evm_mem0 #x000000000000005c)
+                   (select evm_mem0 #x000000000000005d)
+                   (select evm_mem0 #x000000000000005e)
+                   (select evm_mem0 #x000000000000005f)))
+      (a!3 (or (not (= ((_ extract 63 7) memory_size_bytes)
+                       #b000000000000000000000000000000000000000000000000000000000))
+               (bvule #b1100000
+                      ((_ extract 6 0) memory_size_bytes))))
+      (a!25 ((_ extract 63 9)
+              (bvmul (concat #b00000
+                             ((_ extract 63 5)
+                               memory_size_bytes))
+                     (concat #b00000
+                             ((_ extract 63 5)
+                               memory_size_bytes)))))
+      (a!56 (bvmul #xfffffffffffffff7
+                   (concat #b00000
+                           ((_ extract 63 5)
+                             (bvadd #x000000000000001f
+                                    stack_19_z0))))))
+(let ((a!2 ((_ extract 63 5)
+             (bvadd #x000000000000001f
+                    (ite (= stack_19_z0 #x0000000000000000)
+                         #x0000000000000000
+                         (bvadd a!1 stack_19_z0)))))
+      (a!23 (bvmul #x0000000000000003
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000013f a!1)))))
+      (a!24 (bvmul (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000013f a!1)))
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000013f a!1)))))
+      (a!26 (bvadd (bvmul #x0000000000000003
+                          (concat #b00000
+                                  ((_ extract 63 5)
+                                    memory_size_bytes)))
+                   (concat #b000000000 a!25)))
+      (a!29 (bvmul #x0000000000000003
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000003f a!1)))))
+      (a!30 (bvmul (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000003f a!1)))
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000003f a!1)))))
+      (a!32 (bvmul #x0000000000000003
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000005f a!1)))))
+      (a!33 (bvmul (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000005f a!1)))
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000005f a!1)))))
+      (a!35 (bvmul #x0000000000000003
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000007f a!1)))))
+      (a!36 (bvmul
+
+132 (let ((a!1 (concat (select evm_mem0 #x0000000000000058)
+                   (select evm_mem0 #x0000000000000059)
+                   (select evm_mem0 #x000000000000005a)
+                   (select evm_mem0 #x000000000000005b)
+                   (select evm_mem0 #x000000000000005c)
+                   (select evm_mem0 #x000000000000005d)
+                   (select evm_mem0 #x000000000000005e)
+                   (select evm_mem0 #x000000000000005f)))
+      (a!3 (or (not (= ((_ extract 63 7) memory_size_bytes)
+                       #b000000000000000000000000000000000000000000000000000000000))
+               (bvule #b1100000
+                      ((_ extract 6 0) memory_size_bytes))))
+      (a!23 ((_ extract 63 9)
+              (bvmul (concat #b00000
+                             ((_ extract 63 5)
+                               memory_size_bytes))
+                     (concat #b00000
+                             ((_ extract 63 5)
+                               memory_size_bytes)))))
+      (a!51 (bvmul #xfffffffffffffff7
+                   (concat #b00000
+                           ((_ extract 63 5)
+                             (bvadd #x000000000000001f
+                                    stack_19_z0))))))
+(let ((a!2 ((_ extract 63 5)
+             (bvadd #x000000000000001f
+                    (ite (= stack_19_z0 #x0000000000000000)
+                         #x0000000000000000
+                         (bvadd a!1 stack_19_z0)))))
+      (a!21 (bvmul #x0000000000000003
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000011f a!1)))))
+      (a!22 (bvmul (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000011f a!1)))
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000011f a!1)))))
+      (a!24 (bvadd (bvmul #x0000000000000003
+                          (concat #b00000
+                                  ((_ extract 63 5)
+                                    memory_size_bytes)))
+                   (concat #b000000000 a!23)))
+      (a!27 (bvmul #x0000000000000003
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000003f a!1)))))
+      (a!28 (bvmul (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000003f a!1)))
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000003f a!1)))))
+      (a!30 (bvmul #x0000000000000003
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000005f a!1)))))
+      (a!31 (bvmul (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000005f a!1)))
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000005f a!1)))))
+      (a!33 (bvmul #x0000000000000003
+                   (concat #b00000
+                           ((_ extract 63 5) (bvadd #x000000000000007f a!1)))))
+      (a!34 (bvmul
+
+217 (let ((a!1 (ite (= stack_19_z0 #x0000000000000000)
+                #x0000000000000000
+                (bvadd (concat (select evm_mem0
+                                       #x0000000000000058)
+                               (select evm_mem0
+                                       #x0000000000000059)
+                               (select evm_mem0
+                                       #x000000000000005a)
+                               (select evm_mem0
+                                       #x000000000000005b)
+                               (select evm_mem0
+                                       #x000000000000005c)
+                               (select evm_mem0
+                                       #x000000000000005d)
+                               (select evm_mem0
+                                       #x000000000000005e)
+                               (select evm_mem0
+                                       #x000000000000005f))
+                       stack_19_z0)))
+      (a!2 (or (not (= ((_ extract 63 7) memory_size_bytes)
+                       #b000000000000000000000000000000000000000000000000000000000))
+               (bvule #b1100000
+                      ((_ extract 6 0) memory_size_bytes))))
+      (a!8 ((_ extract 63 9)
+             (bvmul (concat #b00000
+                            ((_ extract 63 5)
+                              memory_size_bytes))
+                    (concat #b00000
+                            ((_ extract 63 5)
+                              memory_size_bytes)))))
+      (a!12 (bvmul #x0000000000000006
+                   (concat #b00000
+                           ((_ extract 63 5)
+                             (bvadd #x000000000000001f
+                                    stack_19_z0)))))
+      (a!15 (bvmul #xfffffffffffffffd
+                   (concat #b00000
+                           ((_ extract 63 5)
+                             (bvadd #x000000000000001f
+                                    stack_19_z0))))))
+(let ((a!3 (bvule (concat ((_ extract 63 5) (bvadd #x000000000000001f a!1))
+                          #b00000)
+                  (ite a!2
+                       memory_size_bytes
+                       #x0000000000000060)))
+      (a!6 (bvmul #x0000000000000003
+                  (concat #b00000
+                          ((_ extract 63 5) (bvadd #x000000000000001f a!1)))))
+      (a!7 (bvmul (concat #b00000
+                          ((_ extract 63 5) (bvadd #x000000000000001f a!1)))
+                  (concat #b00000
+                          ((_ extract 63 5) (bvadd #x000000000000001f a!1)))))
+      (a!9 (bvadd (bvmul #x0000000000000003
+                         (concat #b00000
+                                 ((_ extract 63 5)
+                                   memory_size_bytes)))
+                  (concat #b000000000 a!8)))
+      (a!13 (bvadd #x0000000000000009
+                   (bvmul #xfffffffffffffffd
+                          (concat #b00000
+                                  ((_ extract 63 5)
+                    
+
+105 (let ((a!1 (or (not (= ((_ extract 63 7) memory_size_bytes)
+                       #b000000000000000000000000000000000000000000000000000000000))
+               (bvule #b1100000
+                      ((_ extract 6 0) memory_size_bytes))))
+      (a!2 ((_ extract 63 9)
+             (bvmul (concat #b00000
+                            ((_ extract 63 5)
+                              memory_size_bytes))
+                    (concat #b00000
+                            ((_ extract 63 5)
+                              memory_size_bytes))))))
+(let ((a!3 (bvadd #x0000000000000009
+                  (bvmul #xfffffffffffffffd
+                         (concat #b00000
+                                 ((_ extract 63 5)
+                                   memory_size_bytes)))
+                  (bvmul #xffffffffffffffff (concat #b000000000 a!2)))))
+(let ((a!4 (bvadd (concat #b0
+                          (bvadd #xfffffffffffffe92
+                                 gas_remaining))
+                  (bvmul #b11111111111111111111111111111111111111111111111111111111111111111
+                         (concat #b0 (ite a!1 #x0000000000000000 a!3))))))
+  (not (= ((_ extract 64 64) a!4) #b1)))))
+
+114 (let ((a!1 (= ((_ extract 64 64)
+                (bvadd #b11111111111111111111111111111111111111111111111111111111010010010
+                       (concat #b0 gas_remaining)))
+              #b1)))
+  (not a!1))
+

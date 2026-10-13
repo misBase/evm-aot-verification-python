@@ -1,0 +1,739 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c
+configfile: pyproject.toml
+plugins: xdist-3.8.0
+created: 2/2 workers
+2 workers [1619 items]
+
+.................................................................................................................................................................................................................................usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          stem nodes
+-c: error: budgets must be positive
+.usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          stem nodes
+-c: error: budgets must be positive
+.usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          stem nodes
+-c: error: budgets must be positive
+.........................................................................................................................................................................................................................................s...................s.........................................................................................................................................................................................usage: main.py [-h] [--base-addr ADDR] [--timeout MS] [--verbose]
+               [--gas-check {off,fixed-budget,full}] [--gas-budget GAS_BUDGET]
+               [--proof-mode {paths,block-lockstep}] [--num-inputs NUM_INPUTS]
+               [--block-fallback {none,full-program}]
+               ir_json_path x86_hex
+main.py: error: argument --gas-check: invalid choice: 'bogus' (choose from off, fixed-budget, full)
+.................................................................................................................................................................................................................................................................................................................................................................................................................................FFFFFFFFFFFFFFFFFFFFFFF..F........................................................................................................................................................................................................................................................................................................................................................................................................................FFFFFFFFFFF...........................................................................................
+=================================== FAILURES ===================================
+_______________________ test_hot_block_conclusions[Safe] _______________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:164: in test_hot_block_conclusions
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_______________ test_cerc20_8186_top_is_inherited_from_upstream ________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:183: in test_cerc20_8186_top_is_inherited_from_upstream
+    abstraction = _abstraction("CErc20")
+                  ^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_______________ test_safe_5377_top_comes_from_calldatacopy_site ________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:192: in test_safe_5377_top_comes_from_calldatacopy_site
+    abstraction = _abstraction("Safe")
+                  ^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+______________ test_safe_6275_unique_msize_depends_on_provenance _______________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:204: in test_safe_6275_unique_msize_depends_on_provenance
+    assert _abstraction("Safe").msize[6275] == frozenset({0x60})
+           ^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+____________________ test_top_msize_implies_top_fmp[CErc20] ____________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:223: in test_top_msize_implies_top_fmp
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_________________ test_top_msize_implies_top_fmp[ENSRegistry] __________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:223: in test_top_msize_implies_top_fmp
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_____________________ test_top_msize_implies_top_fmp[Safe] _____________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:223: in test_top_msize_implies_top_fmp
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_______________ test_top_is_inherited_not_self_produced[CErc20] ________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:236: in test_top_is_inherited_not_self_produced
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_____________ test_top_is_inherited_not_self_produced[ENSRegistry] _____________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:236: in test_top_is_inherited_not_self_produced
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+________________ test_top_is_inherited_not_self_produced[Safe] _________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:236: in test_top_is_inherited_not_self_produced
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+________________ test_top_source_sites_are_few_and_concentrated ________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:247: in test_top_source_sites_are_few_and_concentrated
+    cerc20 = _abstraction("CErc20")
+             ^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+__________________________ test_ens_has_no_top_blocks __________________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:265: in test_ens_has_no_top_blocks
+    abstraction = _abstraction("ENSRegistry")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+___________ test_upper_bound_is_uninformative_on_top_blocks[CErc20] ____________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:278: in test_upper_bound_is_uninformative_on_top_blocks
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_________ test_upper_bound_is_uninformative_on_top_blocks[ENSRegistry] _________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:278: in test_upper_bound_is_uninformative_on_top_blocks
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+____________ test_upper_bound_is_uninformative_on_top_blocks[Safe] _____________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:278: in test_upper_bound_is_uninformative_on_top_blocks
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_______________________ test_lower_bound_is_informative ________________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:286: in test_lower_bound_is_informative
+    abstraction = _abstraction("CErc20")
+                  ^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_______________________ test_top_is_a_distinct_sentinel ________________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:310: in test_top_is_a_distinct_sentinel
+    abstraction = _abstraction("CErc20")
+                  ^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+____________________ test_call_family_does_not_change_msize ____________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:374: in test_call_family_does_not_change_msize
+    assert _entry_msize_of_second_block(ops, 0) == frozenset({0}), kind
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:354: in _entry_msize_of_second_block
+    return analyze_memory_size(blocks).msize[1]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_____________________ test_create_family_does_change_msize _____________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:381: in test_create_family_does_change_msize
+    assert _entry_msize_of_second_block(ops, 0) == frozenset({0x120})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:354: in _entry_msize_of_second_block
+    return analyze_memory_size(blocks).msize[1]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+___________________ test_zero_length_access_does_not_expand ____________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:391: in test_zero_length_access_does_not_expand
+    assert _entry_msize_of_second_block(ops, 0) == frozenset({0})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:354: in _entry_msize_of_second_block
+    return analyze_memory_size(blocks).msize[1]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_____________________ test_expansion_rounds_up_to_32_bytes _____________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:402: in test_expansion_rounds_up_to_32_bytes
+    assert _entry_msize_of_second_block(ops, 0) == frozenset({0x60})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:354: in _entry_msize_of_second_block
+    return analyze_memory_size(blocks).msize[1]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_____________________ test_free_memory_pointer_is_tracked ______________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:412: in test_free_memory_pointer_is_tracked
+    abstraction = analyze_memory_size(blocks)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_____________ test_dynamic_offset_makes_msize_top_with_source_site _____________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:432: in test_dynamic_offset_makes_msize_top_with_source_site
+    abstraction = analyze_memory_size(blocks)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_________________ test_iteration_budget_exhaustion_is_rejected _________________
+[gw1] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:460: in test_iteration_budget_exhaustion_is_rejected
+    analyze_memory_size(list(_blocks("CErc20")), iteration_budget=1)
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+
+During handling of the above exception, another exception occurred:
+tests/unit/test_msize_absint.py:459: in test_iteration_budget_exhaustion_is_rejected
+    with pytest.raises(MSizeAnalysisError, match="未在 1 次迭代内收敛"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: Regex pattern did not match.
+E     Expected regex: '未在 1 次迭代内收敛'
+E     Actual message: "无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'"
+____________________ test_entry_msize_unique_ratio[CErc20] _____________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:108: in test_entry_msize_unique_ratio
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+__________________ test_entry_msize_unique_ratio[ENSRegistry] __________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:108: in test_entry_msize_unique_ratio
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_____________________ test_entry_msize_unique_ratio[Safe] ______________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:108: in test_entry_msize_unique_ratio
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+________________ test_value_set_distribution_is_binary[CErc20] _________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:128: in test_value_set_distribution_is_binary
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+______________ test_value_set_distribution_is_binary[ENSRegistry] ______________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:128: in test_value_set_distribution_is_binary
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_________________ test_value_set_distribution_is_binary[Safe] __________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:128: in test_value_set_distribution_is_binary
+    stats = _abstraction(name).stats
+            ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+________________ test_unique_values_concentrate_on_0x60[CErc20] ________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:141: in test_unique_values_concentrate_on_0x60
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_____________ test_unique_values_concentrate_on_0x60[ENSRegistry] ______________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:141: in test_unique_values_concentrate_on_0x60
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+_________________ test_unique_values_concentrate_on_0x60[Safe] _________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:141: in test_unique_values_concentrate_on_0x60
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+______________________ test_hot_block_conclusions[CErc20] ______________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:164: in test_hot_block_conclusions
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+___________________ test_hot_block_conclusions[ENSRegistry] ____________________
+[gw0] darwin -- Python 3.13.7 /Users/june/Work/evm-aot-verification-python/.venv/bin/python
+tools/msize_absint.py:793: in _load_call_provenance_module
+    import prov_common  # type: ignore[import-not-found]
+    ^^^^^^^^^^^^^^^^^^
+E   ModuleNotFoundError: No module named 'prov_common'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_msize_absint.py:164: in test_hot_block_conclusions
+    abstraction = _abstraction(name)
+                  ^^^^^^^^^^^^^^^^^^
+tests/unit/test_msize_absint.py:68: in _abstraction
+    return analyze_memory_size(
+tools/msize_absint.py:969: in analyze_memory_size
+    provenance = _load_call_provenance_module()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tools/msize_absint.py:795: in _load_call_provenance_module
+    raise MSizeAnalysisError(
+E   tools.msize_absint.MSizeAnalysisError: 无法加载返回地址影子栈的 CFG 构造（/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c/tmp/prov_common.py）：No module named 'prov_common'
+=========================== short test summary info ============================
+FAILED tests/unit/test_msize_absint.py::test_hot_block_conclusions[Safe] - to...
+FAILED tests/unit/test_msize_absint.py::test_cerc20_8186_top_is_inherited_from_upstream
+FAILED tests/unit/test_msize_absint.py::test_safe_5377_top_comes_from_calldatacopy_site
+FAILED tests/unit/test_msize_absint.py::test_safe_6275_unique_msize_depends_on_provenance
+FAILED tests/unit/test_msize_absint.py::test_top_msize_implies_top_fmp[CErc20]
+FAILED tests/unit/test_msize_absint.py::test_top_msize_implies_top_fmp[ENSRegistry]
+FAILED tests/unit/test_msize_absint.py::test_top_msize_implies_top_fmp[Safe]
+FAILED tests/unit/test_msize_absint.py::test_top_is_inherited_not_self_produced[CErc20]
+FAILED tests/unit/test_msize_absint.py::test_top_is_inherited_not_self_produced[ENSRegistry]
+FAILED tests/unit/test_msize_absint.py::test_top_is_inherited_not_self_produced[Safe]
+FAILED tests/unit/test_msize_absint.py::test_top_source_sites_are_few_and_concentrated
+FAILED tests/unit/test_msize_absint.py::test_ens_has_no_top_blocks - tools.ms...
+FAILED tests/unit/test_msize_absint.py::test_upper_bound_is_uninformative_on_top_blocks[CErc20]
+FAILED tests/unit/test_msize_absint.py::test_upper_bound_is_uninformative_on_top_blocks[ENSRegistry]
+FAILED tests/unit/test_msize_absint.py::test_upper_bound_is_uninformative_on_top_blocks[Safe]
+FAILED tests/unit/test_msize_absint.py::test_lower_bound_is_informative - too...
+FAILED tests/unit/test_msize_absint.py::test_top_is_a_distinct_sentinel - too...
+FAILED tests/unit/test_msize_absint.py::test_call_family_does_not_change_msize
+FAILED tests/unit/test_msize_absint.py::test_create_family_does_change_msize
+FAILED tests/unit/test_msize_absint.py::test_zero_length_access_does_not_expand
+FAILED tests/unit/test_msize_absint.py::test_expansion_rounds_up_to_32_bytes
+FAILED tests/unit/test_msize_absint.py::test_free_memory_pointer_is_tracked
+FAILED tests/unit/test_msize_absint.py::test_dynamic_offset_makes_msize_top_with_source_site
+FAILED tests/unit/test_msize_absint.py::test_iteration_budget_exhaustion_is_rejected
+FAILED tests/unit/test_msize_absint.py::test_entry_msize_unique_ratio[CErc20]
+FAILED tests/unit/test_msize_absint.py::test_entry_msize_unique_ratio[ENSRegistry]
+FAILED tests/unit/test_msize_absint.py::test_entry_msize_unique_ratio[Safe]
+FAILED tests/unit/test_msize_absint.py::test_value_set_distribution_is_binary[CErc20]
+FAILED tests/unit/test_msize_absint.py::test_value_set_distribution_is_binary[ENSRegistry]
+FAILED tests/unit/test_msize_absint.py::test_value_set_distribution_is_binary[Safe]
+FAILED tests/unit/test_msize_absint.py::test_unique_values_concentrate_on_0x60[CErc20]
+FAILED tests/unit/test_msize_absint.py::test_unique_values_concentrate_on_0x60[ENSRegistry]
+FAILED tests/unit/test_msize_absint.py::test_unique_values_concentrate_on_0x60[Safe]
+FAILED tests/unit/test_msize_absint.py::test_hot_block_conclusions[CErc20] - ...
+FAILED tests/unit/test_msize_absint.py::test_hot_block_conclusions[ENSRegistry]
+============ 35 failed, 1582 passed, 2 skipped in 333.20s (0:05:33) ============
+PYTHONPATH=. /Users/june/Work/evm-aot-verification-python/.venv/bin/python -m  603.32s user 18.46s system 186% cpu 5:33.43 total

@@ -1,0 +1,183 @@
+  [    7.6] _refute_over_light_premise 0.5s -> NoneType
+  [    9.4] _refute_by_cases 0.8s -> NoneType
+  [   10.0] _refute_over_light_premise 0.5s -> NoneType
+  [   12.5] _refute_by_cases 0.9s -> NoneType
+  [   13.2] _refute_over_light_premise 0.6s -> NoneType
+  [   14.4] _refute_by_cases 0.7s -> NoneType
+  [   15.0] _refute_over_light_premise 0.5s -> NoneType
+  [   16.6] _refute_by_cases 0.7s -> NoneType
+  [   17.2] _refute_over_light_premise 0.5s -> NoneType
+    [   20.6] solve_query 1.3s budget=29998 -> sat
+  [   20.6] _refute_by_cases 1.3s -> NoneType
+  [   21.2] _refute_over_light_premise 0.5s -> NoneType
+  [   23.1] _refute_by_cases 0.6s -> NoneType
+  [   23.7] _refute_over_light_premise 0.5s -> NoneType
+    [   27.5] solve_query 3.0s budget=29999 -> sat
+  [   27.5] _refute_by_cases 3.0s -> NoneType
+  [   28.1] _refute_over_light_premise 0.5s -> NoneType
+  [   30.5] _refute_by_cases 0.4s -> NoneType
+  [   31.1] _refute_over_light_premise 0.5s -> NoneType
+  [   32.5] _refute_by_cases 0.4s -> NoneType
+  [   33.1] _refute_over_light_premise 0.5s -> NoneType
+  [   34.1] _refute_by_cases 0.7s -> NoneType
+  [   34.7] _refute_over_light_premise 0.5s -> NoneType
+  [   35.9] _refute_by_cases 0.6s -> NoneType
+  [   36.5] _refute_over_light_premise 0.5s -> NoneType
+  [   37.5] _refute_by_cases 0.6s -> NoneType
+  [   38.1] _refute_over_light_premise 0.5s -> NoneType
+  [   38.9] _refute_by_cases 0.6s -> NoneType
+  [   39.5] _refute_over_light_premise 0.6s -> NoneType
+  [   41.5] _refute_by_cases 0.7s -> NoneType
+  [   42.1] _refute_over_light_premise 0.6s -> NoneType
+  [   43.1] _refute_by_cases 0.6s -> NoneType
+  [   43.7] _refute_over_light_premise 0.5s -> NoneType
+  [   45.2] _refute_by_cases 0.6s -> NoneType
+  [   45.7] _refute_over_light_premise 0.5s -> NoneType
+  [   46.8] _refute_by_cases 0.6s -> NoneType
+  [   47.4] _refute_over_light_premise 0.6s -> NoneType
+    [   50.9] solve_query 2.0s budget=29999 -> sat
+  [   50.9] _refute_by_cases 2.0s -> NoneType
+  [   51.5] _refute_over_light_premise 0.6s -> NoneType
+  [   53.5] _refute_by_cases 0.9s -> NoneType
+  [   54.1] _refute_over_light_premise 0.6s -> NoneType
+  [   55.6] _refute_by_cases 0.6s -> NoneType
+  [   56.2] _refute_over_light_premise 0.6s -> NoneType
+  [   57.9] _refute_by_cases 0.8s -> NoneType
+  [   58.5] _refute_over_light_premise 0.5s -> NoneType
+    [   62.3] solve_query 2.0s budget=29999 -> sat
+  [   62.3] _refute_by_cases 2.1s -> NoneType
+  [   62.9] _refute_over_light_premise 0.6s -> NoneType
+    [   66.0] solve_query 1.0s budget=29998 -> sat
+  [   66.0] _refute_by_cases 1.0s -> NoneType
+  [   66.6] _refute_over_light_premise 0.5s -> NoneType
+  [   69.0] _refute_by_cases 0.6s -> NoneType
+  [   69.6] _refute_over_light_premise 0.5s -> NoneType
+  [   71.3] _refute_by_cases 0.7s -> NoneType
+  [   71.9] _refute_over_light_premise 0.5s -> NoneType
+  [   73.7] _refute_by_cases 0.6s -> NoneType
+  [   74.3] _refute_over_light_premise 0.5s -> NoneType
+  [   76.2] _refute_by_cases 0.6s -> NoneType
+  [   76.8] _refute_over_light_premise 0.5s -> NoneType
+  [   78.4] _refute_by_cases 0.6s -> NoneType
+  [   79.0] _refute_over_light_premise 0.5s -> NoneType
+    [   81.3] solve_query 1.7s budget=29999 -> sat
+  [   81.3] _refute_by_cases 1.7s -> NoneType
+  [   81.9] _refute_over_light_premise 0.6s -> NoneType
+    [   86.0] solve_query 2.9s budget=29999 -> sat
+  [   86.0] _refute_by_cases 2.9s -> NoneType
+  [   86.6] _refute_over_light_premise 0.5s -> NoneType
+  [   88.1] _refute_by_cases 0.6s -> NoneType
+  [   88.7] _refute_over_light_premise 0.5s -> NoneType
+  [   90.2] _refute_by_cases 0.7s -> NoneType
+  [   90.7] _refute_over_light_premise 0.5s -> NoneType
+  [   92.6] _refute_by_cases 0.8s -> NoneType
+  [   93.2] _refute_over_light_premise 0.6s -> NoneType
+    [   95.3] solve_query 1.0s budget=29999 -> sat
+  [   95.3] _refute_by_cases 1.0s -> NoneType
+  [   95.9] _refute_over_light_premise 0.5s -> NoneType
+    [   98.6] solve_query 1.6s budget=29999 -> sat
+  [   98.6] _refute_by_cases 1.6s -> NoneType
+  [   99.2] _refute_over_light_premise 0.5s -> NoneType
+    [  101.9] solve_query 1.7s budget=29999 -> sat
+  [  101.9] _refute_by_cases 1.7s -> NoneType
+  [  102.4] _refute_over_light_premise 0.5s -> NoneType
+  [  104.4] _refute_by_cases 0.7s -> NoneType
+  [  105.0] _refute_over_light_premise 0.5s -> NoneType
+    [  107.8] solve_query 2.0s budget=29999 -> sat
+  [  107.8] _refute_by_cases 2.0s -> NoneType
+  [  108.4] _refute_over_light_premise 0.5s -> NoneType
+  [  110.4] _refute_by_cases 0.9s -> NoneType
+  [  111.0] _refute_over_light_premise 0.5s -> NoneType
+  [  112.4] _refute_by_cases 0.6s -> NoneType
+  [  113.0] _refute_over_light_premise 0.6s -> NoneType
+    [  116.1] solve_query 1.0s budget=29999 -> sat
+  [  116.1] _refute_by_cases 1.0s -> NoneType
+  [  116.7] _refute_over_light_premise 0.5s -> NoneType
+  [  118.3] _refute_by_cases 0.6s -> NoneType
+  [  118.8] _refute_over_light_premise 0.5s -> NoneType
+    [  125.8] solve_query 6.3s budget=29999 -> sat
+  [  125.8] _refute_by_cases 6.3s -> NoneType
+  [  126.4] _refute_over_light_premise 0.6s -> NoneType
+    [  128.8] solve_query 1.1s budget=29999 -> sat
+  [  128.8] _refute_by_cases 1.1s -> NoneType
+  [  129.4] _refute_over_light_premise 0.5s -> NoneType
+    [  134.2] solve_query 3.2s budget=29999 -> sat
+  [  134.2] _refute_by_cases 3.2s -> NoneType
+  [  134.8] _refute_over_light_premise 0.5s -> NoneType
+  [  136.1] _refute_by_cases 0.6s -> NoneType
+  [  136.7] _refute_over_light_premise 0.5s -> NoneType
+  [  138.0] _refute_by_cases 0.6s -> NoneType
+  [  138.6] _refute_over_light_premise 0.5s -> NoneType
+  [  139.8] _refute_by_cases 0.7s -> NoneType
+  [  140.4] _refute_over_light_premise 0.6s -> NoneType
+  [  142.2] _refute_by_cases 0.9s -> NoneType
+  [  142.8] _refute_over_light_premise 0.5s -> NoneType
+  [  144.6] _refute_by_cases 0.7s -> NoneType
+  [  145.2] _refute_over_light_premise 0.6s -> NoneType
+    [  148.6] solve_query 1.3s budget=29999 -> sat
+  [  148.6] _refute_by_cases 1.3s -> NoneType
+  [  149.1] _refute_over_light_premise 0.5s -> NoneType
+  [  150.8] _refute_by_cases 0.7s -> NoneType
+  [  151.4] _refute_over_light_premise 0.5s -> NoneType
+  [  152.9] _refute_by_cases 0.7s -> NoneType
+  [  153.5] _refute_over_light_premise 0.5s -> NoneType
+    [  157.0] solve_query 2.3s budget=29999 -> sat
+  [  157.0] _refute_by_cases 2.3s -> NoneType
+  [  157.6] _refute_over_light_premise 0.5s -> NoneType
+  [  158.8] _refute_by_cases 0.8s -> NoneType
+  [  159.4] _refute_over_light_premise 0.5s -> NoneType
+  [  161.2] _refute_by_cases 0.9s -> NoneType
+  [  161.8] _refute_over_light_premise 0.5s -> NoneType
+    [  163.4] solve_query 1.2s budget=29999 -> sat
+  [  163.4] _refute_by_cases 1.2s -> NoneType
+  [  163.9] _refute_over_light_premise 0.5s -> NoneType
+  [  165.1] _refute_by_cases 0.6s -> NoneType
+  [  165.7] _refute_over_light_premise 0.5s -> NoneType
+    [  170.7] solve_query 3.1s budget=29999 -> sat
+  [  170.7] _refute_by_cases 3.1s -> NoneType
+  [  171.3] _refute_over_light_premise 0.5s -> NoneType
+  [  172.4] _refute_by_cases 0.6s -> NoneType
+  [  173.0] _refute_over_light_premise 0.6s -> NoneType
+  [  175.4] _refute_by_cases 1.0s -> NoneType
+  [  176.0] _refute_over_light_premise 0.6s -> NoneType
+  [  178.3] _refute_by_cases 0.7s -> NoneType
+  [  178.9] _refute_over_light_premise 0.5s -> NoneType
+  [  181.1] _refute_by_cases 0.6s -> NoneType
+  [  181.7] _refute_over_light_premise 0.6s -> NoneType
+  [  182.8] _refute_by_cases 0.7s -> NoneType
+  [  183.4] _refute_over_light_premise 0.5s -> NoneType
+  [  184.7] _refute_by_cases 0.8s -> NoneType
+  [  185.3] _refute_over_light_premise 0.6s -> NoneType
+  [  187.0] _refute_by_cases 0.6s -> NoneType
+  [  187.6] _refute_over_light_premise 0.5s -> NoneType
+  [  188.8] _refute_by_cases 0.8s -> NoneType
+  [  189.4] _refute_over_light_premise 0.5s -> NoneType
+  [  191.5] _refute_by_cases 1.0s -> NoneType
+  [  192.1] _refute_over_light_premise 0.5s -> NoneType
+  [  193.5] _refute_by_cases 0.7s -> NoneType
+  [  194.0] _refute_over_light_premise 0.6s -> NoneType
+    [  196.0] solve_query 1.1s budget=29999 -> sat
+  [  196.0] _refute_by_cases 1.1s -> NoneType
+  [  196.6] _refute_over_light_premise 0.6s -> NoneType
+    [  198.0] solve_query 1.1s budget=29999 -> sat
+  [  198.0] _refute_by_cases 1.1s -> NoneType
+  [  198.6] _refute_over_light_premise 0.5s -> NoneType
+  [  201.5] _refute_by_cases 0.9s -> NoneType
+  [  202.1] _refute_over_light_premise 0.5s -> NoneType
+    [  204.3] solve_query 1.3s budget=29999 -> sat
+  [  204.3] _refute_by_cases 1.3s -> NoneType
+  [  204.9] _refute_over_light_premise 0.5s -> NoneType
+  [  206.8] _refute_by_cases 0.8s -> NoneType
+  [  207.3] _refute_over_light_premise 0.5s -> NoneType
+  [  208.5] _refute_by_cases 0.7s -> NoneType
+  [  209.1] _refute_over_light_premise 0.5s -> NoneType
+  [  211.4] _refute_by_cases 0.6s -> NoneType
+  [  211.9] _refute_over_light_premise 0.5s -> NoneType
+  [  213.3] _refute_by_cases 0.6s -> NoneType
+  [  213.9] _refute_over_light_premise 0.5s -> NoneType
+  [  214.9] _refute_by_cases 0.6s -> NoneType
+  [  215.7] _refute_over_light_premise 0.8s -> tuple
+  [  216.0] unify_uf_arguments 209.2s -> 1 lemmas
+    [  222.1] solve_query 5.6s budget=30000 -> unsat
+  [  222.1] _refute_over_light_premise 6.0s -> tuple
+unify(norm) unsat 215.5s lemmas 2 ['unify_0_case_0', 'opaque_array_uf_light']

@@ -1,0 +1,26 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r37c
+configfile: pyproject.toml
+plugins: xdist-3.8.0
+created: 2/2 workers
+2 workers [304 items]
+
+.............................................................................................................................................................................................usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          stem nodes
+-c: error: budgets must be positive
+.usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          stem nodes
+-c: error: budgets must be positive
+.usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          stem nodes
+-c: error: budgets must be positive
+.................................................................................................................
+============================= 304 passed in 40.97s =============================
+PYTHONPATH=. /Users/june/Work/evm-aot-verification-python/.venv/bin/python -m  73.69s user 2.82s system 185% cpu 41.137 total

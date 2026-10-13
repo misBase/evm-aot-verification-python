@@ -1,0 +1,16 @@
+    [    3.3] solve_query 3.3s budget=3000 -> unknown
+    [    6.7] solve_query 3.2s budget=3000 -> unknown
+  [    6.8] pin_split 0.1s -> NoneType
+    [   11.4] solve_query 3.3s budget=10000 -> sat
+    [   25.1] solve_query 10.3s budget=10000 -> unknown
+    [   32.5] solve_query 7.4s budget=10000 -> sat
+  [   32.5] _retry_over_lia 25.7s -> unknown
+  [   42.7] normalize_word_arith 10.1s -> tuple
+    [   46.1] solve_query 3.3s budget=3000 -> unknown
+  [   46.2] pin_split 0.1s -> NoneType
+    [   57.6] solve_query 10.2s budget=10000 -> unknown
+    [   69.9] solve_query 10.2s budget=10000 -> unknown
+    [   80.1] solve_query 10.2s budget=10000 -> unknown
+  [   80.1] _retry_over_lia 33.9s -> unknown
+  [   87.4] normalize_word_arith 7.3s -> tuple
+pair_58_8_2a70e0b6258d.smt2 all proved 88.5s lemmas=7

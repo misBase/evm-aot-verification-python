@@ -1,0 +1,958 @@
+{"i": 0, "exact": "sat", "dec": true, "t": 0.0056, "rec": true}
+{"i": 1, "exact": "sat", "dec": true, "t": 0.0048, "rec": true}
+{"i": 3, "exact": "sat", "dec": true, "t": 0.0013, "rec": true}
+{"i": 4, "exact": "sat", "dec": true, "t": 0.002, "rec": true}
+{"i": 5, "exact": "unsat", "dec": false, "t": 0.0027, "rec": false}
+{"i": 7, "exact": "unsat", "dec": false, "t": 0.0031, "rec": false}
+{"i": 9, "exact": "sat", "dec": true, "t": 0.0048, "rec": true}
+{"i": 12, "probe": "sat", "exact": "sat", "dec": true, "t": 0.115, "rec": true}
+{"i": 13, "probe": "sat", "exact": "sat", "dec": true, "t": 0.063, "rec": true}
+{"i": 16, "probe": "sat", "exact": "sat", "dec": true, "t": 0.0656, "rec": true}
+{"i": 17, "probe": "sat", "exact": "sat", "dec": true, "t": 0.0699, "rec": true}
+{"i": 19, "probe": "sat", "exact": "sat", "dec": true, "t": 0.0867, "rec": true}
+{"i": 22, "probe": "sat", "exact": "sat", "dec": true, "t": 0.135, "rec": true}
+{"i": 23, "probe": "unsat", "dec": false, "t": 0.06, "rec": false}
+{"i": 25, "probe": "unsat", "dec": false, "t": 0.0205, "rec": false}
+{"i": 28, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1117, "rec": true}
+{"i": 29, "exact": "sat", "dec": true, "t": 0.0013, "rec": true}
+{"i": 30, "exact": "sat", "dec": true, "t": 0.0041, "rec": true}
+{"i": 31, "exact": "unsat", "dec": false, "t": 0.0031, "rec": false}
+{"i": 33, "exact": "unsat", "dec": false, "t": 0.0034, "rec": false}
+{"i": 35, "exact": "sat", "dec": true, "t": 0.0049, "rec": true}
+{"i": 37, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 40, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 42, "probe": "unsat", "dec": false, "t": 0.0471, "rec": false}
+{"i": 44, "probe": "unsat", "dec": false, "t": 0.0955, "rec": false}
+{"i": 46, "probe": "unsat", "dec": false, "t": 0.0242, "rec": false}
+{"i": 48, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.2233, "rec": true}
+{"i": 50, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.3234, "rec": true}
+{"i": 53, "probe": "sat", "exact": "sat", "dec": true, "t": 0.5905, "rec": true}
+{"i": 54, "probe": "unsat", "dec": false, "t": 0.0334, "rec": false}
+{"i": 56, "exact": "unsat", "dec": false, "t": 0.0019, "rec": false}
+{"i": 58, "exact": "unsat", "dec": false, "t": 0.0018, "rec": false}
+{"i": 60, "probe": "unsat", "dec": false, "t": 0.0141, "rec": false}
+{"i": 62, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 64, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 66, "exact": "unsat", "dec": false, "t": 0.0018, "rec": false}
+{"i": 68, "exact": "unsat", "dec": false, "t": 0.0018, "rec": false}
+{"i": 70, "probe": "unsat", "dec": false, "t": 0.0139, "rec": false}
+{"i": 72, "exact": "unsat", "dec": false, "t": 0.0023, "rec": false}
+{"i": 74, "exact": "unsat", "dec": false, "t": 0.0019, "rec": false}
+{"i": 76, "exact": "unsat", "dec": false, "t": 0.0019, "rec": false}
+{"i": 78, "probe": "unsat", "dec": false, "t": 0.035, "rec": false}
+{"i": 80, "probe": "unsat", "dec": false, "t": 0.103, "rec": false}
+{"i": 82, "probe": "sat", "exact": "sat", "dec": true, "t": 0.5153, "rec": true}
+{"i": 84, "probe": "unsat", "dec": false, "t": 0.0158, "rec": false}
+{"i": 86, "probe": "unsat", "dec": false, "t": 0.128, "rec": false}
+{"i": 88, "probe": "unsat", "dec": false, "t": 0.0683, "rec": false}
+{"i": 90, "probe": "unsat", "dec": false, "t": 0.302, "rec": false}
+{"i": 92, "probe": "unsat", "dec": false, "t": 0.0476, "rec": false}
+{"i": 94, "probe": "sat", "exact": "sat", "dec": true, "t": 0.5724, "rec": true}
+{"i": 96, "exact": "unsat", "dec": false, "t": 0.0047, "rec": false}
+{"i": 99, "probe": "sat", "exact": "sat", "dec": true, "t": 0.7111, "rec": true}
+{"i": 101, "probe": "unsat", "dec": false, "t": 0.0891, "rec": false}
+{"i": 103, "probe": "unsat", "dec": false, "t": 0.2037, "rec": false}
+{"i": 105, "probe": "unsat", "dec": false, "t": 0.1087, "rec": false}
+{"i": 107, "probe": "unsat", "dec": false, "t": 0.1124, "rec": false}
+{"i": 109, "probe": "unsat", "dec": false, "t": 0.0642, "rec": false}
+{"i": 111, "probe": "sat", "exact": "sat", "dec": true, "t": 0.7629, "rec": true}
+{"i": 113, "exact": "unsat", "dec": false, "t": 0.0025, "rec": false}
+{"i": 116, "probe": "sat", "exact": "sat", "dec": true, "t": 0.8581, "rec": true}
+{"i": 118, "probe": "unsat", "dec": false, "t": 0.1293, "rec": false}
+{"i": 120, "probe": "unsat", "dec": false, "t": 0.1693, "rec": false}
+{"i": 122, "probe": "unsat", "dec": false, "t": 0.1464, "rec": false}
+{"i": 124, "probe": "unsat", "dec": false, "t": 0.1426, "rec": false}
+{"i": 126, "probe": "unsat", "dec": false, "t": 0.0806, "rec": false}
+{"i": 128, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4761, "rec": true}
+{"i": 130, "exact": "unsat", "dec": false, "t": 0.0028, "rec": false}
+{"i": 133, "probe": "sat", "exact": "sat", "dec": true, "t": 1.2709, "rec": true}
+{"i": 135, "probe": "unsat", "dec": false, "t": 0.1725, "rec": false}
+{"i": 137, "probe": "unsat", "dec": false, "t": 0.2022, "rec": false}
+{"i": 139, "probe": "unsat", "dec": false, "t": 0.187, "rec": false}
+{"i": 141, "probe": "unsat", "dec": false, "t": 0.2039, "rec": false}
+{"i": 143, "probe": "unsat", "dec": false, "t": 0.0993, "rec": false}
+{"i": 145, "probe": "sat", "exact": "sat", "dec": true, "t": 0.5949, "rec": true}
+{"i": 147, "exact": "unsat", "dec": false, "t": 0.0032, "rec": false}
+{"i": 150, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4794, "rec": true}
+{"i": 152, "probe": "unsat", "dec": false, "t": 0.182, "rec": false}
+{"i": 154, "probe": "unsat", "dec": false, "t": 0.3258, "rec": false}
+{"i": 156, "probe": "unsat", "dec": false, "t": 0.2123, "rec": false}
+{"i": 158, "probe": "unsat", "dec": false, "t": 0.2306, "rec": false}
+{"i": 160, "probe": "unsat", "dec": false, "t": 0.1151, "rec": false}
+{"i": 162, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.8288, "rec": true}
+{"i": 164, "exact": "unsat", "dec": false, "t": 0.0037, "rec": false}
+{"i": 167, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.8948, "rec": true}
+{"i": 169, "probe": "unsat", "dec": false, "t": 0.2291, "rec": false}
+{"i": 171, "probe": "unsat", "dec": false, "t": 0.2711, "rec": false}
+{"i": 173, "probe": "unsat", "dec": false, "t": 0.2555, "rec": false}
+{"i": 175, "probe": "unsat", "dec": false, "t": 0.2667, "rec": false}
+{"i": 177, "probe": "unsat", "dec": false, "t": 0.1458, "rec": false}
+{"i": 179, "probe": "sat", "exact": "sat", "dec": true, "t": 1.5191, "rec": true}
+{"i": 181, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 184, "probe": "sat", "exact": "sat", "dec": true, "t": 1.8143, "rec": true}
+{"i": 186, "probe": "unsat", "dec": false, "t": 0.2702, "rec": false}
+{"i": 188, "probe": "unsat", "dec": false, "t": 0.4944, "rec": false}
+{"i": 190, "probe": "unsat", "dec": false, "t": 0.311, "rec": false}
+{"i": 192, "probe": "unsat", "dec": false, "t": 0.2968, "rec": false}
+{"i": 194, "probe": "unsat", "dec": false, "t": 0.1673, "rec": false}
+{"i": 196, "probe": "sat", "exact": "sat", "dec": true, "t": 1.6645, "rec": true}
+{"i": 198, "exact": "sat", "dec": true, "t": 0.0019, "rec": true}
+{"i": 199, "exact": "sat", "dec": true, "t": 0.0273, "rec": true}
+{"i": 200, "exact": "unsat", "dec": false, "t": 0.0047, "rec": false}
+{"i": 202, "exact": "unsat", "dec": false, "t": 0.0048, "rec": false}
+{"i": 204, "exact": "sat", "dec": true, "t": 0.006, "rec": true}
+{"i": 206, "exact": "unsat", "dec": false, "t": 0.0034, "rec": false}
+{"i": 209, "probe": "unknown", "exact": "sat", "dec": true, "t": 3.3968, "rec": true}
+{"i": 211, "probe": "unsat", "dec": false, "t": 0.2938, "rec": false}
+{"i": 213, "probe": "unsat", "dec": false, "t": 0.5444, "rec": false}
+{"i": 215, "probe": "unsat", "dec": false, "t": 0.3404, "rec": false}
+{"i": 217, "probe": "unsat", "dec": false, "t": 0.4111, "rec": false}
+{"i": 219, "probe": "unsat", "dec": false, "t": 0.1827, "rec": false}
+{"i": 221, "probe": "sat", "exact": "sat", "dec": true, "t": 1.3567, "rec": true}
+{"i": 223, "exact": "unsat", "dec": false, "t": 0.0038, "rec": false}
+{"i": 226, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.376, "rec": true}
+{"i": 228, "probe": "unsat", "dec": false, "t": 0.3235, "rec": false}
+{"i": 230, "probe": "unsat", "dec": false, "t": 0.6063, "rec": false}
+{"i": 232, "probe": "unsat", "dec": false, "t": 0.3783, "rec": false}
+{"i": 234, "probe": "unsat", "dec": false, "t": 0.4061, "rec": false}
+{"i": 236, "probe": "unsat", "dec": false, "t": 0.2034, "rec": false}
+{"i": 238, "probe": "sat", "exact": "sat", "dec": true, "t": 2.1795, "rec": true}
+{"i": 240, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 243, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.6529, "rec": true}
+{"i": 245, "probe": "unsat", "dec": false, "t": 0.3766, "rec": false}
+{"i": 247, "probe": "unsat", "dec": false, "t": 0.4985, "rec": false}
+{"i": 249, "probe": "unsat", "dec": false, "t": 0.462, "rec": false}
+{"i": 251, "probe": "unsat", "dec": false, "t": 0.4891, "rec": false}
+{"i": 253, "probe": "unsat", "dec": false, "t": 0.217, "rec": false}
+{"i": 255, "probe": "sat", "exact": "sat", "dec": true, "t": 1.8369, "rec": true}
+{"i": 257, "exact": "unsat", "dec": false, "t": 0.006, "rec": false}
+{"i": 260, "probe": "sat", "exact": "sat", "dec": true, "t": 3.0535, "rec": true}
+{"i": 262, "probe": "unsat", "dec": false, "t": 0.3857, "rec": false}
+{"i": 264, "probe": "unsat", "dec": false, "t": 0.5043, "rec": false}
+{"i": 266, "probe": "unsat", "dec": false, "t": 0.4861, "rec": false}
+{"i": 268, "probe": "unsat", "dec": false, "t": 0.4494, "rec": false}
+{"i": 270, "probe": "unsat", "dec": false, "t": 0.253, "rec": false}
+{"i": 272, "probe": "sat", "exact": "sat", "dec": true, "t": 1.9277, "rec": true}
+{"i": 274, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 277, "probe": "sat", "exact": "sat", "dec": true, "t": 2.1406, "rec": true}
+{"i": 279, "probe": "unsat", "dec": false, "t": 0.0741, "rec": false}
+{"i": 281, "probe": "unsat", "dec": false, "t": 0.5248, "rec": false}
+{"i": 283, "probe": "unsat", "dec": false, "t": 0.5198, "rec": false}
+{"i": 285, "probe": "unsat", "dec": false, "t": 2.0116, "rec": false}
+{"i": 287, "probe": "unsat", "dec": false, "t": 0.4103, "rec": false}
+{"i": 289, "probe": "unsat", "dec": false, "t": 0.512, "rec": false}
+{"i": 291, "probe": "unsat", "dec": false, "t": 0.8103, "rec": false}
+{"i": 293, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.9174, "rec": true}
+{"i": 295, "probe": "unsat", "dec": false, "t": 0.0813, "rec": false}
+{"i": 297, "exact": "unsat", "dec": false, "t": 0.0048, "rec": false}
+{"i": 299, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 301, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 303, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 305, "probe": "unsat", "dec": false, "t": 0.0807, "rec": false}
+{"i": 307, "probe": "unsat", "dec": false, "t": 0.9347, "rec": false}
+{"i": 309, "probe": "unsat", "dec": false, "t": 0.0821, "rec": false}
+{"i": 311, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 313, "exact": "unsat", "dec": false, "t": 0.0047, "rec": false}
+{"i": 315, "exact": "unsat", "dec": false, "t": 0.0048, "rec": false}
+{"i": 317, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 319, "probe": "unsat", "dec": false, "t": 0.0832, "rec": false}
+{"i": 321, "probe": "unsat", "dec": false, "t": 0.9606, "rec": false}
+{"i": 323, "probe": "unsat", "dec": false, "t": 0.0848, "rec": false}
+{"i": 325, "exact": "unsat", "dec": false, "t": 0.0049, "rec": false}
+{"i": 327, "exact": "unsat", "dec": false, "t": 0.0047, "rec": false}
+{"i": 329, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 331, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 333, "probe": "unsat", "dec": false, "t": 0.0855, "rec": false}
+{"i": 335, "probe": "unsat", "dec": false, "t": 1.0169, "rec": false}
+{"i": 337, "probe": "unsat", "dec": false, "t": 0.4462, "rec": false}
+{"i": 339, "probe": "unsat", "dec": false, "t": 0.6701, "rec": false}
+{"i": 341, "probe": "unsat", "dec": false, "t": 0.6111, "rec": false}
+{"i": 343, "probe": "unsat", "dec": false, "t": 0.6314, "rec": false}
+{"i": 345, "probe": "unsat", "dec": false, "t": 0.3364, "rec": false}
+{"i": 347, "probe": "unsat", "dec": false, "t": 0.634, "rec": false}
+{"i": 349, "probe": "unsat", "dec": false, "t": 1.2115, "rec": false}
+{"i": 351, "probe": "unknown", "exact": "unknown", "dec": true, "t": 4.0602, "rec": true}
+{"i": 353, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.481, "rec": true}
+{"i": 354, "probe": "sat", "exact": "sat", "dec": true, "t": 2.8434, "rec": true}
+{"i": 355, "probe": "unknown", "exact": "unknown", "dec": true, "t": 3.3575, "rec": true}
+{"i": 357, "probe": "unsat", "dec": false, "t": 0.5003, "rec": false}
+{"i": 359, "probe": "sat", "exact": "sat", "dec": true, "t": 2.6201, "rec": true}
+{"i": 361, "probe": "unsat", "dec": false, "t": 0.4413, "rec": false}
+{"i": 365, "probe": "unsat", "dec": false, "t": 0.4032, "rec": false}
+{"i": 367, "probe": "sat", "exact": "sat", "dec": true, "t": 2.3139, "rec": true}
+{"i": 369, "probe": "unsat", "dec": false, "t": 0.3868, "rec": false}
+{"i": 373, "probe": "unsat", "dec": false, "t": 0.3386, "rec": false}
+{"i": 377, "probe": "unsat", "dec": false, "t": 0.321, "rec": false}
+{"i": 379, "probe": "sat", "exact": "sat", "dec": true, "t": 1.5447, "rec": true}
+{"i": 381, "probe": "unsat", "dec": false, "t": 0.2613, "rec": false}
+{"i": 385, "probe": "unsat", "dec": false, "t": 0.2201, "rec": false}
+{"i": 389, "probe": "unsat", "dec": false, "t": 0.1806, "rec": false}
+{"i": 393, "probe": "unsat", "dec": false, "t": 0.1449, "rec": false}
+{"i": 397, "probe": "unsat", "dec": false, "t": 0.1153, "rec": false}
+{"i": 401, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.3862, "rec": true}
+{"i": 402, "exact": "unsat", "dec": false, "t": 0.0024, "rec": false}
+{"i": 404, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 406, "probe": "unsat", "dec": false, "t": 0.0181, "rec": false}
+{"i": 408, "exact": "unsat", "dec": false, "t": 0.0019, "rec": false}
+{"i": 410, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 412, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 414, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 416, "probe": "unsat", "dec": false, "t": 0.0182, "rec": false}
+{"i": 418, "exact": "unsat", "dec": false, "t": 0.002, "rec": false}
+{"i": 420, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 422, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 424, "probe": "unsat", "dec": false, "t": 0.0482, "rec": false}
+{"i": 426, "probe": "unsat", "dec": false, "t": 0.0934, "rec": false}
+{"i": 428, "probe": "sat", "exact": "sat", "dec": true, "t": 1.2036, "rec": true}
+{"i": 430, "probe": "unsat", "dec": false, "t": 0.0218, "rec": false}
+{"i": 432, "probe": "unsat", "dec": false, "t": 0.1709, "rec": false}
+{"i": 434, "probe": "unsat", "dec": false, "t": 0.1644, "rec": false}
+{"i": 436, "probe": "unsat", "dec": false, "t": 0.3508, "rec": false}
+{"i": 438, "probe": "unsat", "dec": false, "t": 0.0671, "rec": false}
+{"i": 440, "probe": "sat", "exact": "sat", "dec": true, "t": 0.6966, "rec": true}
+{"i": 442, "exact": "unsat", "dec": false, "t": 0.0029, "rec": false}
+{"i": 445, "probe": "sat", "exact": "sat", "dec": true, "t": 0.7954, "rec": true}
+{"i": 447, "probe": "unsat", "dec": false, "t": 0.1089, "rec": false}
+{"i": 449, "probe": "unsat", "dec": false, "t": 0.228, "rec": false}
+{"i": 451, "probe": "unsat", "dec": false, "t": 0.1315, "rec": false}
+{"i": 453, "probe": "unsat", "dec": false, "t": 0.1425, "rec": false}
+{"i": 455, "probe": "unsat", "dec": false, "t": 0.0835, "rec": false}
+{"i": 457, "probe": "sat", "exact": "sat", "dec": true, "t": 1.0567, "rec": true}
+{"i": 459, "exact": "unsat", "dec": false, "t": 0.0028, "rec": false}
+{"i": 462, "probe": "sat", "exact": "sat", "dec": true, "t": 1.1411, "rec": true}
+{"i": 464, "probe": "unsat", "dec": false, "t": 0.1405, "rec": false}
+{"i": 466, "probe": "unsat", "dec": false, "t": 0.1745, "rec": false}
+{"i": 468, "probe": "unsat", "dec": false, "t": 0.1678, "rec": false}
+{"i": 470, "probe": "unsat", "dec": false, "t": 0.1687, "rec": false}
+{"i": 472, "probe": "unsat", "dec": false, "t": 0.0955, "rec": false}
+{"i": 474, "probe": "sat", "exact": "sat", "dec": true, "t": 0.8549, "rec": true}
+{"i": 476, "exact": "unsat", "dec": false, "t": 0.0029, "rec": false}
+{"i": 479, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.5259, "rec": true}
+{"i": 481, "probe": "unsat", "dec": false, "t": 0.1763, "rec": false}
+{"i": 483, "probe": "unsat", "dec": false, "t": 0.2164, "rec": false}
+{"i": 485, "probe": "unsat", "dec": false, "t": 0.2035, "rec": false}
+{"i": 487, "probe": "unsat", "dec": false, "t": 0.2247, "rec": false}
+{"i": 489, "probe": "unsat", "dec": false, "t": 0.1161, "rec": false}
+{"i": 491, "probe": "sat", "exact": "sat", "dec": true, "t": 0.7857, "rec": true}
+{"i": 493, "exact": "unsat", "dec": false, "t": 0.003, "rec": false}
+{"i": 496, "probe": "sat", "exact": "sat", "dec": true, "t": 1.3789, "rec": true}
+{"i": 498, "probe": "unsat", "dec": false, "t": 0.2084, "rec": false}
+{"i": 500, "probe": "unsat", "dec": false, "t": 0.3645, "rec": false}
+{"i": 502, "probe": "unsat", "dec": false, "t": 0.2341, "rec": false}
+{"i": 504, "probe": "unsat", "dec": false, "t": 0.27, "rec": false}
+{"i": 506, "probe": "unsat", "dec": false, "t": 0.1335, "rec": false}
+{"i": 508, "probe": "sat", "exact": "sat", "dec": true, "t": 1.3213, "rec": true}
+{"i": 510, "exact": "unsat", "dec": false, "t": 0.0063, "rec": false}
+{"i": 513, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.2411, "rec": true}
+{"i": 515, "probe": "unsat", "dec": false, "t": 0.2405, "rec": false}
+{"i": 517, "probe": "unsat", "dec": false, "t": 0.2879, "rec": false}
+{"i": 519, "probe": "unsat", "dec": false, "t": 0.2665, "rec": false}
+{"i": 521, "probe": "unsat", "dec": false, "t": 0.2906, "rec": false}
+{"i": 523, "probe": "unsat", "dec": false, "t": 0.1699, "rec": false}
+{"i": 525, "probe": "sat", "exact": "sat", "dec": true, "t": 1.1842, "rec": true}
+{"i": 527, "exact": "unsat", "dec": false, "t": 0.0038, "rec": false}
+{"i": 530, "probe": "sat", "exact": "sat", "dec": true, "t": 2.0692, "rec": true}
+{"i": 532, "probe": "unsat", "dec": false, "t": 0.292, "rec": false}
+{"i": 534, "probe": "unsat", "dec": false, "t": 0.3629, "rec": false}
+{"i": 536, "probe": "unsat", "dec": false, "t": 0.3327, "rec": false}
+{"i": 538, "probe": "unsat", "dec": false, "t": 0.3398, "rec": false}
+{"i": 540, "probe": "unsat", "dec": false, "t": 0.1952, "rec": false}
+{"i": 542, "probe": "sat", "exact": "sat", "dec": true, "t": 1.8627, "rec": true}
+{"i": 544, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 547, "probe": "sat", "exact": "sat", "dec": true, "t": 2.4744, "rec": true}
+{"i": 549, "probe": "unsat", "dec": false, "t": 0.3246, "rec": false}
+{"i": 551, "probe": "unsat", "dec": false, "t": 0.5662, "rec": false}
+{"i": 553, "probe": "unsat", "dec": false, "t": 0.3749, "rec": false}
+{"i": 555, "probe": "unsat", "dec": false, "t": 0.4441, "rec": false}
+{"i": 557, "probe": "unsat", "dec": false, "t": 0.1986, "rec": false}
+{"i": 559, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4404, "rec": true}
+{"i": 561, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 564, "probe": "sat", "exact": "sat", "dec": true, "t": 2.3493, "rec": true}
+{"i": 566, "probe": "unsat", "dec": false, "t": 0.3603, "rec": false}
+{"i": 568, "probe": "unsat", "dec": false, "t": 0.6229, "rec": false}
+{"i": 570, "probe": "unsat", "dec": false, "t": 0.3948, "rec": false}
+{"i": 572, "probe": "unsat", "dec": false, "t": 0.4383, "rec": false}
+{"i": 574, "probe": "unsat", "dec": false, "t": 0.2151, "rec": false}
+{"i": 576, "probe": "sat", "exact": "sat", "dec": true, "t": 2.1881, "rec": true}
+{"i": 578, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 581, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.2609, "rec": true}
+{"i": 583, "probe": "unsat", "dec": false, "t": 0.3845, "rec": false}
+{"i": 585, "probe": "unsat", "dec": false, "t": 0.687, "rec": false}
+{"i": 587, "probe": "unsat", "dec": false, "t": 0.4247, "rec": false}
+{"i": 589, "probe": "unsat", "dec": false, "t": 0.4496, "rec": false}
+{"i": 591, "probe": "unsat", "dec": false, "t": 0.2365, "rec": false}
+{"i": 593, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.667, "rec": true}
+{"i": 595, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 596, "probe": "sat", "exact": "sat", "dec": true, "t": 2.5798, "rec": true}
+{"i": 598, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.0776, "rec": true}
+{"i": 600, "probe": "unsat", "dec": false, "t": 0.4331, "rec": false}
+{"i": 602, "probe": "unsat", "dec": false, "t": 0.7437, "rec": false}
+{"i": 604, "probe": "unsat", "dec": false, "t": 0.454, "rec": false}
+{"i": 606, "probe": "unsat", "dec": false, "t": 0.5161, "rec": false}
+{"i": 608, "probe": "unsat", "dec": false, "t": 0.2814, "rec": false}
+{"i": 610, "probe": "sat", "exact": "sat", "dec": true, "t": 2.8188, "rec": true}
+{"i": 612, "exact": "unsat", "dec": false, "t": 0.0047, "rec": false}
+{"i": 615, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.4424, "rec": true}
+{"i": 617, "probe": "unsat", "dec": false, "t": 0.0764, "rec": false}
+{"i": 619, "probe": "unsat", "dec": false, "t": 0.5437, "rec": false}
+{"i": 621, "probe": "unsat", "dec": false, "t": 0.5709, "rec": false}
+{"i": 623, "probe": "unsat", "dec": false, "t": 3.3907, "rec": false}
+{"i": 625, "probe": "unsat", "dec": false, "t": 0.2787, "rec": false}
+{"i": 627, "probe": "unsat", "dec": false, "t": 0.5007, "rec": false}
+{"i": 629, "probe": "unsat", "dec": false, "t": 0.8005, "rec": false}
+{"i": 631, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.2576, "rec": true}
+{"i": 633, "probe": "unsat", "dec": false, "t": 0.0807, "rec": false}
+{"i": 635, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 637, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 639, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 641, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 643, "probe": "unsat", "dec": false, "t": 0.0831, "rec": false}
+{"i": 645, "probe": "unsat", "dec": false, "t": 0.91, "rec": false}
+{"i": 647, "probe": "unsat", "dec": false, "t": 0.0833, "rec": false}
+{"i": 649, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 651, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 653, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 655, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 657, "probe": "unsat", "dec": false, "t": 0.0829, "rec": false}
+{"i": 659, "probe": "unsat", "dec": false, "t": 0.9422, "rec": false}
+{"i": 661, "probe": "unsat", "dec": false, "t": 0.0825, "rec": false}
+{"i": 663, "exact": "unsat", "dec": false, "t": 0.0046, "rec": false}
+{"i": 665, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 667, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 669, "exact": "unsat", "dec": false, "t": 0.0046, "rec": false}
+{"i": 671, "probe": "unsat", "dec": false, "t": 0.0839, "rec": false}
+{"i": 673, "probe": "unsat", "dec": false, "t": 1.0215, "rec": false}
+{"i": 675, "probe": "unsat", "dec": false, "t": 0.4304, "rec": false}
+{"i": 677, "probe": "unsat", "dec": false, "t": 0.6307, "rec": false}
+{"i": 679, "probe": "unsat", "dec": false, "t": 0.5929, "rec": false}
+{"i": 681, "probe": "unsat", "dec": false, "t": 0.5917, "rec": false}
+{"i": 683, "probe": "unsat", "dec": false, "t": 0.3186, "rec": false}
+{"i": 685, "probe": "unsat", "dec": false, "t": 0.6054, "rec": false}
+{"i": 687, "probe": "unknown", "exact": "unknown", "dec": true, "t": 3.8369, "rec": false}
+{"i": 689, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.5779, "rec": true}
+{"i": 691, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.7128, "rec": true}
+{"i": 692, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.2102, "rec": true}
+{"i": 695, "probe": "unsat", "dec": false, "t": 0.4822, "rec": false}
+{"i": 697, "probe": "sat", "exact": "sat", "dec": true, "t": 2.6471, "rec": true}
+{"i": 699, "probe": "unsat", "dec": false, "t": 0.438, "rec": false}
+{"i": 703, "probe": "unsat", "dec": false, "t": 0.4027, "rec": false}
+{"i": 707, "probe": "unsat", "dec": false, "t": 0.3489, "rec": false}
+{"i": 711, "probe": "unsat", "dec": false, "t": 0.3074, "rec": false}
+{"i": 715, "probe": "unsat", "dec": false, "t": 0.268, "rec": false}
+{"i": 719, "probe": "unsat", "dec": false, "t": 0.2305, "rec": false}
+{"i": 723, "probe": "unsat", "dec": false, "t": 0.197, "rec": false}
+{"i": 727, "probe": "unsat", "dec": false, "t": 0.1719, "rec": false}
+{"i": 731, "probe": "unsat", "dec": false, "t": 0.1452, "rec": false}
+{"i": 735, "probe": "unsat", "dec": false, "t": 0.1113, "rec": false}
+{"i": 738, "exact": "unsat", "dec": false, "t": 0.0019, "rec": false}
+{"i": 740, "exact": "unsat", "dec": false, "t": 0.0023, "rec": false}
+{"i": 742, "probe": "unsat", "dec": false, "t": 0.017, "rec": false}
+{"i": 744, "exact": "unsat", "dec": false, "t": 0.0023, "rec": false}
+{"i": 746, "exact": "unsat", "dec": false, "t": 0.0017, "rec": false}
+{"i": 748, "exact": "unsat", "dec": false, "t": 0.0026, "rec": false}
+{"i": 750, "exact": "unsat", "dec": false, "t": 0.0021, "rec": false}
+{"i": 752, "probe": "unsat", "dec": false, "t": 0.0214, "rec": false}
+{"i": 754, "exact": "unsat", "dec": false, "t": 0.0026, "rec": false}
+{"i": 756, "exact": "unsat", "dec": false, "t": 0.0018, "rec": false}
+{"i": 758, "exact": "unsat", "dec": false, "t": 0.0021, "rec": false}
+{"i": 760, "probe": "unsat", "dec": false, "t": 0.0506, "rec": false}
+{"i": 762, "probe": "unsat", "dec": false, "t": 0.1336, "rec": false}
+{"i": 764, "probe": "sat", "exact": "sat", "dec": true, "t": 0.8009, "rec": true}
+{"i": 766, "probe": "unsat", "dec": false, "t": 0.0202, "rec": false}
+{"i": 768, "probe": "unsat", "dec": false, "t": 0.1774, "rec": false}
+{"i": 770, "probe": "unsat", "dec": false, "t": 0.1061, "rec": false}
+{"i": 772, "probe": "unsat", "dec": false, "t": 0.3615, "rec": false}
+{"i": 774, "probe": "unsat", "dec": false, "t": 0.0641, "rec": false}
+{"i": 776, "probe": "sat", "exact": "sat", "dec": true, "t": 0.5625, "rec": true}
+{"i": 778, "exact": "unsat", "dec": false, "t": 0.003, "rec": false}
+{"i": 779, "probe": "sat", "exact": "sat", "dec": true, "t": 0.3891, "rec": true}
+{"i": 781, "probe": "sat", "exact": "sat", "dec": true, "t": 0.9934, "rec": true}
+{"i": 783, "probe": "unsat", "dec": false, "t": 0.113, "rec": false}
+{"i": 785, "probe": "unsat", "dec": false, "t": 0.1573, "rec": false}
+{"i": 787, "probe": "unsat", "dec": false, "t": 0.1413, "rec": false}
+{"i": 789, "probe": "unsat", "dec": false, "t": 0.1502, "rec": false}
+{"i": 791, "probe": "unsat", "dec": false, "t": 0.0815, "rec": false}
+{"i": 793, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4771, "rec": true}
+{"i": 795, "exact": "unsat", "dec": false, "t": 0.0031, "rec": false}
+{"i": 796, "probe": "sat", "exact": "sat", "dec": true, "t": 0.8491, "rec": true}
+{"i": 798, "probe": "sat", "exact": "sat", "dec": true, "t": 0.9946, "rec": true}
+{"i": 800, "probe": "unsat", "dec": false, "t": 0.1486, "rec": false}
+{"i": 802, "probe": "unsat", "dec": false, "t": 0.1853, "rec": false}
+{"i": 804, "probe": "unsat", "dec": false, "t": 0.1766, "rec": false}
+{"i": 806, "probe": "unsat", "dec": false, "t": 0.1681, "rec": false}
+{"i": 808, "probe": "unsat", "dec": false, "t": 0.096, "rec": false}
+{"i": 810, "probe": "sat", "exact": "sat", "dec": true, "t": 1.2445, "rec": true}
+{"i": 812, "exact": "unsat", "dec": false, "t": 0.0031, "rec": false}
+{"i": 815, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.5878, "rec": true}
+{"i": 817, "probe": "unsat", "dec": false, "t": 0.179, "rec": false}
+{"i": 819, "probe": "unsat", "dec": false, "t": 0.2136, "rec": false}
+{"i": 821, "probe": "unsat", "dec": false, "t": 0.1951, "rec": false}
+{"i": 823, "probe": "unsat", "dec": false, "t": 0.2141, "rec": false}
+{"i": 825, "probe": "unsat", "dec": false, "t": 0.1127, "rec": false}
+{"i": 827, "probe": "sat", "exact": "sat", "dec": true, "t": 1.0936, "rec": true}
+{"i": 829, "exact": "unsat", "dec": false, "t": 0.0035, "rec": false}
+{"i": 832, "probe": "sat", "exact": "sat", "dec": true, "t": 1.39, "rec": true}
+{"i": 834, "probe": "unsat", "dec": false, "t": 0.2101, "rec": false}
+{"i": 836, "probe": "unsat", "dec": false, "t": 0.2609, "rec": false}
+{"i": 838, "probe": "unsat", "dec": false, "t": 0.241, "rec": false}
+{"i": 840, "probe": "unsat", "dec": false, "t": 0.266, "rec": false}
+{"i": 842, "probe": "unsat", "dec": false, "t": 0.1371, "rec": false}
+{"i": 844, "probe": "sat", "exact": "sat", "dec": true, "t": 1.3577, "rec": true}
+{"i": 846, "exact": "unsat", "dec": false, "t": 0.0038, "rec": false}
+{"i": 849, "probe": "sat", "exact": "sat", "dec": true, "t": 1.6344, "rec": true}
+{"i": 851, "probe": "unsat", "dec": false, "t": 0.2526, "rec": false}
+{"i": 853, "probe": "unsat", "dec": false, "t": 0.307, "rec": false}
+{"i": 855, "probe": "unsat", "dec": false, "t": 0.2672, "rec": false}
+{"i": 857, "probe": "unsat", "dec": false, "t": 0.2764, "rec": false}
+{"i": 859, "probe": "unsat", "dec": false, "t": 0.1579, "rec": false}
+{"i": 861, "probe": "sat", "exact": "sat", "dec": true, "t": 1.8537, "rec": true}
+{"i": 863, "exact": "unsat", "dec": false, "t": 0.0038, "rec": false}
+{"i": 866, "probe": "sat", "exact": "sat", "dec": true, "t": 1.7221, "rec": true}
+{"i": 868, "probe": "unsat", "dec": false, "t": 0.2591, "rec": false}
+{"i": 870, "probe": "unsat", "dec": false, "t": 0.5253, "rec": false}
+{"i": 872, "probe": "unsat", "dec": false, "t": 0.3286, "rec": false}
+{"i": 874, "probe": "unsat", "dec": false, "t": 0.3199, "rec": false}
+{"i": 876, "probe": "unsat", "dec": false, "t": 0.1837, "rec": false}
+{"i": 878, "probe": "sat", "exact": "sat", "dec": true, "t": 1.2699, "rec": true}
+{"i": 880, "exact": "unsat", "dec": false, "t": 0.0035, "rec": false}
+{"i": 883, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.1553, "rec": true}
+{"i": 885, "probe": "unsat", "dec": false, "t": 0.2932, "rec": false}
+{"i": 887, "probe": "unsat", "dec": false, "t": 0.5385, "rec": false}
+{"i": 889, "probe": "unsat", "dec": false, "t": 0.3542, "rec": false}
+{"i": 891, "probe": "unsat", "dec": false, "t": 0.4295, "rec": false}
+{"i": 893, "probe": "unsat", "dec": false, "t": 0.2024, "rec": false}
+{"i": 895, "probe": "sat", "exact": "sat", "dec": true, "t": 2.0931, "rec": true}
+{"i": 897, "exact": "unsat", "dec": false, "t": 0.0037, "rec": false}
+{"i": 900, "probe": "unknown", "exact": "unknown", "dec": true, "t": 2.6228, "rec": true}
+{"i": 902, "probe": "unsat", "dec": false, "t": 0.3476, "rec": false}
+{"i": 904, "probe": "unsat", "dec": false, "t": 0.585, "rec": false}
+{"i": 906, "probe": "unsat", "dec": false, "t": 0.389, "rec": false}
+{"i": 908, "probe": "unsat", "dec": false, "t": 0.4141, "rec": false}
+{"i": 910, "probe": "unsat", "dec": false, "t": 0.2072, "rec": false}
+{"i": 912, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.5357, "rec": true}
+{"i": 914, "exact": "unsat", "dec": false, "t": 0.004, "rec": false}
+{"i": 917, "probe": "sat", "exact": "sat", "dec": true, "t": 2.9568, "rec": true}
+{"i": 919, "probe": "unsat", "dec": false, "t": 0.3648, "rec": false}
+{"i": 921, "probe": "unsat", "dec": false, "t": 0.4379, "rec": false}
+{"i": 923, "probe": "unsat", "dec": false, "t": 0.4094, "rec": false}
+{"i": 925, "probe": "unsat", "dec": false, "t": 0.4183, "rec": false}
+{"i": 927, "probe": "unsat", "dec": false, "t": 0.2273, "rec": false}
+{"i": 929, "probe": "sat", "exact": "sat", "dec": true, "t": 2.2544, "rec": true}
+{"i": 931, "exact": "unsat", "dec": false, "t": 0.0048, "rec": false}
+{"i": 934, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.8973, "rec": true}
+{"i": 936, "probe": "unsat", "dec": false, "t": 0.4422, "rec": false}
+{"i": 938, "probe": "unsat", "dec": false, "t": 0.555, "rec": false}
+{"i": 940, "probe": "unsat", "dec": false, "t": 0.4813, "rec": false}
+{"i": 942, "probe": "unsat", "dec": false, "t": 0.4644, "rec": false}
+{"i": 944, "probe": "unsat", "dec": false, "t": 0.2549, "rec": false}
+{"i": 946, "probe": "sat", "exact": "sat", "dec": true, "t": 2.6644, "rec": true}
+{"i": 948, "exact": "unsat", "dec": false, "t": 0.0055, "rec": false}
+{"i": 951, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.8979, "rec": true}
+{"i": 953, "probe": "unsat", "dec": false, "t": 0.0751, "rec": false}
+{"i": 955, "probe": "unsat", "dec": false, "t": 0.5106, "rec": false}
+{"i": 957, "probe": "unsat", "dec": false, "t": 0.4735, "rec": false}
+{"i": 959, "probe": "unsat", "dec": false, "t": 1.8465, "rec": false}
+{"i": 961, "probe": "unsat", "dec": false, "t": 0.2527, "rec": false}
+{"i": 963, "probe": "unsat", "dec": false, "t": 0.4376, "rec": false}
+{"i": 965, "probe": "unsat", "dec": false, "t": 0.7306, "rec": false}
+{"i": 967, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.8448, "rec": true}
+{"i": 969, "probe": "unsat", "dec": false, "t": 0.0779, "rec": false}
+{"i": 971, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 973, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 975, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 977, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 979, "probe": "unsat", "dec": false, "t": 0.0804, "rec": false}
+{"i": 981, "probe": "unsat", "dec": false, "t": 0.8605, "rec": false}
+{"i": 983, "probe": "unsat", "dec": false, "t": 0.0791, "rec": false}
+{"i": 985, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 987, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 989, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 991, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 993, "probe": "unsat", "dec": false, "t": 0.0808, "rec": false}
+{"i": 995, "probe": "unsat", "dec": false, "t": 0.9179, "rec": false}
+{"i": 997, "probe": "unsat", "dec": false, "t": 0.082, "rec": false}
+{"i": 999, "exact": "unsat", "dec": false, "t": 0.0047, "rec": false}
+{"i": 1001, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 1003, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 1005, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 1007, "probe": "unsat", "dec": false, "t": 0.0833, "rec": false}
+{"i": 1009, "probe": "unsat", "dec": false, "t": 0.9817, "rec": false}
+{"i": 1011, "probe": "unsat", "dec": false, "t": 0.4197, "rec": false}
+{"i": 1013, "probe": "unsat", "dec": false, "t": 0.6125, "rec": false}
+{"i": 1015, "probe": "unsat", "dec": false, "t": 0.5723, "rec": false}
+{"i": 1017, "probe": "unsat", "dec": false, "t": 0.5887, "rec": false}
+{"i": 1019, "probe": "unsat", "dec": false, "t": 0.3203, "rec": false}
+{"i": 1021, "probe": "unsat", "dec": false, "t": 0.5943, "rec": false}
+{"i": 1023, "probe": "unsat", "dec": false, "t": 1.3024, "rec": false}
+{"i": 1025, "probe": "sat", "exact": "unknown", "dec": true, "t": 4.103, "rec": true}
+{"i": 1027, "probe": "unknown", "exact": "unknown", "dec": true, "t": 3.829, "rec": true}
+{"i": 1028, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.0168, "rec": true}
+{"i": 1029, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.8326, "rec": true}
+{"i": 1031, "probe": "unsat", "dec": false, "t": 0.4623, "rec": false}
+{"i": 1033, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.4333, "rec": true}
+{"i": 1035, "probe": "unsat", "dec": false, "t": 0.438, "rec": false}
+{"i": 1039, "probe": "unsat", "dec": false, "t": 0.3894, "rec": false}
+{"i": 1043, "probe": "unsat", "dec": false, "t": 0.3391, "rec": false}
+{"i": 1047, "probe": "unsat", "dec": false, "t": 0.3058, "rec": false}
+{"i": 1051, "probe": "unsat", "dec": false, "t": 0.2538, "rec": false}
+{"i": 1055, "probe": "unsat", "dec": false, "t": 0.2198, "rec": false}
+{"i": 1057, "probe": "sat", "exact": "sat", "dec": true, "t": 1.2187, "rec": true}
+{"i": 1059, "probe": "unsat", "dec": false, "t": 0.2132, "rec": false}
+{"i": 1061, "probe": "sat", "exact": "sat", "dec": true, "t": 1.0599, "rec": true}
+{"i": 1063, "probe": "unsat", "dec": false, "t": 0.1831, "rec": false}
+{"i": 1067, "probe": "unsat", "dec": false, "t": 0.1429, "rec": false}
+{"i": 1071, "probe": "unsat", "dec": false, "t": 0.1078, "rec": false}
+{"i": 1075, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.1965, "rec": true}
+{"i": 1077, "probe": "unsat", "dec": false, "t": 0.0643, "rec": false}
+{"i": 1082, "probe": "unsat", "dec": false, "t": 0.0056, "rec": false}
+{"i": 1085, "probe": "unsat", "dec": false, "t": 0.01, "rec": false}
+{"i": 1086, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1088, "exact": "unsat", "dec": false, "t": 0.0013, "rec": false}
+{"i": 1090, "exact": "unsat", "dec": false, "t": 0.0013, "rec": false}
+{"i": 1093, "exact": "unsat", "dec": false, "t": 0.0013, "rec": false}
+{"i": 1094, "probe": "unsat", "dec": false, "t": 0.0103, "rec": false}
+{"i": 1096, "probe": "unsat", "dec": false, "t": 0.0104, "rec": false}
+{"i": 1099, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1099, "rec": true}
+{"i": 1100, "probe": "unsat", "dec": false, "t": 0.0258, "rec": false}
+{"i": 1102, "exact": "unsat", "dec": false, "t": 0.0016, "rec": false}
+{"i": 1105, "exact": "unsat", "dec": false, "t": 0.0019, "rec": false}
+{"i": 1106, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1109, "exact": "unsat", "dec": false, "t": 0.0018, "rec": false}
+{"i": 1110, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1112, "exact": "unsat", "dec": false, "t": 0.0019, "rec": false}
+{"i": 1114, "exact": "unsat", "dec": false, "t": 0.0016, "rec": false}
+{"i": 1117, "exact": "unsat", "dec": false, "t": 0.0019, "rec": false}
+{"i": 1118, "probe": "unsat", "dec": false, "t": 0.0129, "rec": false}
+{"i": 1120, "probe": "unsat", "dec": false, "t": 0.0135, "rec": false}
+{"i": 1122, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1133, "rec": true}
+{"i": 1124, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1311, "rec": true}
+{"i": 1126, "probe": "sat", "exact": "sat", "dec": true, "t": 0.2348, "rec": true}
+{"i": 1128, "probe": "unsat", "dec": false, "t": 0.0802, "rec": false}
+{"i": 1130, "probe": "unsat", "dec": false, "t": 0.0407, "rec": false}
+{"i": 1132, "probe": "sat", "exact": "sat", "dec": true, "t": 0.127, "rec": true}
+{"i": 1134, "exact": "unsat", "dec": false, "t": 0.0022, "rec": false}
+{"i": 1137, "probe": "sat", "exact": "sat", "dec": true, "t": 0.3553, "rec": true}
+{"i": 1139, "probe": "unsat", "dec": false, "t": 0.0648, "rec": false}
+{"i": 1141, "probe": "unsat", "dec": false, "t": 0.0862, "rec": false}
+{"i": 1143, "probe": "unsat", "dec": false, "t": 0.0821, "rec": false}
+{"i": 1145, "probe": "unsat", "dec": false, "t": 0.0849, "rec": false}
+{"i": 1147, "probe": "unsat", "dec": false, "t": 0.0576, "rec": false}
+{"i": 1149, "probe": "sat", "exact": "sat", "dec": true, "t": 0.264, "rec": true}
+{"i": 1151, "exact": "unsat", "dec": false, "t": 0.0023, "rec": false}
+{"i": 1154, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.4099, "rec": true}
+{"i": 1156, "probe": "unsat", "dec": false, "t": 0.0932, "rec": false}
+{"i": 1158, "probe": "unsat", "dec": false, "t": 0.1092, "rec": false}
+{"i": 1160, "probe": "unsat", "dec": false, "t": 0.1002, "rec": false}
+{"i": 1162, "probe": "unsat", "dec": false, "t": 0.107, "rec": false}
+{"i": 1164, "probe": "unsat", "dec": false, "t": 0.0748, "rec": false}
+{"i": 1166, "probe": "sat", "exact": "sat", "dec": true, "t": 0.4976, "rec": true}
+{"i": 1168, "exact": "unsat", "dec": false, "t": 0.0034, "rec": false}
+{"i": 1171, "probe": "sat", "exact": "sat", "dec": true, "t": 0.7541, "rec": true}
+{"i": 1173, "probe": "unsat", "dec": false, "t": 0.111, "rec": false}
+{"i": 1175, "probe": "unsat", "dec": false, "t": 0.1954, "rec": false}
+{"i": 1177, "probe": "unsat", "dec": false, "t": 0.1339, "rec": false}
+{"i": 1179, "probe": "unsat", "dec": false, "t": 0.1456, "rec": false}
+{"i": 1181, "probe": "unsat", "dec": false, "t": 0.0886, "rec": false}
+{"i": 1183, "probe": "sat", "exact": "sat", "dec": true, "t": 0.513, "rec": true}
+{"i": 1185, "exact": "unsat", "dec": false, "t": 0.0027, "rec": false}
+{"i": 1188, "probe": "sat", "exact": "sat", "dec": true, "t": 0.944, "rec": true}
+{"i": 1190, "probe": "unsat", "dec": false, "t": 0.1343, "rec": false}
+{"i": 1192, "probe": "unsat", "dec": false, "t": 0.178, "rec": false}
+{"i": 1194, "probe": "unsat", "dec": false, "t": 0.1653, "rec": false}
+{"i": 1196, "probe": "unsat", "dec": false, "t": 0.1703, "rec": false}
+{"i": 1198, "probe": "unsat", "dec": false, "t": 0.1037, "rec": false}
+{"i": 1200, "probe": "sat", "exact": "sat", "dec": true, "t": 0.6302, "rec": true}
+{"i": 1202, "exact": "unsat", "dec": false, "t": 0.0035, "rec": false}
+{"i": 1205, "probe": "sat", "exact": "sat", "dec": true, "t": 1.3144, "rec": true}
+{"i": 1207, "probe": "unsat", "dec": false, "t": 0.1653, "rec": false}
+{"i": 1209, "probe": "unsat", "dec": false, "t": 0.2179, "rec": false}
+{"i": 1211, "probe": "unsat", "dec": false, "t": 0.197, "rec": false}
+{"i": 1213, "probe": "unsat", "dec": false, "t": 0.1942, "rec": false}
+{"i": 1215, "probe": "unsat", "dec": false, "t": 0.1213, "rec": false}
+{"i": 1217, "probe": "sat", "exact": "sat", "dec": true, "t": 1.1653, "rec": true}
+{"i": 1219, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 1222, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.7769, "rec": true}
+{"i": 1224, "probe": "unsat", "dec": false, "t": 0.1915, "rec": false}
+{"i": 1226, "probe": "unsat", "dec": false, "t": 0.239, "rec": false}
+{"i": 1228, "probe": "unsat", "dec": false, "t": 0.2167, "rec": false}
+{"i": 1230, "probe": "unsat", "dec": false, "t": 0.2079, "rec": false}
+{"i": 1232, "probe": "unsat", "dec": false, "t": 0.1355, "rec": false}
+{"i": 1234, "probe": "sat", "exact": "sat", "dec": true, "t": 0.9027, "rec": true}
+{"i": 1236, "exact": "unsat", "dec": false, "t": 0.004, "rec": false}
+{"i": 1239, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4951, "rec": true}
+{"i": 1241, "probe": "unsat", "dec": false, "t": 0.2279, "rec": false}
+{"i": 1243, "probe": "unsat", "dec": false, "t": 0.3808, "rec": false}
+{"i": 1245, "probe": "unsat", "dec": false, "t": 0.2548, "rec": false}
+{"i": 1247, "probe": "unsat", "dec": false, "t": 0.3248, "rec": false}
+{"i": 1249, "probe": "unsat", "dec": false, "t": 0.1559, "rec": false}
+{"i": 1251, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4911, "rec": true}
+{"i": 1253, "exact": "unsat", "dec": false, "t": 0.0034, "rec": false}
+{"i": 1256, "probe": "sat", "exact": "sat", "dec": true, "t": 2.992, "rec": true}
+{"i": 1258, "probe": "unsat", "dec": false, "t": 0.2561, "rec": false}
+{"i": 1260, "probe": "unsat", "dec": false, "t": 0.4422, "rec": false}
+{"i": 1262, "probe": "unsat", "dec": false, "t": 0.3082, "rec": false}
+{"i": 1264, "probe": "unsat", "dec": false, "t": 0.3234, "rec": false}
+{"i": 1266, "probe": "unsat", "dec": false, "t": 0.1752, "rec": false}
+{"i": 1268, "probe": "sat", "exact": "sat", "dec": true, "t": 1.1616, "rec": true}
+{"i": 1270, "exact": "unsat", "dec": false, "t": 0.0036, "rec": false}
+{"i": 1273, "probe": "sat", "exact": "sat", "dec": true, "t": 2.0864, "rec": true}
+{"i": 1275, "probe": "unsat", "dec": false, "t": 0.3047, "rec": false}
+{"i": 1277, "probe": "unsat", "dec": false, "t": 0.3671, "rec": false}
+{"i": 1279, "probe": "unsat", "dec": false, "t": 0.3384, "rec": false}
+{"i": 1281, "probe": "unsat", "dec": false, "t": 0.3549, "rec": false}
+{"i": 1283, "probe": "unsat", "dec": false, "t": 0.1905, "rec": false}
+{"i": 1285, "probe": "sat", "exact": "sat", "dec": true, "t": 1.3429, "rec": true}
+{"i": 1287, "exact": "unsat", "dec": false, "t": 0.0037, "rec": false}
+{"i": 1290, "probe": "sat", "exact": "sat", "dec": true, "t": 2.1704, "rec": true}
+{"i": 1292, "probe": "unsat", "dec": false, "t": 0.3227, "rec": false}
+{"i": 1294, "probe": "unsat", "dec": false, "t": 0.4119, "rec": false}
+{"i": 1296, "probe": "unsat", "dec": false, "t": 0.3653, "rec": false}
+{"i": 1298, "probe": "unsat", "dec": false, "t": 0.368, "rec": false}
+{"i": 1300, "probe": "unsat", "dec": false, "t": 0.2092, "rec": false}
+{"i": 1302, "probe": "sat", "exact": "sat", "dec": true, "t": 1.502, "rec": true}
+{"i": 1304, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1307, "probe": "sat", "exact": "sat", "dec": true, "t": 2.4786, "rec": true}
+{"i": 1309, "probe": "unsat", "dec": false, "t": 0.0736, "rec": false}
+{"i": 1311, "probe": "unsat", "dec": false, "t": 0.4246, "rec": false}
+{"i": 1313, "probe": "unsat", "dec": false, "t": 0.4007, "rec": false}
+{"i": 1315, "probe": "unsat", "dec": false, "t": 2.3653, "rec": false}
+{"i": 1317, "probe": "unsat", "dec": false, "t": 0.2257, "rec": false}
+{"i": 1319, "probe": "unsat", "dec": false, "t": 0.4183, "rec": false}
+{"i": 1321, "probe": "unsat", "dec": false, "t": 0.6062, "rec": false}
+{"i": 1323, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.559, "rec": true}
+{"i": 1325, "probe": "unsat", "dec": false, "t": 0.077, "rec": false}
+{"i": 1327, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1329, "exact": "unsat", "dec": false, "t": 0.004, "rec": false}
+{"i": 1331, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1333, "exact": "unsat", "dec": false, "t": 0.004, "rec": false}
+{"i": 1335, "probe": "unsat", "dec": false, "t": 0.0772, "rec": false}
+{"i": 1337, "probe": "unsat", "dec": false, "t": 0.7588, "rec": false}
+{"i": 1339, "probe": "unsat", "dec": false, "t": 0.0782, "rec": false}
+{"i": 1341, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 1343, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 1345, "exact": "unsat", "dec": false, "t": 0.004, "rec": false}
+{"i": 1347, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 1349, "probe": "unsat", "dec": false, "t": 0.0804, "rec": false}
+{"i": 1351, "probe": "unsat", "dec": false, "t": 0.7185, "rec": false}
+{"i": 1353, "probe": "unsat", "dec": false, "t": 0.0792, "rec": false}
+{"i": 1355, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 1357, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1359, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1361, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1363, "probe": "unsat", "dec": false, "t": 0.0812, "rec": false}
+{"i": 1365, "probe": "unsat", "dec": false, "t": 0.8013, "rec": false}
+{"i": 1367, "probe": "unsat", "dec": false, "t": 0.3625, "rec": false}
+{"i": 1369, "probe": "unsat", "dec": false, "t": 0.4987, "rec": false}
+{"i": 1371, "probe": "unsat", "dec": false, "t": 0.5411, "rec": false}
+{"i": 1373, "probe": "unsat", "dec": false, "t": 0.4811, "rec": false}
+{"i": 1375, "probe": "unsat", "dec": false, "t": 0.277, "rec": false}
+{"i": 1377, "probe": "unsat", "dec": false, "t": 0.5025, "rec": false}
+{"i": 1379, "probe": "unsat", "dec": false, "t": 0.9142, "rec": false}
+{"i": 1381, "probe": "unknown", "exact": "unknown", "dec": true, "t": 3.3213, "rec": true}
+{"i": 1383, "probe": "unknown", "exact": "unknown", "dec": true, "t": 4.6547, "rec": true}
+{"i": 1387, "probe": "unsat", "dec": false, "t": 0.3906, "rec": false}
+{"i": 1391, "probe": "unsat", "dec": false, "t": 0.3196, "rec": false}
+{"i": 1395, "probe": "unsat", "dec": false, "t": 0.2882, "rec": false}
+{"i": 1397, "probe": "sat", "exact": "sat", "dec": true, "t": 1.6011, "rec": true}
+{"i": 1399, "probe": "unsat", "dec": false, "t": 0.2644, "rec": false}
+{"i": 1403, "probe": "unsat", "dec": false, "t": 0.2152, "rec": false}
+{"i": 1407, "probe": "unsat", "dec": false, "t": 0.1838, "rec": false}
+{"i": 1411, "probe": "unsat", "dec": false, "t": 0.1635, "rec": false}
+{"i": 1415, "probe": "unsat", "dec": false, "t": 0.1267, "rec": false}
+{"i": 1419, "probe": "unsat", "dec": false, "t": 0.1048, "rec": false}
+{"i": 1423, "probe": "unsat", "dec": false, "t": 0.0828, "rec": false}
+{"i": 1427, "probe": "unsat", "dec": false, "t": 0.0608, "rec": false}
+{"i": 1433, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1137, "rec": true}
+{"i": 1434, "exact": "unsat", "dec": false, "t": 0.002, "rec": false}
+{"i": 1437, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1438, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1441, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1442, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1444, "exact": "unsat", "dec": false, "t": 0.0016, "rec": false}
+{"i": 1446, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1449, "exact": "unsat", "dec": false, "t": 0.0016, "rec": false}
+{"i": 1450, "probe": "unsat", "dec": false, "t": 0.0122, "rec": false}
+{"i": 1452, "probe": "unsat", "dec": false, "t": 0.0139, "rec": false}
+{"i": 1454, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1246, "rec": true}
+{"i": 1456, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1843, "rec": true}
+{"i": 1458, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1294, "rec": true}
+{"i": 1460, "probe": "unsat", "dec": false, "t": 0.0816, "rec": false}
+{"i": 1462, "probe": "unsat", "dec": false, "t": 0.0412, "rec": false}
+{"i": 1464, "probe": "sat", "exact": "sat", "dec": true, "t": 0.131, "rec": true}
+{"i": 1466, "exact": "unsat", "dec": false, "t": 0.002, "rec": false}
+{"i": 1469, "probe": "sat", "exact": "sat", "dec": true, "t": 0.3527, "rec": true}
+{"i": 1471, "probe": "unsat", "dec": false, "t": 0.057, "rec": false}
+{"i": 1473, "probe": "unsat", "dec": false, "t": 0.0754, "rec": false}
+{"i": 1475, "probe": "unsat", "dec": false, "t": 0.0737, "rec": false}
+{"i": 1477, "probe": "unsat", "dec": false, "t": 0.0774, "rec": false}
+{"i": 1479, "probe": "unsat", "dec": false, "t": 0.0536, "rec": false}
+{"i": 1481, "probe": "sat", "exact": "sat", "dec": true, "t": 0.2261, "rec": true}
+{"i": 1483, "exact": "unsat", "dec": false, "t": 0.0022, "rec": false}
+{"i": 1486, "probe": "sat", "exact": "sat", "dec": true, "t": 0.5404, "rec": true}
+{"i": 1488, "probe": "unsat", "dec": false, "t": 0.0813, "rec": false}
+{"i": 1490, "probe": "unsat", "dec": false, "t": 0.1023, "rec": false}
+{"i": 1492, "probe": "unsat", "dec": false, "t": 0.1006, "rec": false}
+{"i": 1494, "probe": "unsat", "dec": false, "t": 0.1125, "rec": false}
+{"i": 1496, "probe": "unsat", "dec": false, "t": 0.0731, "rec": false}
+{"i": 1498, "probe": "sat", "exact": "sat", "dec": true, "t": 0.5077, "rec": true}
+{"i": 1500, "exact": "unsat", "dec": false, "t": 0.0025, "rec": false}
+{"i": 1503, "probe": "sat", "exact": "sat", "dec": true, "t": 0.666, "rec": true}
+{"i": 1505, "probe": "unsat", "dec": false, "t": 0.1253, "rec": false}
+{"i": 1507, "probe": "unsat", "dec": false, "t": 0.181, "rec": false}
+{"i": 1509, "probe": "unsat", "dec": false, "t": 0.1247, "rec": false}
+{"i": 1511, "probe": "unsat", "dec": false, "t": 0.139, "rec": false}
+{"i": 1513, "probe": "unsat", "dec": false, "t": 0.0935, "rec": false}
+{"i": 1515, "probe": "sat", "exact": "sat", "dec": true, "t": 0.5269, "rec": true}
+{"i": 1517, "exact": "unsat", "dec": false, "t": 0.0026, "rec": false}
+{"i": 1520, "probe": "sat", "exact": "sat", "dec": true, "t": 0.962, "rec": true}
+{"i": 1522, "probe": "unsat", "dec": false, "t": 0.1368, "rec": false}
+{"i": 1524, "probe": "unsat", "dec": false, "t": 0.1842, "rec": false}
+{"i": 1526, "probe": "unsat", "dec": false, "t": 0.1672, "rec": false}
+{"i": 1528, "probe": "unsat", "dec": false, "t": 0.173, "rec": false}
+{"i": 1530, "probe": "unsat", "dec": false, "t": 0.113, "rec": false}
+{"i": 1532, "probe": "sat", "exact": "sat", "dec": true, "t": 0.8954, "rec": true}
+{"i": 1534, "exact": "unsat", "dec": false, "t": 0.0028, "rec": false}
+{"i": 1537, "probe": "sat", "exact": "sat", "dec": true, "t": 1.183, "rec": true}
+{"i": 1539, "probe": "unsat", "dec": false, "t": 0.1625, "rec": false}
+{"i": 1541, "probe": "unsat", "dec": false, "t": 0.2064, "rec": false}
+{"i": 1543, "probe": "unsat", "dec": false, "t": 0.1937, "rec": false}
+{"i": 1545, "probe": "unsat", "dec": false, "t": 0.2012, "rec": false}
+{"i": 1547, "probe": "unsat", "dec": false, "t": 0.1155, "rec": false}
+{"i": 1549, "probe": "sat", "exact": "sat", "dec": true, "t": 1.2069, "rec": true}
+{"i": 1551, "exact": "unsat", "dec": false, "t": 0.0037, "rec": false}
+{"i": 1554, "probe": "sat", "exact": "sat", "dec": true, "t": 1.9744, "rec": true}
+{"i": 1556, "probe": "unsat", "dec": false, "t": 0.1916, "rec": false}
+{"i": 1558, "probe": "unsat", "dec": false, "t": 0.2409, "rec": false}
+{"i": 1560, "probe": "unsat", "dec": false, "t": 0.2318, "rec": false}
+{"i": 1562, "probe": "unsat", "dec": false, "t": 0.2133, "rec": false}
+{"i": 1564, "probe": "unsat", "dec": false, "t": 0.1354, "rec": false}
+{"i": 1566, "probe": "sat", "exact": "sat", "dec": true, "t": 0.8575, "rec": true}
+{"i": 1568, "exact": "unsat", "dec": false, "t": 0.0033, "rec": false}
+{"i": 1571, "probe": "sat", "exact": "sat", "dec": true, "t": 1.5481, "rec": true}
+{"i": 1573, "probe": "unsat", "dec": false, "t": 0.2243, "rec": false}
+{"i": 1575, "probe": "unsat", "dec": false, "t": 0.2792, "rec": false}
+{"i": 1577, "probe": "unsat", "dec": false, "t": 0.2654, "rec": false}
+{"i": 1579, "probe": "unsat", "dec": false, "t": 0.3166, "rec": false}
+{"i": 1581, "probe": "unsat", "dec": false, "t": 0.1528, "rec": false}
+{"i": 1583, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4929, "rec": true}
+{"i": 1585, "exact": "unsat", "dec": false, "t": 0.0035, "rec": false}
+{"i": 1588, "probe": "unknown", "exact": "sat", "dec": true, "t": 3.0638, "rec": true}
+{"i": 1590, "probe": "unsat", "dec": false, "t": 0.2532, "rec": false}
+{"i": 1592, "probe": "unsat", "dec": false, "t": 0.3049, "rec": false}
+{"i": 1594, "probe": "unsat", "dec": false, "t": 0.3062, "rec": false}
+{"i": 1596, "probe": "unsat", "dec": false, "t": 0.3219, "rec": false}
+{"i": 1598, "probe": "unsat", "dec": false, "t": 0.1763, "rec": false}
+{"i": 1600, "probe": "sat", "exact": "sat", "dec": true, "t": 1.1549, "rec": true}
+{"i": 1602, "exact": "unsat", "dec": false, "t": 0.0035, "rec": false}
+{"i": 1605, "probe": "sat", "exact": "sat", "dec": true, "t": 1.9188, "rec": true}
+{"i": 1607, "probe": "unsat", "dec": false, "t": 0.2996, "rec": false}
+{"i": 1609, "probe": "unsat", "dec": false, "t": 0.3698, "rec": false}
+{"i": 1611, "probe": "unsat", "dec": false, "t": 0.3257, "rec": false}
+{"i": 1613, "probe": "unsat", "dec": false, "t": 0.3621, "rec": false}
+{"i": 1615, "probe": "unsat", "dec": false, "t": 0.193, "rec": false}
+{"i": 1617, "probe": "sat", "exact": "sat", "dec": true, "t": 1.9394, "rec": true}
+{"i": 1619, "exact": "unsat", "dec": false, "t": 0.0037, "rec": false}
+{"i": 1622, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.3741, "rec": true}
+{"i": 1624, "probe": "unsat", "dec": false, "t": 0.3273, "rec": false}
+{"i": 1626, "probe": "unsat", "dec": false, "t": 0.4031, "rec": false}
+{"i": 1628, "probe": "unsat", "dec": false, "t": 0.3661, "rec": false}
+{"i": 1630, "probe": "unsat", "dec": false, "t": 0.3635, "rec": false}
+{"i": 1632, "probe": "unsat", "dec": false, "t": 0.2069, "rec": false}
+{"i": 1634, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4661, "rec": true}
+{"i": 1636, "exact": "unsat", "dec": false, "t": 0.0049, "rec": false}
+{"i": 1639, "probe": "sat", "exact": "sat", "dec": true, "t": 2.8949, "rec": true}
+{"i": 1641, "probe": "unsat", "dec": false, "t": 0.0768, "rec": false}
+{"i": 1643, "probe": "unsat", "dec": false, "t": 0.4312, "rec": false}
+{"i": 1645, "probe": "unsat", "dec": false, "t": 0.3922, "rec": false}
+{"i": 1647, "probe": "unsat", "dec": false, "t": 1.82, "rec": false}
+{"i": 1649, "probe": "unsat", "dec": false, "t": 0.2174, "rec": false}
+{"i": 1651, "probe": "unsat", "dec": false, "t": 0.381, "rec": false}
+{"i": 1653, "probe": "unsat", "dec": false, "t": 0.5877, "rec": false}
+{"i": 1655, "probe": "sat", "exact": "unknown", "dec": true, "t": 2.3967, "rec": true}
+{"i": 1657, "probe": "unsat", "dec": false, "t": 0.0764, "rec": false}
+{"i": 1659, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1661, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1663, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1665, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1667, "probe": "unsat", "dec": false, "t": 0.0789, "rec": false}
+{"i": 1669, "probe": "unsat", "dec": false, "t": 0.7161, "rec": false}
+{"i": 1671, "probe": "unsat", "dec": false, "t": 0.0795, "rec": false}
+{"i": 1673, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1675, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 1677, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 1679, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 1681, "probe": "unsat", "dec": false, "t": 0.0799, "rec": false}
+{"i": 1683, "probe": "unsat", "dec": false, "t": 0.7541, "rec": false}
+{"i": 1685, "probe": "unsat", "dec": false, "t": 0.0794, "rec": false}
+{"i": 1687, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 1689, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1691, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1693, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 1695, "probe": "unsat", "dec": false, "t": 0.0796, "rec": false}
+{"i": 1697, "probe": "unsat", "dec": false, "t": 0.7718, "rec": false}
+{"i": 1699, "probe": "unsat", "dec": false, "t": 0.3674, "rec": false}
+{"i": 1701, "probe": "unsat", "dec": false, "t": 0.4866, "rec": false}
+{"i": 1703, "probe": "unsat", "dec": false, "t": 0.4822, "rec": false}
+{"i": 1705, "probe": "unsat", "dec": false, "t": 0.5083, "rec": false}
+{"i": 1707, "probe": "unsat", "dec": false, "t": 0.2746, "rec": false}
+{"i": 1709, "probe": "unsat", "dec": false, "t": 0.5037, "rec": false}
+{"i": 1711, "probe": "unsat", "dec": false, "t": 0.9563, "rec": false}
+{"i": 1713, "probe": "sat", "exact": "sat", "dec": true, "t": 2.874, "rec": true}
+{"i": 1717, "probe": "unknown", "exact": "sat", "dec": true, "t": 3.7279, "rec": true}
+{"i": 1719, "probe": "unsat", "dec": false, "t": 0.3912, "rec": false}
+{"i": 1723, "probe": "unsat", "dec": false, "t": 0.3398, "rec": false}
+{"i": 1725, "probe": "sat", "exact": "sat", "dec": true, "t": 1.9759, "rec": true}
+{"i": 1727, "probe": "unsat", "dec": false, "t": 0.3226, "rec": false}
+{"i": 1731, "probe": "unsat", "dec": false, "t": 0.2726, "rec": false}
+{"i": 1735, "probe": "unsat", "dec": false, "t": 0.2211, "rec": false}
+{"i": 1739, "probe": "unsat", "dec": false, "t": 0.1928, "rec": false}
+{"i": 1743, "probe": "unsat", "dec": false, "t": 0.1658, "rec": false}
+{"i": 1747, "probe": "unsat", "dec": false, "t": 0.1319, "rec": false}
+{"i": 1751, "probe": "unsat", "dec": false, "t": 0.1065, "rec": false}
+{"i": 1755, "probe": "unsat", "dec": false, "t": 0.0935, "rec": false}
+{"i": 1759, "probe": "unsat", "dec": false, "t": 0.0621, "rec": false}
+{"i": 1764, "exact": "unsat", "dec": false, "t": 0.0018, "rec": false}
+{"i": 1767, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1768, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1771, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1772, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1774, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1776, "exact": "unsat", "dec": false, "t": 0.0015, "rec": false}
+{"i": 1779, "exact": "unsat", "dec": false, "t": 0.0016, "rec": false}
+{"i": 1780, "probe": "unsat", "dec": false, "t": 0.0136, "rec": false}
+{"i": 1782, "probe": "unsat", "dec": false, "t": 0.0145, "rec": false}
+{"i": 1784, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1204, "rec": true}
+{"i": 1786, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1831, "rec": true}
+{"i": 1788, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1279, "rec": true}
+{"i": 1790, "probe": "unsat", "dec": false, "t": 0.083, "rec": false}
+{"i": 1792, "probe": "unsat", "dec": false, "t": 0.0422, "rec": false}
+{"i": 1794, "probe": "sat", "exact": "sat", "dec": true, "t": 0.1413, "rec": true}
+{"i": 1796, "exact": "unsat", "dec": false, "t": 0.0021, "rec": false}
+{"i": 1799, "probe": "sat", "exact": "sat", "dec": true, "t": 0.3399, "rec": true}
+{"i": 1801, "probe": "unsat", "dec": false, "t": 0.0634, "rec": false}
+{"i": 1803, "probe": "unsat", "dec": false, "t": 0.0811, "rec": false}
+{"i": 1805, "probe": "unsat", "dec": false, "t": 0.0774, "rec": false}
+{"i": 1807, "probe": "unsat", "dec": false, "t": 0.0796, "rec": false}
+{"i": 1809, "probe": "unsat", "dec": false, "t": 0.0545, "rec": false}
+{"i": 1811, "probe": "sat", "exact": "sat", "dec": true, "t": 0.2254, "rec": true}
+{"i": 1813, "exact": "unsat", "dec": false, "t": 0.0023, "rec": false}
+{"i": 1816, "probe": "sat", "exact": "sat", "dec": true, "t": 0.601, "rec": true}
+{"i": 1818, "probe": "unsat", "dec": false, "t": 0.0852, "rec": false}
+{"i": 1820, "probe": "unsat", "dec": false, "t": 0.1074, "rec": false}
+{"i": 1822, "probe": "unsat", "dec": false, "t": 0.1113, "rec": false}
+{"i": 1824, "probe": "unsat", "dec": false, "t": 0.1093, "rec": false}
+{"i": 1826, "probe": "unsat", "dec": false, "t": 0.0703, "rec": false}
+{"i": 1828, "probe": "sat", "exact": "sat", "dec": true, "t": 0.4204, "rec": true}
+{"i": 1830, "exact": "unsat", "dec": false, "t": 0.0026, "rec": false}
+{"i": 1833, "probe": "sat", "exact": "sat", "dec": true, "t": 0.8147, "rec": true}
+{"i": 1835, "probe": "unsat", "dec": false, "t": 0.1138, "rec": false}
+{"i": 1837, "probe": "unsat", "dec": false, "t": 0.1395, "rec": false}
+{"i": 1839, "probe": "unsat", "dec": false, "t": 0.1276, "rec": false}
+{"i": 1841, "probe": "unsat", "dec": false, "t": 0.1362, "rec": false}
+{"i": 1843, "probe": "unsat", "dec": false, "t": 0.0836, "rec": false}
+{"i": 1845, "probe": "sat", "exact": "sat", "dec": true, "t": 0.4292, "rec": true}
+{"i": 1847, "exact": "unsat", "dec": false, "t": 0.0026, "rec": false}
+{"i": 1850, "probe": "sat", "exact": "sat", "dec": true, "t": 0.9806, "rec": true}
+{"i": 1852, "probe": "unsat", "dec": false, "t": 0.15, "rec": false}
+{"i": 1854, "probe": "unsat", "dec": false, "t": 0.1828, "rec": false}
+{"i": 1856, "probe": "unsat", "dec": false, "t": 0.173, "rec": false}
+{"i": 1858, "probe": "unsat", "dec": false, "t": 0.1876, "rec": false}
+{"i": 1860, "probe": "unsat", "dec": false, "t": 0.1072, "rec": false}
+{"i": 1862, "probe": "sat", "exact": "sat", "dec": true, "t": 1.2989, "rec": true}
+{"i": 1864, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 1867, "probe": "sat", "exact": "sat", "dec": true, "t": 1.2713, "rec": true}
+{"i": 1869, "probe": "unsat", "dec": false, "t": 0.178, "rec": false}
+{"i": 1871, "probe": "unsat", "dec": false, "t": 0.2182, "rec": false}
+{"i": 1873, "probe": "unsat", "dec": false, "t": 0.2054, "rec": false}
+{"i": 1875, "probe": "unsat", "dec": false, "t": 0.2121, "rec": false}
+{"i": 1877, "probe": "unsat", "dec": false, "t": 0.1271, "rec": false}
+{"i": 1879, "probe": "sat", "exact": "sat", "dec": true, "t": 1.1439, "rec": true}
+{"i": 1881, "exact": "unsat", "dec": false, "t": 0.0037, "rec": false}
+{"i": 1884, "probe": "unknown", "exact": "sat", "dec": true, "t": 3.8408, "rec": true}
+{"i": 1886, "probe": "unsat", "dec": false, "t": 0.1875, "rec": false}
+{"i": 1888, "probe": "unsat", "dec": false, "t": 0.3385, "rec": false}
+{"i": 1890, "probe": "unsat", "dec": false, "t": 0.2326, "rec": false}
+{"i": 1892, "probe": "unsat", "dec": false, "t": 0.2174, "rec": false}
+{"i": 1894, "probe": "unsat", "dec": false, "t": 0.1388, "rec": false}
+{"i": 1896, "probe": "sat", "exact": "sat", "dec": true, "t": 1.4294, "rec": true}
+{"i": 1898, "exact": "unsat", "dec": false, "t": 0.0033, "rec": false}
+{"i": 1901, "probe": "sat", "exact": "sat", "dec": true, "t": 1.5927, "rec": true}
+{"i": 1903, "probe": "unsat", "dec": false, "t": 0.2439, "rec": false}
+{"i": 1905, "probe": "unsat", "dec": false, "t": 0.4142, "rec": false}
+{"i": 1907, "probe": "unsat", "dec": false, "t": 0.2764, "rec": false}
+{"i": 1909, "probe": "unsat", "dec": false, "t": 0.3315, "rec": false}
+{"i": 1911, "probe": "unsat", "dec": false, "t": 0.1631, "rec": false}
+{"i": 1913, "probe": "sat", "exact": "sat", "dec": true, "t": 1.5584, "rec": true}
+{"i": 1915, "exact": "unsat", "dec": false, "t": 0.0044, "rec": false}
+{"i": 1918, "probe": "sat", "exact": "sat", "dec": true, "t": 1.7158, "rec": true}
+{"i": 1920, "probe": "unsat", "dec": false, "t": 0.2637, "rec": false}
+{"i": 1922, "probe": "unsat", "dec": false, "t": 0.3432, "rec": false}
+{"i": 1924, "probe": "unsat", "dec": false, "t": 0.3179, "rec": false}
+{"i": 1926, "probe": "unsat", "dec": false, "t": 0.3434, "rec": false}
+{"i": 1928, "probe": "unsat", "dec": false, "t": 0.1842, "rec": false}
+{"i": 1930, "probe": "sat", "exact": "sat", "dec": true, "t": 1.654, "rec": true}
+{"i": 1932, "exact": "unsat", "dec": false, "t": 0.0036, "rec": false}
+{"i": 1935, "probe": "sat", "exact": "unknown", "dec": true, "t": 1.9888, "rec": true}
+{"i": 1937, "probe": "unsat", "dec": false, "t": 0.3004, "rec": false}
+{"i": 1939, "probe": "unsat", "dec": false, "t": 0.5121, "rec": false}
+{"i": 1941, "probe": "unsat", "dec": false, "t": 0.3611, "rec": false}
+{"i": 1943, "probe": "unsat", "dec": false, "t": 0.3645, "rec": false}
+{"i": 1945, "probe": "unsat", "dec": false, "t": 0.2035, "rec": false}
+{"i": 1947, "probe": "sat", "exact": "sat", "dec": true, "t": 1.39, "rec": true}
+{"i": 1949, "exact": "unsat", "dec": false, "t": 0.0052, "rec": false}
+{"i": 1952, "probe": "unknown", "exact": "sat", "dec": true, "t": 4.1247, "rec": true}
+{"i": 1954, "probe": "unsat", "dec": false, "t": 0.3259, "rec": false}
+{"i": 1956, "probe": "unsat", "dec": false, "t": 0.395, "rec": false}
+{"i": 1958, "probe": "unsat", "dec": false, "t": 0.367, "rec": false}
+{"i": 1960, "probe": "unsat", "dec": false, "t": 0.3541, "rec": false}
+{"i": 1962, "probe": "unsat", "dec": false, "t": 0.2169, "rec": false}
+{"i": 1964, "probe": "sat", "exact": "sat", "dec": true, "t": 1.5039, "rec": true}
+{"i": 1966, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1969, "probe": "sat", "exact": "sat", "dec": true, "t": 2.5705, "rec": true}
+{"i": 1971, "probe": "unsat", "dec": false, "t": 0.0733, "rec": false}
+{"i": 1973, "probe": "unsat", "dec": false, "t": 0.4342, "rec": false}
+{"i": 1975, "probe": "unsat", "dec": false, "t": 0.3864, "rec": false}
+{"i": 1977, "probe": "unsat", "dec": false, "t": 1.7349, "rec": false}
+{"i": 1979, "probe": "unsat", "dec": false, "t": 0.2188, "rec": false}
+{"i": 1981, "probe": "unsat", "dec": false, "t": 0.373, "rec": false}
+{"i": 1983, "probe": "unsat", "dec": false, "t": 0.6069, "rec": false}
+{"i": 1985, "probe": "sat", "exact": "sat", "dec": true, "t": 2.4727, "rec": true}
+{"i": 1987, "probe": "unsat", "dec": false, "t": 0.0772, "rec": false}
+{"i": 1989, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 1991, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1993, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1995, "exact": "unsat", "dec": false, "t": 0.0039, "rec": false}
+{"i": 1997, "probe": "unsat", "dec": false, "t": 0.0842, "rec": false}
+{"i": 1999, "probe": "unsat", "dec": false, "t": 0.734, "rec": false}
+{"i": 2001, "probe": "unsat", "dec": false, "t": 0.0785, "rec": false}
+{"i": 2003, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 2005, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 2007, "exact": "unsat", "dec": false, "t": 0.0041, "rec": false}
+{"i": 2009, "exact": "unsat", "dec": false, "t": 0.0042, "rec": false}
+{"i": 2011, "probe": "unsat", "dec": false, "t": 0.0796, "rec": false}
+{"i": 2013, "probe": "unsat", "dec": false, "t": 2.3444, "rec": false}
+{"i": 2015, "probe": "unsat", "dec": false, "t": 0.4143, "rec": false}
+{"i": 2017, "probe": "unsat", "dec": false, "t": 0.4281, "rec": false}
+{"i": 2020, "probe": "unsat", "dec": false, "t": 0.7282, "rec": false}
+{"i": 2021, "probe": "unsat", "dec": false, "t": 0.079, "rec": false}
+{"i": 2023, "exact": "unsat", "dec": false, "t": 0.0045, "rec": false}
+{"i": 2025, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 2027, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 2029, "exact": "unsat", "dec": false, "t": 0.0043, "rec": false}
+{"i": 2031, "probe": "unsat", "dec": false, "t": 0.0798, "rec": false}
+{"i": 2033, "probe": "unsat", "dec": false, "t": 0.8953, "rec": false}
+{"i": 2035, "probe": "unsat", "dec": false, "t": 0.3404, "rec": false}
+{"i": 2037, "probe": "unsat", "dec": false, "t": 0.5057, "rec": false}
+{"i": 2039, "probe": "unsat", "dec": false, "t": 0.4727, "rec": false}
+{"i": 2041, "probe": "unsat", "dec": false, "t": 0.4982, "rec": false}
+{"i": 2043, "probe": "unsat", "dec": false, "t": 0.3188, "rec": false}
+{"i": 2045, "probe": "unsat", "dec": false, "t": 0.6277, "rec": false}
+{"i": 2047, "probe": "unsat", "dec": false, "t": 1.1496, "rec": false}
+{"i": 2049, "probe": "sat", "exact": "unknown", "dec": true, "t": 3.0896, "rec": true}
+{"i": 2051, "probe": "sat", "exact": "sat", "dec": true, "t": 3.706, "rec": true}
+{"i": 2055, "probe": "unsat", "dec": false, "t": 0.4683, "rec": false}
+{"i": 2059, "probe": "unsat", "dec": false, "t": 0.394, "rec": false}
+{"i": 2063, "probe": "unsat", "dec": false, "t": 0.3449, "rec": false}
+{"i": 2067, "probe": "unsat", "dec": false, "t": 0.314, "rec": false}
+{"i": 2071, "probe": "unsat", "dec": false, "t": 0.2626, "rec": false}
+{"i": 2075, "probe": "unsat", "dec": false, "t": 0.2508, "rec": false}

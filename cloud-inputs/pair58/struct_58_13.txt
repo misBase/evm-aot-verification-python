@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/Users/june/Work/evm-aot-verification-python/tmp/bl-runs/snap-r35b/../../agents/pair58/struct.py", line 5, in <module>
+    from z3 import And, parse_smt2_file, is_not, is_and, is_eq, Z3_ARRAY_SORT, is_app
+  File "/Users/june/Work/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/__init__.py", line 1, in <module>
+    from .z3 import *
+  File "/Users/june/Work/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 46, in <module>
+    from . import z3core
+  File "/Users/june/Work/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 6, in <module>
+    import ctypes
+  File "/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ctypes/__init__.py", line 16, in <module>
+    from struct import calcsize as _calcsize
+  File "/Users/june/Work/evm-aot-verification-python/tmp/agents/pair58/struct.py", line 5, in <module>
+    from z3 import And, parse_smt2_file, is_not, is_and, is_eq, Z3_ARRAY_SORT, is_app
+ImportError: cannot import name 'And' from partially initialized module 'z3' (most likely due to a circular import) (/Users/june/Work/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/__init__.py)

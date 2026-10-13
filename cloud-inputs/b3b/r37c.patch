@@ -1,0 +1,703 @@
+diff --git a/tests/unit/test_block_correspondence.py b/tests/unit/test_block_correspondence.py
+index 22783cd..e52989a 100644
+--- a/tests/unit/test_block_correspondence.py
++++ b/tests/unit/test_block_correspondence.py
+@@ -96,15 +96,9 @@ def test_empty_probe_only_for_unknown_rows_without_sibling_proposal(monkeypatch)
+     seven, big = x == 7, x == 200
+     hard = {seven.get_id(), big.get_id()}  # rows whose quick query is "unknown"
+     x86 = [at(ULT(x, 5), "A"), at(And(UGE(x, 5), ULT(x, 10)), "A"), at(UGE(x, 20), "C"), at(seven, "A"), at(big, "D")]
+-    real, probed = be._solver, []
+-
+-    class Unknown:
+-        def add(self, query):
+-            pass
+-
+-        def check(self):
+-            return z3.unknown
+-    monkeypatch.setattr(be, "_solver", lambda budget, q: Unknown() if any(a.get_id() in hard for a in q.children()) else real(budget, q))
++    real, probed = be.PrefixSolver.check, []
++    monkeypatch.setattr(be.PrefixSolver, "check", lambda self, conjuncts, *a: z3.unknown
++                        if any(c.get_id() in hard for c in conjuncts) else real(self, conjuncts, *a))
+     monkeypatch.setattr(be.BlockEquivalenceProver, "_empty_by_bvabs", lambda self, p, x: probed.append(x.location) or True)
+     corr = be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)._correspondence(evm, x86, BoolVal(True), [])
+     # Row 3's siblings at A agree on EVM 0 (prove() proposes it); only row 4 is probed for emptiness.
+diff --git a/tests/unit/test_block_speedups.py b/tests/unit/test_block_speedups.py
+new file mode 100644
+index 0000000..97dbafb
+--- /dev/null
++++ b/tests/unit/test_block_speedups.py
+@@ -0,0 +1,184 @@
++"""Speedups that must not change any answer: incremental reachability (P1),
++witness-answered summary entry (P2), evm_disjoint by divergence (P3), mapping
++proposals from executor witnesses + one incremental solver (P4), coverage via
++bvmul->UF first (P5), complementary-conjunct refutation (P6)."""
++from copy import copy
++
++import pytest
++from z3 import And, BitVec, BoolVal, Not, Or, Solver, SolverFor, ULT, ULE, UGT, sat, unsat
++
++from state.smt_state import SMTState
++from verification.block_equivalence import BlockEquivalenceProver, Obligation, disjoint_groups, solve_query
++from verification.loop_induction import SegmentPath
++from x86_64.cfg_state import PrefixSolver, X86Constraints
++from x86_64.summaries.base import refuted_by_complement
++
++x, y = BitVec("x", 8), BitVec("y", 8)
++
++
++# P1 ---------------------------------------------------------------------------
++
++def test_prefix_solver_matches_fresh_solver_across_pops():
++    a, b, c, d = ULT(x, 10), UGT(x, 3), x == 5, x == 7
++    queries = [[a], [a, b], [a, b, c], [a, b, d],      # sibling: pop one scope
++               [a, b, c, d], [a, Not(b)], [a],         # pop back to a shorter prefix
++               [UGT(x, 20), a], [a, b, c]]             # nothing shared, then re-push
++    prefix = PrefixSolver()
++    for conjuncts in queries:
++        fresh = Solver()
++        fresh.add(*conjuncts)
++        assert prefix.check(conjuncts, 1000) == fresh.check()
++        assert [t.get_id() for t in prefix.stack] == [t.get_id() for t in conjuncts]
++        assert len(prefix.solver.assertions()) == len(conjuncts)
++
++
++def test_is_possible_with_prefix_solver_agrees_and_keeps_witness():
++    prefix = PrefixSolver()
++    parent = X86Constraints()
++    parent.add(ULT(x, 10))
++    assert parent.is_possible(prefix_solver=prefix) and parent._witness is not None
++    dead, live = copy(parent), copy(parent)
++    dead.add(UGT(x, 20))
++    live.add(UGT(x, 8))
++    assert not dead.is_possible(prefix_solver=prefix) and dead._witness is None
++    assert live.is_possible(prefix_solver=prefix)
++    assert live._witness.eval(x).as_long() == 9
++    # bvmul: the exact query decides (no probe needed) with or without prefix.
++    contradictory = X86Constraints()
++    contradictory.add(x * y == 5)
++    contradictory.add(x * y == 6)
++    assert not contradictory.is_possible(prefix_solver=prefix)
++
++
++def test_prefix_unknown_keeps_path_unless_probe_refutes(monkeypatch):
++    import x86_64.cfg_state as cfg_state
++    w, z = BitVec("w", 64), BitVec("z", 64)
++    hard = X86Constraints()
++    hard.add(w * z == 7 * 1000003)
++    hard.add(And(UGT(w, 7), ULT(w, 1000), ULT(z, 1000)))
++    monkeypatch.setattr(cfg_state, "REACHABILITY_RLIMIT_PER_MS", 1)
++    monkeypatch.setattr(cfg_state, "REACHABILITY_WALL_SAFETY_FACTOR", 10**6)
++    assert copy(hard).is_possible(solver_timeout=10, prefix_solver=PrefixSolver())  # unknown -> kept
++
++
++# P2 ---------------------------------------------------------------------------
++
++def _entry_case(monkeypatch):
++    from tests.unit.test_block_summary_certificates import copy_case
++    runtime, summary, state = copy_case(7)
++    solved = []
++    real = runtime._solve
++    monkeypatch.setattr(runtime, "_solve", lambda name, *a, **k: solved.append(name) or real(name, *a, **k))
++    return runtime, summary, state, solved
++
++
++def test_summary_entry_answered_by_path_witness(monkeypatch):
++    runtime, summary, state, solved = _entry_case(monkeypatch)
++    path = ULT(x, 10)
++    model = SolverFor("QF_AUFBV")
++    model.add(path, *(state.assumptions or []))
++    assert model.check() == sat
++    runtime.apply(summary, state, path_condition=path, witness=model.model())
++    assert "entry" not in solved and runtime.certificates[0].complete
++    entry = next(r for r in runtime.certificates[0].obligations if r.name == "entry")
++    assert entry.answer == entry.expected == "sat"
++
++
++def test_summary_entry_solved_when_witness_misses(monkeypatch):
++    runtime, summary, state, solved = _entry_case(monkeypatch)
++    model = SolverFor("QF_AUFBV")
++    model.add(x == 50)
++    assert model.check() == sat
++    runtime.apply(summary, state, path_condition=ULT(x, 10), witness=model.model())
++    assert solved[0] == "entry" and runtime.certificates[0].complete
++
++
++# P3 / P4 ----------------------------------------------------------------------
++
++def _path(condition, witness=None):
++    return SegmentPath("terminal", None, condition, SMTState.create_initial_state(num_inputs=0), witness)
++
++
++EVM = [And(ULT(x, 10), ULT(x, 5)), And(ULT(x, 10), Not(ULT(x, 5))),
++       And(Not(ULT(x, 10)), x == 20), And(Not(ULT(x, 10)), Not(x == 20))]
++
++
++def test_disjoint_groups_cover_every_pair_once_and_weaken_it():
++    groups = disjoint_groups(BoolVal(True), EVM)
++    pairs = [p for members, _ in groups for p in members]
++    assert sorted(pairs) == [(i, k) for i in range(4) for k in range(i + 1, 4)]
++    assert len(groups) == 3   # (0,1) | (0..1, 2..3) | (2,3)
++    for members, formula in groups:
++        assert solve_query(formula, 1000) == "unsat"
++        for i, k in members:  # the group query is implied by each member's full query
++            assert solve_query(And(EVM[i], EVM[k], Not(formula)), 1000) == "unsat"
++    # One condition a prefix of the other: the full query is kept.
++    (only,) = disjoint_groups(BoolVal(True), [ULT(x, 10), And(ULT(x, 10), x == 3)])
++    assert only[0] == [(0, 1)] and solve_query(only[1], 1000) == "sat"
++
++
++def test_correspondence_records_and_mapping(monkeypatch):
++    prover = BlockEquivalenceProver([], [], {}, timeout_ms=2000)
++    calls = []
++
++    def check_all(obligations, records):
++        for name, formula, _ in obligations:
++            calls.append(name)
++            answer = solve_query(formula, 2000)
++            records.append(Obligation(name, formula.sexpr(), answer))
++            yield answer == "unsat"
++    monkeypatch.setattr(prover, "_check_all", check_all)
++
++    def model(*facts):
++        s = Solver()
++        s.add(*facts)
++        assert s.check() == sat
++        return s.model()
++    x86 = [_path(ULT(x, 3), model(x == 1)),            # witness hits e0
++           _path(And(UGT(x, 5), ULT(x, 8)), model(x == 99)),  # stale witness: solver
++           _path(x == 20),                              # no witness: solver
++           _path(And(UGT(x, 30), ULT(x, 40)), model(x == 35)),
++           _path(And(x == 3, x == 4))]                  # empty
++    records = []
++    corr = prover._correspondence([_path(c) for c in EVM], x86, BoolVal(True), records)
++    assert corr == (0, 1, 2, 3, None)
++    assert len(calls) == 3
++    assert [r.name for r in records] == [f"evm_disjoint_{i}_{k}" for i in range(4) for k in range(i + 1, 4)]
++    assert all(r.proved for r in records)
++
++
++# P5 ---------------------------------------------------------------------------
++
++def test_coverage_refuted_over_mul_abstraction_first(monkeypatch):
++    prover = BlockEquivalenceProver([], [], {}, timeout_ms=5000)
++    w, z = BitVec("w", 64), BitVec("z", 64)
++    paths = [_path(ULT(w * z, 10)), _path(UGT(w * z, 4))]
++    for p in paths:
++        p.state.assumptions = []
++    monkeypatch.setattr(prover, "_check", lambda *a, **k: pytest.fail("cascade not needed"))
++    records = []
++    initial = SMTState.create_initial_state(num_inputs=0)
++    initial.assumptions = []
++    prover.check_paths(paths, paths, BoolVal(True), initial, records)
++    assert [r.name for r in records] == ["evm_coverage", "x86_coverage"] and all(r.proved for r in records)
++
++
++# P6 ---------------------------------------------------------------------------
++
++def test_complement_refutation_hit_and_miss():
++    guard = UGT(x * y, 40)
++    path = And(BoolVal(True), ULT(y, 9), Not(guard), ULE(x, 200))
++    assert refuted_by_complement(path, guard)                 # Not(guard) is a path conjunct
++    assert refuted_by_complement(path, And(ULT(y, 9), ULT(x, 0)))  # simplify -> false
++    assert not refuted_by_complement(path, UGT(x * y, 41))    # implied, but not syntactically: solver's job
++    assert not refuted_by_complement(And(Not(guard), *[x != i for i in range(16)]), guard)  # outside the window
++
++
++def test_summary_solve_skips_solver_on_complement(monkeypatch):
++    from verification import block_summaries
++    from tests.unit.test_block_summary_certificates import copy_case
++    runtime, _, _ = copy_case(7)
++    guard = Or(x == 3, UGT(y, 7))
++    monkeypatch.setattr(block_summaries, "solve_query", lambda *a: pytest.fail("solver called"))
++    record = runtime._solve("memgas_exit_guard_excluded", And(And(ULT(x, 9), Not(guard)), guard))
++    assert record.proved
+diff --git a/verification/block_equivalence.py b/verification/block_equivalence.py
+index d58965e..cbed947 100644
+--- a/verification/block_equivalence.py
++++ b/verification/block_equivalence.py
+@@ -35,6 +35,7 @@ from common.store_forwarding import _memoized, _subtract_base_term, forward_sele
+ from verification.alpha_canon import binder_capture_risk, canon_binders
+ from verification.loop_induction import run_evm_segment, run_x86_segment, terminal_observable_conditions
+ from x86_64.aot_profile import GO_HPC_EVM_PROFILE
++from x86_64.cfg_state import PrefixSolver
+ 
+ 
+ def _semantic_sources_digest():
+@@ -2132,6 +2133,46 @@ def discharge_maps_by_prefix(premise, x86_conditions, jobs, timeout_ms, deadline
+     return done
+ 
+ 
++def _ordered_conjuncts(condition):
++    """Top-level conjuncts of a path condition in execution order (as_bool)."""
++    return list(condition.children()) if is_and(condition) else [condition]
++
++
++def disjoint_groups(premise, conditions):
++    """[(pairs, formula)]: every (i, k), i < k, in exactly one group.
++
++    Path conditions are And(conjuncts in execution order). If those of i and
++    k first differ at position L, with edges a and b, then
++    premise ∧ prefix_L ∧ a ∧ b is a sub-conjunction of premise ∧ e_i ∧ e_k,
++    so its UNSAT refutes the pair, and every pair diverging at the same
++    (prefix, a, b) shares it (Safe 5377: 3655 pairs, 322 groups). Executor
++    paths diverge at the two edges of one branch; complementary ones
++    (x and Not(x), or simplify(a ∧ b) false) need only a ∧ b. A pair where
++    one condition is a prefix of the other keeps its own full query. A group
++    may fail where its pairs hold (edges that exclude each other only with
++    later conjuncts): the caller then checks those pairs' full queries.
++    """
++    paths = [_ordered_conjuncts(c) for c in conditions]
++    out, shared = [], {}
++    for i in range(len(paths)):
++        for k in range(i + 1, len(paths)):
++            a, b, size = paths[i], paths[k], 0
++            while size < min(len(a), len(b)) and a[size].eq(b[size]):
++                size += 1
++            if size == len(a) or size == len(b):
++                out.append(([(i, k)], And(premise, conditions[i], conditions[k])))
++                continue
++            key = (tuple(c.get_id() for c in a[:size]), a[size].get_id(), b[size].get_id())
++            if key not in shared:
++                x, y = a[size], b[size]
++                complementary = ((is_not(x) and x.arg(0).eq(y)) or (is_not(y) and y.arg(0).eq(x))
++                                 or is_false(simplify(And(x, y))))
++                shared[key] = ([], And(x, y) if complementary else And(premise, *a[:size], x, y))
++                out.append(shared[key])
++            shared[key][0].append((i, k))
++    return out
++
++
+ def propose_from_siblings(correspondence, x86):
+     """Replace "all" by the EVM index every mapped sibling (same kind and
+     location) agrees on. Only a proposal: if any of its obligations fails,
+@@ -2747,27 +2788,55 @@ class BlockEquivalenceProver:
+         n, m = len(evm), len(x86)
+         if n < 2 or n * m <= n * (n - 1) // 2 + 2 * m:
+             return ()
+-        disjoint = [(f"evm_disjoint_{i}_{k}", And(premise, evm[i].condition, evm[k].condition), "")
+-                    for i in range(n) for k in range(i + 1, n)]
+-        trial = []
+-        checks = self._check_all(disjoint, trial)
++        def full(i, k):
++            return And(premise, evm[i].condition, evm[k].condition)
++        # One proof per divergence group (disjoint_groups), recorded under
++        # every pair name it covers. A group refuted only with more of the
++        # path (edges that do not exclude each other on their own) falls back
++        # to its pairs' full queries; any failure there is an overlap.
++        groups, proofs, trial = disjoint_groups(premise, [e.condition for e in evm]), {}, []
++        checks = self._check_all([("evm_disjoint_%d_%d" % pairs[0], formula, "") for pairs, formula in groups], trial)
+         try:
+-            if not all(checks):
+-                return ()
++            for (pairs, formula), proved in zip(groups, checks):
++                if proved:
++                    proofs.update((f"evm_disjoint_{i}_{k}", replace(trial[-1], name=f"evm_disjoint_{i}_{k}"))
++                                  for i, k in pairs)
++                    continue
++                if len(pairs) == 1 and formula.eq(full(*pairs[0])):
++                    return ()
++                sub = []
++                inner = self._check_all([(f"evm_disjoint_{i}_{k}", full(i, k), "") for i, k in pairs], sub)
++                try:
++                    if not all(inner):
++                        return ()
++                finally:
++                    inner.close()
++                proofs.update((r.name, r) for r in sub)
+         finally:
+             checks.close()
+-        records.extend(trial)
++        records.extend(proofs[f"evm_disjoint_{i}_{k}"] for i in range(n) for k in range(i + 1, n))  # manifest order
+         correspondence, unknown = [], []
++        # Mapping proposals. First the executor's last model of the path, if it
++        # still satisfies premise ∧ x_j (170 of 171 rows on Safe 5377); else one
++        # incremental solver over [premise, conjuncts of x_j]: rows share long
++        # prefixes (Safe 5377: 300s, 44 unknown -> 62s, 2 unknown, every decided
++        # row the same). Either way only a proposal (see above).
++        logic = _bv_array_formula(And(premise, *(x.condition for x in x86)))
++        prefix = PrefixSolver(SolverFor("QF_AUFBV") if logic else Solver())
+         for j, x in enumerate(x86):
++            witness = getattr(x, "witness", None)
++            if witness is not None and is_true(witness.eval(And(premise, x.condition), model_completion=True)):
++                hits = [i for i, e in enumerate(evm)
++                        if is_true(witness.eval(e.condition, model_completion=True))]
++                if len(hits) == 1:
++                    correspondence.append(hits[0])
++                    continue
+             budget = min(_QUICK_EXACT_MS, self.timeout_ms)
+             if self.deadline is not None:
+                 budget = min(budget, int((self.deadline - monotonic()) * 1000))
+             if budget <= 0:
+                 raise ProofBudgetExceeded("proof wall budget exhausted")
+-            query = And(premise, x.condition)
+-            solver = _solver(budget, query)
+-            solver.add(query)
+-            answer = solver.check()
++            answer = prefix.check([premise, *_ordered_conjuncts(x.condition)], budget, "correspondence")
+             if answer not in (sat, unsat):
+                 unknown.append(j)
+             if answer == unsat:
+@@ -2775,7 +2844,7 @@ class BlockEquivalenceProver:
+                 continue
+             target = "all"
+             if answer == sat:
+-                model = solver.model()
++                model = prefix.solver.model()
+                 hits = [i for i, e in enumerate(evm)
+                         if is_true(model.eval(e.condition, model_completion=True))]
+                 if len(hits) == 1:
+@@ -3283,5 +3352,14 @@ class BlockEquivalenceProver:
+                     if not self._check(f"{label}_assumption_{len(justified)}", goal, records):
+                         raise ValueError(f"{label}: unproved execution assumption")
+                     justified.add(assumption.get_id())
+-            if not self._check(f"{label}_coverage", And(premise, Not(Or(*(p.condition for p in paths)))), records):
++            name, coverage = f"{label}_coverage", And(premise, Not(Or(*(p.condition for p in paths))))
++            # The bvmul->UF route (_retry_over_nonlinear_mul: abstraction UNSAT
++            # is exact UNSAT) before _check's cascade: symbolic memory gas makes
++            # the exact coverage query slow (Safe 5377 x86: 251s -> 11s). A miss
++            # costs at most one query budget and falls through unchanged.
++            started = monotonic()
++            proved, answer, _ = self._retry_over_nonlinear_mul(coverage, "unknown")
++            if answer == "unsat":
++                records.append(Obligation(name, proved.sexpr(), "unsat", "unsat", monotonic() - started))
++            elif not self._check(name, coverage, records):
+                 raise ValueError(f"{label}: outcome guards do not cover the entry domain")
+diff --git a/verification/block_summaries.py b/verification/block_summaries.py
+index cd1e5a2..7f4aabe 100644
+--- a/verification/block_summaries.py
++++ b/verification/block_summaries.py
+@@ -15,7 +15,7 @@ from hashlib import sha256
+ from time import monotonic
+ 
+ from z3 import (And, Not, Or, BoolVal, Extract, ULE, UGT, is_expr, is_const, Z3_OP_UNINTERPRETED, substitute,
+-                is_bv_value, simplify, is_store, Store, FreshConst, Select, is_eq, is_array, Const)
++                is_bv_value, simplify, is_store, Store, FreshConst, Select, is_eq, is_array, Const, is_and, is_true)
+ 
+ from verification.block_equivalence import (Obligation, ProofBudgetExceeded, solve_query, digest,
+                                              state_digest, abstract_nonlinear_mul, _conjuncts)
+@@ -24,7 +24,7 @@ from verification.loop_induction import run_x86_segment
+ from x86_64.disassembler import parse_operands
+ from x86_64.models import Register
+ from x86_64.summaries import build_x86_summary_runtime
+-from x86_64.summaries.base import SummaryPreconditionError
++from x86_64.summaries.base import SummaryPreconditionError, refuted_by_complement
+ from x86_64.summaries.div_proof import DivProofError
+ 
+ 
+@@ -848,6 +848,12 @@ class VerifiedSummaryRuntime:
+             if timeout <= 0:
+                 raise ProofBudgetExceeded("summary proof deadline exhausted")
+         self.proof_queries += 1
++        # premise ∧ goal (the exit guard check of _apply_div, which the
++        # executor's split already negated on this path): see
++        # refuted_by_complement; a miss runs the unchanged query below.
++        if (expected == "unsat" and is_and(formula) and formula.num_args() >= 2
++                and refuted_by_complement(And(*formula.children()[:-1]), formula.arg(formula.num_args() - 1))):
++            return Obligation(name, formula.sexpr(), "unsat", expected, monotonic() - started)
+         query = simplify(formula, expand_select_store=True)
+         answer = solve_query(query, timeout)
+         if answer == "unknown" and expected == "unsat":
+@@ -889,7 +895,7 @@ class VerifiedSummaryRuntime:
+         proof_cache.record_lemma(key)
+         return replace(certificate, obligations=tuple(solved))
+ 
+-    def apply(self, summary, state, path_condition=None):
++    def apply(self, summary, state, path_condition=None, witness=None):
+         # Kept for diagnostics: a rejected hit still shows which obligation failed.
+         records = self.last_records = []
+         def check(name, formula, expected="unsat"):
+@@ -917,7 +923,16 @@ class VerifiedSummaryRuntime:
+                 if instance is not None:
+                     return instance
+             try:
+-                check("entry", premise, "sat")
++                # A model of the path (the executor's last reachability witness)
++                # that also satisfies the premise is itself the SAT certificate:
++                # eval with model completion is exact on quantifier-free terms.
++                # Otherwise (or for a generic-mode statement) solve as before.
++                if (witness is not None and not self._generic_mode
++                        and is_true(witness.eval(premise, model_completion=True))):
++                    self.proof_queries += 1
++                    records.append(Obligation("entry", premise.sexpr(), "sat", "sat"))
++                else:
++                    check("entry", premise, "sat")
+                 required = ["entry"]
+             except ValueError:
+                 from verification.mcopy_induction import dead_hit
+diff --git a/verification/loop_induction.py b/verification/loop_induction.py
+index 9ab2c34..28b287a 100644
+--- a/verification/loop_induction.py
++++ b/verification/loop_induction.py
+@@ -353,6 +353,9 @@ class SegmentPath:
+     location: Optional[int]  # latch/exit：到达的 pc/addr；terminal：None
+     condition: object  # 路径条件（BoolRef）
+     state: SMTState
++    # x86：执行器在这条路径上最后一次可达性检查的模型（可能已不满足
++    # condition，使用方须先 eval 核对）；只用于提议，不参与任何证明。
++    witness: object = field(default=None, compare=False, repr=False)
+ 
+ 
+ # ---------------------------------------------------------------------------
+@@ -532,6 +535,7 @@ def run_x86_segment(
+                 location=addr,
+                 condition=gstate.get_constraints().as_bool(),
+                 state=gstate.mstate,
++                witness=gstate.get_constraints()._witness,
+             )
+         )
+     for gstate in final_states:
+@@ -550,6 +554,7 @@ def run_x86_segment(
+                 location=gstate.node.address if gstate.node else None,
+                 condition=gstate.get_constraints().as_bool(),
+                 state=gstate.mstate,
++                witness=gstate.get_constraints()._witness,
+             )
+         )
+     return paths, defects, notes
+diff --git a/x86_64/cfg_executor.py b/x86_64/cfg_executor.py
+index 32ce101..da8f9b7 100644
+--- a/x86_64/cfg_executor.py
++++ b/x86_64/cfg_executor.py
+@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
+ from .aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
+ from .models import Register, X86Block, X86Instruction
+ from .cfg_structures import X86DynamicCFG, X86EdgeType
+-from .cfg_state import X86GlobalState, X86WorldState
++from .cfg_state import PrefixSolver, X86GlobalState, X86WorldState
+ from .cfg_strategies import X86DFSStrategy, X86TopologicalStrategy
+ from .disassembler import parse_operands
+ from .summaries.base import (
+@@ -113,6 +113,10 @@ class X86SymbolicExecutor:
+         self.reachability_call_count = 0
+         self.reachability_total_wall = 0.0
+         self.reachability_pruned_count = 0
++        # One incremental solver for all reachability checks of this run (see
++        # PrefixSolver): DFS order makes consecutive path conditions share
++        # long prefixes.
++        self._prefix_solver = PrefixSolver()
+ 
+         # 终止状态列表
+         self.final_states: List[X86GlobalState] = []
+@@ -173,7 +177,8 @@ class X86SymbolicExecutor:
+         t0 = _t.time()
+         try:
+             result = state.get_constraints().is_possible(
+-                solver_timeout=self.reachability_timeout_ms
++                solver_timeout=self.reachability_timeout_ms,
++                prefix_solver=self._prefix_solver,
+             )
+         finally:
+             self.reachability_total_wall += _t.time() - t0
+@@ -748,6 +753,7 @@ class X86SymbolicExecutor:
+                         summary,
+                         new_mstate,
+                         path_condition=global_state.get_constraints().as_bool(),
++                        witness=global_state.get_constraints()._witness,
+                     )
+                 except SummaryPreconditionError as error:
+                     self.summary_runtime.record_precondition_failure(error)
+@@ -838,7 +844,8 @@ class X86SymbolicExecutor:
+         if not is_true(guard) and feasible(fast):
+             try:
+                 applied = self.summary_runtime.apply(
+-                    summary, new_mstate, path_condition=fast.get_constraints().as_bool())
++                    summary, new_mstate, path_condition=fast.get_constraints().as_bool(),
++                    witness=fast.get_constraints()._witness)
+             except SummaryPreconditionError as error:
+                 self.summary_runtime.record_precondition_failure(error)
+                 if not self.summary_runtime.should_fallback_on_precondition(summary.kind):
+diff --git a/x86_64/cfg_state.py b/x86_64/cfg_state.py
+index 7e5e4f8..c66ca9f 100644
+--- a/x86_64/cfg_state.py
++++ b/x86_64/cfg_state.py
+@@ -9,7 +9,7 @@ from __future__ import annotations
+ import os
+ import time
+ from typing import List, Optional, Dict, TYPE_CHECKING
+-from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, is_true, And
++from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, unknown, is_true, And
+ 
+ from state.smt_state import SMTState
+ 
+@@ -52,6 +52,38 @@ def _bounded_check(solver, timeout_ms, tag):
+     return result
+ 
+ 
++class PrefixSolver:
++    """One incremental solver, one push scope per conjunct.
++
++    A query pops back to the longest common prefix (by AST id) with the
++    previous query and pushes the rest, so sibling and descendant paths reuse
++    the internalized terms and learned clauses (Safe 5377: 958 reachability
++    queries 482s -> 86s). At every check the assertions are exactly
++    `conjuncts`: pop retracts a scope's assertion together with every clause
++    learned from it, so UNSAT here is UNSAT of the conjunction. The asserted
++    ASTs are kept in `stack`, which keeps their ids from being reused.
++    """
++
++    def __init__(self, solver=None):
++        self.solver = solver if solver is not None else SolverFor("QF_AUFBV")
++        self.stack: List[BoolRef] = []
++
++    def check(self, conjuncts, timeout_ms, tag="incremental"):
++        common = 0
++        for old, new in zip(self.stack, conjuncts):
++            if old.get_id() != new.get_id():
++                break
++            common += 1
++        if len(self.stack) > common:
++            self.solver.pop(len(self.stack) - common)
++            del self.stack[common:]
++        for conjunct in conjuncts[common:]:
++            self.solver.push()
++            self.solver.add(conjunct)
++            self.stack.append(conjunct)
++        return _bounded_check(self.solver, timeout_ms, tag)
++
++
+ class X86Constraints:
+     """x86-64 约束条件集合。
+ 
+@@ -121,11 +153,14 @@ class X86Constraints:
+         """约束数量。"""
+         return len(self._constraints)
+ 
+-    def is_possible(self, solver_timeout: Optional[int] = None) -> bool:
++    def is_possible(self, solver_timeout: Optional[int] = None,
++                    prefix_solver: Optional[PrefixSolver] = None) -> bool:
+         """检查约束是否可满足（可达性检查）。
+ 
+         Args:
+             solver_timeout: 求解器超时时间（毫秒）
++            prefix_solver: 执行器持有的增量 solver（见 PrefixSolver）；None
++                时每次新建 solver
+ 
+         Returns:
+             如果约束可满足则返回 True
+@@ -138,6 +173,27 @@ class X86Constraints:
+         if self._witness is not None and is_true(
+                 self._witness.eval(self.as_bool(), model_completion=True)):
+             return True
++        timeout_ms = (
++            solver_timeout
++            if solver_timeout is not None
++            else DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS
++        )
++        from verification.block_equivalence import abstract_nonlinear_mul  # lazy: layer cycle
++        if prefix_solver is not None:
++            # Exact query first, incrementally (same rlimit budget). Only an
++            # unknown pays for the bvmul->UF probe on a fresh solver: its UNSAT
++            # is exact UNSAT (see below); anything else keeps the path.
++            conjuncts = list(self._constraints) + list(self.flag_constraints.values())
++            result = prefix_solver.check(conjuncts, timeout_ms)
++            self._witness = prefix_solver.solver.model() if result == sat else None
++            if result != unknown:
++                return result == sat
++            relaxed, changed = abstract_nonlinear_mul(self.as_bool())
++            if changed:
++                probe = SolverFor("QF_AUFBV")
++                probe.add(relaxed)
++                return _bounded_check(probe, timeout_ms, "probe") != unsat
++            return True
+         # 全符号场景下，calldata/storage 是 Z3 Array，约束含 Array Select。默认的
+         # 通用 Solver() 会尝试组合多种理论，bit-blast 慢；QF_AUFBV 直接走 array
+         # + bit-vector + uninterpreted-function tactic，对我们用到的形式更快。
+@@ -147,18 +203,11 @@ class X86Constraints:
+         for flag_cond in self.flag_constraints.values():
+             solver.add(flag_cond)
+ 
+-        timeout_ms = (
+-            solver_timeout
+-            if solver_timeout is not None
+-            else DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS
+-        )
+-
+         # Symbolic memory-expansion gas (words*words) puts 64-bit multipliers
+         # in the path condition. Refute first with bvmul abstracted to a UF:
+         # every real model extends to the abstraction, so its UNSAT is exact
+         # UNSAT (2-4x faster on those paths); SAT/unknown there proves nothing
+         # and falls through to the exact query below.
+-        from verification.block_equivalence import abstract_nonlinear_mul  # lazy: layer cycle
+         relaxed, changed = abstract_nonlinear_mul(self.as_bool())
+         if changed:
+             probe = SolverFor("QF_AUFBV")
+diff --git a/x86_64/summaries/base.py b/x86_64/summaries/base.py
+index 85cd637..ca4eb54 100644
+--- a/x86_64/summaries/base.py
++++ b/x86_64/summaries/base.py
+@@ -10,6 +10,35 @@ from x86_64.models import Register, X86Block
+ 
+ 
+ SummaryStart = Tuple[int, int]
++# refuted_by_complement looks at this many conjuncts, latest first: the
++# executor's exit-guard split appends Not(guard) last (then only CPU flags).
++COMPLEMENT_WINDOW = 16
++
++
++def refuted_by_complement(premise, goal) -> bool:
++    """True if premise ∧ goal is UNSAT without a solver call.
++
++    That is the case if simplify(goal) is false, or equals simplify(Not(c))
++    for one of the last COMPLEMENT_WINDOW top-level conjuncts c of premise:
++    simplify preserves equivalence, so goal ≡ ¬c and c ∧ goal ≡ false, and
++    every conjunction containing both is UNSAT. False only means "not
++    decided here" -- callers then run their solver query unchanged.
++    (memgas: the exit guard the executor already excluded on this path is
++    checked again by every application, 223 of 239 calls on Safe 5377.)
++    """
++    from z3 import Not, is_and, is_false, simplify
++
++    target = simplify(goal)
++    if is_false(target):
++        return True
++    work, conjuncts = [premise], []
++    while work:  # top-level conjuncts in order
++        term = work.pop()
++        if is_and(term):
++            work.extend(reversed(term.children()))
++        else:
++            conjuncts.append(term)
++    return any(simplify(Not(c)).eq(target) for c in reversed(conjuncts[-COMPLEMENT_WINDOW:]))
+ SUMMARY_PLUGIN_MODES = frozenset({"off", "fallback", "strict"})
+ 
+ 
+@@ -501,12 +530,13 @@ class X86SummaryRuntime:
+         return None if guard is None else guard(summary, state)
+ 
+     def apply(self, summary: X86Summary, state: SMTState,
+-              path_condition=None) -> SMTState:
++              path_condition=None, witness=None) -> SMTState:
+         """应用 summary。前提未被证明时抛 :class:`SummaryPreconditionError`。
+ 
+         ``path_condition`` 是当前路径的累积约束——prove-or-reject 的 summary
+         用它来**证明**自己的适用前提；不传则前提只能靠全局先验证明，通常会
+-        被拒绝（fail-closed 方向）。
++        被拒绝（fail-closed 方向）。``witness`` 是该路径最近的可达性模型，
++        这里不用（VerifiedSummaryRuntime 用它回答 entry）。
+         """
+         self._instance_counter += 1
+         fresh_prefix = f"{summary.kind}_summary_{self._instance_counter}"
+diff --git a/x86_64/summaries/memgas.py b/x86_64/summaries/memgas.py
+index ad31e1c..1b44b12 100644
+--- a/x86_64/summaries/memgas.py
++++ b/x86_64/summaries/memgas.py
+@@ -43,6 +43,7 @@ from .base import (
+     SummaryMatchError,
+     SummaryPreconditionError,
+     X86Summary,
++    refuted_by_complement,
+     require_single_entry,
+ )
+ from .div import _Parser
+@@ -255,6 +256,11 @@ def _require_implied(summary: X86Summary, state: SMTState, path_condition, goal,
+ 
+     if simplify(goal).eq(BoolVal(True)):
+         return
++    # The executor's exit-guard split put Not(guard) into this very path
++    # condition: refuting path ∧ ¬goal syntactically refutes the full query
++    # (which only adds the state assumptions).
++    if path_condition is not None and refuted_by_complement(path_condition, Not(goal)):
++        return
+     solver = SolverFor("QF_AUFBV")
+     solver.set(timeout=timeout_ms)
+     solver.add(*(state.assumptions or []))

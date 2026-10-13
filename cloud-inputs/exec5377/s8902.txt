@@ -1,0 +1,1 @@
+BlockSpecialization(pc=8902, stack_depth=48, memory_size=None, free_memory_pointer=None, stack_constants=((1, 10019309979067222254582373821846632475949454479833780424560900009889672200192),))

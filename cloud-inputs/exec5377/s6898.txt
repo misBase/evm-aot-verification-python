@@ -1,0 +1,1 @@
+BlockSpecialization(pc=6898, stack_depth=25, memory_size=None, free_memory_pointer=None, stack_constants=())

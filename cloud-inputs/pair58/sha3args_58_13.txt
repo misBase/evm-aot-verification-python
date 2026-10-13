@@ -1,0 +1,49 @@
+2 sha3_slice apps
+  args: ['Lambda(alpha_b1_0, If(ULE(stack_19_z0, alpha_b1_0), 0, If(And(ULE(Concat(evm_mem0[88], evm_mem0[89], evm_mem0[90], evm_mem0[91], evm_mem0[92], evm_mem0[93], evm_mem0[94], evm_mem0[95]), Concat(evm_mem0[88], evm_mem0[89], evm_mem0[90], evm_mem0[91], evm_mem0[92], evm_mem0[93], evm_mem0[94], evm_mem0[', 'Concat(stack_19_z3, stack_19_z2, stack_19_z1, stack_19_z0)']
+  args: ['Lambda(alpha_b1_0, If(ULE(stack_19_z0, alpha_b1_0), 0, If(And(Not(stack_19_z0 == 0), ULE(Concat(evm_mem0[88], evm_mem0[89], evm_mem0[90], evm_mem0[91], evm_mem0[92], evm_mem0[93], evm_mem0[94], evm_mem0[95]), Concat(evm_mem0[88], evm_mem0[89], evm_mem0[90], evm_mem0[91], evm_mem0[92], evm_mem0[93], ', 'Concat(stack_19_z3, stack_19_z2, stack_19_z1, stack_19_z0)']
+arg 0: no premise sat 0.0s
+BODY0 (let ((a!1 (concat (select evm_mem0 #x0000000000000058)
+                   (select evm_mem0 #x0000000000000059)
+                   (select evm_mem0 #x000000000000005a)
+                   (select evm_mem0 #x000000000000005b)
+                   (select evm_mem0 #x000000000000005c)
+                   (select evm_mem0 #x000000000000005d)
+                   (select evm_mem0 #x000000000000005e)
+                   (select evm_mem0 #x000000000000005f))))
+(let ((a!2 (and (bvule a!1 (bvadd a!1 (:var 0)))
+                (not (bvule (bvadd a!1 stack_19_z0)
+                            (bvadd a!1 (:var 0)))))))
+(let ((a!3 (ite a!2
+                (ite (bvule CallDataSize (bvadd CallDataSize (:var 0)))
+                     #x00
+                     (select CallData (bvadd CallDataSize (:var 0))))
+                (select evm_mem0 (bvadd a!1 (:var 0))))))
+  (ite (bvule stack_19_z0 (:var 0)) #x00 a!3))))
+BODY1 (let ((a!1 (concat (select evm_mem0 #x0000000000000058)
+                   (select evm_mem0 #x0000000000000059)
+                   (select evm_mem0 #x000000000000005a)
+                   (select evm_mem0 #x000000000000005b)
+                   (select evm_mem0 #x000000000000005c)
+                   (select evm_mem0 #x000000000000005d)
+                   (select evm_mem0 #x000000000000005e)
+                   (select evm_mem0 #x000000000000005f)))
+      (a!2 (ite (and (= stack_18_z1 #x0000000000000000)
+                     (= stack_18_z2 #x0000000000000000)
+                     (= stack_18_z3 #x0000000000000000))
+                stack_18_z0
+                #xffffffffffffffff)))
+(let ((a!3 (bvadd CallDataSize
+                  (bvmul #xffffffffffffffff
+                         (ite (bvule a!2 CallDataSize) a!2 CallDataSize))))
+      (a!4 (select CallData
+                   (bvadd (ite (bvule a!2 CallDataSize) a!2 CallDataSize)
+                          (:var 0)))))
+(let ((a!5 (ite (and (not (= stack_19_z0
+                             #x0000000000000000))
+                     (bvule a!1 (bvadd a!1 (:var 0)))
+                     (not (bvule stack_19_z0 (:var 0))))
+                (ite (bvule a!3 (:var 0)) #x00 a!4)
+                (select evm_mem0 (bvadd a!1 (:var 0))))))
+  (ite (bvule stack_19_z0 (:var 0)) #x00 a!5))))
+arg 0: direct unknown 1.1s
+arg 1: identical

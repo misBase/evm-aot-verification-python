@@ -1,0 +1,45 @@
+    [    3.4] solve_query 3.3s budget=3000 -> unknown
+  [    3.6] pin_split 0.2s -> NoneType
+    [   15.2] solve_query 10.2s budget=10000 -> unknown
+    [   29.6] solve_query 10.3s budget=10000 -> unknown
+    [   32.1] solve_query 2.5s budget=10000 -> sat
+  [   32.1] _retry_over_lia 28.5s -> unknown
+  [   41.1] normalize_word_arith 9.1s -> tuple
+    [   44.4] solve_query 3.2s budget=3000 -> unknown
+    [   74.6] solve_query 30.2s budget=30000 -> unknown
+    [   81.4] solve_query 3.1s budget=3000 -> unknown
+    [   92.6] solve_query 2.2s budget=2000 -> unknown
+    [  112.4] solve_query 2.2s budget=2000 -> unknown
+    [  121.9] solve_query 2.0s budget=2000 -> unknown
+    [  155.5] solve_query 33.0s budget=120000 -> unknown
+  [  155.5] _retry_over_potential 80.8s -> unknown
+  [  155.6] _alias_split 0.1s -> NoneType
+    [  162.3] solve_query 3.2s budget=3000 -> unknown
+    [  189.5] solve_query 2.2s budget=2000 -> unknown
+    [  321.0] solve_query 120.1s budget=120000 -> unknown
+  [  321.0] _retry_over_potential 165.4s -> unknown
+  [  323.8] refute_over_bv_abstraction 2.8s -> sat
+  [  333.3] refute_over_bv_abstraction 9.5s -> sat
+    [  393.5] solve_query 60.2s budget=60000 -> unknown
+    [  424.2] solve_query 30.3s budget=30000 -> unknown
+  [  424.2] _retry_over_nonlinear_mul 30.7s -> unknown
+    [  426.9] solve_query 2.2s budget=2000 -> unknown
+    [  429.2] solve_query 2.2s budget=2000 -> unknown
+    [  431.5] solve_query 2.2s budget=2000 -> unknown
+    [  433.9] solve_query 2.2s budget=2000 -> unknown
+    [  436.2] solve_query 2.2s budget=2000 -> unknown
+    [  438.5] solve_query 2.2s budget=2000 -> unknown
+    [  440.8] solve_query 2.2s budget=2000 -> unknown
+    [  443.1] solve_query 2.2s budget=2000 -> unknown
+    [  445.4] solve_query 2.2s budget=2000 -> unknown
+    [  447.7] solve_query 2.2s budget=2000 -> unknown
+    [  450.0] solve_query 2.2s budget=2000 -> unknown
+    [  452.3] solve_query 2.2s budget=2000 -> unknown
+    [  454.7] solve_query 2.2s budget=2000 -> unknown
+  [  454.8] _retry_over_nonlinear_mul 30.6s -> unknown
+    [  464.1] solve_query 3.7s budget=29998 -> sat
+    [  529.6] solve_query 2.2s budget=29998 -> sat
+    [  542.0] solve_query 2.1s budget=29999 -> sat
+    [  552.9] solve_query 3.6s budget=29999 -> sat
+    [  575.7] solve_query 3.4s budget=29999 -> sat
+    [  595.1] solve_query 3.2s budget=29999 -> sat

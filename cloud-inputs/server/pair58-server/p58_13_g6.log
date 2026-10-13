@@ -1,0 +1,8 @@
+    [    3.2] solve_query 3.2s budget=3000 -> unknown
+  [    3.3] pin_split 0.1s -> NoneType
+    [   11.4] solve_query 7.0s budget=10000 -> sat
+    [   23.5] solve_query 10.2s budget=10000 -> unknown
+    [   32.3] solve_query 8.7s budget=10000 -> sat
+  [   32.3] _retry_over_lia 29.0s -> unknown
+  [   37.5] normalize_word_arith 5.2s -> tuple
+pair_58_13_82bafc15a954.smt2 6 proved 37.5s lemmas=179

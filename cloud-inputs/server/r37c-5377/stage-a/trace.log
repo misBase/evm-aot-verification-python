@@ -1,0 +1,10 @@
+     0.0 START ['tests/data/ext_contracts/calldataload_fixed/Safe', '/home/heqi/evm-verif/scripts/n5377a.json', '--output', '/home/heqi/evm-verif/bl-runs/r37c-5377/outa.json', '--timeout-ms', '30000', '--node-seconds', '10800']
+     5.1 PHASE evm 0.7s cpu 0.7s paths 86 defects [] reach(all executors incl. summary replays) {'executors': 0, 'calls': 0, 'wall': 0.0, 'pruned': 0}
+   313.2 PHASE x86 293.9s cpu 293.7s paths 171 defects [] reach(all executors incl. summary replays) {'executors': 5, 'calls': 2099, 'wall': 161.1, 'pruned': 756}
+   328.1 BEGIN check_paths
+   344.0 PHASE check_paths 15.9s cpu 15.9s {'evm_coverage': ('unsat', 1.6), 'x86_coverage': ('unsat', 14.3)}
+   344.0 BEGIN _correspondence
+   364.8 PHASE _correspondence 20.9s cpu 20.4s {'rows': 171, 'all': 0, 'empty': 1, 'mapped': 170, 'all_rows': []}
+   364.8 BEGIN _pair_phase
+  8106.2 PHASE _pair_phase 7741.4s cpu 1991.7s exception
+  8107.5 END 8107.5s

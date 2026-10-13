@@ -1,0 +1,58 @@
+    [    3.2] solve_query 3.2s budget=3000 -> unknown
+    [    6.6] solve_query 3.2s budget=3000 -> unknown
+  [    6.6] pin_split 0.1s -> NoneType
+    [   13.8] solve_query 6.2s budget=10000 -> sat
+    [   26.4] solve_query 10.1s budget=10000 -> unknown
+  [   27.9] _retry_over_lia 21.3s -> unknown
+  [   32.8] normalize_word_arith 4.9s -> tuple
+    [   35.9] solve_query 3.1s budget=3000 -> unknown
+    [   43.5] solve_query 7.5s budget=30000 -> unknown
+    [   48.6] solve_query 3.1s budget=3000 -> unknown
+    [   57.1] solve_query 2.0s budget=2000 -> unknown
+    [   62.4] solve_query 2.2s budget=2000 -> unknown
+    [   68.2] solve_query 2.0s budget=2000 -> unknown
+    [   90.9] solve_query 15.9s budget=120000 -> unknown
+  [   90.9] _retry_over_potential 47.5s -> unknown
+  [   91.0] _alias_split 0.1s -> NoneType
+    [   95.8] solve_query 3.0s budget=3000 -> unknown
+    [  234.9] solve_query 120.1s budget=120000 -> unknown
+  [  234.9] _retry_over_potential 143.9s -> unknown
+  [  236.4] refute_over_bv_abstraction 1.5s -> sat
+  [  239.5] refute_over_bv_abstraction 3.1s -> sat
+    [  299.7] solve_query 60.1s budget=60000 -> unknown
+    [  330.1] solve_query 30.2s budget=30000 -> unknown
+  [  330.1] _retry_over_nonlinear_mul 30.4s -> unknown
+    [  332.5] solve_query 2.1s budget=2000 -> unknown
+    [  335.4] solve_query 2.1s budget=2000 -> unknown
+    [  337.5] solve_query 2.0s budget=2000 -> unknown
+    [  339.7] solve_query 2.1s budget=2000 -> unknown
+    [  341.9] solve_query 2.1s budget=2000 -> unknown
+    [  344.1] solve_query 2.1s budget=2000 -> unknown
+    [  346.2] solve_query 2.1s budget=2000 -> unknown
+    [  348.4] solve_query 2.1s budget=2000 -> unknown
+    [  350.6] solve_query 2.1s budget=2000 -> unknown
+    [  352.8] solve_query 2.1s budget=2000 -> unknown
+    [  355.0] solve_query 2.1s budget=2000 -> unknown
+    [  357.1] solve_query 2.1s budget=2000 -> unknown
+    [  360.5] solve_query 3.3s budget=3138 -> unknown
+  [  360.5] _retry_over_nonlinear_mul 30.4s -> unknown
+    [  366.2] solve_query 4.4s budget=29999 -> sat
+    [  373.8] solve_query 4.2s budget=29999 -> sat
+    [  381.7] solve_query 3.4s budget=29999 -> sat
+    [  392.6] solve_query 4.5s budget=29999 -> sat
+    [  410.5] solve_query 2.1s budget=29998 -> sat
+    [  424.0] solve_query 3.8s budget=29999 -> sat
+    [  436.9] solve_query 2.4s budget=29999 -> sat
+    [  451.2] solve_query 3.5s budget=29999 -> sat
+    [  488.7] solve_query 4.5s budget=29999 -> sat
+    [  501.9] solve_query 2.7s budget=29999 -> sat
+    [  507.0] solve_query 3.7s budget=30000 -> unsat
+  [  507.0] _retry_with_uf_unification 146.5s -> unsat
+    [  510.4] solve_query 3.2s budget=3000 -> unknown
+  [  510.4] pin_split 0.1s -> NoneType
+    [  518.5] solve_query 7.3s budget=10000 -> sat
+    [  530.1] solve_query 10.2s budget=10000 -> unknown
+    [  540.2] solve_query 10.1s budget=10000 -> unknown
+  [  540.2] _retry_over_lia 29.8s -> unknown
+  [  545.0] normalize_word_arith 4.8s -> tuple
+pair_58_12_7495947f8f3d.smt2 all proved 546.0s lemmas=7
