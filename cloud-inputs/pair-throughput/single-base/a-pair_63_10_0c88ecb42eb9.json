@@ -1,0 +1,334 @@
+{
+ "name": "a-pair_63_10_0c88ecb42eb9.smt2",
+ "answer": "proved",
+ "seconds": 881.5,
+ "frames": [
+  {
+   "name": "a-pair_63_10_0c88ecb42eb9.smt2",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.41
+    ],
+    [
+     "split",
+     "unsat",
+     875.89
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_63_10_0c88ecb42eb9.smt2_goal_0_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.01
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_63_10_0c88ecb42eb9.smt2_goal_1_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.02
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_63_10_0c88ecb42eb9.smt2_goal_2_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.37
+    ],
+    [
+     "pin",
+     "unknown",
+     0.14
+    ],
+    [
+     "lia",
+     "unknown",
+     29.07
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "pre-normalize",
+     null,
+     0.0
+    ],
+    [
+     "normalize",
+     null,
+     9.88
+    ],
+    [
+     "quick*",
+     "unknown",
+     3.15
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "blast*",
+     "unknown",
+     83.89
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "alias*",
+     "unknown",
+     0.15
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "potential*",
+     "unknown",
+     163.71
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs*",
+     "unknown",
+     4.77
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs",
+     "unknown",
+     19.11
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "exact*",
+     "unknown",
+     60.25
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "mul",
+     "unknown",
+     31.41
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "mul*",
+     "unknown",
+     31.47
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "unify*",
+     "unsat",
+     383.55
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_63_10_0c88ecb42eb9.smt2_goal_3_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.03
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_63_10_0c88ecb42eb9.smt2_goal_4_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.03
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_63_10_0c88ecb42eb9.smt2_goal_5_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.01
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_63_10_0c88ecb42eb9.smt2_goal_6_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.26
+    ],
+    [
+     "pin",
+     "unknown",
+     0.11
+    ],
+    [
+     "lia",
+     "unknown",
+     36.56
+    ],
+    [
+     "gap",
+     null,
+     0.01
+    ],
+    [
+     "pre-normalize",
+     null,
+     0.0
+    ],
+    [
+     "normalize",
+     null,
+     11.54
+    ],
+    [
+     "quick*",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "probes": {
+  "light<_prove_equal": {
+   "hit": 2,
+   "miss": 88,
+   "hit_s": 3.02,
+   "miss_s": 100.47
+  },
+  "unsat_core<_prove_equal": {
+   "hit": 0,
+   "miss": 88,
+   "hit_s": 0.0,
+   "miss_s": 135.87
+  },
+  "cases<_prove_equal": {
+   "hit": 0,
+   "miss": 88,
+   "hit_s": 0.0,
+   "miss_s": 196.15
+  },
+  "cases<_retry_over_nonlinear_mul": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 30.44
+  },
+  "light<_retry_with_uf_unification": {
+   "hit": 1,
+   "miss": 0,
+   "hit_s": 12.66,
+   "miss_s": 0.0
+  }
+ }
+}

@@ -208,3 +208,8 @@ new 两个上下文合计，unsat_core 探针 1023 次：sat 765 次（这些 ca
 
 - `cloud-inputs/tools/route_trace.py`：路由剖析（单独模式 / `--sequence` 模式）。
 - `cloud-inputs/tools/route_summary.py`：汇总 trace JSON，可加 `--per-obligation` 打印每条义务的明细。
+- `cloud-inputs/pair-throughput/`：本报告的原始数据。
+  - `single-base/`：§2 的单独模式 trace（r37d 原码，16 条）；
+  - `seq-{base,new}-{a,b}/` 和对应的 `.log`：§4 的序列模式 A/B trace；
+  - `runall.sh CODE_DIR OUT_DIR SECONDS`（单独模式，4 路并行）、`ab.sh OUT_ROOT SECONDS`（序列 A/B，需要 `SCRATCH` 下有 `basewt/`、`newwt/` 两个 worktree）。
+  - 汇总：`PYTHONPATH=. python cloud-inputs/tools/route_summary.py cloud-inputs/pair-throughput/seq-new-a --per-obligation`。
