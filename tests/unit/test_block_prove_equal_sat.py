@@ -1,6 +1,7 @@
 """_prove_equal skips the case tree once the unsat-core probe found a model of
 premise ∧ x ≠ y (the case tree refutes exactly that formula), and its cache
-entries keep their terms alive (z3 recycles the ids of freed terms)."""
+entries keep their terms alive (z3 recycles the ids of freed terms). The
+light-premise probe's per-conjunct tests (_heavy, _no_binder) are memoized."""
 import gc
 
 from z3 import And, BitVec, If, ULE, ULT
@@ -66,3 +67,17 @@ def test_cache_entries_keep_their_terms_alive():
     (_, _, keep), = cache[key]
     assert {keep[0].get_id(), keep[1].get_id()} == set(key)
     assert all(t.get_id() for t in keep[2])
+
+
+def test_memoized_conjunct_tests_agree_with_the_walk():
+    from z3 import Array, BitVecSort, Function, Lambda, Select
+    f = Function("pes_f", BitVecSort(16), BitVecSort(16))
+    m = Array("pes_m", BitVecSort(16), BitVecSort(16))
+    i = BitVec("pes_i", 16)
+    terms = [a == b, a * b == c, a * 3 == c, f(a) == b, f(BitVec("pes_k", 16)) == 0,
+             Select(Lambda([i], Select(m, i + a)), b) == c, ULT(a, b)]
+    for _ in range(2):  # the second pass answers from the memo
+        assert [be._heavy(t) for t in terms] == [be._heavy_uncached(t) for t in terms] == [
+            False, True, False, True, True, False, False]
+        assert [be._no_binder(t) for t in terms] == [be._no_binder_uncached(t) for t in terms] == [
+            True, True, True, True, True, False, True]

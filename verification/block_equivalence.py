@@ -1731,6 +1731,13 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
 
 
 def _no_binder(term):
+    # Memoized per term (pure; _memoized keeps the term alive, so its id stays its own):
+    # unify_uf_arguments and the light-premise probe ask it of every premise conjunct per
+    # candidate pair (Safe 5377 d30: ~195 conjuncts, 0.25s per pass, ~100 passes per pair).
+    return _memoized("no_binder", (term,), lambda: _no_binder_uncached(term))
+
+
+def _no_binder_uncached(term):
     seen, work = set(), [term]
     while work:
         t = work.pop()
@@ -1830,7 +1837,12 @@ def _differ(x, y):
 def _heavy(term):
     """True if `term` has a product of non-literals or a UF application (the
     multiplication abstraction's products, host results): the gas sums over
-    symbolic memory sizes, which dominate bit-blasting."""
+    symbolic memory sizes, which dominate bit-blasting. Memoized as _no_binder
+    (0.5s per pass over a Safe 5377 d30 premise, once per candidate pair)."""
+    return _memoized("heavy", (term,), lambda: _heavy_uncached(term))
+
+
+def _heavy_uncached(term):
     if _nonlinear_mul_terms(term):
         return True
     seen, work = set(), [term]
