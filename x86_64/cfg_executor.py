@@ -5,6 +5,7 @@ x86-64 符号执行引擎（参考 evm_ir）。
 """
 
 import logging
+from time import monotonic
 from typing import List, Dict, Optional, Tuple, Set, TYPE_CHECKING
 from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat, is_false
 
@@ -53,7 +54,8 @@ class X86SymbolicExecutor:
                  call_site_mapping: Optional["CallSiteMapping"] = None,
                  aot_profile: Optional[X86AOTProfile] = None,
                  summary_runtime: Optional[X86SummaryRuntime] = None,
-                 stop_addrs: Optional[set] = None):
+                 stop_addrs: Optional[set] = None,
+                 deadline: Optional[float] = None):
         """初始化符号执行引擎。
 
         Args:
@@ -72,6 +74,7 @@ class X86SymbolicExecutor:
         self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
         self.block_index: Dict[int, int] = {block.start_addr: i for i, block in enumerate(blocks)}
         self.max_depth = max_depth
+        self.deadline = deadline
         self.use_reachability_check = use_reachability_check
         self.enable_go_bridge = enable_go_bridge
         self.enable_merge = enable_merge
@@ -696,16 +699,21 @@ class X86SymbolicExecutor:
         if self._is_terminal_state(state):
             self.final_states.append(state)
 
-    def execute_state(self, global_state: X86GlobalState) -> List[X86GlobalState]:
+    def execute_state(self, global_state: X86GlobalState,
+                      skip_summary_at: Optional[Tuple[int, int]] = None) -> List[X86GlobalState]:
         """执行单个全局状态。
 
         Args:
             global_state: 要执行的全局状态
+            skip_summary_at: 本次调用内不套用该 (block, index) 上的 summary
+                （出口守卫分裂的 G 分支：只作用于这一次命中，后续再到达照常套用）
 
         Returns:
             新生成的全局状态列表
         """
         node = global_state.node
+        if self.deadline is not None and monotonic() >= self.deadline:
+            raise TimeoutError("x86 segment execution deadline exhausted")
         if node is None:
             self._mark_coverage_incomplete("encountered state without CFG node")
             return []
@@ -725,6 +733,12 @@ class X86SymbolicExecutor:
         instruction_index = 0
         while instruction_index < len(block.instructions):
             summary = self.summary_runtime.get(block.start_addr, instruction_index)
+            if summary is not None and summary.start_key == skip_summary_at:
+                summary = None
+            if summary is not None and summary.is_cross_block:
+                guard = self.summary_runtime.exit_guard(summary, new_mstate)
+                if guard is not None:
+                    return self._split_on_exit_guard(global_state, summary, new_mstate, guard)
             if summary is not None:
                 # prove-or-reject：summary 的适用前提必须由当前 path condition
                 # 证明。被拒时按策略要么整体失败，要么**原样逐指令执行本循环**
@@ -782,6 +796,56 @@ class X86SymbolicExecutor:
         else:
             # 顺序执行到下一个块
             return self._handle_fallthrough(global_state, new_mstate, block)
+
+    def _split_on_exit_guard(self, global_state: X86GlobalState, summary: X86Summary,
+                             new_mstate: SMTState, guard) -> List[X86GlobalState]:
+        """Summary with an exit guard G (an exit it does not model): fork.
+
+        * G: the block is re-run from its start with this ONE hit skipped
+          (`skip_summary_at`), so the raw slice runs and leaves through its
+          real exit; later arrivals at the entry are summarized again.
+        * not G: the summary is applied (its lemma holds exactly there) and
+          execution jumps to the continuation.
+
+        G and not G partition the hit's path condition, so the two forks
+        together are complete; infeasible forks are pruned.
+        """
+        import copy as copy_module
+        from z3 import is_true
+
+        guard = simplify(guard)
+        # Forks copy the PRE-block state: a raw fork re-runs the block prefix.
+        raw, fast = copy_module.copy(global_state), copy_module.copy(global_state)
+        raw.add_constraint(guard)
+        fast.add_constraint(Not(guard))
+        global_state.mstate = new_mstate
+        global_state.summary_control_flow_managed = True
+
+        def feasible(state):
+            return not self.use_reachability_check or self._is_state_reachable(state)
+
+        def run_raw(state):
+            states = self.execute_state(state, skip_summary_at=summary.start_key)
+            if states and not state.summary_control_flow_managed and state.node.block.instructions:
+                self.manage_cfg(state.node.block.instructions[-1], states, state.node.address)
+            if self._is_terminal_state(state):
+                self.final_states.append(state)
+            return states
+
+        out: List[X86GlobalState] = []
+        if not is_false(guard) and feasible(raw):
+            out.extend(run_raw(raw))
+        if not is_true(guard) and feasible(fast):
+            try:
+                applied = self.summary_runtime.apply(
+                    summary, new_mstate, path_condition=fast.get_constraints().as_bool())
+            except SummaryPreconditionError as error:
+                self.summary_runtime.record_precondition_failure(error)
+                if not self.summary_runtime.should_fallback_on_precondition(summary.kind):
+                    raise
+                return out + run_raw(fast)
+            out.extend(self._continue_after_cross_block_summary(fast, summary, applied))
+        return out
 
     def _continue_after_cross_block_summary(
         self,

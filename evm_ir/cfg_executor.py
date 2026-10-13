@@ -691,7 +691,7 @@ class SymbolicExecutor:
 
         analysis = analyze_jump_target(target_value)
 
-        if not analysis.is_static and last_op.immediate_set:
+        if not analysis.is_static and (last_op.immediate_set or mstate.complete_jump_domain):
             # resolved_multi JUMP 且目标值是纯符号（如循环归纳 havoc 后的
             # caller-frame 返回地址）：按 IR 保证（resolveSymbolicJumps 已证
             # 目标 ∈ immediate_set）对每个候选目标分叉，路径带 value==target
@@ -700,7 +700,9 @@ class SymbolicExecutor:
             from z3 import BitVecVal
             fork_states = []
             from .cfg_structures import EdgeType as _EdgeType
-            for target_pc in dict.fromkeys(last_op.immediate_set):
+            candidates = (sorted(self.valid_jump_targets) if mstate.complete_jump_domain
+                          else dict.fromkeys(last_op.immediate_set))
+            for target_pc in candidates:
                 target_block = self.blocks_by_pc.get(target_pc)
                 if target_block is None:
                     raise LogicError(

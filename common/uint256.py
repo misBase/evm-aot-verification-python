@@ -172,6 +172,58 @@ class Uint256:
 
         return Uint256(result_z0, result_z1, result_z2, result_z3)
 
+    @staticmethod
+    def mul_codegen_order(p: 'Uint256', q: 'Uint256') -> 'Uint256':
+        """(p * q) mod 2^256 built exactly as go-hpc-evm compileEVMMul does.
+
+        compileEVMMul multiplies p = the SECOND stack operand by q = the top,
+        adding each partial product's `z` term before the running carry (the
+        raw add/adc order; see x86_64/summaries/mul_proof.py). The value equals
+        holiman Mul (multiplication mod 2^256 commutes); building the same term
+        shape lets the block proof compare MUL results syntactically instead
+        of re-proving 256-bit commutativity, which bit-blasting cannot do.
+        User-approved modelling alignment (2026-09-27).
+        """
+        zero_64 = BitVecVal(0, 64)
+        zero_carry = BitVecVal(0, 1)
+
+        def mul64(x, y):
+            product = ZeroExt(64, x) * ZeroExt(64, y)
+            return Extract(127, 64, product), Extract(63, 0, product)
+
+        def add64(x, y, carry=zero_carry):
+            total = (Concat(BitVecVal(0, 1), x) + Concat(BitVecVal(0, 1), y)
+                     + Concat(BitVecVal(0, 64), carry))
+            return Extract(63, 0, total), Extract(64, 64, total)
+
+        def hop(z, x, y):
+            hi, lo = mul64(x, y)
+            lo, carry = add64(lo, z)
+            hi, _ = add64(hi, zero_64, carry)
+            return hi, lo
+
+        def step_x86_order(z, x, y, carry):
+            hi, lo = mul64(x, y)
+            lo, bit = add64(lo, z)
+            hi, _ = add64(hi, zero_64, bit)
+            lo, bit = add64(lo, carry)
+            hi, _ = add64(hi, zero_64, bit)
+            return hi, lo
+
+        p0, p1, p2, p3 = p.z0, p.z1, p.z2, p.z3
+        q0, q1, q2, q3 = q.z0, q.z1, q.z2, q.z3
+        carry0, z0 = mul64(p0, q0)
+        carry0, res1 = hop(carry0, p1, q0)
+        carry0, res2 = hop(carry0, p2, q0)
+        _, res3 = hop(carry0, p3, q0)
+        carry1, z1 = hop(res1, p0, q1)
+        carry1, res2 = step_x86_order(res2, p1, q1, carry1)
+        _, res3 = step_x86_order(res3, p2, q1, carry1)
+        carry2, z2 = hop(res2, p0, q2)
+        _, res3 = step_x86_order(res3, p1, q2, carry2)
+        _, z3 = hop(res3, p0, q3)
+        return Uint256(z0, z1, z2, z3)
+
     def mul_semantics(self, other: 'Uint256') -> 'Uint256':
         """将两个Uint256值相乘（语义建模）。
 

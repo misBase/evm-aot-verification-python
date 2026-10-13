@@ -17,22 +17,83 @@ from typing import Dict, List, Optional, Tuple
 
 from z3 import (
     BitVecVal,
+    BitVecSort,
+    Concat,
+    Extract,
+    FreshConst,
+    Z3_OP_CONCAT,
+    Z3_OP_EXTRACT,
+    Lambda,
     Select,
     Store,
     is_app,
     is_bv,
     is_bv_value,
+    is_const,
+    is_const_array,
     is_quantifier,
     is_select,
     is_store,
+    is_true,
+    is_var,
+    get_var_index,
     simplify,
+    substitute_vars,
 )
 
-# 线性化地址的规范键：((term_sexpr, count), ...) 排序元组
-_AddrKey = Tuple[Tuple[str, int], ...]
+# 线性化地址的规范键：((term_id, count), ...) 排序元组（AST 哈希共享：同项同 id）
+_AddrKey = Tuple[Tuple[int, int], ...]
+
+
+def memory_as_offset_view(memory, base):
+    """Translate absolute byte addresses to offsets, preserving every byte.
+
+    Addition modulo 2**64 is a bijection, so Store addresses can be translated
+    exactly without alias or no-overflow assumptions.
+    """
+    stores = []
+    while is_store(memory):
+        stores.append((simplify(memory.arg(1) - base), memory.arg(2)))
+        memory = memory.arg(0)
+    offset = FreshConst(BitVecSort(64), "memory_view_offset")
+    result = simplify(Lambda([offset], Select(memory, base + offset)))
+    if is_quantifier(result) and result.is_lambda():
+        body = result.body()
+        # Z3 leaves Lambda(i, A[i]) intact; a free array A is already that view.
+        if (is_select(body) and is_const(body.arg(0))
+                and is_var(body.arg(1)) and get_var_index(body.arg(1)) == 0):
+            result = body.arg(0)
+    for address, value in reversed(stores):
+        result = Store(result, address, value)
+    return result
+
+
+# Pure functions of their AST arguments. Values keep the argument ASTs alive,
+# so their ids cannot be recycled while cached. ponytail: cleared wholesale at
+# _MEMO_LIMIT entries; an LRU if that ever thrashes.
+_MEMO: Dict[tuple, tuple] = {}
+_MEMO_LIMIT = 200_000
+
+
+def _memoized(name, args, compute):
+    key = (name, *(a.get_id() for a in args))
+    hit = _MEMO.get(key)
+    if hit is not None:
+        return hit[1]
+    if len(_MEMO) >= _MEMO_LIMIT:
+        _MEMO.clear()
+    value = compute()
+    _MEMO[key] = (args, value)
+    return value
 
 
 def linearize_address(addr) -> Optional[Tuple[_AddrKey, int]]:
+    if not is_bv(addr):
+        return None
+    return _memoized("linearize", (addr,), lambda: _linearize_address(addr))
+
+
+def _linearize_address(addr) -> Optional[Tuple[_AddrKey, int]]:
     """把位向量地址拆成（非常量项多重集, 常量和）。
 
     先做 z3 simplify：折叠常量算术（如 ``(8-4)*8``）、归一化
@@ -46,7 +107,7 @@ def linearize_address(addr) -> Optional[Tuple[_AddrKey, int]]:
     width = addr.size()
     mask = (1 << width) - 1
     const = 0
-    terms: Dict[str, Tuple[object, int]] = {}
+    terms: Dict[int, Tuple[object, int]] = {}
     stack = [addr]
     while stack:
         node = stack.pop()
@@ -55,7 +116,7 @@ def linearize_address(addr) -> Optional[Tuple[_AddrKey, int]]:
         elif is_app(node) and node.decl().name() == "bvadd":
             stack.extend(node.children())
         else:
-            key = node.sexpr()
+            key = node.get_id()  # hash-consed: same term <=> same id, no printing
             prev = terms.get(key)
             terms[key] = (node, (prev[1] + 1) if prev else 1)
     addr_key = tuple(sorted((k, v[1]) for k, v in terms.items()))
@@ -99,42 +160,115 @@ def resolve_select_over_store(select_expr, max_chain: int = 4096):
     return Select(node, select_expr.arg(1))
 
 
+_ALIVE = "alive"  # cache slot holding every keyed node: its id cannot be reused while cached
+
+
+def _put(cache, node, value):
+    cache[node.get_id()] = value
+    cache.setdefault(_ALIVE, []).append(node)
+
+
 def forward_selects(expr, _cache: Optional[Dict[int, object]] = None):
     """自底向上改写表达式中所有可解析的 Select-over-Store。
 
     量词/Lambda 节点保守跳过（不深入改写其体）。
     """
+    # Iterative post-order (explicit stack): Store chains of real contracts
+    # exceed Python's recursion limit. Stage 0 expands, 1 rebuilds, 2 adopts
+    # the forwarded result of a resolved Select.
     if _cache is None:
         _cache = {}
-    key = expr.get_id()
-    hit = _cache.get(key)
-    if hit is not None:
-        return hit
+    stack = [(expr, 0, None)]
+    while stack:
+        node, stage, resolved = stack.pop()
+        key = node.get_id()
+        if stage == 0:
+            if key in _cache:
+                continue
+            if is_quantifier(node) or not is_app(node):
+                _put(_cache, node, node)
+                continue
+            stack.append((node, 1, None))
+            stack.extend((c, 0, None) for c in node.children() if c.get_id() not in _cache)
+        elif stage == 1:
+            originals = node.children()
+            children = [_cache[c.get_id()] for c in originals]
+            result = node
+            if any(c is not o for c, o in zip(children, originals)):
+                result = node.decl()(*children)
+            if is_select(result):
+                target = resolve_select_over_store(result)
+                if target is not None:
+                    if target.get_id() not in _cache:
+                        stack.append((node, 2, target))
+                        stack.append((target, 0, None))
+                        continue
+                    result = _cache[target.get_id()]
+            _put(_cache, node, result)
+        else:
+            _put(_cache, node, _cache[resolved.get_id()])
+    return _cache[expr.get_id()]
 
-    if is_quantifier(expr):
-        _cache[key] = expr
-        return expr
 
-    result = expr
-    if is_app(expr):
-        children = [forward_selects(c, _cache) for c in expr.children()]
-        if any(c is not o for c, o in zip(children, expr.children())):
-            result = expr.decl()(*children)
-        if is_select(result):
-            resolved = resolve_select_over_store(result)
-            if resolved is not None:
-                result = forward_selects(resolved, _cache)
-    _cache[key] = result
-    return result
+def join_extracts(expr, _cache: Optional[Dict[int, object]] = None):
+    """Concat(…, s[h:m+1], s[m:l], …) -> Concat(…, s[h:l], …), and s[w-1:0] -> s, bottom-up.
+
+    A limb written with store_64bit and read back with load_64bit forwards
+    to Concat(Extract(63,56,V), …, Extract(7,0,V)). Z3's simplifier pushes
+    each Extract into V before it would rejoin them (into ite, bvadd, the low
+    bits of bvmul), so `limb == V` becomes a multiplier-circuit equivalence
+    once V carries memory-cost squares (CErc20 10233 H2 callEngine
+    gas_remaining mirror: unknown after 1868s; joined: V == V, False at once).
+    A bit-vector identity, so the rewrite is exact. Binders are not entered.
+    """
+    if _cache is None:
+        _cache = {}
+    stack = [(expr, False)]
+    while stack:
+        node, built = stack.pop()
+        key = node.get_id()
+        if key in _cache:
+            continue
+        if is_quantifier(node) or not is_app(node) or node.num_args() == 0:
+            _put(_cache, node, node)
+            continue
+        if not built:
+            stack.append((node, True))
+            stack.extend((c, False) for c in node.children() if c.get_id() not in _cache)
+            continue
+        originals = node.children()
+        children = [_cache[c.get_id()] for c in originals]
+        result = node if all(c.eq(o) for c, o in zip(children, originals)) else node.decl()(*children)
+        if result.decl().kind() == Z3_OP_CONCAT:
+            parts = []  # [hi, lo, source]; hi None: not an extract
+            for arg in result.children():
+                if arg.decl().kind() == Z3_OP_EXTRACT:
+                    hi, lo = arg.params()
+                    if parts and parts[-1][0] is not None and parts[-1][1] == hi + 1 and parts[-1][2].eq(arg.arg(0)):
+                        parts[-1][1] = lo
+                        continue
+                    parts.append([hi, lo, arg.arg(0)])
+                else:
+                    parts.append([None, None, arg])
+            if len(parts) < result.num_args():
+                terms = [t if hi is None or (hi == t.size() - 1 and lo == 0) else Extract(hi, lo, t)
+                         for hi, lo, t in parts]
+                result = terms[0] if len(terms) == 1 else Concat(*terms)
+        _put(_cache, node, result)
+    return _cache[expr.get_id()]
 
 
 def _subtract_base_term(addr, base_term) -> Optional[object]:
-    """从地址的 bvadd 线性组合中移除一次 base_term；不含则返回 None。"""
+    """从地址的 bvadd 线性组合中移除一次 base_term；不含则返回 None（按两个 AST 记忆）。"""
+    return _memoized("subtract", (addr, base_term), lambda: _subtract_base_term_raw(addr, base_term))
+
+
+def _subtract_base_term_raw(addr, base_term) -> Optional[object]:
     if not is_bv(addr):
         return None
     addr = simplify(addr)
     width = addr.size()
-    base_key = simplify(base_term).sexpr()
+    base = simplify(base_term)
     const = 0
     rest: List[object] = []
     removed = False
@@ -145,7 +279,7 @@ def _subtract_base_term(addr, base_term) -> Optional[object]:
             const = (const + node.as_long()) & ((1 << width) - 1)
         elif is_app(node) and node.decl().name() == "bvadd":
             stack.extend(node.children())
-        elif not removed and node.sexpr() == base_key:
+        elif not removed and node.eq(base):
             removed = True
         else:
             rest.append(node)
@@ -158,6 +292,11 @@ def _subtract_base_term(addr, base_term) -> Optional[object]:
 
 
 def unshift_store_chain(array_expr, base_term, base_array) -> Optional[object]:
+    return _memoized("unshift", (array_expr, base_term, base_array),
+                     lambda: _unshift_store_chain(array_expr, base_term, base_array))
+
+
+def _unshift_store_chain(array_expr, base_term, base_array) -> Optional[object]:
     """把 Store 链从绝对地址空间（base_term + offset）下推到 offset 空间。
 
     要求链上每个 Store 地址都线性含 base_term（系数 1），链底等于
@@ -176,14 +315,18 @@ def unshift_store_chain(array_expr, base_term, base_array) -> Optional[object]:
         stores.append((offset, node.arg(2)))
         node = node.arg(0)
 
-    # 链底必须是我们构造的平移 Lambda（Lambda a. base_array[a - base]）
-    # 或 base_array 自身。宽松判定：quantifier(lambda) 且 body 是对
-    # base_array 的 Select。
+    # 必须核对平移索引，不能仅凭读取了同一数组就丢弃 Lambda。
     if node.get_id() == base_array.get_id():
+        if not (is_const_array(node) or is_true(simplify(base_term == 0))):
+            return None
         root = base_array
-    elif is_quantifier(node) and node.is_lambda():
+    elif is_quantifier(node) and node.is_lambda() and node.num_vars() == 1:
         body = node.body()
         if is_select(body) and body.arg(0).get_id() == base_array.get_id():
+            offset = FreshConst(BitVecSort(64), "unshift_probe")
+            index = substitute_vars(body.arg(1), base_term + offset)
+            if not is_true(simplify(index == offset)):
+                return None
             root = base_array
         else:
             return None

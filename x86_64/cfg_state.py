@@ -6,8 +6,10 @@ x86-64 全局状态管理（参考 evm_ir）。
 
 from __future__ import annotations
 
+import os
+import time
 from typing import List, Optional, Dict, TYPE_CHECKING
-from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, And
+from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, is_true, And
 
 from state.smt_state import SMTState
 
@@ -17,6 +19,37 @@ if TYPE_CHECKING:
     from .cfg_annotations import X86StateAnnotation
 
 DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS = 1000
+# A reachability budget of T ms is enforced as Z3's deterministic resource
+# limit (T * RLIMIT_PER_MS), so which checks come back unknown -- and hence
+# how many infeasible paths survive -- no longer depends on machine load.
+# Calibrated with REACH_STATS_FILE on Safe pc=5377 under the old 1s wall
+# budget (load ~5, 1351 checks): Z3 spends ~3.4k rlimit/ms (median, 2.0k-6.8k
+# p10-p90); timed-out checks had spent up to 10.2M, decided ones <= 8.5M.
+# x86 paths vs rate: 5000/ms -> 185, 7500 -> 177, 10000 -> 172 (1s wall: 176-263),
+# and 10000 costs less total rlimit than 5000 (fewer paths, fewer checks).
+# The wall clock is only a safety net for pathological tactics.
+REACHABILITY_RLIMIT_PER_MS = 10000
+REACHABILITY_WALL_SAFETY_FACTOR = 10
+
+
+def _bounded_check(solver, timeout_ms, tag):
+    """solver.check() under the reachability budget; any non-UNSAT keeps the path."""
+    if timeout_ms is not None and timeout_ms > 0:
+        cap = 2**32 - 1  # both are unsigned-int Z3 params
+        solver.set("rlimit", min(timeout_ms * REACHABILITY_RLIMIT_PER_MS, cap))
+        solver.set("timeout", min(timeout_ms * REACHABILITY_WALL_SAFETY_FACTOR, cap))
+    stats = os.environ.get("REACH_STATS_FILE")
+    if not stats:
+        return solver.check()
+    # Diagnostic: "tag result seconds rlimit-spent". Z3's "rlimit count" is
+    # cumulative per context, so spent = after - before.
+    before = solver.statistics().get_key_value("rlimit count")
+    started = time.monotonic()
+    result = solver.check()
+    spent = solver.statistics().get_key_value("rlimit count") - before
+    with open(stats, "a") as log:
+        log.write(f"{tag} {result} {time.monotonic() - started:.4f} {spent}\n")
+    return result
 
 
 class X86Constraints:
@@ -29,6 +62,9 @@ class X86Constraints:
         """初始化约束集合。"""
         self._constraints: List[BoolRef] = [BoolVal(True)]
         self.flag_constraints: Dict[str, BoolRef] = {}  # CPU 标志: CF, ZF, SF, OF
+        # Last satisfying model found on this path (shared with forks): a
+        # concrete witness, so a branch it satisfies needs no solver call.
+        self._witness = None
 
     def add(self, constraint: BoolRef) -> None:
         """添加约束。
@@ -61,6 +97,7 @@ class X86Constraints:
         # Z3 表达式是不可变的，所以共享列表元素是安全的
         new_constraints._constraints = self._constraints.copy()
         new_constraints.flag_constraints = self.flag_constraints.copy()
+        new_constraints._witness = self._witness
         return new_constraints
 
     def __deepcopy__(self, memo):
@@ -73,6 +110,7 @@ class X86Constraints:
         new_constraints = X86Constraints()
         new_constraints._constraints = copy.deepcopy(self._constraints, memo)
         new_constraints.flag_constraints = copy.deepcopy(self.flag_constraints, memo)
+        new_constraints._witness = self._witness
         return new_constraints
 
     def __iter__(self):
@@ -92,6 +130,14 @@ class X86Constraints:
         Returns:
             如果约束可满足则返回 True
         """
+        # A model under which the whole path condition evaluates to true is a
+        # sat witness: the solver could only answer sat (or time out -> keep).
+        # Pruning below still requires an explicit UNSAT, so this only skips
+        # calls whose outcome is already "keep". At a fork the parent's model
+        # satisfies exactly one branch, halving the solver calls.
+        if self._witness is not None and is_true(
+                self._witness.eval(self.as_bool(), model_completion=True)):
+            return True
         # 全符号场景下，calldata/storage 是 Z3 Array，约束含 Array Select。默认的
         # 通用 Solver() 会尝试组合多种理论，bit-blast 慢；QF_AUFBV 直接走 array
         # + bit-vector + uninterpreted-function tactic，对我们用到的形式更快。
@@ -106,10 +152,23 @@ class X86Constraints:
             if solver_timeout is not None
             else DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS
         )
-        if timeout_ms is not None and timeout_ms > 0:
-            solver.set(timeout=timeout_ms)
 
-        result = solver.check()
+        # Symbolic memory-expansion gas (words*words) puts 64-bit multipliers
+        # in the path condition. Refute first with bvmul abstracted to a UF:
+        # every real model extends to the abstraction, so its UNSAT is exact
+        # UNSAT (2-4x faster on those paths); SAT/unknown there proves nothing
+        # and falls through to the exact query below.
+        from verification.block_equivalence import abstract_nonlinear_mul  # lazy: layer cycle
+        relaxed, changed = abstract_nonlinear_mul(self.as_bool())
+        if changed:
+            probe = SolverFor("QF_AUFBV")
+            probe.add(relaxed)
+            if _bounded_check(probe, timeout_ms, "probe") == unsat:
+                self._witness = None
+                return False
+
+        result = _bounded_check(solver, timeout_ms, "exact")
+        self._witness = solver.model() if result == sat else None
         # 仅当明确 UNSAT 时才剪枝；UNKNOWN 视为可能可达，避免不声音剪枝。
         return result != unsat
 
@@ -217,7 +276,7 @@ class X86GlobalState:
         # WorldState 也使用浅拷贝
         new_state = X86GlobalState(
             mstate=self.mstate,  # SMTState 不可变，共享
-            world_state=copy(self.world_state),
+            world_state=copy.copy(self.world_state),
             node=self.node
         )
         new_state.depth = self.depth

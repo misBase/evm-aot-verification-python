@@ -18,6 +18,7 @@ from z3 import (
     ULE,
     ULT,
     is_and,
+    is_select,
     simplify,
     unknown,
     unsat,
@@ -577,6 +578,19 @@ def _replace_evm_mem_from_offset_array(state: SMTState, r15, new_offset_memory):
     )
 
 
+def _reads_array(term) -> bool:
+    seen, work = set(), [term]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen:
+            continue
+        seen.add(t.get_id())
+        if is_select(t):
+            return True
+        work.extend(t.children())
+    return False
+
+
 def _implication_result(
     path_condition,
     assumptions,
@@ -592,6 +606,17 @@ def _implication_result(
         list(path_condition.children()) if is_and(path_condition) else [path_condition]
     )
     assumption_terms = [simplify(term) for term in assumptions]
+    # Forwarding a premise that itself reads a long Store chain (copy operands
+    # loaded from the EVM stack) measured ~10 s per Safe copy hit, while the
+    # plain query was decided in 0.2 s. Try that first, bounded: UNSAT proves
+    # the implication; any other answer falls through to the exact path below.
+    if _reads_array(premise):
+        solver = SolverFor("QF_AUFBV")
+        solver.set("timeout", min(timeout_ms, 2000))
+        solver.add(simplify(And(*assumptions, path_condition, Not(premise)),
+                            expand_select_store=True))
+        if solver.check() == unsat:
+            return unsat
     # Copy operands are commonly loaded through a long call-engine Store chain.
     # Resolve only syntactically provable Select-over-Store hits before asking
     # Z3; ``forward_selects`` never assumes non-aliasing when it cannot prove

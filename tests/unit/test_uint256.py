@@ -561,3 +561,28 @@ class TestUint256Conversions:
         assert hasattr(val, 'z1')
         assert hasattr(val, 'z2')
         assert hasattr(val, 'z3')
+
+
+class TestMulCodegenOrder:
+    """EVM MUL 按 compileEVMMul 的项形状建模（2026-09-27 审核）：值必须仍是 a*b mod 2^256。"""
+
+    def test_concrete_matches_product(self):
+        import random
+        rng = random.Random(11)
+        edges = [0, 1, UINT64_MASK, UINT256_MASK, 1 << 64, 1 << 192]
+        values = edges + [rng.getrandbits(256) for _ in range(20)]
+        for p in values:
+            for q in values[:8]:
+                assert_uint256_equals_int(Uint256.mul_codegen_order(Uint256.from_int(p), Uint256.from_int(q)), p * q)
+
+    def test_symbolic_equals_holiman_product(self):
+        from z3 import Or, SolverFor
+        from verification.linear_encoding import lia_query
+        a, b = Uint256.symbolic("a"), Uint256.symbolic("b")
+        new = Uint256.mul_codegen_order(b, a)
+        old = a.mul_semantics(b)
+        differ = Or(*[getattr(new, f"z{i}") != getattr(old, f"z{i}") for i in range(4)])
+        solver = SolverFor("QF_LIA")
+        solver.set("timeout", 60_000)
+        solver.add(lia_query(simplify(differ, bv_sort_ac=True)))
+        assert solver.check() == unsat

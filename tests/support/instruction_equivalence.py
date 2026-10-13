@@ -67,6 +67,9 @@ _PATH_ITE_MIN_BV_BITS = 64
 # 大位宽 ITE 分支，只留该路径对应分支与 x86 对齐（soundness 中性，证不动就保留原 AST）。
 _PATH_AWARE_ITE_EVM_KINDS = {"SDIV", "SMOD", "ADDMOD"}
 _CALLENGINE_LIMB_ATTRS = {
+    0x50: "callengine_block_number",
+    0x58: "callengine_block_timestamp",
+    0x60: "callengine_gaslimit",
     0x18: "callengine_memory_size_bytes",
     0x68: "callengine_callvalue",
     0x70: "callengine_gas_remaining",

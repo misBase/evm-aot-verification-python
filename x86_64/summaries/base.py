@@ -493,6 +493,13 @@ class X86SummaryRuntime:
     def get(self, block_addr: int, instruction_index: int) -> X86Summary | None:
         return self.manager.get(block_addr, instruction_index)
 
+    def exit_guard(self, summary: X86Summary, state: SMTState):
+        """Condition under which the raw slice leaves through an exit the
+        summary does not model, or None. The executor splits on it: raw
+        execution under the guard, the summary under its negation."""
+        guard = getattr(self.manager.specs[summary.kind], "exit_guard", None)
+        return None if guard is None else guard(summary, state)
+
     def apply(self, summary: X86Summary, state: SMTState,
               path_condition=None) -> SMTState:
         """应用 summary。前提未被证明时抛 :class:`SummaryPreconditionError`。

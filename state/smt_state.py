@@ -74,6 +74,9 @@ class SMTState:
         "callengine_stack_pointer_limbs",
         "callengine_stack_byte_offset",
         "callengine_stack_base",
+        "callengine_block_number",
+        "callengine_block_timestamp",
+        "callengine_gaslimit",
         "callengine_callvalue",
         "callengine_gas_remaining",
         "callengine_self_address_pointer",
@@ -198,6 +201,9 @@ class SMTState:
         # 以显式把这个字段置 False。
         self.assume_calldata_offset_no_overflow: bool = True
         self.abstract_calldataload_words: bool = False
+        # Block proofs must not turn compiler-proposed jump candidates into
+        # source semantics. Legacy paths keep their historical IR interpretation.
+        self.complete_jump_domain: bool = False
 
         # host/builtin gas UF 开关。**唯一写入方是 program_verifier**（gas_check != OFF
         # 时置位）——曾经 create_initial_state 也跟着 symbolic_gas 置位，第二个事实源会让
@@ -241,6 +247,9 @@ class SMTState:
         self.block_number = BitVec('BlockNumber', 64)
         self.gaslimit = BitVec('GasLimit', 64)
         self.blobbasefee = BitVec('BlobBaseFee', 64)
+        self.callengine_block_number = self.block_number
+        self.callengine_block_timestamp = self.block_timestamp
+        self.callengine_gaslimit = self.gaslimit
 
     def add_assumption(self, assumption) -> None:
         """追加一个全局假设到 self.assumptions（若需要会自动初始化为空 list）。
@@ -348,6 +357,7 @@ class SMTState:
         other.host_gas_uf_enabled = getattr(
             self, 'host_gas_uf_enabled', False,
         )
+        other.complete_jump_domain = getattr(self, 'complete_jump_domain', False)
 
     def copy_callengine_side_channels_to(self, other: 'SMTState') -> None:
         """复制 callEngine side-channel 字段到另一个 SMTState。"""
@@ -533,6 +543,13 @@ class SMTState:
         initial_state.callengine_stack_byte_offset = BitVecVal(0, 64)
         initial_state.callengine_stack_base = r14
         initial_state.callengine_callvalue = callvalue64
+        # Couple the x86 fast path and backing bytes to the EVM environment.
+        from x86_64.aot_profile import GO_HPC_EVM_PROFILE
+        for field in ("block_number", "block_timestamp", "gaslimit"):
+            initial_state.x86_memory = initial_state.x86_memory.store_limb(
+                r13 + GO_HPC_EVM_PROFILE.offsets[field], getattr(initial_state, field),
+                domain=MemoryDomain.CALLENGINE,
+            )
         # gas。关键不变量：**evm_gas 与 callengine_gas_remaining([R13+0x70]) 必须是同一个
         # 对象** —— 两侧路径剪枝自动对称、gas 假设无需跨侧传递，全靠这一点。
         # - symbolic_gas=False（默认，GasCheck.OFF / FIXED_BUDGET）：具体预算。

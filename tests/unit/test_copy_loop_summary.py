@@ -543,6 +543,23 @@ def test_summary_premise_structural_fact_fast_path_rejects_nonmatches(
     assert solver_calls
 
 
+def test_array_reading_premise_is_tried_by_the_plain_solver_first(monkeypatch):
+    # Operands loaded from a Store chain: forwarding the premise is the slow
+    # part, so a bounded plain query runs first. Only UNSAT short-circuits.
+    memory = Array("copy_plain_first_memory", BitVecSort(64), BitVecSort(8))
+    for offset in range(64):
+        memory = Store(memory, BitVecVal(offset, 64), BitVec(f"copy_plain_first_{offset}", 8))
+    size = Select(memory, BitVec("copy_plain_first_address", 64))
+    real_forward_selects = copy_loop_module.forward_selects
+    forwarded = []
+    monkeypatch.setattr(copy_loop_module, "forward_selects",
+                        lambda expr, _cache=None: forwarded.append(1) or real_forward_selects(expr, _cache=_cache))
+    implied = copy_loop_module._implication_result(ULT(size, 100), [], ULT(size, 200), timeout_ms=1000)
+    assert implied == unsat and not forwarded
+    refuted = copy_loop_module._implication_result(ULT(size, 200), [], ULT(size, 100), timeout_ms=1000)
+    assert refuted == sat and forwarded
+
+
 def test_structural_fact_fallback_reuses_one_forward_cache(monkeypatch):
     left = BitVec("copy_shared_cache_left", 64) == BitVecVal(1, 64)
     right = BitVec("copy_shared_cache_right", 64) == BitVecVal(2, 64)

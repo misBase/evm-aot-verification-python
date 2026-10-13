@@ -465,6 +465,17 @@ def run_x86_segment(
     aot_profile=None,
     use_reachability_check: bool = False,
     summary_config=None,
+    summary_runtime=None,
+    deadline=None,
+    call_site_mapping=None,
+    # Idle-machine reachability checks on CErc20: p99 35ms, max 47ms (2026-09-26);
+    # 50ms left no margin, so load turned checks into unknown -> less pruning ->
+    # depth-pruned segments. Unknown still means reachable (sound either way).
+    # Symbolic-fmp/msize blocks (memory-expansion gas words*words) need up to
+    # ~1s even with the mul-abstracted refutation (2026-09-27, Safe 6898:
+    # 250ms kept 81 paths/107s, 1000ms 61 paths/68s; 3000ms no further gain).
+    # Witness reuse means only non-model branches pay this budget.
+    reachability_timeout_ms: int = 1000,
 ) -> Tuple[List[SegmentPath], List[str], List[str]]:
     """从 cutpoint 执行一轮 x86 段。
 
@@ -474,7 +485,8 @@ def run_x86_segment(
         它们的性质供报告标注。旧版在此处按 no-OOG/no-stack-limit envelope
         把这些路径整个丢弃，envelope 取消后该行为已移除。
     """
-    summary_runtime = None
+    if summary_runtime is not None and summary_config is not None:
+        raise ValueError("supply summary_runtime or summary_config, not both")
     if summary_config is not None:
         # 段执行覆盖真实入口前缀/出口延续时，selector/calldata 的逐字节
         # 读代码需要 CALLDATALOAD summary 折叠（与整程序验证同一配置），
@@ -492,6 +504,9 @@ def run_x86_segment(
         stop_addrs=stop_addrs,
         aot_profile=aot_profile,
         summary_runtime=summary_runtime,
+        deadline=deadline,
+        call_site_mapping=call_site_mapping,
+        reachability_timeout_ms=reachability_timeout_ms,
     )
     final_states = executor.execute(cut_state, entry_addr=entry_addr)
 

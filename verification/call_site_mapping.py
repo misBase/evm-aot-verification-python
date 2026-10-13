@@ -90,8 +90,15 @@ class CallSiteMapping:
 
 def build_call_site_mapping(evm_program: EVMProgram, x86_program: X86Program) -> CallSiteMapping:
     """Build a structural mapping from x86 host bridge sites to EVM op.pc values."""
-    evm_sites = _enumerate_evm_host_sites(evm_program)
-    x86_sites = _enumerate_x86_host_bridge_sites(x86_program)
+    return build_call_site_mapping_from_blocks(
+        evm_program.blocks, identify_basic_blocks(x86_program._get_instructions()),
+        aot_profile=x86_program.aot_profile)
+
+
+def build_call_site_mapping_from_blocks(evm_blocks, x86_blocks, *, aot_profile=None) -> CallSiteMapping:
+    """Use the executor's actual block boundaries, including cutpoint splits."""
+    evm_sites = _enumerate_evm_host_sites(evm_blocks)
+    x86_sites = _enumerate_x86_host_bridge_sites(x86_blocks, aot_profile)
 
     if len(evm_sites) != len(x86_sites):
         raise ValueError(
@@ -118,22 +125,17 @@ def build_call_site_mapping(evm_program: EVMProgram, x86_program: X86Program) ->
 
 
 def _enumerate_evm_host_sites(
-    evm_program: EVMProgram,
+    blocks,
 ) -> List[Tuple[int, str, int | None]]:
     sites: List[Tuple[int, str, int | None]] = []
-    for block in evm_program.blocks:
+    for block in blocks:
         for op in block.operations:
             if op.kind in EVM_HOST_OP_KINDS:
                 sites.append((op.pc, op.kind, op.immediate))
     return sites
 
 
-def _enumerate_x86_host_bridge_sites(x86_program: X86Program) -> List[Tuple[int, str]]:
-    instructions = x86_program._get_instructions()
-    if not instructions:
-        return []
-
-    blocks = identify_basic_blocks(instructions)
+def _enumerate_x86_host_bridge_sites(blocks, aot_profile=None) -> List[Tuple[int, str]]:
     if not blocks:
         return []
 
@@ -141,7 +143,7 @@ def _enumerate_x86_host_bridge_sites(x86_program: X86Program) -> List[Tuple[int,
         blocks=blocks,
         enable_go_bridge=True,
         enable_merge=False,
-        aot_profile=x86_program.aot_profile,
+        aot_profile=aot_profile,
     )
     host_status = executor.aot_profile.status_codes["call_go_host_function"]
 

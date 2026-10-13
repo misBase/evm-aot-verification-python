@@ -98,6 +98,11 @@ _QUAD_COEFF_DIV = 512  # params.QuadCoeffDiv
 def memory_expansion_fee(mem_size_bytes, last_gas_cost, requested_size_64):
     """纯计算 memoryGasCost 的 expansion 分支，返回 (fee, new_mem_size, new_last_gas)。
 
+    Go interpreter.go 在 dynamicGas 之前先取整（本函数的 requested 是取整前的值）：
+        memorySize = SafeMul(toWordSize(memSize), 32)
+    随后 memoryGasCost(newMemSize = memorySize)。两步都照写，使字数项与 x86
+    codegen 同形；cap 内与一步写法 (r+31)>>5 逐值相等（2026-09-26 经用户审核）。
+
     Go memoryGasCost(newMemSize):
         memWords   = (newMemSize + 31) >> 5
         rounded    = memWords << 5
@@ -111,11 +116,23 @@ def memory_expansion_fee(mem_size_bytes, last_gas_cost, requested_size_64):
         else:
             fee = 0                        # lastGasCost 不变
 
-    与 x86 codegen 对齐的两个关键点：
+    与 x86 codegen 对齐的三个关键点：
+    - square 是 **uint64 乘法**（`w*w` 回绕），不是 128-bit 精确积。Go 源就是
+      `square := newMemSizeWords * newMemSizeWords`（gas_table.go:46，uint64）；
+      amd64 codegen（gas_dynamic_amd64.go:552-554）`MULQ` 之后只
+      `MOVQ RAX, tmpReg4` —— **RDX（高 64 位）被丢弃**。
     - quad 用 **128-bit** UDiv（`UDiv(ZeroExt(64,square), 512_128)` 取低 64 位），
       使 div_bridge 能以 (udiv, 128) 配对 x86 的 `div r64`（dividend=Concat(RDX,RAX)
-      是 128-bit），否则 64-bit UDiv 配不上 → Z3 bit-blast。
+      是 128-bit），否则 64-bit UDiv 配不上 → Z3 bit-blast。x86 在 DIVQ 前显式
+      `MOVQ 0, RDX`（:566），所以 dividend 正是 `ZeroExt(64, square)`——与这里逐字同形。
     - 扣减/字段更新只在 expands 时发生，避免连续内存操作过扣。
+
+    曾经 square 写成 `ZeroExt(64,w)*ZeroExt(64,w)`（128-bit 精确积）。它在协议 cap
+    内（w ≤ 0xFFFFFFFF）与本式等价，但 AST 不同形：x86 侧 dividend 高 64 位是字面
+    0、EVM 侧是一个 64×64 乘法器的高位，Z3 只能 bit-blast 去证二者相等，CErc20
+    pc=792 / Safe pc=771 的 RETURN 义务因此 unknown。cap 外两式更是真不等
+    （Go 回绕、128-bit 式不回绕），所以本式是**更忠实**的一方，不是为迁就编译器。
+    见 tests/unit/test_memory_gas_square.py。
 
     **不改 state、不注入 assumption**：写回哪几项由调用方决定——gas 错误分支的快照
     要求各不相同（cap/溢出分支一项都不写、dynamic-OOG 分支只写 lastGasCost），
@@ -129,17 +146,36 @@ def memory_expansion_fee(mem_size_bytes, last_gas_cost, requested_size_64):
     Returns:
         (fee, new_mem_size, new_last_gas)，均为 64-bit BitVec。
     """
+    from z3 import BitVecVal, LShR
+
+    # interpreter.go rounds BEFORE dynamicGas:
+    #   memorySize = SafeMul(toWordSize(memSize), 32)
+    # and memoryGasCost(newMemSize=memorySize) takes toWordSize again. The x86
+    # codegen mirrors both steps, so the word count here has the same shape
+    # (32*w + 31) >> 5. On every path reaching this fee the cap branch has
+    # already bounded requested <= 0x1FFFFFFFE0, where 32*toWordSize(r) cannot
+    # wrap and the two-step value equals (r + 31) >> 5 exactly (see
+    # tests/unit/test_memory_gas_square.py::test_two_step_rounding_*).
+    memory_size = LShR(requested_size_64 + BitVecVal(31, 64), BitVecVal(5, 64)) << BitVecVal(5, 64)
+    return memory_fee_for_size(mem_size_bytes, last_gas_cost, memory_size)
+
+
+def memory_fee_for_size(mem_size_bytes, last_gas_cost, memory_size):
+    """Go memoryGasCost(mem, newMemSize=memory_size) 本体（调用方已取整）。
+
+    x86 侧 memgas summary（x86_64/summaries/memgas.py）直接以模板入参 s 调用本函数，
+    EVM 侧经 memory_expansion_fee 调用——两侧逐字同形。返回 (fee, new_mem_size, new_last_gas)。
+    """
     from z3 import BitVecVal, ZeroExt, Extract, UDiv, UGT, If, LShR
 
     thirty_one = BitVecVal(31, 64)
-    # memWords = (requested + 31) >> 5
-    mem_words = LShR(requested_size_64 + thirty_one, BitVecVal(5, 64))
+    mem_words = LShR(memory_size + thirty_one, BitVecVal(5, 64))
     # rounded = memWords << 5
     rounded = mem_words << BitVecVal(5, 64)
 
-    # square = memWords * memWords（cap 内 < 2^64，但用 128-bit 表达保证与 x86
-    # 的 128-bit dividend 对齐）
-    square_128 = ZeroExt(64, mem_words) * ZeroExt(64, mem_words)
+    # square = memWords * memWords（Go 的 uint64 乘法；x86 MULQ 后丢弃 RDX），
+    # 再 ZeroExt 成 128-bit 以匹配 x86 `MOVQ 0,RDX; DIVQ` 的 dividend
+    square_128 = ZeroExt(64, mem_words * mem_words)
     # quad = (square / 512)，128-bit UDiv 取低 64 位（镜像 x86 div r64）
     quad_128 = UDiv(square_128, BitVecVal(_QUAD_COEFF_DIV, 128))
     quad_64 = Extract(63, 0, quad_128)

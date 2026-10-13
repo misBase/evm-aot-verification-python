@@ -183,7 +183,7 @@ def apply_mul_summary(
     new_state = state.copy()
     p = Uint256(*[_limb_location_expr(loc, state) for loc in summary.p_limb_locs])
     q = Uint256(*[_limb_location_expr(loc, state) for loc in summary.q_limb_locs])
-    result = p.mul_semantics(q)
+    result = Uint256.mul_codegen_order(p, q)  # 与 EVM MUL 同形（值 == p.mul_semantics(q)，见 test_uint256）
 
     r14 = state.x86_registers.get_register(Register.R14)
     for offset, limb in zip(

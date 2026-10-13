@@ -103,3 +103,22 @@ for f in "$OUT"/*.hex; do printf '%s %s\n' "$(head -c 8 "$f")" "$f"; done
 - `docs/Gas一致性验证设计.md` §9 — gas fixture 清单与每条覆盖点
 - `tests/integration/test_gas_consistency_*.py` — 消费 `gas_*` 的测试
 - `ext_contracts/README.md` — 真实合约 fixture 的来源与编译
+
+
+## 块级无界循环验收
+
+`lockstep_{counter,fmp,calldata,return,storage}_loop.{json,hex}` 是 go-hpc-evm 同次生成的成对产物；输入 runtime 字节码、编译器版本、生成器及产物哈希见 `lockstep_loops_manifest.json`。分别覆盖无源级退出条件的计数循环、动态自由内存指针循环、符号 calldata 决定次数后正常返回的循环，辅助块经动态 JUMP 返回的循环，以及持续执行 SLOAD/SSTORE 的数据相关循环。
+
+再生：`poetry run python -m tools.generate_block_loop_fixtures --compiler-root /path/to/go-hpc-evm`。生成器使用 Go overlay，不改编译器工作区；强制 `GOARCH=amd64`，先比对既有 `gas_create` 基线再写入循环样本。Go 可能需要联网及可写缓存，在 Codex 沙箱中按实际需要申请脱沙箱执行。
+
+验收：`poetry run pytest tests/integration/test_block_symbolic_loops.py -q`。没有 EVM 迭代次数上限；局部机器码段的有限推进和完整整程序 H0/H2 证书仍为必需。
+
+### Block environment and host-memory regressions (2026-09-20)
+
+`block_environment.{json,hex}` returns NUMBER/TIMESTAMP/GASLIMIT.
+`block_host_memory.{json,hex}` writes nonempty memory, executes STATICCALL and
+returns the success word. Both are real go-hpc-evm amd64 outputs. Generator,
+runtime bytecodes, compiler revision/source hashes and reproducible overlay
+driver are in `docs/reports/block-lockstep-directed-2026-09-18/`. Their FULL-mode
+certificate tests include one-sided field, call-site and memory-coordinate
+mutations. They are small-program evidence, not CErc20/Safe certificates.

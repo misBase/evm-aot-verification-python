@@ -180,10 +180,14 @@ class EVMOperationSemantics:
         return result_uint.to_bv256()
 
     def mul_semantics(self, a: BitVec, b: BitVec) -> BitVec:
-        """构建EVM MUL操作的逻辑公式。"""
+        """构建EVM MUL操作的逻辑公式（a = 栈顶, b = 次顶）。
+
+        值等于 (a*b) mod 2^256；项的形状按 compileEVMMul（p = 次顶 b, q = 栈顶 a,
+        x86 累加顺序）构造，见 Uint256.mul_codegen_order（2026-09-27 用户审核）。
+        """
         a_uint = self._to_uint256(a)
         b_uint = self._to_uint256(b)
-        result_uint = a_uint.mul_semantics(b_uint)
+        result_uint = Uint256.mul_codegen_order(b_uint, a_uint)
         return result_uint.to_bv256()
 
     def div_semantics(self, a: BitVec, b: BitVec) -> BitVec:
@@ -532,6 +536,10 @@ def _jump_target_candidates(op: EvmOperator, state: "SMTState") -> "Optional[Lis
     （impl_amd64.go:3443/3482）——空 ImmediateSet 在 Go 里走 else 分支，不是
     "零候选全部非法"。真动态跳转由 cfg_executor 以 UnsupportedJumpError 拒绝。
     """
+    if getattr(state, "complete_jump_domain", False):
+        if state.valid_jump_targets is None:
+            raise ValueError("complete jump domain requires the full program target set")
+        return sorted(state.valid_jump_targets)
     if op.immediate_set:
         return list(op.immediate_set)
 

@@ -112,7 +112,10 @@ def _memory_gas_cost_formula(mem_size_bytes):
     from z3 import Extract as _Extract, UDiv, ZeroExt, LShR
 
     mem_words = LShR(mem_size_bytes, BitVecVal(5, 64))
-    square_128 = ZeroExt(64, mem_words) * ZeroExt(64, mem_words)
+    # square 是 uint64 乘法，同 `memory_expansion_fee`（Go gas_table.go:46 用 uint64；
+    # amd64 MULQ 后只取 RAX、DIVQ 前 RDX 清零）。写成 128-bit 精确积会与 x86 侧
+    # dividend 不同形，逼 Z3 bit-blast 一个 64×64 乘法器。
+    square_128 = ZeroExt(64, mem_words * mem_words)
     quad_64 = _Extract(63, 0, UDiv(square_128, BitVecVal(_QUAD_COEFF_DIV, 128)))
     return mem_words * BitVecVal(_MEMORY_GAS, 64) + quad_64
 
@@ -448,6 +451,9 @@ class CutpointRelationSchema:
     # 都当场抛错。少一个就是 §4.5.5 的那类内部缺口——分量名在、义务里却没有它，
     # 对称性断言看不见（它只比名称集合）。
     _CALLENGINE_MIRROR_FIELDS: Tuple[Tuple[str, str], ...] = (
+        ("callengine_block_number", "block_number"),
+        ("callengine_block_timestamp", "block_timestamp"),
+        ("callengine_gaslimit", "gaslimit"),
         ("callengine_stack_byte_offset", "stack_byte_offset"),
         ("callengine_memory_size_bytes", "memory_size"),
         ("callengine_memory_gas_used", "last_gas_cost"),
@@ -468,6 +474,9 @@ class CutpointRelationSchema:
     # 循环体内不会被改写、但 suffix 可能读到的 callEngine 只读字段。
     # return_data 的 pointer/size 不在此列（见上）。
     _CALLENGINE_ENVIRONMENT_FIELDS: Tuple[str, ...] = (
+        "callengine_block_number",
+        "callengine_block_timestamp",
+        "callengine_gaslimit",
         "callengine_self_address_pointer",
         "callengine_origin_address_pointer",
         "callengine_caller_address_pointer",
@@ -792,6 +801,8 @@ class CutpointRelationSchema:
 
         # --- environment / callengine_environment -------------------------
         # 同上：只读环境在两侧是同一批 Z3 常量。
+        for field in ("block_number", "block_timestamp", "gaslimit"):
+            _sync_callengine("callengine_" + field, field, getattr(state, field))
         bound.append("environment")
         bound.append("callengine_environment")
 
@@ -1122,6 +1133,9 @@ class CutpointRelationSchema:
                     # 编码。只做两侧同名字段相等，会允许两个 side channel 一起
                     # 漂移。
                     x86_state.callengine_input_size_bytes == evm_state.calldatasize,
+                    x86_state.callengine_block_number == evm_state.block_number,
+                    x86_state.callengine_block_timestamp == evm_state.block_timestamp,
+                    x86_state.callengine_gaslimit == evm_state.gaslimit,
                     x86_state.callengine_callvalue
                     == Extract(63, 0, evm_state.callvalue),
                     Extract(255, 64, evm_state.callvalue) == BitVecVal(0, 192),

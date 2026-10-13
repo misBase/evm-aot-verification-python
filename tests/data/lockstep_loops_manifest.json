@@ -1,0 +1,48 @@
+{
+  "compiler_revision": "b3ddbdb553d776f74f8bb037a963d611037da16d",
+  "compiler_tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "compiler_go_mod_sha256": "1dff440d4d2a681d688c84878dd48204cdaefe380bffdf9b5ea8ae8edbff8a07",
+  "compiler_go_sum_sha256": "84d715ddfc4cd817f8499fd53a23b92aebefe825783ab389fc1753befdbb677c",
+  "generator_sha256": "39eb12e4bd8ee333e9bd960755c12ba681f8a9a17f40ad6fd525ada2d68cb3ad",
+  "generator_driver_sha256": "4a345de5efdf438e2830a4c9619bdcb3cf57bfd16f295bb39739c643dd7f9fb6",
+  "go_version": "go version go1.26.1 darwin/arm64",
+  "GOARCH": "amd64",
+  "baseline_check": "gas_create hex identical; IR JSON structurally identical",
+  "fixtures": {
+    "lockstep_storage_loop": {
+      "evm_runtime_hex": "6000355b8015601957600054600101600055600190036003565b5060005460005260206000f3",
+      "sha256": {
+        ".json": "fa8f41881b1e38dc7d5a94e0587736f588912ca5f82a7ca3ec5f09bd761f0435",
+        ".hex": "991cfffc75b11915e709328f204061f7395d9d7e838ccb7205db9a05847df292"
+      }
+    },
+    "lockstep_return_loop": {
+      "evm_runtime_hex": "5b60006006565b56",
+      "sha256": {
+        ".json": "63d035fc4c78a10e7cade12a4aeea16503e5d9f331a52ec0ab985b9fb708fce4",
+        ".hex": "6bdfc2cf61221ef5e1c2ccdc807ee8290684900ce8b3c5074fd0900ded42e5a4"
+      }
+    },
+    "lockstep_counter_loop": {
+      "evm_runtime_hex": "60005b600101600256",
+      "sha256": {
+        ".json": "aa6cf176eca8393ed2c163758dc2d63fb5b9415a589a1977101a634cdd255a98",
+        ".hex": "47b1fb8b9379fd1043cf88de26a2c297736a247cc732cb3b3b610c90f5ac2925"
+      }
+    },
+    "lockstep_fmp_loop": {
+      "evm_runtime_hex": "60806040525b604051602001604052600556",
+      "sha256": {
+        ".json": "c721dc6a8bdaa3bd2a06eb185da0621332f14091a5503b31ddaf14ad5eb3da69",
+        ".hex": "50030d8bbc834f8588f05a93a8472e16ad02b2bc46841d11ac1e47d61d9ad023"
+      }
+    },
+    "lockstep_calldata_loop": {
+      "evm_runtime_hex": "6000355b8015601057600190036003565b60005260206000f3",
+      "sha256": {
+        ".json": "c4e3b8fd74139f131adaae7af0c94eec907ca8d8ce0a46067a8921604bd754a1",
+        ".hex": "6eabb55b197ba26411d05f8bc1359aae364e07fcc41143b38b9ed7f85568e2dd"
+      }
+    }
+  }
+}

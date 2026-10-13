@@ -169,6 +169,8 @@ ARITHMETIC_0X00_CASES = [
         x86_execution_mode="cfg",
         x86_summary_config=X86SummaryConfig.enabled(mul="strict"),
         solver_timeout_ms=5_000,
+        # 与 SUB 相同的出栈方向；两侧都按 compileEVMMul 形状展开，语法同形。
+        evm_operand_indices=(1, 0),
     ),
     # IR: DIV, STOP
     # common/arithmetic.div_semantics 已镜像 holiman uint256 的分段实现（快路径

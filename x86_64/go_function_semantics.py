@@ -12,6 +12,7 @@ import logging
 from typing import Optional, Tuple
 
 from z3 import And, BitVec, BitVecVal, If, Lambda, Select, UGE, ULT, simplify
+from common.store_forwarding import memory_as_offset_view
 
 from .aot_profile import X86AOTProfile
 from state.smt_state import SMTState, MemoryDomain
@@ -385,20 +386,29 @@ class GoFunctionSemantics:
     def _write_symbolic_memory_slice(self, mstate: SMTState, dest_offset: BitVec, size: BitVec,
                                      byte_fn, effect_tag: str,
                                      should_copy=None) -> SMTState:
-        """将一个符号化字节切片写入 x86 内存（EVM 256-bit memory，R15 域）。"""
+        """将一个符号化字节切片写入 x86 内存（EVM 256-bit memory，R15 域）。
+
+        区间判定在 **offset 空间**（o = idx - R15）做，与 EVM 侧
+        `evm_ir.semantics._write_symbolic_memory_slice` 逐字对齐：host 函数按 Go
+        `Memory.Set(offset, size, …)` 的切片下标写入，本来就是 offset 语义。
+        旧版在绝对地址空间比较 `UGE(idx, R15 + off)`，R15+off 回绕 2^64 时与 EVM
+        侧判定不同（Safe 2586 / CErc20 4236 的 H2 memory 分量真 SAT，
+        retOffset = 2^64-31）。R15+off+size 不回绕时（所有真实的成功写入）新旧
+        语义相同。2026-10-03 经用户确认。
+        """
         from x86_64.models import Register
 
         dest_offset_64 = truncate_to_64(dest_offset)
         size_64 = truncate_to_64(size)
         zero_64 = BitVecVal(0, 64)
         r15 = mstate.x86_registers.get_register(Register.R15)
-        base_addr = r15 + dest_offset_64
 
         idx = BitVec(effect_tag, 64)
-        relative = idx - base_addr
+        offset = idx - r15
+        relative = offset - dest_offset_64
         in_range = And(
             size_64 != zero_64,
-            UGE(idx, base_addr),
+            UGE(offset, dest_offset_64),
             ULT(relative, size_64),
         )
         write_cond = in_range if should_copy is None else And(should_copy, in_range)
@@ -602,7 +612,8 @@ class GoFunctionSemantics:
         value, sp, mstate = self._pop_uint256(sp, mstate)
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.evm_mem
+        old_memory = memory_as_offset_view(
+            mstate.x86_memory.evm_mem, mstate.x86_registers.get_register(Register.R15))
         result = uninterpreted.create_semantics(value, offset, size, old_memory, effect_id=effect_id)
         sp, mstate = self._push_uint256(sp, result, mstate)
         mstate = self._update_sp_in_memory(sp, mstate)
@@ -630,7 +641,8 @@ class GoFunctionSemantics:
         offset, sp, mstate = self._pop_uint256(sp, mstate)
         size, sp, mstate = self._pop_uint256(sp, mstate)
         salt, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.evm_mem
+        old_memory = memory_as_offset_view(
+            mstate.x86_memory.evm_mem, mstate.x86_registers.get_register(Register.R15))
         result = uninterpreted.create2_semantics(
             value, offset, size, salt, old_memory, effect_id=effect_id
         )
@@ -661,7 +673,8 @@ class GoFunctionSemantics:
         args_size, sp, mstate = self._pop_uint256(sp, mstate)
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.evm_mem
+        old_memory = memory_as_offset_view(
+            mstate.x86_memory.evm_mem, mstate.x86_registers.get_register(Register.R15))
         result = uninterpreted.call_semantics(
             gas, addr, value, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=effect_id)
@@ -712,7 +725,8 @@ class GoFunctionSemantics:
         args_size, sp, mstate = self._pop_uint256(sp, mstate)
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.evm_mem
+        old_memory = memory_as_offset_view(
+            mstate.x86_memory.evm_mem, mstate.x86_registers.get_register(Register.R15))
         result = uninterpreted.callcode_semantics(
             gas, addr, value, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=effect_id)
@@ -761,7 +775,8 @@ class GoFunctionSemantics:
         args_size, sp, mstate = self._pop_uint256(sp, mstate)
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.evm_mem
+        old_memory = memory_as_offset_view(
+            mstate.x86_memory.evm_mem, mstate.x86_registers.get_register(Register.R15))
         result = uninterpreted.delegate_call_semantics(
             gas, addr, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=effect_id)
@@ -810,7 +825,8 @@ class GoFunctionSemantics:
         args_size, sp, mstate = self._pop_uint256(sp, mstate)
         ret_offset, sp, mstate = self._pop_uint256(sp, mstate)
         ret_size, sp, mstate = self._pop_uint256(sp, mstate)
-        old_memory = mstate.x86_memory.evm_mem
+        old_memory = memory_as_offset_view(
+            mstate.x86_memory.evm_mem, mstate.x86_registers.get_register(Register.R15))
         result = uninterpreted.static_call_semantics(
             gas, addr, args_offset, args_size, ret_offset, ret_size,
             old_memory, effect_id=effect_id)

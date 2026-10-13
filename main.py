@@ -87,6 +87,12 @@ def parse_args():
         ),
     )
     
+    parser.add_argument('--proof-mode', choices=('paths', 'block-lockstep'), default='paths',
+                        help='Use a closed block theorem graph or the existing whole-program path verifier')
+    parser.add_argument('--num-inputs', type=int, default=None,
+                        help='Initial stack depth (block mode default: 0; legacy paths default: 2)')
+    parser.add_argument('--block-fallback', choices=('none', 'full-program'), default='none',
+                        help='Optional independent full-program rerun after an incomplete block graph')
     return parser.parse_args()
 
 
@@ -98,6 +104,9 @@ def verify_programs(
     verbose: bool,
     gas_check: 'GasCheck | str' = GasCheck.OFF,
     gas_budget: int = None,
+    proof_mode: str = "paths",
+    num_inputs: int = None,
+    block_fallback: str = "none",
 ):
     """验证EVM和x86程序之间的等价性。
     
@@ -143,13 +152,18 @@ def verify_programs(
         verbose=verbose,
         gas_check=mode,
     )
-    # TODO: should be delete later
+    if num_inputs is None:
+        num_inputs = 0 if proof_mode == "block-lockstep" else 2
     # 初始 gas 配置必须与模式匹配，否则 verify_program_pair 会 fail-closed 拒绝。
     if mode is GasCheck.FULL:
-        initial_state = SMTState.create_initial_state(2, symbolic_gas=True)
+        initial_state = SMTState.create_initial_state(num_inputs, symbolic_gas=True)
     else:
-        initial_state = SMTState.create_initial_state(2, gas_budget=gas_budget)
-    return checker.verify_program_pair(evm_program, x86_program, initial_state)
+        initial_state = SMTState.create_initial_state(num_inputs, gas_budget=gas_budget)
+    if block_fallback != "none" and proof_mode != "block-lockstep":
+        return False, "INCONCLUSIVE: --block-fallback requires --proof-mode block-lockstep"
+    return checker.verify_program_pair(evm_program, x86_program, initial_state,
+        **({"proof_mode": proof_mode, "block_options": {"fallback": block_fallback}}
+           if proof_mode != "paths" else {}))
 
 
 def main():
@@ -171,6 +185,9 @@ def main():
         args.verbose,
         args.gas_check.replace('-', '_'),
         args.gas_budget,
+        args.proof_mode,
+        args.num_inputs,
+        args.block_fallback,
     )
     
     # 输出结果

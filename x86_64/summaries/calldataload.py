@@ -54,6 +54,9 @@ class CallDataLoadSummary:
     clobber_registers: Tuple[Register, ...]
     internal_block_addrs: Tuple[int, ...]
     require_concrete_offset: bool = False
+    # True for the fixed codegen (``sub size, offset; cmp size, 32``), whose
+    # fast/partial split cannot wrap; False for legacy ``add offset, 32``.
+    wrap_free: bool = False
 
 
 class CallDataLoadSummaryMatchError(ValueError):
@@ -235,15 +238,17 @@ def _match_calldataload_at(
     high_locs, entry_instruction_index = _parse_high_limb_locations(entry)
     size_block = _next_block(blocks, entry_idx, "missing input-size block")
     size_reg, low_loc = _parse_size_check_block(size_block, zero_addr)
-    require_concrete_offset = _requires_concrete_low_offset(low_loc)
 
     # 3. prep 块加载 calldata pointer，计算 input+offset，并分出
     #    fast path（完整 32 字节）和 partial path（需要补零）。
     prep_block = _next_block(blocks, entry_idx + 1, "missing calldata prep block")
-    offset_reg, mem_begin_reg, partial_addr = _parse_prep_block(
+    offset_reg, mem_begin_reg, partial_addr, wrap_free = _parse_prep_block(
         prep_block,
         size_reg,
         low_loc,
+    )
+    require_concrete_offset = (
+        False if wrap_free else _requires_concrete_low_offset(low_loc)
     )
     if partial_addr not in blocks_by_addr:
         raise CallDataLoadSummaryMatchError("partial path target is not a local block")
@@ -306,6 +311,7 @@ def _match_calldataload_at(
         clobber_registers=clobbers,
         internal_block_addrs=internal_blocks,
         require_concrete_offset=require_concrete_offset,
+        wrap_free=wrap_free,
     )
 
 
@@ -570,7 +576,7 @@ def _parse_prep_block(
     block: X86Block,
     size_reg: Register,
     low_loc: LimbLocation,
-) -> Tuple[Register, Register, int]:
+) -> Tuple[Register, Register, int, bool]:
     insns = _meaningful(block.instructions)
     if len(insns) != 7:
         raise CallDataLoadSummaryMatchError("prep block is not canonical")
@@ -611,28 +617,36 @@ def _parse_prep_block(
     ):
         raise CallDataLoadSummaryMatchError("prep block does not add offset to calldata pointer")
 
-    add_size_ops = parse_operands(insns[4])
-    if (
-        insns[4].mnemonic.lower() != "add"
-        or add_size_ops.get("dest_reg") != offset_reg
-        or add_size_ops.get("immediate") != 0x20
-    ):
-        raise CallDataLoadSummaryMatchError("prep block does not add 32 to offset")
-
+    # Legacy: ``add offset, 32; cmp size, offset`` (wraps near 2^64).
+    # Fixed:  ``sub size, offset; cmp size, 32`` (size >= offset already checked).
+    size_ops = parse_operands(insns[4])
     cmp_ops = parse_operands(insns[5])
-    if (
-        insns[5].mnemonic.lower() != "cmp"
-        or cmp_ops.get("dest_reg") != size_reg
-        or cmp_ops.get("src_reg") != offset_reg
-    ):
-        raise CallDataLoadSummaryMatchError("prep block does not compare size and offset+32")
+    legacy = (
+        insns[4].mnemonic.lower() == "add"
+        and size_ops.get("dest_reg") == offset_reg
+        and size_ops.get("immediate") == 0x20
+        and insns[5].mnemonic.lower() == "cmp"
+        and cmp_ops.get("dest_reg") == size_reg
+        and cmp_ops.get("src_reg") == offset_reg
+    )
+    fixed = (
+        insns[4].mnemonic.lower() == "sub"
+        and size_ops.get("dest_reg") == size_reg
+        and size_ops.get("src_reg") == offset_reg
+        and insns[5].mnemonic.lower() == "cmp"
+        and cmp_ops.get("dest_reg") == size_reg
+        and cmp_ops.get("src_reg") is None
+        and cmp_ops.get("immediate") == 0x20
+    )
+    if not (legacy or fixed):
+        raise CallDataLoadSummaryMatchError("prep block does not compare remaining size with 32")
 
     if insns[-1].mnemonic.lower() != "jb":
         raise CallDataLoadSummaryMatchError("prep block does not branch to partial path")
     partial_addr = _jump_target(insns[-1])
     if partial_addr is None:
         raise CallDataLoadSummaryMatchError("partial path target is missing")
-    return offset_reg, mem_begin_reg, partial_addr
+    return offset_reg, mem_begin_reg, partial_addr, fixed
 
 
 def _parse_fast_path_block(block: X86Block, mem_begin_reg: Register) -> Tuple[int, int]:
@@ -784,6 +798,119 @@ def _collect_summary_clobber_registers(
     return _collect_clobber_registers(
         [entry_suffix, *blocks[entry_idx + 1:exit_idx]]
     )
+
+
+_RESERVED_REGISTERS = {Register.R13, Register.R14, Register.R15}
+
+_GO_CALLER_SAVED = {
+    Register.RAX, Register.RCX, Register.RDX, Register.RSI, Register.RDI,
+    Register.R8, Register.R9, Register.R10, Register.R11,
+}
+
+
+def _reg_names(reg: Register) -> Tuple[set, set]:
+    """(all alias names, alias names whose write defines the full register)."""
+    name = reg.value
+    if name.startswith("r") and name[1:].isdigit():
+        full = {name, name + "d"}
+        return full | {name + "w", name + "b"}, full
+    base = name[1:]  # ax, cx, si, ...
+    full = {name, "e" + base}
+    low8 = {"ax": "al", "cx": "cl", "dx": "dl", "bx": "bl"}.get(base, base + "l")
+    return full | {base, low8}, full
+
+
+# Mnemonic prefix -> 64-bit registers it reads/writes without naming them.
+_IMPLICIT_REGS = (
+    (("rep", "movs", "stos", "lods", "cmps", "scas"), {"rax", "rcx", "rsi", "rdi"}),
+    (("div", "idiv", "cqo", "cdq", "cwd", "cbw", "cwde"), {"rax", "rdx"}),
+    (("loop", "jrcxz", "jecxz"), {"rcx"}),
+    (("xlat", "xchg", "cmpxchg"), {"rax", "rbx"}),
+    (("cpuid", "rdtsc", "syscall"), {"rax", "rbx", "rcx", "rdx", "r11"}),
+    (("push", "pop", "leave", "enter"), {"rsp", "rbp"}),
+)
+
+
+def _implicitly_uses(mnemonic, op_str, reg):
+    if mnemonic in ("mul", "imul") and "," not in op_str:
+        return reg.value in ("rax", "rdx")
+    return any(mnemonic.startswith(prefixes) and reg.value in regs
+               for prefixes, regs in _IMPLICIT_REGS)
+
+
+def pointer_tag_dead_at(
+    blocks: Sequence[X86Block],
+    addr: int,
+    reg: Register,
+    *,
+    max_blocks: int = 512,
+    kill_at: Set[int] = frozenset(),
+) -> bool:
+    """Conservatively prove ``reg``'s pointer tag is never observed from ``addr``.
+
+    Every static path must fully redefine ``reg`` (``mov reg, src`` with ``src``
+    not mentioning it) or reach a Go-bridge ``ret`` (which clears caller-saved
+    tags) before any other instruction mentions it. Anything else is "live".
+
+    ``kill_at``: block-lockstep cutpoints. Their entry state havocs every
+    non-reserved register with tag NONE, so the tag is dead once reached.
+    """
+    import re
+
+    names, full = _reg_names(reg)
+    starts = {}
+    for i, b in enumerate(blocks):
+        for j, insn in enumerate(b.instructions):
+            starts[insn.addr] = (i, j)
+    work, seen = [addr], set()
+    while work:
+        at = work.pop()
+        if at in seen:
+            continue
+        seen.add(at)
+        if at in kill_at and reg not in _RESERVED_REGISTERS:
+            continue
+        if len(seen) > max_blocks or at not in starts:
+            return False
+        bi, j = starts[at]
+        block = blocks[bi]
+        killed = False
+        for insn in block.instructions[j:]:
+            mnemonic = insn.mnemonic.lower()
+            if mnemonic.startswith("nop"):
+                continue
+            # Implicit register operands never appear in op_str; treat as live.
+            if _implicitly_uses(mnemonic, insn.op_str, reg):
+                return False
+            dest, _, src = insn.op_str.partition(",")
+            if set(re.findall(r"[a-z0-9]+", insn.op_str)) & names:
+                if (mnemonic == "mov" and dest.strip() in full
+                        and not set(re.findall(r"[a-z0-9]+", src)) & names):
+                    killed = True
+                    break
+                return False
+            if mnemonic == "ret":
+                if reg not in _GO_CALLER_SAVED:
+                    return False
+                killed = True
+                break
+            if mnemonic == "call":
+                return False
+        if killed:
+            continue
+        last = block.instructions[-1]
+        mnemonic = last.mnemonic.lower()
+        if mnemonic.startswith("j"):
+            target = _jump_target(last)
+            if target is None:
+                return False
+            work.append(target)
+            if mnemonic == "jmp":
+                continue
+        if bi + 1 >= len(blocks):
+            return False
+        work.append(blocks[bi + 1].start_addr)
+    return True
 
 
 def _second_operand_location(insn: X86Instruction) -> Optional[LimbLocation]:

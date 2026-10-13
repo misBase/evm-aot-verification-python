@@ -11,6 +11,8 @@ from x86_64.models import X86Block
 from .base import X86SummaryPlugin, X86SummaryRuntime, X86SummarySpec
 from .calldataload import CALLDATALOAD_SUMMARY_KIND, CallDataLoadSummarySpec
 from .copy_loop import COPY_LOOP_SUMMARY_KIND, CopyLoopSummarySpec
+from .div import DIV_SUMMARY_KIND, DivSummarySpec
+from .memgas import MEMGAS_SUMMARY_KIND, MemGasSummarySpec
 from .mul import MUL_SUMMARY_KIND, MulSummarySpec
 
 
@@ -20,6 +22,8 @@ BUILTIN_SUMMARY_SPECS: Mapping[str, Callable[[], X86SummarySpec]] = {
     CALLDATALOAD_SUMMARY_KIND: CallDataLoadSummarySpec,
     COPY_LOOP_SUMMARY_KIND: CopyLoopSummarySpec,
     MUL_SUMMARY_KIND: MulSummarySpec,
+    DIV_SUMMARY_KIND: DivSummarySpec,
+    MEMGAS_SUMMARY_KIND: MemGasSummarySpec,
 }
 
 
@@ -32,11 +36,20 @@ class X86SummaryConfig:
 
     ``prove_mul_hits`` 控制 MUL summary 的 per-hit glue 证明（fail-closed，
     证明失败时 fallback 模式同样报错）；默认开启，单次实测 10-40ms。
+
+    ``prove_div_hits`` 同理控制 DIV summary 的逐切片引理（div_proof.py，在自由
+    输入上证 raw 切片含 builtin 桥 ≡ summary，按切片语义指纹缓存，首次应用时证）。
+    DIV 不在任何默认配置里：只有显式 ``div="fallback"/"strict"`` 才启用。
+
+    MEMGAS（memoryGasCost 模板，memgas.py）同样默认关（显式 ``memgas="fallback"/"strict"``）；
+    逐形状引理（memgas_proof.py）复用 ``prove_div_hits``/``div_proof_timeout_ms``。
     """
 
     builtin_modes: Mapping[str, str] = field(default_factory=dict)
     prove_mul_hits: bool = True
     mul_proof_timeout_ms: int = 10_000
+    prove_div_hits: bool = True
+    div_proof_timeout_ms: int = 30_000
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -55,6 +68,8 @@ class X86SummaryConfig:
         *,
         prove_mul_hits: bool = True,
         mul_proof_timeout_ms: int = 10_000,
+        prove_div_hits: bool = True,
+        div_proof_timeout_ms: int = 30_000,
         **builtin_modes: str,
     ) -> "X86SummaryConfig":
         # keyword-only 分离：除显式具名参数外，其余 kwargs 都是 summary kind。
@@ -62,6 +77,8 @@ class X86SummaryConfig:
             builtin_modes=builtin_modes,
             prove_mul_hits=prove_mul_hits,
             mul_proof_timeout_ms=mul_proof_timeout_ms,
+            prove_div_hits=prove_div_hits,
+            div_proof_timeout_ms=div_proof_timeout_ms,
         )
 
 
@@ -116,6 +133,16 @@ def build_x86_summary_runtime(
             spec = MulSummarySpec(
                 prove_hits=config.prove_mul_hits,
                 proof_timeout_ms=config.mul_proof_timeout_ms,
+            )
+        elif kind == DIV_SUMMARY_KIND:
+            spec = DivSummarySpec(
+                prove_hits=config.prove_div_hits,
+                proof_timeout_ms=config.div_proof_timeout_ms,
+            )
+        elif kind == MEMGAS_SUMMARY_KIND:
+            spec = MemGasSummarySpec(
+                prove_hits=config.prove_div_hits,
+                proof_timeout_ms=config.div_proof_timeout_ms,
             )
         else:
             spec = spec_factory()

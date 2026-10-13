@@ -241,6 +241,27 @@ class TestCallFamilyEffects:
         solver_outside.add(state.x86_memory.load_byte(BitVecVal(0x3F, 64), domain=MemoryDomain.EVM) != old_outside)
         assert solver_outside.check() == unsat
 
+    def test_return_data_range_is_decided_in_offset_space_like_evm(self):
+        """retOffset = 2^64-31, size 32: the slice is offsets [2^64-31, 2^64) plus a
+        wrapped 0..0 is NOT covered on the EVM side (UGE(0, 2^64-31) is false), so the
+        byte at offset 0 must stay untouched on x86 too. The old absolute-address
+        check UGE(R15 + 0, R15 + 2^64-31) wrapped and wrote it (Safe 2586 H2 SAT)."""
+        profile = _make_profile_with_host({5: "staticCall"})
+        sem = GoFunctionSemantics(profile)
+        state, sp = _make_state_with_stack([32, (1 << 64) - 31, 4, 0, 0x1234, 1000])
+        r15 = 1 << 46
+        state.x86_registers.set_register(Register.R15, BitVecVal(r15, 64))
+        before = state.x86_memory.load_byte(BitVecVal(r15, 64), domain=MemoryDomain.EVM)
+        state = sem.apply(4, 5, sp, state, evm_pc=0x20)
+        solver = Solver()
+        solver.add(state.x86_memory.load_byte(BitVecVal(r15, 64), domain=MemoryDomain.EVM) != before)
+        assert solver.check() == unsat
+        # Inside the slice (offset 2^64-31) the return data is written.
+        inside = BitVecVal((r15 + (1 << 64) - 31) % (1 << 64), 64)
+        old = Solver()
+        old.add(state.x86_memory.load_byte(inside, domain=MemoryDomain.EVM) != BitVecVal(0, 8))
+        assert old.check() == sat
+
     def test_staticcall_same_args_different_pc_are_independent(self):
         profile = _make_profile_with_host({5: "staticCall"})
         sem = GoFunctionSemantics(profile)
@@ -1059,47 +1080,40 @@ class TestLog:
             "return-data size 被钉成了 retSize，真实返回长度不在量化域内"
         )
 
-    def test_return_data_uf_needs_matching_memory_coordinate_systems(self):
-        """已知边界:return-data UF 的两侧实参用的是**不同坐标系的内存数组**。
+    @pytest.mark.parametrize("kind,host_name,values", [
+        ("CALL", "call", [2, 64, 4, 0, 7, 0x1234, 1000]),
+        ("CALLCODE", "callCode", [2, 64, 4, 0, 7, 0x1234, 1000]),
+        ("DELEGATECALL", "delegateCall", [2, 64, 4, 0, 0x1234, 1000]),
+        ("STATICCALL", "staticCall", [2, 64, 4, 0, 0x1234, 1000]),
+        ("CREATE", "create", [32, 64, 7]),
+        ("CREATE2", "create2", [123, 32, 64, 7]),
+    ])
+    def test_host_memory_coordinates_with_symbolic_base(self, kind, host_name, values):
+        from z3 import Array, BitVecSort, Lambda, Or, Select, Store
+        from evm_ir.models import EvmOperator
+        from evm_ir.semantics import evm_operator_to_z3
 
-        EVM 侧传 offset-space 的 `evm_memory.Memory`,x86 侧传 absolute-space
-        的 `x86_memory.evm_mem`。内存为空时两侧都是零数组 `K(BitVec(64),0)`,
-        平移后仍相同,所以 UF 照常相消——本文件其它跨侧用例正处在这一格。
-
-        但内存**已有写入**且 R15 ≠ 0 时,两个数组只满足平移关系、不是同一个
-        表达式,UF 便可以取到不同的值。
-
-        方向是**降级**不是假绿:含 CALL 族的循环会无谓 inconclusive,不会把
-        不等价判成等价。彻底修法是把两侧统一到 offset-space,那要改动所有既有
-        host UF 的实参(call_semantics / *_return_byte / *_should_copy…),影响面
-        远超本次改动,故先固化边界。
-        """
-        from z3 import BitVec, Solver, Store, sat
-
-        from common import uninterpreted
-
-        # 两个平移关系的内存数组：offset-space 的 m 与 absolute-space 的 m'
-        r15 = BitVec("r15_base", 64)
-        offset_space = Store(
-            SMTState().evm_memory.Memory, BitVecVal(5, 64), BitVecVal(0xAA, 8)
-        )
-        absolute_space = Store(
-            SMTState().x86_memory.evm_mem, r15 + BitVecVal(5, 64),
-            BitVecVal(0xAA, 8),
-        )
-
-        args = [BitVecVal(v, 256) for v in (1000, 0x1234, 0, 4, 0x40, 2)]
-        evm_side = uninterpreted.static_call_return_size(
-            *args, offset_space, effect_id=0x41
-        )
-        x86_side = uninterpreted.static_call_return_size(
-            *args, absolute_space, effect_id=0x41
-        )
-
-        solver = Solver()
-        solver.add(r15 != BitVecVal(0, 64))
-        solver.add(evm_side != x86_side)
-        assert solver.check() == sat, (
-            "若这里变成 unsat，说明坐标系问题已被解决，可以删掉本测试并把"
-            "边界说明从文档里移除"
-        )
+        memory = Array("host_input_memory", BitVecSort(64), BitVecSort(8))
+        base, index = BitVec("host_memory_base", 64), BitVec("host_probe", 64)
+        evm = SMTState()
+        evm.evm_memory.Memory = memory
+        for value in values:
+            evm.evm_stack = evm.evm_stack.push(BitVecVal(value, 256))
+        evm = evm_operator_to_z3(EvmOperator(kind=kind, pc=33), evm)
+        sem = GoFunctionSemantics(_make_profile_with_host({5: host_name}))
+        for corrupt in (False, True):
+            x86, sp = _make_state_with_stack(values)
+            x86.x86_registers.set_register(Register.R15, base)
+            x86.x86_memory.evm_mem = Lambda([index], Select(memory, index - base))
+            if corrupt:
+                x86.x86_memory.evm_mem = Store(x86.x86_memory.evm_mem, base,
+                    Select(memory, BitVecVal(0, 64)) + 1)
+            x86 = sem.apply(4, 5, sp, x86, evm_pc=33)
+            result = x86.x86_memory.load_256bit(
+                BitVecVal(_compute_stack_addr(R14_BASE, sp - 4 * len(values)), 64),
+                domain=MemoryDomain.STACK)
+            solver = Solver(); solver.set(timeout=5000)
+            solver.add(Or(evm.evm_stack.peek(0) != result,
+                evm.callengine_return_data_size_bytes != x86.callengine_return_data_size_bytes,
+                Select(evm.return_data, index) != Select(x86.return_data, index)))
+            assert solver.check() == (sat if corrupt else unsat), kind

@@ -285,7 +285,9 @@ class ProgramEquivalenceChecker:
                            x86_reachability_timeout_ms: Optional[int] = 50,
                            max_depth: Optional[int] = None,
                            loop_guard: bool = False,
-                           fold_loops: bool = False) -> Tuple[bool, Optional[str]]:
+                           fold_loops: bool = False,
+                           proof_mode: str = "paths",
+                           block_options: Optional[dict] = None) -> Tuple[bool, Optional[str]]:
         """验证EVM程序和x86程序在语义上等价。
 
         默认使用旧的 merged-result 检查路径，保持原有 Alive2 风格的
@@ -325,6 +327,27 @@ class ProgramEquivalenceChecker:
         Returns:
             (verified, message)，如果程序等价则verified为True
         """
+        if proof_mode not in ("paths", "block-lockstep"):
+            return False, f"INCONCLUSIVE: unknown proof mode {proof_mode!r}"
+        if proof_mode == "block-lockstep":
+            from .block_program import BlockProgramVerifier
+            if fold_loops or stack_check is not None:
+                return False, "INCONCLUSIVE: block mode does not consume legacy summary/folding/debug-stack certificates"
+            options = dict(block_options or {})
+            if "gas_check" in options or "timeout_ms" in options:
+                return False, "INCONCLUSIVE: block options may not override the requested gas/solver configuration"
+            prepared = initial_state.copy()
+            prepared.host_gas_uf_enabled = self.gas_check is not GasCheck.OFF
+            prepared.assume_calldata_offset_no_overflow = False
+            prepared.abstract_calldataload_words = False
+            verifier = BlockProgramVerifier(
+                gas_check=self.gas_check, timeout_ms=self.equivalence_checker.timeout_ms,
+                summary_config=summary_config,
+                **({"max_depth": max_depth} if max_depth is not None else {}), **options)
+            result = verifier.verify_program_pair(evm_program, x86_program, prepared)
+            return result.verified, result.message
+        if block_options:
+            return False, "INCONCLUSIVE: block_options require block-lockstep mode"
         if stack_check is not None and stack_check <= 0:
             raise ValueError("stack_check must be a positive integer or None")
         if stack_check_timeout_ms <= 0:

@@ -11,6 +11,7 @@ from common.store_forwarding import (
     linearize_address,
     resolve_select_over_store,
     unshift_store_chain,
+    memory_as_offset_view,
 )
 
 B = BitVec("B", 64)
@@ -76,3 +77,20 @@ def test_unshift_bails_without_base_term():
     r15 = BitVec("r15", 64)
     chain = Store(mem0, BitVecVal(5, 64), V1)  # 地址不含 r15
     assert unshift_store_chain(chain, r15, mem0) is None
+
+
+def test_offset_view_preserves_arbitrary_bytes_and_wrapping_addresses():
+    from z3 import Solver, unsat
+    # Neither store needs to syntactically contain B. They may alias or wrap.
+    absolute = Store(Store(ARR, O, V1), B + 1, V2)
+    offset = BitVec("view_probe", 64)
+    view = memory_as_offset_view(absolute, B)
+    solver = Solver()
+    solver.add(Select(view, offset) != Select(absolute, B + offset))
+    assert solver.check() == unsat
+
+
+def test_unshift_rejects_wrong_translation_and_untranslated_array():
+    index = BitVec("bad_view_index", 64)
+    for memory in (ARR, Lambda([index], Select(ARR, index - B + 1))):
+        assert unshift_store_chain(Store(memory, B + 5, V1), B, ARR) is None
