@@ -15,6 +15,7 @@ counted with their hit/miss time per caller.
 """
 import inspect
 import json
+import re
 import sys
 import textwrap
 from time import monotonic
@@ -101,29 +102,45 @@ def _instrumented_check():
     return check
 
 
-def main():
-    out, path = sys.argv[1], sys.argv[2]
-    seconds = float(sys.argv[sys.argv.index("--seconds") + 1]) if "--seconds" in sys.argv else 1800
-    be.BlockEquivalenceProver._check = _instrumented_check()
-    be._refute_over_light_premise = _probe("light", be._refute_over_light_premise)
-    be.unsat_core = _probe("unsat_core", be.unsat_core)
-    be._refute_by_cases = _probe("cases", be._refute_by_cases)
-    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=30000)
+def _run(prover, path, name, seconds, out):
+    frames, probes = len(FRAMES), {k: dict(v) for k, v in PROBES.items()}
     prover.deadline = monotonic() + seconds
     records, started = [], monotonic()
-    name = path.rsplit("/", 1)[-1]
     try:
         ok = prover._check(name, And(*parse_smt2_file(path)), records)
         answer = "proved" if ok else records[-1].answer
     except be.ProofBudgetExceeded:
         answer = "budget"
     total = monotonic() - started
-    print(name, answer, f"{total:.1f}s", flush=True)
+    print(path.rsplit("/", 1)[-1], name, answer, f"{total:.1f}s", flush=True)
+    delta = {k: {kk: round(vv - probes.get(k, {}).get(kk, 0), 2) for kk, vv in v.items()} for k, v in PROBES.items()}
     with open(out, "w") as handle:
-        json.dump({"name": name, "answer": answer, "seconds": round(total, 1),
-                   "frames": [{"name": f.name, "marks": f.marks} for f in FRAMES],
-                   "probes": {k: {kk: round(vv, 2) for kk, vv in v.items()} for k, v in PROBES.items()}},
-                  handle, indent=1)
+        json.dump({"name": name, "file": path.rsplit("/", 1)[-1], "answer": answer, "seconds": round(total, 1),
+                   "frames": [{"name": f.name, "marks": f.marks} for f in FRAMES[frames:]],
+                   "probes": delta}, handle, indent=1)
+
+
+def main():
+    seconds = float(sys.argv[sys.argv.index("--seconds") + 1]) if "--seconds" in sys.argv else 1800
+    be.BlockEquivalenceProver._check = _instrumented_check()
+    be._refute_over_light_premise = _probe("light", be._refute_over_light_premise)
+    be.unsat_core = _probe("unsat_core", be.unsat_core)
+    be._refute_by_cases = _probe("cases", be._refute_by_cases)
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=30000)
+    if "--sequence" in sys.argv:
+        # route_trace.py --sequence OUT_DIR FILE... : one prover for all, as one pair worker of
+        # a node (route statistics, lemma cache, unification flag carry over); each obligation is
+        # named pair_i_j after its file and gets its own deadline.
+        args = [a for n, a in enumerate(sys.argv[1:], 1) if a != "--sequence" and sys.argv[n - 1] != "--seconds"
+                and a != "--seconds"]
+        out_dir, paths = args[0], args[1:]
+        for path in paths:
+            base = path.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+            m = re.search(r"pair_\d+_\d+", base)
+            _run(prover, path, m.group(0) if m else base, seconds, f"{out_dir}/{base}.json")
+        return
+    out, path = sys.argv[1], sys.argv[2]
+    _run(prover, path, path.rsplit("/", 1)[-1], seconds, out)
 
 
 if __name__ == "__main__":

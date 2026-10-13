@@ -111,26 +111,32 @@ def _solve_query(formula, timeout_ms):
     return answer
 
 
-def unsat_core(assertions, goal, timeout_ms):
-    """Indices of `assertions` in an unsat core of assertions ∧ goal, or None."""
+def unsat_core(assertions, goal, timeout_ms, outcome=None):
+    """Indices of `assertions` in an unsat core of assertions ∧ goal, or None.
+    `outcome` (optional dict) gets the solver's answer as "answer"."""
     key = proof_cache.query_key("core", *assertions, goal) if proof_cache.enabled() else None
     if key is not None:
         cached = proof_cache.lookup(key)
         if isinstance(cached, list):
+            if outcome is not None:
+                outcome["answer"] = "unsat"
             return cached
-    core = _unsat_core(assertions, goal, timeout_ms)
+    core = _unsat_core(assertions, goal, timeout_ms, outcome)
     if key is not None and core is not None:
         proof_cache.store(key, core)
     return core
 
 
-def _unsat_core(assertions, goal, timeout_ms):
+def _unsat_core(assertions, goal, timeout_ms, outcome=None):
     solver = _solver(timeout_ms, And(*assertions, goal))
     tracks = [FreshConst(BoolVal(True).sort(), "core") for _ in assertions]
     for assertion, track in zip(assertions, tracks):
         solver.assert_and_track(assertion, track)
     solver.add(goal)
-    if solver.check() != unsat:
+    answer = solver.check()
+    if outcome is not None:
+        outcome["answer"] = str(answer)
+    if answer != unsat:
         return None
     core = {t.get_id() for t in solver.unsat_core()}
     return [i for i, t in enumerate(tracks) if t.get_id() in core]
@@ -1871,11 +1877,15 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
 
     `cache` (optional dict) reuses a refutation found under conjuncts Q ⊆ the
     current premise's conjuncts: P ⊇ Q, so P ∧ x≠y is UNSAT too. Failures are
-    only reused for premises no stronger than the failed one (time saving)."""
-    conjuncts = frozenset(c.get_id() for c in _conjuncts(premise))
+    only reused for premises no stronger than the failed one (time saving).
+    Entries keep x, y and the conjuncts alive: z3 recycles the id of a freed
+    term, and a cached id must never come to name another term."""
+    parts = _conjuncts(premise)
+    conjuncts = frozenset(c.get_id() for c in parts)
     key = tuple(sorted((x.get_id(), y.get_id())))
+    keep = (x, y, tuple(parts))
     if cache is not None:
-        for used, proofs in cache.get(key, ()):
+        for used, proofs, _ in cache.get(key, ()):
             if proofs is not None and used <= conjuncts:
                 return proofs
             if proofs is None and conjuncts <= used:
@@ -1886,25 +1896,30 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     light_ms = min(budget_ms, _LIGHT_MS)
     if deadline is not None:
         light_ms = min(light_ms, int((deadline - monotonic()) * 1000))
-    proofs = _refute_over_light_premise(_conjuncts(premise), hide(differ), light_ms)
+    proofs = _refute_over_light_premise(parts, hide(differ), light_ms)
     if proofs is not None:
         if cache is not None:
-            cache.setdefault(key, []).append((proofs[1], proofs[0]))
+            cache.setdefault(key, []).append((proofs[1], proofs[0], keep))
         return proofs[0]
     if cache is not None:
         # Cache only the conjuncts the refutation used (unsat core), so the
         # lemma transfers to sibling pairs whose path conditions differ.
-        parts = _conjuncts(premise)
-        started = monotonic()
-        used = unsat_core([hide(c) for c in parts], hide(differ), min(budget_ms, 2000))
+        started, outcome = monotonic(), {}
+        used = unsat_core([hide(c) for c in parts], hide(differ), min(budget_ms, 2000), outcome)
         if used is not None:
             used = [parts[i] for i in used]
             proofs = [(And(*(hide(c) for c in used), hide(differ)), monotonic() - started)]
-            cache.setdefault(key, []).append((frozenset(c.get_id() for c in used), proofs))
+            cache.setdefault(key, []).append((frozenset(c.get_id() for c in used), proofs, keep))
             return proofs
+        if outcome.get("answer") == "sat":
+            # hide(premise) ∧ hide(differ) has a model: the case tree below refutes
+            # exactly that formula, so it cannot succeed (Safe 5377 d30 pairs: ~100
+            # such candidates per pair, 1.5-2.3s of case tree each).
+            cache.setdefault(key, []).append((conjuncts, None, keep))
+            return None
     proofs = _refute_by_cases(hide(premise), hide(differ), budget_ms, deadline)
     if cache is not None:
-        cache.setdefault(key, []).append((conjuncts, proofs))
+        cache.setdefault(key, []).append((conjuncts, proofs, keep))
     return proofs
 
 

@@ -74,7 +74,7 @@ def test_timeouts_never_become_proofs(monkeypatch):
     formula = And(UGT(c, 1), h(If(c == 0, 5, c + 1)) != h(c + 1))  # c != 0 would decide the guard
     monkeypatch.setattr(be, "solve_query", lambda query, timeout: "unknown")
     monkeypatch.setattr(be, "solve_pure_bv", lambda query, timeout: "unknown")
-    monkeypatch.setattr(be, "unsat_core", lambda assertions, goal, timeout: None)
+    monkeypatch.setattr(be, "unsat_core", lambda assertions, goal, timeout, outcome=None: None)
     assert unify_uf_arguments(formula, 3000)[1] == ()
     records = []
     assert not BlockEquivalenceProver([], [], {}, timeout_ms=3000)._check("pair", formula, records)
