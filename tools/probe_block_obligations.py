@@ -1,7 +1,8 @@
 """Directed block-local proof runner. LOCAL EVIDENCE ONLY — never a program certificate.
 
 Usage: PYTHONPATH=. poetry run python tools/probe_block_obligations.py STEM NODES.json \
-           --output /tmp/probe.json [--timeout-ms 5000] [--node-seconds 30] [--formula-dir DIR]
+           --output /tmp/probe.json [--timeout-ms 5000] [--node-seconds 30] [--formula-dir DIR] \
+           [--keep-going]
 
 NODES.json is a JSON list of {"pc": int, "stack_depth": int, "memory_size": int|null,
 "free_memory_pointer": int|null, "stack_constants": [[index, value], ...]}. null
@@ -11,6 +12,11 @@ discovered once; every application still replays and proves its own obligations.
 
 Gas is symbolic FULL, the CALLDATALOAD offset domain is the full uint64 range, and the
 authoritative pc->addr mapping is used unpruned: no inferred or narrowed jump domain.
+
+--keep-going (or BLOCK_KEEP_GOING=1): a failing pair-phase obligation no longer stops
+the node; every remaining row is still tried and the node is still reported
+inconclusive. keep_going_failures lists each such failure (name, answer, seconds).
+Off by default; the production verifier never enables it.
 """
 from __future__ import annotations
 import argparse
@@ -19,6 +25,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import math
+import os
 from pathlib import Path
 import time
 
@@ -59,7 +66,7 @@ def parse_nodes(raw):
     return specs
 
 
-def build_prover(stem, *, base_addr, timeout_ms, node_seconds, max_depth, summaries):
+def build_prover(stem, *, base_addr, timeout_ms, node_seconds, max_depth, summaries, keep_going=False):
     from evm_ir.json_parser import load_ir_from_json
     from evm_ir.program import EVMProgram
     from tools.tag_align import build_block_alignment
@@ -78,7 +85,8 @@ def build_prover(stem, *, base_addr, timeout_ms, node_seconds, max_depth, summar
     return BlockEquivalenceProver(
         blocks, split_at_cutpoints(basic_blocks, alignment.pc_to_addr.values()),
         alignment.pc_to_addr, timeout_ms=timeout_ms, max_depth=max_depth, compare_gas=True,
-        host_gas_uf_enabled=True, summary_config=config, node_timeout_seconds=node_seconds)
+        host_gas_uf_enabled=True, summary_config=config, node_timeout_seconds=node_seconds,
+        keep_going=keep_going)
 
 
 def probe_node(prover, spec, formula_dir=None):
@@ -101,6 +109,9 @@ def probe_node(prover, spec, formula_dir=None):
                 queries=result.queries, evm_paths=result.evm_paths, x86_paths=result.x86_paths,
                 paired_transitions=result.paired_transitions, terminals_proved=result.terminals_proved,
                 reasons=list(result.reasons), failed_obligations=failed,
+                keep_going_failures=[dict(name=f["name"], answer=f["answer"], seconds=f["seconds"],
+                                          where=f["where"])
+                                     for f in getattr(result, "kept_failures", ())],
                 summary_hits=len(result.theorem.summary_hits) if result.theorem else 0)
 
 
@@ -115,6 +126,9 @@ def main(argv=None):
     p.add_argument("--base-addr", type=lambda v: int(v, 0), default=0x1000)
     p.add_argument("--no-summaries", dest="summaries", action="store_false")
     p.add_argument("--formula-dir", type=Path, help="Dump each failed obligation's formula here")
+    p.add_argument("--keep-going", action="store_true",
+                   default=os.environ.get("BLOCK_KEEP_GOING", "") not in ("", "0"),
+                   help="Diagnostics: try every pair-phase row after a failure (default: BLOCK_KEEP_GOING)")
     args = p.parse_args(argv)
     if (args.timeout_ms <= 0 or args.node_seconds <= 0 or args.max_depth <= 0
             or not math.isfinite(args.node_seconds)):
@@ -135,7 +149,7 @@ def main(argv=None):
     args.output.parent.mkdir(parents=True, exist_ok=True)
     prover = build_prover(args.stem, base_addr=args.base_addr, timeout_ms=args.timeout_ms,
                           node_seconds=args.node_seconds, max_depth=args.max_depth,
-                          summaries=args.summaries)
+                          summaries=args.summaries, keep_going=args.keep_going)
     for spec in specs:
         report["nodes"].append(probe_node(prover, spec, args.formula_dir))
         report["locally_proved"] = sum(n["status"] == "proved" for n in report["nodes"])

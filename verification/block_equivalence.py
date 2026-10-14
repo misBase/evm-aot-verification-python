@@ -2450,6 +2450,8 @@ class BlockProofResult:
     context: object = field(default=None, repr=False)
     premise: object = field(default=None, repr=False)
     elapsed_seconds: float = 0.0
+    # keep_going only (diagnostics): every pair-phase failure that did not stop the node.
+    kept_failures: tuple = ()
     _issuer: object = field(default=None, repr=False)
 
     def _proved_for_identity(self, current_identity):
@@ -2480,7 +2482,7 @@ class BlockEquivalenceProver:
     def __init__(self, evm_blocks, x86_blocks, pc_to_addr, schema=None, *,
                  timeout_ms=30_000, max_depth=400, aot_profile=None,
                  compare_gas=True, host_gas_uf_enabled=True, summary_config=None,
-                 deadline=None, max_path_pairs=100_000, node_timeout_seconds=None):
+                 deadline=None, max_path_pairs=100_000, node_timeout_seconds=None, keep_going=False):
         self.evm_blocks = list(evm_blocks)
         self.x86_blocks = list(x86_blocks)
         self.pc_to_addr = dict(pc_to_addr)
@@ -2501,6 +2503,11 @@ class BlockEquivalenceProver:
         self._potential_pending = None  # (input, target, lemmas): a capped potential solve that ran out
         self.node_timeout_seconds = node_timeout_seconds
         self.max_path_pairs = max_path_pairs
+        # Diagnostics only (tools/probe_block_obligations --keep-going): a failing
+        # pair-phase obligation is recorded in _kept_failures and the remaining rows
+        # are still checked; prove() then fails the node. Production never sets it.
+        self.keep_going = keep_going
+        self._kept_failures = []
         self._issued_theorems = []
         self._summary_templates = None
         self.call_site_mapping = None
@@ -3296,7 +3303,9 @@ class BlockEquivalenceProver:
         (the full product if it is ()), appending their records. Names in
         `ready` (proved records) are not checked again; "all" rows add their
         shared-prefix proofs to it. A failing obligation of a row in
-        `tolerated` marks that row; any other failure fails the node.
+        `tolerated` marks that row; any other failure fails the node: at once,
+        or with keep_going after the remaining items (recorded in
+        _kept_failures; prove() turns them into the node's failure).
         Returns the marked rows."""
         n = len(evm)
         alls = [j for j in rows if correspondence and correspondence[j] == "all"]
@@ -3340,7 +3349,11 @@ class BlockEquivalenceProver:
             for (row, *_), (name, _, where), ok in zip(items, pairs, checks):
                 if not ok:
                     if row not in tolerated:
-                        raise ValueError(f"outcome mismatch {name}: {where} (solver={records[-1].answer})")
+                        if not self.keep_going:
+                            raise ValueError(f"outcome mismatch {name}: {where} (solver={records[-1].answer})")
+                        self._kept_failures.append(dict(name=name, answer=records[-1].answer,
+                                                        seconds=records[-1].elapsed_seconds, where=where))
+                        continue
                     failed.add(row)
         finally:
             checks.close()
@@ -3358,6 +3371,7 @@ class BlockEquivalenceProver:
         result = BlockProofResult(spec)
         self._node_needed_unification = False
         self._route_stats = {}
+        self._kept_failures = []
         program_deadline = self.deadline
         if self.node_timeout_seconds is not None:
             node_deadline = started + self.node_timeout_seconds
@@ -3431,6 +3445,11 @@ class BlockEquivalenceProver:
 
             correspondence = self._pair_phase(evm, x86, premise, pair,
                                               self._correspondence(evm, x86, premise, records), records)
+            if self._kept_failures:
+                # keep_going: the same failure, raised after every row was tried.
+                raise ValueError(f"outcome mismatch ({len(self._kept_failures)} pair obligations, keep-going): "
+                                 + "; ".join(f"{f['name']}: {f['where']} (solver={f['answer']})"
+                                             for f in self._kept_failures))
             result.theorem = BlockTheorem(
                 self.identity, spec, tuple(records),
                 obligation_manifest(evm, x86, state, correspondence=correspondence),
@@ -3447,6 +3466,7 @@ class BlockEquivalenceProver:
             result.reasons += (f"{type(exc).__name__}: {exc}",)
         finally:
             self.deadline = program_deadline
+        result.kept_failures = tuple(self._kept_failures)  # also after a later abort (e.g. node budget)
         result.obligations = tuple(records)
         result.queries = len(records) + (runtime.proof_queries if runtime is not None else 0)
         result.elapsed_seconds = monotonic() - started
