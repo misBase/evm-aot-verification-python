@@ -1573,6 +1573,76 @@ def skolemize_array_disequalities(formula, timeout_ms=1000):
     return And(*out), tuple(lemmas)
 
 
+def _read_disequality(term):
+    """(A, i, B, j) for a top-level ¬(A[i] = B[j]) / distinct(A[i], B[j]), else None."""
+    if is_not(term) and is_eq(term.arg(0)):
+        term = term.arg(0)
+    elif not (is_distinct(term) and term.num_args() == 2):
+        return None
+    x, y = term.children()
+    if not (is_select(x) and is_select(y) and x.num_args() == 2 and y.num_args() == 2):
+        return None
+    return x.arg(0), x.arg(1), y.arg(0), y.arg(1)
+
+
+def _same_offset(kb, ka, d):
+    gap = simplify(kb - ka - d)
+    return is_bv_value(gap) and gap.as_long() == 0
+
+
+def peel_matching_stores(formula, timeout_ms=1000):
+    """F with each top-level ¬(A[i] = B[j]) whose arrays end in pairwise
+    matching stores replaced by the read of what lies below them; (F', lemmas)
+    or None when nothing peels.
+
+    A = store(X, a, v), B = store(Y, b, u) match when b - a ≡ j - i (=: d)
+    and v ≡ u (word-level simplifier). Then A[i] ≠ B[j] implies X[i] ≠ Y[j]:
+    i = a would read v on both sides (j = a + d = b), and otherwise
+    j = i + d ≠ a + d = b too, so both reads fall through. Repeated from the
+    top of both chains while they match. F ⊨ F' (each replaced conjunct is
+    implied by its original), so only UNSAT of F' transfers back; the facts
+    i ≠ a are dropped, which only weakens F' further. The lemma refutes the
+    generic step (fresh arrays and words of the same sorts), valid for all
+    instances. Safe 5377 d30 pair_68_58: both memories write the same 320
+    bytes (EVM at fmp + k, x86 at R15 + fmp + k) over a CALLDATACOPY lambda;
+    the opaque UF query needs 113-126s, the peeled one 5s.
+    """
+    out, lemmas, sorts, peeled = [], [], [], 0
+    for term in _conjuncts(formula):
+        found = _read_disequality(term)
+        if found is None:
+            out.append(term)
+            continue
+        a, i, b, j = found
+        d, n = simplify(j - i), 0
+        while is_store(a) and is_store(b) and a.num_args() == 3 and b.num_args() == 3:
+            (x, ka, va), (y, kb, vb) = a.children(), b.children()
+            if not (_same_offset(kb, ka, d) and (va.eq(vb) or is_true(simplify(va == vb, bv_sort_ac=True)))):
+                break
+            a, b, n = x, y, n + 1
+        if not n:
+            out.append(term)
+            continue
+        if not any(s.eq(a.sort()) for s in sorts):
+            gx, gy = FreshConst(a.sort(), "peel_x"), FreshConst(a.sort(), "peel_y")
+            gi, ga, gd = (FreshConst(a.sort().domain(), f"peel_{s}") for s in "iad")
+            gv = FreshConst(a.sort().range(), "peel_v")
+            generic = And(Select(Store(gx, ga, gv), gi) != Select(Store(gy, ga + gd, gv), gi + gd),
+                          Select(gx, gi) == Select(gy, gi + gd))
+            started = monotonic()
+            answer = solve_query(generic, timeout_ms)
+            if answer != "unsat":
+                return None
+            sorts.append(a.sort())
+            lemmas.append(Obligation(f"store_peel_{len(lemmas)}", generic.sexpr(), answer,
+                                     elapsed_seconds=monotonic() - started))
+        out.append(simplify(Select(a, i) != Select(b, j)))
+        peeled += n
+    if not peeled:
+        return None
+    return And(*out), tuple(lemmas)
+
+
 def generalize_array_terms(formula, max_rounds=8):
     """F with every closed read Select(A, i) replaced by h_A(i) and every UF
     application f(x, A) with array arguments by g_{f,A}(x): one fresh UF per
@@ -1861,9 +1931,14 @@ def _heavy_uncached(term):
 _LIGHT_MS = 2000
 
 
-def _refute_over_light_premise(parts, goal, budget_ms):
+def _refute_over_light_premise(parts, goal, budget_ms, retry_ms=0):
     """([(query, seconds)], kept conjunct ids) refuting `parts` without their
     binder-free _heavy conjuncts, ∧ goal; or None.
+
+    `retry_ms` > budget_ms: an "unknown" (timed out, not SAT) query is solved
+    once more with that budget. Misses are SAT in ~0.2s (Safe 5377 d30), so
+    only queries near the cap pay; Safe 5377 d30 pair_68_58's sha3 memory
+    arguments refute in 0.9-2.1s against the 2s cap.
 
     Dropping conjuncts only weakens a conjunction (every model of all parts is
     one of the kept ones), so UNSAT of kept ∧ goal is UNSAT of parts ∧ goal;
@@ -1878,7 +1953,10 @@ def _refute_over_light_premise(parts, goal, budget_ms):
         return None
     started = monotonic()
     query = simplify(And(*light, goal))
-    if solve_query(query, budget_ms) != "unsat":
+    answer = solve_query(query, budget_ms)
+    if answer == "unknown" and retry_ms > budget_ms:
+        answer = solve_query(query, retry_ms)
+    if answer != "unsat":
         return None
     return [(query, monotonic() - started)], frozenset(c.get_id() for c in light)
 
@@ -1909,10 +1987,11 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     differ = _differ(x, y)
     opaque = _uf_app_constants(premise, differ)
     hide = (lambda t: substitute(t, *opaque)) if opaque else (lambda t: t)
-    light_ms = min(budget_ms, _LIGHT_MS)
+    light_ms, retry_ms = min(budget_ms, _LIGHT_MS), budget_ms
     if deadline is not None:
-        light_ms = min(light_ms, int((deadline - monotonic()) * 1000))
-    proofs = _refute_over_light_premise(parts, hide(differ), light_ms)
+        left = int((deadline - monotonic()) * 1000)
+        light_ms, retry_ms = min(light_ms, left), min(retry_ms, left)
+    proofs = _refute_over_light_premise(parts, hide(differ), light_ms, retry_ms)
     if proofs is not None:
         if cache is not None:
             kept = [c for c in parts if c.get_id() in proofs[1]]
@@ -3181,17 +3260,26 @@ class BlockEquivalenceProver:
             budget = self.timeout_ms if self.deadline is None else min(
                 self.timeout_ms, int((self.deadline - started) * 1000))
             query = simplify(substitute(unified, *opaque))
-            # Gas sums out first (Safe 5377 d30 pair_68_9: 10s here, 60s+ with them).
-            light = _refute_over_light_premise(_conjuncts(query), BoolVal(True), budget)
-            if light is not None:
-                (light_query, seconds), = light[0]
-                return light_query, "unsat", lemmas + (
-                    Obligation("opaque_array_uf_light", light_query.sexpr(), "unsat", elapsed_seconds=seconds),)
-            if self.deadline is not None:
-                budget = min(budget, int((self.deadline - monotonic()) * 1000))
-            if budget > 0 and solve_query(query, budget) == "unsat":
-                return query, "unsat", lemmas + (
-                    Obligation("opaque_array_uf", query.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
+            # Both memories' matching top stores peeled off first (a weakening, see
+            # peel_matching_stores; Safe 5377 d30 pair_68_58: 113-126s -> 5s). If the
+            # weaker query is not refuted, the unpeeled one is tried as before.
+            peeled = peel_matching_stores(query)
+            attempts = ((("opaque_array_uf_peeled",) + peeled,) if peeled is not None else ()) + (
+                ("opaque_array_uf", query, ()),)
+            for tag, target, peel_lemmas in attempts:
+                # Gas sums out first (Safe 5377 d30 pair_68_9: 10s here, 60s+ with them).
+                light = _refute_over_light_premise(_conjuncts(target), BoolVal(True), budget)
+                if light is not None:
+                    (light_query, seconds), = light[0]
+                    return light_query, "unsat", lemmas + peel_lemmas + (
+                        Obligation(f"{tag}_light", light_query.sexpr(), "unsat", elapsed_seconds=seconds),)
+                if self.deadline is not None:
+                    budget = min(budget, int((self.deadline - monotonic()) * 1000))
+                if budget > 0 and solve_query(target, budget) == "unsat":
+                    return target, "unsat", lemmas + peel_lemmas + (
+                        Obligation(tag, target.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
+                if self.deadline is not None:
+                    budget = min(self.timeout_ms, int((self.deadline - monotonic()) * 1000))
         before = unified
         unified, swept = sweep_equalities(unified, self.timeout_ms, self.deadline, cache=self._lemma_cache)
         if swept:  # merged subterms can make more UF arguments syntactically equal
