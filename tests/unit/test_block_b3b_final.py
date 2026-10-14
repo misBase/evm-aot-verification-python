@@ -126,9 +126,9 @@ def test_uf_unification_light_query_keeps_the_per_query_budget(monkeypatch):
     L_plain = Lambda([i], If(ULT(i, n), Select(M, i), BitVecVal(0, 8)))
     budgets, real = [], be._refute_over_light_premise
 
-    def record(parts, goal, budget_ms):
+    def record(parts, goal, budget_ms, *retry):
         budgets.append(budget_ms)
-        return real(parts, goal, budget_ms)
+        return real(parts, goal, budget_ms, *retry)
     monkeypatch.setattr(be, "_refute_over_light_premise", record)
     F = And(v == Select(M, k), ULT(sha3(L_store, n), 5), ULT(5, sha3(L_plain, n)), xx * yy == ww)
     prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=30000)
