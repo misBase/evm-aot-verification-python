@@ -1883,6 +1883,55 @@ def _refute_over_light_premise(parts, goal, budget_ms):
     return [(query, monotonic() - started)], frozenset(c.get_id() for c in light)
 
 
+def _peel_store_pair(x, y):
+    """(Select(A, i), Select(B, j)) for x = Select(C_A, i), y = Select(C_B, j), or None.
+
+    C_A, C_B are store chains whose outermost stores pair up: equal values (same
+    AST after simplify) at addresses a, b with b - a = j - i (same AST after
+    simplify, i.e. equal in every model). Peeling stops at the first pair that
+    does not match; None if no store is peeled.
+    """
+    a, i, b, j = x.arg(0), x.arg(1), y.arg(0), y.arg(1)
+    if not (is_bv(i) and is_bv(j) and i.size() == j.size()):
+        return None
+    shift, peeled = simplify(j - i, bv_sort_ac=True), 0
+    while is_store(a) and is_store(b) and a.num_args() == 3 and b.num_args() == 3:
+        if not simplify(a.arg(2), bv_sort_ac=True).eq(simplify(b.arg(2), bv_sort_ac=True)):
+            break
+        if not simplify(b.arg(1) - a.arg(1), bv_sort_ac=True).eq(shift):
+            break
+        a, b, peeled = a.arg(0), b.arg(0), peeled + 1
+    return (Select(a, i), Select(b, j)) if peeled else None
+
+
+def peel_matching_stores(formula):
+    """F with each top-level conjunct Select(C_A, i) != Select(C_B, j) weakened
+    to Select(A, i) != Select(B, j) by peeling matching stores (_peel_store_pair);
+    None if nothing is peeled.
+
+    Store(A, a, v)[i] = ite(i = a, v, A[i]) and Store(B, b, v)[j] = ite(j = b, v, B[j]);
+    with b - a = j - i, i = a iff j = b (adding j - i is a bijection mod 2^n), so
+    A[i] = B[j] implies the two stored reads are equal. Hence each original
+    conjunct implies its peeled one, F ⊨ F', and only UNSAT of F' transfers back
+    (a SAT F' says nothing: the stores may cover where A and B differ).
+    Safe 5377 d30 pair_68_58: both memories put the same 320 bytes at fmp + k
+    (x86: R15 + fmp + k) over CALLDATACOPY lambdas; the opaque query needs 140s+
+    through the chains, its peeled form ~5s.
+    """
+    out, changed = [], False
+    for c in _conjuncts(formula):
+        eq = c.arg(0) if is_not(c) and is_eq(c.arg(0)) else c if is_distinct(c) and c.num_args() == 2 else None
+        peeled = None
+        if eq is not None and is_select(eq.arg(0)) and is_select(eq.arg(1)):
+            peeled = _peel_store_pair(eq.arg(0), eq.arg(1))
+        if peeled is None:
+            out.append(c)
+        else:
+            out.append(Not(peeled[0] == peeled[1]))
+            changed = True
+    return And(*out) if changed else None
+
+
 def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     """Refuted queries showing premise ⊨ x = y, or None. UF applications are
     made opaque (only adds models), which keeps memory arrays out.
@@ -3174,6 +3223,25 @@ class BlockEquivalenceProver:
             budget = self.timeout_ms if self.deadline is None else min(
                 self.timeout_ms, int((self.deadline - started) * 1000))
             query = simplify(substitute(unified, *opaque))
+            # Matching stores peeled off the memory disequality first (F ⊨ F', see
+            # peel_matching_stores): Safe 5377 d30 pair_68_58, 140s+ through the two
+            # 320-store chains, ~5s on the CALLDATACOPY lambdas below them. Anything
+            # but UNSAT falls through to the unpeeled queries (the stores may hide a
+            # difference of the bases).
+            peeled = peel_matching_stores(query)
+            if peeled is not None:
+                peeled = simplify(peeled)
+                parts = _conjuncts(peeled)
+                light = _refute_over_light_premise(parts, BoolVal(True), budget)
+                if light is None and not any(_no_binder(c) and _heavy(c) for c in parts):
+                    if budget > 0 and solve_query(peeled, budget) == "unsat":
+                        light = [(peeled, monotonic() - started)], None
+                if light is not None:
+                    (light_query, seconds), = light[0]
+                    return light_query, "unsat", lemmas + (
+                        Obligation("opaque_array_uf_peeled", light_query.sexpr(), "unsat", elapsed_seconds=seconds),)
+                if self.deadline is not None:
+                    budget = min(budget, int((self.deadline - monotonic()) * 1000))
             # Gas sums out first (Safe 5377 d30 pair_68_9: 10s here, 60s+ with them).
             light = _refute_over_light_premise(_conjuncts(query), BoolVal(True), budget)
             if light is not None:
