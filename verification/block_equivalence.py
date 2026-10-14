@@ -1857,8 +1857,10 @@ def _heavy_uncached(term):
     return False
 
 
-# ponytail: fixed 2s cap (the unsat_core probe's); the light queries measured 0.3-0.5s.
-_LIGHT_MS = 2000
+# ponytail: fixed 8s cap. Misses are SAT in ~0.2s (Safe 5377 d30: 1023 misses, 232s), so the cap
+# only bounds the rare hard light query; the sha3-slice merge of pair_68_58 takes 0.9-2.4s (more
+# under CPU load), and the former 2s cap lost it, and with it the whole unify route.
+_LIGHT_MS = 8000
 
 
 def _refute_over_light_premise(parts, goal, budget_ms):

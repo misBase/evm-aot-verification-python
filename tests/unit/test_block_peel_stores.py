@@ -141,3 +141,20 @@ def test_peeled_soundness_satisfiable_formula_is_not_refuted():
     F = And(_merged_sha3(), x * y == z, Select(ca, w) != Select(cb, r + w))
     _, answer, _ = _prover()._retry_with_uf_unification(F, "unknown")
     assert answer != "unsat"
+
+
+def test_prove_equal_light_probe_cap_covers_the_measured_sha3_merge(monkeypatch):
+    """The light probe of _prove_equal gets min(budget, _LIGHT_MS). On Safe 5377 d30
+    pair_68_58 the sha3-slice merge needs 0.9-2.4s there (a 2s cap lost it under CPU
+    load, and with it the unify route); keep ~3x headroom. Callers passing a smaller
+    budget (sweep_equalities: 2s) keep theirs."""
+    assert be._LIGHT_MS >= 3 * 2400
+    budgets, real = [], be._refute_over_light_premise
+
+    def record(parts, goal, budget_ms):
+        budgets.append(budget_ms)
+        return real(parts, goal, budget_ms)
+    monkeypatch.setattr(be, "_refute_over_light_premise", record)
+    assert be._prove_equal(And(w == k, x * y == z), w, k, 30000, None) is not None
+    assert be._prove_equal(And(w == k, x * y == z), w, k, 2000, None) is not None
+    assert budgets == [be._LIGHT_MS, 2000]
