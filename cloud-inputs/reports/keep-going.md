@@ -78,7 +78,33 @@ PYTHONPATH=. BLOCK_KEEP_GOING=1 poetry run python tools/probe_block_obligations.
 
 ## 4. 测试结果
 
-（见下文）
+命令：`PYTHONPATH=. poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider`（云端 4 核，未加 `-x`，以便看到全部失败）。
+
+| 运行 | 结果 | 耗时 |
+|---|---|---|
+| 改动前（`cloud/b3b-final` 4d56743） | **1661 passed、2 skipped、10 deselected、0 failed** | 1140s |
+| 改动后（`cloud/keep-going`） | **1673 passed、2 skipped、10 deselected、0 failed** | 1123s |
+
+多出的 12 条就是新测试。msize_absint 相关测试全部通过，没有已知例外。
+
+新测试按节点 ID 用 `-v` 逐条单独跑过：12 条都被收集到，都通过，没有同名覆盖。
+
+| 测试 | 验证内容 |
+|---|---|
+| `test_keep_going_reports_both_failures_and_the_node_is_not_proved` | 真实 prover（muti_block pc=120）：`pair_0_0`、`pair_1_1` 失败，打开开关后 4 条 pair 全部被尝试，两条都在 `kept_failures`/`reasons` 里，`proved` 为假，`theorem` 为 None |
+| `test_default_stops_at_the_first_failure` | 同一场景、开关关闭：只尝试到 `pair_0_0`，之后的 pair 一条都没有被尝试，消息格式和原来一样 |
+| `test_kept_failures_survive_a_later_budget_abort` | 记录一条失败之后再遇到 `ProofBudgetExceeded`：节点中止，已记录的失败仍然输出 |
+| `test_keep_going_without_failures_still_proves` | 没有失败时，打开开关也照常 proved |
+| `test_pair_phase_keep_going_collects_failures_of_both_rounds` | `_pair_phase`：第一轮非提议行的失败和第二轮降级行的失败都被记录，`theorem.complete` 为假 |
+| `test_pair_phase_keep_going_with_pair_workers` | 同上，走 `BLOCK_PAIR_WORKERS=2` 的进程池路径，结果一致 |
+| `test_pair_phase_default_raises_at_the_first_failure` | 同上、开关关闭：在 `pair_0_0` 处抛出 |
+| `test_tolerated_proposal_failure_is_not_a_kept_failure` | 只有提议失败、降级后证出：不算 keep-going 失败，节点 complete |
+| `test_cli_keep_going_lists_every_failure` | CLI `--keep-going`：JSON 列出两条失败（name/answer/seconds），退出码 1，节点 inconclusive |
+| `test_cli_environment_switch` | `BLOCK_KEEP_GOING=1` 等价于 `--keep-going` |
+| `test_cli_default_is_off` | 默认关闭：`keep_going_failures` 为空，只有第一条失败 |
+| `test_production_never_enables_keep_going` | 参数默认 False；三个生产模块的源码里不出现 `keep_going`/`KEEP_GOING` |
+
+原有的相关测试（`test_block_prefix_maps.py`、`test_block_probe_cli.py`、`test_block_pair_workers.py`）单独跑过：32 passed。
 
 ## 5. 离线验证数据
 
