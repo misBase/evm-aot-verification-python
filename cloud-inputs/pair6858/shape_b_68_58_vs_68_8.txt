@@ -1,0 +1,85 @@
+A: premise conjuncts 1 (flattened 285), goal parts 7
+  part 0: 130 nodes, sha3 0, products 0: (let ((a!1 (lambda ((alpha_b1_0 (_ BitVec 64)))
+             (! (select blk5377_30_None_None_evm_mem0
+                        (bvsub alpha_b1_0 R15_mem_base))
+ 
+  part 1: 46 nodes, sha3 0, products 0: (let ((a!1 (concat ((_ extract 63 56)
+                     ((_ extract 63 0)
+                       (concat blk5377_30_None_None_stack_26_z3
+                   
+  part 2: 1289 nodes, sha3 1, products 0: (let ((a!1 ((_ extract 63 0)
+             (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000040)
+                     (select blk5377_30_None_None_ev
+  part 3: 2 nodes, sha3 0, products 0: (= Storage Storage)
+  part 4: 2 nodes, sha3 0, products 0: (= TransientStorage TransientStorage)
+  part 5: 4 nodes, sha3 0, products 0: (= #x0c ((_ extract 7 0) #x000000000000000c))
+  part 6: 1210 nodes, sha3 0, products 39: (let ((a!1 (bvshl (bvlshr (bvadd ((_ extract 63 0)
+                                   #x0000000000000000000000000000000000000000000000000000000000000040)
+      
+  sha3_slice in premise: 0, products in premise: 25
+B: premise conjuncts 1 (flattened 285), goal parts 7
+  part 0: 130 nodes, sha3 0, products 0: (let ((a!1 (lambda ((alpha_b1_0 (_ BitVec 64)))
+             (! (select blk5377_30_None_None_evm_mem0
+                        (bvsub alpha_b1_0 R15_mem_base))
+ 
+  part 1: 46 nodes, sha3 0, products 0: (let ((a!1 (concat ((_ extract 63 56)
+                     ((_ extract 63 0)
+                       (concat blk5377_30_None_None_stack_26_z3
+                   
+  part 2: 1289 nodes, sha3 1, products 0: (let ((a!1 ((_ extract 63 0)
+             (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000040)
+                     (select blk5377_30_None_None_ev
+  part 3: 2 nodes, sha3 0, products 0: (= Storage Storage)
+  part 4: 2 nodes, sha3 0, products 0: (= TransientStorage TransientStorage)
+  part 5: 4 nodes, sha3 0, products 0: (= #x0c ((_ extract 7 0) #x000000000000000c))
+  part 6: 1210 nodes, sha3 0, products 39: (let ((a!1 (bvshl (bvlshr (bvadd ((_ extract 63 0)
+                                   #x0000000000000000000000000000000000000000000000000000000000000040)
+      
+  sha3_slice in premise: 0, products in premise: 25
+common 234, only A 3, only B 3
+--- only A [0] (263 chars)
+(let ((a!1 ((_ extract 64 64)
+             (bvadd (concat #b0 CallDataSize)
+                    (bvmul #b11111111111111111111111111111111111111111111111111111111111111111
+                           (concat #b0 blk5377_30_None_None_stack_18_z0))))))
+  (= a!1 #b0))
+--- only A [1] (149 chars)
+(= (bvor blk5377_30_None_None_stack_18_z1
+         blk5377_30_None_None_stack_18_z2
+         blk5377_30_None_None_stack_18_z3)
+   #x0000000000000000)
+--- only A [2] (1171 chars)
+(let ((a!1 ((_ extract 63 37)
+             (bvadd (concat (select blk5377_30_None_None_evm_mem0
+                                    #x0000000000000058)
+                            (select blk5377_30_None_None_evm_mem0
+                                    #x0000000000000059)
+                            (select blk5377_30_None_None_evm_mem0
+                                    #x000000000000005a)
+                            (select blk5377_30_None_None_evm_mem0
+                                    #x000000000000005b)
+                            (select blk5377_30_None_None_evm_mem0
+                
+--- only B [0] (208 chars)
+(let ((a!1 (= ((_ extract 64 64)
+                (bvadd #b10000000000000000000000000000000000000000000000000000000000000001
+                       (concat #b0 CallDataSize)))
+              #b0)))
+  (not a!1))
+--- only B [1] (170 chars)
+(not (= (bvor blk5377_30_None_None_stack_18_z1
+              blk5377_30_None_None_stack_18_z2
+              blk5377_30_None_None_stack_18_z3)
+        #x0000000000000000))
+--- only B [2] (1171 chars)
+(let ((a!1 ((_ extract 63 37)
+             (bvadd (concat (select blk5377_30_None_None_evm_mem0
+                                    #x0000000000000058)
+                            (select blk5377_30_None_None_evm_mem0
+                                    #x0000000000000059)
+                            (select blk5377_30_None_None_evm_mem0
+                                    #x000000000000005a)
+                            (select blk5377_30_None_None_evm_mem0
+                                    #x000000000000005b)
+                            (select blk5377_30_None_None_evm_mem0
+                

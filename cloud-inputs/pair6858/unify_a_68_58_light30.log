@@ -1,0 +1,671 @@
+normalize 12.1s
+  light budget=30000ms parts=197 0.75s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.16s -> miss
+  light budget=30000ms parts=197 0.23s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 3.75s -> miss
+  light budget=30000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.44s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 0.92s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 0.56s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.95s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 1.64s -> miss
+  light budget=30000ms parts=197 0.22s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.35s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.54s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.31s -> miss
+  light budget=30000ms parts=197 0.24s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 3.07s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.18s -> miss
+  light budget=30000ms parts=197 0.21s -> miss
+  core answer=sat 1.91s -> miss
+  light budget=30000ms parts=197 0.22s -> miss
+  core answer=sat 0.78s -> miss
+  light budget=30000ms parts=197 0.25s -> miss
+  core answer=sat 0.46s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 0.63s -> miss
+  light budget=30000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.35s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 3.26s -> miss
+  light budget=30000ms parts=197 0.24s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.30s -> miss
+  light budget=30000ms parts=197 0.24s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.24s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 1.01s -> miss
+  light budget=30000ms parts=197 0.22s -> miss
+  core answer=sat 0.38s -> miss
+  light budget=30000ms parts=197 0.23s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.30s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 1.95s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.43s -> miss
+  light budget=30000ms parts=197 0.17s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 3.55s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.87s -> miss
+  light budget=30000ms parts=197 0.20s -> miss
+  core answer=sat 1.10s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.52s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.07s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.39s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 1.06s -> miss
+  light budget=30000ms parts=197 0.22s -> miss
+  core answer=sat 0.85s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.79s -> miss
+  light budget=30000ms parts=197 0.20s -> miss
+  core answer=sat 1.90s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 0.93s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.13s -> miss
+  cases 1.04s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 0.92s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.86s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.53s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.30s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.72s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.04s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.09s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 0.93s -> miss
+  light budget=30000ms parts=197 0.22s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.35s -> miss
+  light budget=30000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.76s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=sat 1.01s -> miss
+  light budget=30000ms parts=197 0.20s -> miss
+  core answer=sat 1.32s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 4.71s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 7.40s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.32s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.37s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.21s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.54s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.50s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.51s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 0.46s -> miss
+  light budget=30000ms parts=197 0.22s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 4.31s -> miss
+  light budget=30000ms parts=197 0.17s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 0.97s -> miss
+  light budget=30000ms parts=197 0.17s -> miss
+  core answer=sat 1.94s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.22s -> miss
+  light budget=30000ms parts=197 0.17s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.26s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.11s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.48s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.47s -> miss
+  light budget=30000ms parts=197 0.17s -> miss
+  core answer=sat 1.20s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 2.01s -> miss
+  light budget=30000ms parts=197 0.22s -> miss
+  core answer=sat 1.02s -> miss
+  light budget=30000ms parts=197 0.22s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.18s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 2.08s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 1.92s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 0.96s -> miss
+  light budget=30000ms parts=197 0.21s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.17s -> miss
+  light budget=30000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.26s -> miss
+  light budget=30000ms parts=197 0.20s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.13s -> miss
+  light budget=30000ms parts=197 0.18s -> miss
+  core answer=sat 2.00s -> miss
+  light budget=30000ms parts=197 0.20s -> miss
+  core answer=sat 1.77s -> miss
+  light budget=30000ms parts=197 1.02s -> hit
+  light budget=30000ms parts=198 30.25s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.26s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.15s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.50s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 2.03s -> miss
+  light budget=2000ms parts=197 0.24s -> miss
+  core answer=sat 1.68s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.14s -> miss
+  light budget=2000ms parts=197 0.17s -> miss
+  core answer=sat 1.64s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.48s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.71s -> miss
+  light budget=2000ms parts=197 0.17s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.12s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.49s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.69s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.66s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.67s -> miss
+  light budget=2000ms parts=197 0.17s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.26s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.67s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.12s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.15s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.29s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.20s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.68s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.92s -> miss
+  light budget=2000ms parts=197 0.26s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.69s -> miss
+  light budget=2000ms parts=197 0.17s -> miss
+  core answer=sat 1.50s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.81s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.95s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.97s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.74s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.93s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=sat 1.62s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.91s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.09s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.58s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.75s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.13s -> miss
+  light budget=2000ms parts=197 0.17s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.23s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 2.03s -> miss
+  light budget=2000ms parts=197 0.21s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.10s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.28s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.02s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.37s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=sat 0.79s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.39s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 1.51s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 1.38s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 0.44s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.51s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.13s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.85s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.41s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.08s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.98s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.08s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.18s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.51s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.11s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.80s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.14s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.96s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.59s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.01s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.38s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 0.37s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 0.81s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.26s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.28s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=sat 1.78s -> miss
+  light budget=2000ms parts=197 0.24s -> miss
+  core answer=sat 1.34s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.07s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 2.03s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.05s -> miss
+  light budget=2000ms parts=197 0.24s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.80s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.22s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.52s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.59s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.14s -> miss
+  light budget=2000ms parts=197 0.21s -> miss
+  core answer=sat 1.83s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.45s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.63s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.12s -> miss
+  cases 1.44s -> miss
+  light budget=2000ms parts=197 0.24s -> miss
+  core answer=sat 1.90s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.09s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 0.58s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 1.25s -> miss
+  light budget=2000ms parts=197 0.24s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.74s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.50s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.87s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.08s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.22s -> miss
+  light budget=2000ms parts=197 0.23s -> miss
+  core answer=sat 1.42s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.20s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 0.67s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.11s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 1.27s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.74s -> miss
+  light budget=2000ms parts=197 0.23s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.31s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=sat 1.48s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.75s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.34s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.60s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.82s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.03s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.28s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.91s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.33s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.43s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.12s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.19s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.29s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 0.50s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.81s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.16s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.67s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 0.70s -> miss
+  light budget=2000ms parts=197 0.21s -> miss
+  core answer=sat 0.75s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.11s -> miss
+  cases 1.30s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.65s -> miss
+  light budget=2000ms parts=197 0.26s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.27s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.14s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.35s -> miss
+  light budget=2000ms parts=197 0.24s -> miss
+  core answer=sat 0.28s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.08s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 0.87s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.24s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 1.54s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.67s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.25s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.41s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.60s -> miss
+  light budget=2000ms parts=197 0.21s -> miss
+  core answer=sat 1.69s -> miss
+  light budget=2000ms parts=197 0.21s -> miss
+  core answer=sat 1.07s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.89s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.89s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.44s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.42s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 1.06s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.71s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.44s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 1.81s -> miss
+  light budget=2000ms parts=197 0.21s -> miss
+  core answer=unknown 2.12s -> miss
+  cases 1.42s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.16s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.21s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 2.42s -> miss
+  light budget=2000ms parts=197 0.23s -> miss
+  core answer=sat 1.29s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.14s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 2.06s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.22s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 0.85s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.24s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.24s -> miss
+  core answer=unknown 2.12s -> miss
+  cases 1.19s -> miss
+  light budget=2000ms parts=197 0.21s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.26s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 1.29s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.63s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.33s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 0.85s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.83s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 1.33s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.36s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=sat 1.64s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.59s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.29s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=sat 1.74s -> miss
+  light budget=2000ms parts=197 0.22s -> miss
+  core answer=sat 1.47s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 0.95s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 0.51s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.55s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.55s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.11s -> miss
+  cases 1.34s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 0.78s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 2.01s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.11s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 0.88s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.14s -> miss
+  light budget=2000ms parts=197 0.21s -> miss
+  core answer=sat 1.24s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 0.96s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.08s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.95s -> miss
+  light budget=2000ms parts=197 0.20s -> miss
+  core answer=sat 0.75s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=sat 1.35s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.10s -> miss
+  cases 2.07s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.34s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 1.18s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.85s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.08s -> miss
+  light budget=2000ms parts=197 0.19s -> miss
+  core answer=unknown 2.09s -> miss
+  cases 2.07s -> miss
+  light budget=2000ms parts=197 0.18s -> miss
+  core answer=sat 1.47s -> miss
+  cases 120.34s -> miss
+unify*: unknown 1250.1s lemmas=[]
