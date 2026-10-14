@@ -35,6 +35,7 @@ from common.store_forwarding import _memoized, _subtract_base_term, forward_sele
 from verification.alpha_canon import binder_capture_risk, canon_binders
 from verification.loop_induction import run_evm_segment, run_x86_segment, terminal_observable_conditions
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
+from x86_64.cfg_state import PrefixSolver
 
 
 def _semantic_sources_digest():
@@ -110,26 +111,32 @@ def _solve_query(formula, timeout_ms):
     return answer
 
 
-def unsat_core(assertions, goal, timeout_ms):
-    """Indices of `assertions` in an unsat core of assertions ∧ goal, or None."""
+def unsat_core(assertions, goal, timeout_ms, outcome=None):
+    """Indices of `assertions` in an unsat core of assertions ∧ goal, or None.
+    `outcome` (optional dict) gets the solver's answer as "answer"."""
     key = proof_cache.query_key("core", *assertions, goal) if proof_cache.enabled() else None
     if key is not None:
         cached = proof_cache.lookup(key)
         if isinstance(cached, list):
+            if outcome is not None:
+                outcome["answer"] = "unsat"
             return cached
-    core = _unsat_core(assertions, goal, timeout_ms)
+    core = _unsat_core(assertions, goal, timeout_ms, outcome)
     if key is not None and core is not None:
         proof_cache.store(key, core)
     return core
 
 
-def _unsat_core(assertions, goal, timeout_ms):
+def _unsat_core(assertions, goal, timeout_ms, outcome=None):
     solver = _solver(timeout_ms, And(*assertions, goal))
     tracks = [FreshConst(BoolVal(True).sort(), "core") for _ in assertions]
     for assertion, track in zip(assertions, tracks):
         solver.assert_and_track(assertion, track)
     solver.add(goal)
-    if solver.check() != unsat:
+    answer = solver.check()
+    if outcome is not None:
+        outcome["answer"] = str(answer)
+    if answer != unsat:
         return None
     core = {t.get_id() for t in solver.unsat_core()}
     return [i for i, t in enumerate(tracks) if t.get_id() in core]
@@ -1492,6 +1499,32 @@ def _goal_split(formula):
 
 
 _GOAL_NAME = re.compile(r"_goal_(\d+)_of_(\d+)$")
+# Diagnostic / A-B switch: BLOCK_ROUTE_ORDER=static keeps the fixed route table.
+_ROUTE_ORDER_STATIC = __import__("os").environ.get("BLOCK_ROUTE_ORDER") == "static"
+
+
+def _route_class(name):
+    """Obligations whose routes behave alike: the name without its path
+    indices, goal-split parts kept apart (pair_67_9_goal_2_of_7 ->
+    pair_goal_2_of_7, x86_maps_3_5 -> x86_maps). Siblings of one node share
+    the relation goals, so part k of every pair has the same shape."""
+    m = _GOAL_NAME.search(name)
+    base = name[:m.start()] if m else name
+    return re.sub(r"(_\d+)+$", "", base) + (m.group(0) if m else "")
+
+
+def _winners_first(routes, stats):
+    """`routes` with those that refuted an obligation of this class before
+    first (most refutations per second spent on the route, wins and misses,
+    first); the rest keep their order. `stats`: route -> (wins, seconds).
+
+    Only the order changes: every route is still tried until one refutes F.
+    Safe 5377 d30 pairs: the memory goal part is refuted only by normalised
+    unification, after ~400-470s of routes that never refute it.
+    """
+    won = sorted((r for r in routes if stats.get(r, (0, 0.0))[0]),
+                 key=lambda r: -stats[r][0] / max(stats[r][1], 1e-3))
+    return won + [r for r in routes if r not in won]
 
 
 def _array_disequality(term):
@@ -1537,6 +1570,76 @@ def skolemize_array_disequalities(formula, timeout_ms=1000):
                                  elapsed_seconds=monotonic() - started))
     if not lemmas:
         return formula, ()
+    return And(*out), tuple(lemmas)
+
+
+def _read_disequality(term):
+    """(A, i, B, j) for a top-level ¬(A[i] = B[j]) / distinct(A[i], B[j]), else None."""
+    if is_not(term) and is_eq(term.arg(0)):
+        term = term.arg(0)
+    elif not (is_distinct(term) and term.num_args() == 2):
+        return None
+    x, y = term.children()
+    if not (is_select(x) and is_select(y) and x.num_args() == 2 and y.num_args() == 2):
+        return None
+    return x.arg(0), x.arg(1), y.arg(0), y.arg(1)
+
+
+def _same_offset(kb, ka, d):
+    gap = simplify(kb - ka - d)
+    return is_bv_value(gap) and gap.as_long() == 0
+
+
+def peel_matching_stores(formula, timeout_ms=1000):
+    """F with each top-level ¬(A[i] = B[j]) whose arrays end in pairwise
+    matching stores replaced by the read of what lies below them; (F', lemmas)
+    or None when nothing peels.
+
+    A = store(X, a, v), B = store(Y, b, u) match when b - a ≡ j - i (=: d)
+    and v ≡ u (word-level simplifier). Then A[i] ≠ B[j] implies X[i] ≠ Y[j]:
+    i = a would read v on both sides (j = a + d = b), and otherwise
+    j = i + d ≠ a + d = b too, so both reads fall through. Repeated from the
+    top of both chains while they match. F ⊨ F' (each replaced conjunct is
+    implied by its original), so only UNSAT of F' transfers back; the facts
+    i ≠ a are dropped, which only weakens F' further. The lemma refutes the
+    generic step (fresh arrays and words of the same sorts), valid for all
+    instances. Safe 5377 d30 pair_68_58: both memories write the same 320
+    bytes (EVM at fmp + k, x86 at R15 + fmp + k) over a CALLDATACOPY lambda;
+    the opaque UF query needs 113-126s, the peeled one 5s.
+    """
+    out, lemmas, sorts, peeled = [], [], [], 0
+    for term in _conjuncts(formula):
+        found = _read_disequality(term)
+        if found is None:
+            out.append(term)
+            continue
+        a, i, b, j = found
+        d, n = simplify(j - i), 0
+        while is_store(a) and is_store(b) and a.num_args() == 3 and b.num_args() == 3:
+            (x, ka, va), (y, kb, vb) = a.children(), b.children()
+            if not (_same_offset(kb, ka, d) and (va.eq(vb) or is_true(simplify(va == vb, bv_sort_ac=True)))):
+                break
+            a, b, n = x, y, n + 1
+        if not n:
+            out.append(term)
+            continue
+        if not any(s.eq(a.sort()) for s in sorts):
+            gx, gy = FreshConst(a.sort(), "peel_x"), FreshConst(a.sort(), "peel_y")
+            gi, ga, gd = (FreshConst(a.sort().domain(), f"peel_{s}") for s in "iad")
+            gv = FreshConst(a.sort().range(), "peel_v")
+            generic = And(Select(Store(gx, ga, gv), gi) != Select(Store(gy, ga + gd, gv), gi + gd),
+                          Select(gx, gi) == Select(gy, gi + gd))
+            started = monotonic()
+            answer = solve_query(generic, timeout_ms)
+            if answer != "unsat":
+                return None
+            sorts.append(a.sort())
+            lemmas.append(Obligation(f"store_peel_{len(lemmas)}", generic.sexpr(), answer,
+                                     elapsed_seconds=monotonic() - started))
+        out.append(simplify(Select(a, i) != Select(b, j)))
+        peeled += n
+    if not peeled:
+        return None
     return And(*out), tuple(lemmas)
 
 
@@ -1698,6 +1801,13 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
 
 
 def _no_binder(term):
+    # Memoized per term (pure; _memoized keeps the term alive, so its id stays its own):
+    # unify_uf_arguments and the light-premise probe ask it of every premise conjunct per
+    # candidate pair (Safe 5377 d30: ~195 conjuncts, 0.25s per pass, ~100 passes per pair).
+    return _memoized("no_binder", (term,), lambda: _no_binder_uncached(term))
+
+
+def _no_binder_uncached(term):
     seen, work = set(), [term]
     while work:
         t = work.pop()
@@ -1794,17 +1904,82 @@ def _differ(x, y):
     return x != y
 
 
+def _heavy(term):
+    """True if `term` has a product of non-literals or a UF application (the
+    multiplication abstraction's products, host results): the gas sums over
+    symbolic memory sizes, which dominate bit-blasting. Memoized as _no_binder
+    (0.5s per pass over a Safe 5377 d30 premise, once per candidate pair)."""
+    return _memoized("heavy", (term,), lambda: _heavy_uncached(term))
+
+
+def _heavy_uncached(term):
+    if _nonlinear_mul_terms(term):
+        return True
+    seen, work = set(), [term]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen or not is_app(t):
+            continue
+        seen.add(t.get_id())
+        if t.decl().kind() == Z3_OP_UNINTERPRETED and t.num_args() > 0:
+            return True
+        work.extend(t.children())
+    return False
+
+
+# ponytail: fixed 2s cap (the unsat_core probe's); the light queries measured 0.3-0.5s.
+_LIGHT_MS = 2000
+
+
+def _refute_over_light_premise(parts, goal, budget_ms, retry_ms=0):
+    """([(query, seconds)], kept conjunct ids) refuting `parts` without their
+    binder-free _heavy conjuncts, ∧ goal; or None.
+
+    `retry_ms` > budget_ms: an "unknown" (timed out, not SAT) query is solved
+    once more with that budget. Misses are SAT in ~0.2s (Safe 5377 d30), so
+    only queries near the cap pay; Safe 5377 d30 pair_68_58's sha3 memory
+    arguments refute in 0.9-2.1s against the 2s cap.
+
+    Dropping conjuncts only weakens a conjunction (every model of all parts is
+    one of the kept ones), so UNSAT of kept ∧ goal is UNSAT of parts ∧ goal;
+    SAT/unknown proves nothing and the caller goes on with every conjunct.
+    Only tried when something is dropped. Conjuncts under a binder (memory
+    goals) stay. Safe 5377 d30 pair_58_13: the two sha3 memory arguments are
+    equal under 8 linear conjuncts (0.3s); with all ~200 (gas sums of symbolic
+    msize) the query needs ~47s and the 2s-probe case tree gives up.
+    """
+    light = [c for c in parts if not (_no_binder(c) and _heavy(c))]
+    if len(light) == len(parts) or budget_ms <= 0:
+        return None
+    started = monotonic()
+    query = simplify(And(*light, goal))
+    answer = solve_query(query, budget_ms)
+    if answer == "unknown" and retry_ms > budget_ms:
+        answer = solve_query(query, retry_ms)
+    if answer != "unsat":
+        return None
+    return [(query, monotonic() - started)], frozenset(c.get_id() for c in light)
+
+
 def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     """Refuted queries showing premise ⊨ x = y, or None. UF applications are
     made opaque (only adds models), which keeps memory arrays out.
 
     `cache` (optional dict) reuses a refutation found under conjuncts Q ⊆ the
     current premise's conjuncts: P ⊇ Q, so P ∧ x≠y is UNSAT too. Failures are
-    only reused for premises no stronger than the failed one (time saving)."""
-    conjuncts = frozenset(c.get_id() for c in _conjuncts(premise))
+    only reused for premises no stronger than the failed one (time saving).
+
+    Keys and conjunct sets are AST ids, and the cache outlives the formulas
+    they came from: a proof entry keeps x, y and its conjuncts alive (third
+    field, flat: x, y, *conjuncts), so none of its ids can be recycled for
+    another term while cached (a recycled one could match a premise that does
+    not imply x = y). A failure entry holds nothing: a false match there only
+    costs a miss."""
+    parts = _conjuncts(premise)
+    conjuncts = frozenset(c.get_id() for c in parts)
     key = tuple(sorted((x.get_id(), y.get_id())))
     if cache is not None:
-        for used, proofs in cache.get(key, ()):
+        for used, proofs, _alive in cache.get(key, ()):
             if proofs is not None and used <= conjuncts:
                 return proofs
             if proofs is None and conjuncts <= used:
@@ -1812,20 +1987,36 @@ def _prove_equal(premise, x, y, budget_ms, deadline, cache=None):
     differ = _differ(x, y)
     opaque = _uf_app_constants(premise, differ)
     hide = (lambda t: substitute(t, *opaque)) if opaque else (lambda t: t)
+    light_ms, retry_ms = min(budget_ms, _LIGHT_MS), budget_ms
+    if deadline is not None:
+        left = int((deadline - monotonic()) * 1000)
+        light_ms, retry_ms = min(light_ms, left), min(retry_ms, left)
+    proofs = _refute_over_light_premise(parts, hide(differ), light_ms, retry_ms)
+    if proofs is not None:
+        if cache is not None:
+            kept = [c for c in parts if c.get_id() in proofs[1]]
+            cache.setdefault(key, []).append((proofs[1], proofs[0], (x, y, *kept)))
+        return proofs[0]
     if cache is not None:
         # Cache only the conjuncts the refutation used (unsat core), so the
         # lemma transfers to sibling pairs whose path conditions differ.
-        parts = _conjuncts(premise)
-        started = monotonic()
-        used = unsat_core([hide(c) for c in parts], hide(differ), min(budget_ms, 2000))
+        started, outcome = monotonic(), {}
+        used = unsat_core([hide(c) for c in parts], hide(differ), min(budget_ms, 2000), outcome)
         if used is not None:
             used = [parts[i] for i in used]
             proofs = [(And(*(hide(c) for c in used), hide(differ)), monotonic() - started)]
-            cache.setdefault(key, []).append((frozenset(c.get_id() for c in used), proofs))
+            cache.setdefault(key, []).append((frozenset(c.get_id() for c in used), proofs, (x, y, *used)))
             return proofs
+        if outcome.get("answer") == "sat":
+            # hide(premise) ∧ hide(differ) has a model: the case tree below refutes
+            # exactly that formula, so it cannot succeed (Safe 5377 d30 pairs: ~100
+            # such candidates per pair, 1.5-2.3s of case tree each). A failure
+            # entry, recorded under the full premise as a case-tree failure is.
+            cache.setdefault(key, []).append((conjuncts, None, ()))
+            return None
     proofs = _refute_by_cases(hide(premise), hide(differ), budget_ms, deadline)
     if cache is not None:
-        cache.setdefault(key, []).append((conjuncts, proofs))
+        cache.setdefault(key, []).append((conjuncts, proofs, () if proofs is None else (x, y, *parts)))
     return proofs
 
 
@@ -2132,6 +2323,46 @@ def discharge_maps_by_prefix(premise, x86_conditions, jobs, timeout_ms, deadline
     return done
 
 
+def _ordered_conjuncts(condition):
+    """Top-level conjuncts of a path condition in execution order (as_bool)."""
+    return list(condition.children()) if is_and(condition) else [condition]
+
+
+def disjoint_groups(premise, conditions):
+    """[(pairs, formula)]: every (i, k), i < k, in exactly one group.
+
+    Path conditions are And(conjuncts in execution order). If those of i and
+    k first differ at position L, with edges a and b, then
+    premise ∧ prefix_L ∧ a ∧ b is a sub-conjunction of premise ∧ e_i ∧ e_k,
+    so its UNSAT refutes the pair, and every pair diverging at the same
+    (prefix, a, b) shares it (Safe 5377: 3655 pairs, 322 groups). Executor
+    paths diverge at the two edges of one branch; complementary ones
+    (x and Not(x), or simplify(a ∧ b) false) need only a ∧ b. A pair where
+    one condition is a prefix of the other keeps its own full query. A group
+    may fail where its pairs hold (edges that exclude each other only with
+    later conjuncts): the caller then checks those pairs' full queries.
+    """
+    paths = [_ordered_conjuncts(c) for c in conditions]
+    out, shared = [], {}
+    for i in range(len(paths)):
+        for k in range(i + 1, len(paths)):
+            a, b, size = paths[i], paths[k], 0
+            while size < min(len(a), len(b)) and a[size].eq(b[size]):
+                size += 1
+            if size == len(a) or size == len(b):
+                out.append(([(i, k)], And(premise, conditions[i], conditions[k])))
+                continue
+            key = (tuple(c.get_id() for c in a[:size]), a[size].get_id(), b[size].get_id())
+            if key not in shared:
+                x, y = a[size], b[size]
+                complementary = ((is_not(x) and x.arg(0).eq(y)) or (is_not(y) and y.arg(0).eq(x))
+                                 or is_false(simplify(And(x, y))))
+                shared[key] = ([], And(x, y) if complementary else And(premise, *a[:size], x, y))
+                out.append(shared[key])
+            shared[key][0].append((i, k))
+    return out
+
+
 def propose_from_siblings(correspondence, x86):
     """Replace "all" by the EVM index every mapped sibling (same kind and
     location) agrees on. Only a proposal: if any of its obligations fails,
@@ -2298,6 +2529,8 @@ class BlockProofResult:
     context: object = field(default=None, repr=False)
     premise: object = field(default=None, repr=False)
     elapsed_seconds: float = 0.0
+    # keep_going only (diagnostics): every pair-phase failure that did not stop the node.
+    kept_failures: tuple = ()
     _issuer: object = field(default=None, repr=False)
 
     def _proved_for_identity(self, current_identity):
@@ -2328,7 +2561,7 @@ class BlockEquivalenceProver:
     def __init__(self, evm_blocks, x86_blocks, pc_to_addr, schema=None, *,
                  timeout_ms=30_000, max_depth=400, aot_profile=None,
                  compare_gas=True, host_gas_uf_enabled=True, summary_config=None,
-                 deadline=None, max_path_pairs=100_000, node_timeout_seconds=None):
+                 deadline=None, max_path_pairs=100_000, node_timeout_seconds=None, keep_going=False):
         self.evm_blocks = list(evm_blocks)
         self.x86_blocks = list(x86_blocks)
         self.pc_to_addr = dict(pc_to_addr)
@@ -2345,9 +2578,15 @@ class BlockEquivalenceProver:
         # same terms keep the same ids and _prove_equal's cache hits.
         self._mul_functions, self._lemma_cache = {}, {}
         self._node_needed_unification = False
+        self._route_stats = {}  # _route_class -> {route: (wins, seconds)}, see _winners_first
         self._potential_pending = None  # (input, target, lemmas): a capped potential solve that ran out
         self.node_timeout_seconds = node_timeout_seconds
         self.max_path_pairs = max_path_pairs
+        # Diagnostics only (tools/probe_block_obligations --keep-going): a failing
+        # pair-phase obligation is recorded in _kept_failures and the remaining rows
+        # are still checked; prove() then fails the node. Production never sets it.
+        self.keep_going = keep_going
+        self._kept_failures = []
         self._issued_theorems = []
         self._summary_templates = None
         self.call_site_mapping = None
@@ -2448,8 +2687,6 @@ class BlockEquivalenceProver:
                 left = timeout if self.deadline is None else int((self.deadline - monotonic()) * 1000)
                 answer = solve_query(simplify(formula), min(left, _QUICK_EXACT_MS)) if left > 0 else "unknown"
         if expected == "unsat" and answer == "unknown":
-            proved, answer, lemmas = self._retry_over_lia(formula)
-        if expected == "unsat" and answer == "unknown":
             # Same routes either way; once a sibling pair needed unification
             # it goes first, sparing the abstraction attempt that rarely yields.
             # "norm" routes run on normalize_word_arith(F), an equivalent formula
@@ -2472,11 +2709,20 @@ class BlockEquivalenceProver:
             # store chains). One per-query budget only: it wins fast or not at all.
             # "potential" (telescoped memory charges, _retry_over_potential) next:
             # it returns at once unless memory-cost sums are present.
-            routes = ([("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
+            # "lia" (_retry_over_lia, own caps, no share) first: the LIA reading of
+            # product limbs, before the SAT routes.
+            routes = ([("lia", False), ("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
                        ("mul", False), ("mul", True), ("unify", True), ("unify", False)]
                       if not self._node_needed_unification else
-                      [("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("unify", True),
+                      [("lia", False), ("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("unify", True),
                        ("exact", True), ("unify", False), ("mul", True), ("mul", False)])
+            # Routes that refuted this class of obligation before go first (_winners_first);
+            # with no history the table above is unchanged.
+            stats = self._route_stats.setdefault(_route_class(name), {})
+            promoted = 0
+            if not _ROUTE_ORDER_STATIC:
+                routes = _winners_first(routes, stats)
+                promoted = sum(1 for r in routes if stats.get(r, (0, 0.0))[0])
             normalized = None
             node_deadline = self.deadline
             pending, self._potential_pending = None, None
@@ -2490,10 +2736,16 @@ class BlockEquivalenceProver:
                         continue  # nothing rewritten: the plain route covers it
                 # Each route gets an equal share of what is left (the direct
                 # query below keeps one share), so no route starves the rest.
-                if node_deadline is not None:
-                    self.deadline = monotonic() + (node_deadline - monotonic()) / (len(routes) - index + 1)
+                # A promoted route (it refuted this class before) gets half: it is
+                # expected to need what it needed there (Safe 5377 unify: 190-320s).
+                if node_deadline is not None and route != "lia":
+                    shares = 1 if index < promoted else sum(1 for r, _ in routes[index:] if r != "lia")
+                    self.deadline = monotonic() + (node_deadline - monotonic()) / (shares + 1)
+                route_started = monotonic()
                 try:
-                    if route == "quick":
+                    if route == "lia":
+                        proved, answer, lemmas = self._retry_over_lia(target)
+                    elif route == "quick":
                         # Quick exact on F' first: once guards are decided both sides often
                         # agree syntactically (CErc20 10233 x86_maps_1_19: 0.5s; potential 127s).
                         budget = min(_QUICK_EXACT_MS, int((self.deadline - monotonic()) * 1000)
@@ -2554,6 +2806,8 @@ class BlockEquivalenceProver:
                     proved, answer, lemmas = formula, "unknown", ()
                 finally:
                     self.deadline = node_deadline
+                wins, seconds = stats.get((route, norm), (0, 0.0))
+                stats[(route, norm)] = (wins + (answer == "unsat"), seconds + monotonic() - route_started)
                 ours = self._potential_pending
                 if pending is None and ours is not None and ours[0].eq(target):
                     pending = (ours[1], ours[2], rewrites)
@@ -2747,27 +3001,57 @@ class BlockEquivalenceProver:
         n, m = len(evm), len(x86)
         if n < 2 or n * m <= n * (n - 1) // 2 + 2 * m:
             return ()
-        disjoint = [(f"evm_disjoint_{i}_{k}", And(premise, evm[i].condition, evm[k].condition), "")
-                    for i in range(n) for k in range(i + 1, n)]
-        trial = []
-        checks = self._check_all(disjoint, trial)
+        def full(i, k):
+            return And(premise, evm[i].condition, evm[k].condition)
+        # One proof per divergence group (disjoint_groups), recorded under
+        # every pair name it covers. A group refuted only with more of the
+        # path (edges that do not exclude each other on their own) falls back
+        # to its pairs' full queries; any failure there is an overlap.
+        groups, proofs, trial = disjoint_groups(premise, [e.condition for e in evm]), {}, []
+        checks = self._check_all([("evm_disjoint_%d_%d" % pairs[0], formula, "") for pairs, formula in groups], trial)
         try:
-            if not all(checks):
-                return ()
+            for (pairs, formula), proved in zip(groups, checks):
+                if proved:
+                    proofs.update((f"evm_disjoint_{i}_{k}", replace(trial[-1], name=f"evm_disjoint_{i}_{k}"))
+                                  for i, k in pairs)
+                    continue
+                if len(pairs) == 1 and formula.eq(full(*pairs[0])):
+                    return ()
+                sub = []
+                inner = self._check_all([(f"evm_disjoint_{i}_{k}", full(i, k), "") for i, k in pairs], sub)
+                try:
+                    if not all(inner):
+                        return ()
+                finally:
+                    inner.close()
+                proofs.update((r.name, r) for r in sub)
         finally:
             checks.close()
-        records.extend(trial)
+        records.extend(proofs[f"evm_disjoint_{i}_{k}"] for i in range(n) for k in range(i + 1, n))  # manifest order
         correspondence, unknown = [], []
+        # Mapping proposals. First the executor's last model of the path, if it
+        # still satisfies premise ∧ x_j (170 of 171 rows on Safe 5377); else one
+        # incremental solver over [premise, conjuncts of x_j]: rows share long
+        # prefixes (Safe 5377: 300s, 44 unknown -> 62s, 2 unknown, every decided
+        # row the same). Either way only a proposal (see above).
+        logic = _bv_array_formula(And(premise, *(x.condition for x in x86)))
+        prefix = PrefixSolver(SolverFor("QF_AUFBV") if logic else Solver())
         for j, x in enumerate(x86):
+            witness = getattr(x, "witness", None)
+            if witness is not None and is_true(witness.eval(And(premise, x.condition), model_completion=True)):
+                hits = [i for i, e in enumerate(evm)
+                        if is_true(witness.eval(e.condition, model_completion=True))]
+                if len(hits) == 1:
+                    correspondence.append(hits[0])
+                    continue
             budget = min(_QUICK_EXACT_MS, self.timeout_ms)
             if self.deadline is not None:
                 budget = min(budget, int((self.deadline - monotonic()) * 1000))
             if budget <= 0:
                 raise ProofBudgetExceeded("proof wall budget exhausted")
-            query = And(premise, x.condition)
-            solver = _solver(budget, query)
-            solver.add(query)
-            answer = solver.check()
+            # Wall clock = the budget, as the fresh per-row solver had (not the
+            # reachability 10x safety net): a row must not overrun the node deadline.
+            answer = prefix.check([premise, *_ordered_conjuncts(x.condition)], budget, "correspondence", budget)
             if answer not in (sat, unsat):
                 unknown.append(j)
             if answer == unsat:
@@ -2775,7 +3059,7 @@ class BlockEquivalenceProver:
                 continue
             target = "all"
             if answer == sat:
-                model = solver.model()
+                model = prefix.solver.model()
                 hits = [i for i, e in enumerate(evm)
                         if is_true(model.eval(e.condition, model_completion=True))]
                 if len(hits) == 1:
@@ -2976,9 +3260,26 @@ class BlockEquivalenceProver:
             budget = self.timeout_ms if self.deadline is None else min(
                 self.timeout_ms, int((self.deadline - started) * 1000))
             query = simplify(substitute(unified, *opaque))
-            if budget > 0 and solve_query(query, budget) == "unsat":
-                return query, "unsat", lemmas + (
-                    Obligation("opaque_array_uf", query.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
+            # Both memories' matching top stores peeled off first (a weakening, see
+            # peel_matching_stores; Safe 5377 d30 pair_68_58: 113-126s -> 5s). If the
+            # weaker query is not refuted, the unpeeled one is tried as before.
+            peeled = peel_matching_stores(query)
+            attempts = ((("opaque_array_uf_peeled",) + peeled,) if peeled is not None else ()) + (
+                ("opaque_array_uf", query, ()),)
+            for tag, target, peel_lemmas in attempts:
+                # Gas sums out first (Safe 5377 d30 pair_68_9: 10s here, 60s+ with them).
+                light = _refute_over_light_premise(_conjuncts(target), BoolVal(True), budget)
+                if light is not None:
+                    (light_query, seconds), = light[0]
+                    return light_query, "unsat", lemmas + peel_lemmas + (
+                        Obligation(f"{tag}_light", light_query.sexpr(), "unsat", elapsed_seconds=seconds),)
+                if self.deadline is not None:
+                    budget = min(budget, int((self.deadline - monotonic()) * 1000))
+                if budget > 0 and solve_query(target, budget) == "unsat":
+                    return target, "unsat", lemmas + peel_lemmas + (
+                        Obligation(tag, target.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
+                if self.deadline is not None:
+                    budget = min(self.timeout_ms, int((self.deadline - monotonic()) * 1000))
         before = unified
         unified, swept = sweep_equalities(unified, self.timeout_ms, self.deadline, cache=self._lemma_cache)
         if swept:  # merged subterms can make more UF arguments syntactically equal
@@ -3090,7 +3391,9 @@ class BlockEquivalenceProver:
         (the full product if it is ()), appending their records. Names in
         `ready` (proved records) are not checked again; "all" rows add their
         shared-prefix proofs to it. A failing obligation of a row in
-        `tolerated` marks that row; any other failure fails the node.
+        `tolerated` marks that row; any other failure fails the node: at once,
+        or with keep_going after the remaining items (recorded in
+        _kept_failures; prove() turns them into the node's failure).
         Returns the marked rows."""
         n = len(evm)
         alls = [j for j in rows if correspondence and correspondence[j] == "all"]
@@ -3134,7 +3437,11 @@ class BlockEquivalenceProver:
             for (row, *_), (name, _, where), ok in zip(items, pairs, checks):
                 if not ok:
                     if row not in tolerated:
-                        raise ValueError(f"outcome mismatch {name}: {where} (solver={records[-1].answer})")
+                        if not self.keep_going:
+                            raise ValueError(f"outcome mismatch {name}: {where} (solver={records[-1].answer})")
+                        self._kept_failures.append(dict(name=name, answer=records[-1].answer,
+                                                        seconds=records[-1].elapsed_seconds, where=where))
+                        continue
                     failed.add(row)
         finally:
             checks.close()
@@ -3151,6 +3458,8 @@ class BlockEquivalenceProver:
         runtime = None
         result = BlockProofResult(spec)
         self._node_needed_unification = False
+        self._route_stats = {}
+        self._kept_failures = []
         program_deadline = self.deadline
         if self.node_timeout_seconds is not None:
             node_deadline = started + self.node_timeout_seconds
@@ -3224,6 +3533,11 @@ class BlockEquivalenceProver:
 
             correspondence = self._pair_phase(evm, x86, premise, pair,
                                               self._correspondence(evm, x86, premise, records), records)
+            if self._kept_failures:
+                # keep_going: the same failure, raised after every row was tried.
+                raise ValueError(f"outcome mismatch ({len(self._kept_failures)} pair obligations, keep-going): "
+                                 + "; ".join(f"{f['name']}: {f['where']} (solver={f['answer']})"
+                                             for f in self._kept_failures))
             result.theorem = BlockTheorem(
                 self.identity, spec, tuple(records),
                 obligation_manifest(evm, x86, state, correspondence=correspondence),
@@ -3240,6 +3554,7 @@ class BlockEquivalenceProver:
             result.reasons += (f"{type(exc).__name__}: {exc}",)
         finally:
             self.deadline = program_deadline
+        result.kept_failures = tuple(self._kept_failures)  # also after a later abort (e.g. node budget)
         result.obligations = tuple(records)
         result.queries = len(records) + (runtime.proof_queries if runtime is not None else 0)
         result.elapsed_seconds = monotonic() - started
@@ -3283,5 +3598,14 @@ class BlockEquivalenceProver:
                     if not self._check(f"{label}_assumption_{len(justified)}", goal, records):
                         raise ValueError(f"{label}: unproved execution assumption")
                     justified.add(assumption.get_id())
-            if not self._check(f"{label}_coverage", And(premise, Not(Or(*(p.condition for p in paths)))), records):
+            name, coverage = f"{label}_coverage", And(premise, Not(Or(*(p.condition for p in paths))))
+            # The bvmul->UF route (_retry_over_nonlinear_mul: abstraction UNSAT
+            # is exact UNSAT) before _check's cascade: symbolic memory gas makes
+            # the exact coverage query slow (Safe 5377 x86: 251s -> 11s). A miss
+            # costs at most one query budget and falls through unchanged.
+            started = monotonic()
+            proved, answer, _ = self._retry_over_nonlinear_mul(coverage, "unknown")
+            if answer == "unsat":
+                records.append(Obligation(name, proved.sexpr(), "unsat", "unsat", monotonic() - started))
+            elif not self._check(name, coverage, records):
                 raise ValueError(f"{label}: outcome guards do not cover the entry domain")

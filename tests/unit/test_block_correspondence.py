@@ -96,15 +96,9 @@ def test_empty_probe_only_for_unknown_rows_without_sibling_proposal(monkeypatch)
     seven, big = x == 7, x == 200
     hard = {seven.get_id(), big.get_id()}  # rows whose quick query is "unknown"
     x86 = [at(ULT(x, 5), "A"), at(And(UGE(x, 5), ULT(x, 10)), "A"), at(UGE(x, 20), "C"), at(seven, "A"), at(big, "D")]
-    real, probed = be._solver, []
-
-    class Unknown:
-        def add(self, query):
-            pass
-
-        def check(self):
-            return z3.unknown
-    monkeypatch.setattr(be, "_solver", lambda budget, q: Unknown() if any(a.get_id() in hard for a in q.children()) else real(budget, q))
+    real, probed = be.PrefixSolver.check, []
+    monkeypatch.setattr(be.PrefixSolver, "check", lambda self, conjuncts, *a: z3.unknown
+                        if any(c.get_id() in hard for c in conjuncts) else real(self, conjuncts, *a))
     monkeypatch.setattr(be.BlockEquivalenceProver, "_empty_by_bvabs", lambda self, p, x: probed.append(x.location) or True)
     corr = be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)._correspondence(evm, x86, BoolVal(True), [])
     # Row 3's siblings at A agree on EVM 0 (prove() proposes it); only row 4 is probed for emptiness.

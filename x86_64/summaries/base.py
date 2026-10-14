@@ -10,6 +10,35 @@ from x86_64.models import Register, X86Block
 
 
 SummaryStart = Tuple[int, int]
+# refuted_by_complement looks at this many conjuncts, latest first: the
+# executor's exit-guard split appends Not(guard) last (then only CPU flags).
+COMPLEMENT_WINDOW = 16
+
+
+def refuted_by_complement(premise, goal) -> bool:
+    """True if premise ∧ goal is UNSAT without a solver call.
+
+    That is the case if simplify(goal) is false, or equals simplify(Not(c))
+    for one of the last COMPLEMENT_WINDOW top-level conjuncts c of premise:
+    simplify preserves equivalence, so goal ≡ ¬c and c ∧ goal ≡ false, and
+    every conjunction containing both is UNSAT. False only means "not
+    decided here" -- callers then run their solver query unchanged.
+    (memgas: the exit guard the executor already excluded on this path is
+    checked again by every application, 223 of 239 calls on Safe 5377.)
+    """
+    from z3 import Not, is_and, is_false, simplify
+
+    target = simplify(goal)
+    if is_false(target):
+        return True
+    work, conjuncts = [premise], []
+    while work:  # top-level conjuncts in order
+        term = work.pop()
+        if is_and(term):
+            work.extend(reversed(term.children()))
+        else:
+            conjuncts.append(term)
+    return any(simplify(Not(c)).eq(target) for c in reversed(conjuncts[-COMPLEMENT_WINDOW:]))
 SUMMARY_PLUGIN_MODES = frozenset({"off", "fallback", "strict"})
 
 
@@ -501,12 +530,13 @@ class X86SummaryRuntime:
         return None if guard is None else guard(summary, state)
 
     def apply(self, summary: X86Summary, state: SMTState,
-              path_condition=None) -> SMTState:
+              path_condition=None, witness=None) -> SMTState:
         """应用 summary。前提未被证明时抛 :class:`SummaryPreconditionError`。
 
         ``path_condition`` 是当前路径的累积约束——prove-or-reject 的 summary
         用它来**证明**自己的适用前提；不传则前提只能靠全局先验证明，通常会
-        被拒绝（fail-closed 方向）。
+        被拒绝（fail-closed 方向）。``witness`` 是该路径最近的可达性模型，
+        这里不用（VerifiedSummaryRuntime 用它回答 entry）。
         """
         self._instance_counter += 1
         fresh_prefix = f"{summary.kind}_summary_{self._instance_counter}"

@@ -43,6 +43,7 @@ from .base import (
     SummaryMatchError,
     SummaryPreconditionError,
     X86Summary,
+    refuted_by_complement,
     require_single_entry,
 )
 from .div import _Parser
@@ -254,6 +255,11 @@ def _require_implied(summary: X86Summary, state: SMTState, path_condition, goal,
     from z3 import SolverFor, unsat
 
     if simplify(goal).eq(BoolVal(True)):
+        return
+    # The executor's exit-guard split put Not(guard) into this very path
+    # condition: refuting path ∧ ¬goal syntactically refutes the full query
+    # (which only adds the state assumptions).
+    if path_condition is not None and refuted_by_complement(path_condition, Not(goal)):
         return
     solver = SolverFor("QF_AUFBV")
     solver.set(timeout=timeout_ms)

@@ -386,6 +386,40 @@ def _collect_facts(blocks: Sequence[EVMBlock], options: ProvenanceOptions) -> _F
     )
 
 
+@dataclass(frozen=True)
+class ReturnAwareCfg:
+    """给其他前向分析复用的 CFG 事实（``tools/msize_absint.py`` 的影子栈 CFG）。
+
+    字段与 ``_Facts`` 同源、同口径，只是公开出去；不含深度传播结果。
+    """
+
+    entry: int
+    by_pc: Mapping[int, EVMBlock]
+    #: 朴素后继（``build_evm_cfg``）；返回点的后继是其 ``immediate_set`` 全集
+    succs: Mapping[int, List[int]]
+    #: 全程序已解析返回站点（``evm_resolved_return_sites``）
+    pads: FrozenSet[int]
+    #: 返回点块 pc -> 活控制流 ``JUMP`` 的 ``immediate_set``（去重、保序）
+    ret_points: Mapping[int, Tuple[int, ...]]
+
+
+def build_return_aware_cfg(evm_blocks: Sequence[EVMBlock]) -> ReturnAwareCfg:
+    """抽出返回点 / 返回 pad / 朴素后继，供影子栈式分析使用。
+
+    与 :func:`build_call_provenance` 共用 ``_collect_facts``，因此同样 fail-closed：
+    JUMPI 上的 ``immediate_set``、动态未解析跳转、跳转目标不落在块上一律抛
+    :class:`UnsupportedJumpShape`——CFG 缺边会让下游前向分析静默漏状态。
+    """
+    facts = _collect_facts(evm_blocks, DEFAULT_OPTIONS)
+    return ReturnAwareCfg(
+        entry=facts.entry,
+        by_pc=facts.blocks_by_pc,
+        succs=facts.succs,
+        pads=facts.pads,
+        ret_points=facts.return_points,
+    )
+
+
 # ---------------------------------------------------------------------------
 # 静态交集判据（**只进报告，不参与建图**——见模块文档坑 1）
 # ---------------------------------------------------------------------------
