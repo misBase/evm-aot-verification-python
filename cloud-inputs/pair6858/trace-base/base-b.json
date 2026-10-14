@@ -1,0 +1,307 @@
+{
+ "name": "b-pair_68_58.smt2",
+ "file": "b-pair_68_58.smt2",
+ "answer": "unknown",
+ "seconds": 2634.4,
+ "frames": [
+  {
+   "name": "b-pair_68_58.smt2",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.48
+    ],
+    [
+     "split",
+     "unknown",
+     2629.2
+    ]
+   ]
+  },
+  {
+   "name": "b-pair_68_58.smt2_goal_0_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.02
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "b-pair_68_58.smt2_goal_1_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.02
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "b-pair_68_58.smt2_goal_2_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.55
+    ],
+    [
+     "pin",
+     "unknown",
+     0.18
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "lia",
+     "unknown",
+     35.6
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "pre-normalize",
+     null,
+     0.0
+    ],
+    [
+     "normalize",
+     null,
+     12.22
+    ],
+    [
+     "quick*",
+     "unknown",
+     3.3
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "blast*",
+     "unknown",
+     188.68
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "alias*",
+     "unknown",
+     0.22
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "potential*",
+     "unknown",
+     127.74
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs*",
+     "unknown",
+     3.95
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs",
+     "unknown",
+     12.46
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "exact*",
+     "unknown",
+     60.33
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "mul",
+     "unknown",
+     30.81
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "mul*",
+     "unknown",
+     31.01
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "unify*",
+     "unknown",
+     1029.1
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "unify",
+     "unknown",
+     1034.21
+    ],
+    [
+     "tail",
+     "unknown",
+     55.58
+    ]
+   ]
+  }
+ ],
+ "probes": {
+  "light<_prove_equal@blast*": {
+   "hit": 1,
+   "miss": 11,
+   "hit_s": 0.75,
+   "miss_s": 2.85
+  },
+  "unsat_core:sat": {
+   "n": 162,
+   "s": 216.52
+  },
+  "unsat_core<_prove_equal@blast*": {
+   "hit": 0,
+   "miss": 11,
+   "hit_s": 0.0,
+   "miss_s": 19.57
+  },
+  "unsat_core:unknown": {
+   "n": 277,
+   "s": 589.14
+  },
+  "cases<_prove_equal@blast*": {
+   "hit": 0,
+   "miss": 4,
+   "hit_s": 0.0,
+   "miss_s": 5.2
+  },
+  "cases<_retry_over_nonlinear_mul@mul*": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 30.42
+  },
+  "light<_prove_equal@unify*": {
+   "hit": 1,
+   "miss": 272,
+   "hit_s": 1.08,
+   "miss_s": 58.9
+  },
+  "unsat_core<_prove_equal@unify*": {
+   "hit": 0,
+   "miss": 272,
+   "hit_s": 0.0,
+   "miss_s": 454.25
+  },
+  "cases<_prove_equal@unify*": {
+   "hit": 0,
+   "miss": 127,
+   "hit_s": 0.0,
+   "miss_s": 202.15
+  },
+  "light<_retry_with_uf_unification@unify*": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 30.27
+  },
+  "cases<_retry_with_uf_unification@unify*": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 120.35
+  },
+  "light<_prove_equal@unify": {
+   "hit": 13,
+   "miss": 156,
+   "hit_s": 7.56,
+   "miss_s": 57.99
+  },
+  "unsat_core<_prove_equal@unify": {
+   "hit": 0,
+   "miss": 156,
+   "hit_s": 0.0,
+   "miss_s": 331.85
+  },
+  "cases<_prove_equal@unify": {
+   "hit": 0,
+   "miss": 146,
+   "hit_s": 0.0,
+   "miss_s": 569.76
+  },
+  "light<_retry_with_uf_unification@unify": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 26.43
+  },
+  "cases<_retry_with_uf_unification@unify": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 0.21
+  }
+ }
+}

@@ -1,0 +1,731 @@
+[    0.3] pin_split None
+[   11.5] normalize 236
+[   12.3] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes))
+[   13.0]   light 0.73s -> miss budget=2000 parts=197
+[   14.6]   unsat_core 1.51s -> False {'answer': 'sat'}
+[   14.6]   _prove_equal 2.35s -> None
+[   14.6] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   14.8]   light 0.18s -> miss budget=2000 parts=197
+[   17.0]   unsat_core 2.08s -> False {'answer': 'unknown'}
+[   20.6]     solve_query 29997ms 3.61s -> sat caller=_refute_by_cases
+[   20.6]   cases 3.61s -> False budget=30000
+[   20.6]   _prove_equal 5.97s -> None
+[   20.6] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   20.9]   light 0.23s -> miss budget=2000 parts=197
+[   22.7]   unsat_core 1.70s -> False {'answer': 'sat'}
+[   22.7]   _prove_equal 2.06s -> None
+[   22.7] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   22.9]   light 0.21s -> miss budget=2000 parts=197
+[   24.9]   unsat_core 1.95s -> False {'answer': 'sat'}
+[   24.9]   _prove_equal 2.27s -> None
+[   24.9] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   25.2]   light 0.18s -> miss budget=2000 parts=197
+[   27.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[   29.0]     solve_query 29998ms 1.68s -> sat caller=_refute_by_cases
+[   29.0]   cases 1.68s -> False budget=30000
+[   29.0]   _prove_equal 4.06s -> None
+[   29.0] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   29.2]   light 0.19s -> miss budget=2000 parts=197
+[   30.7]   unsat_core 1.38s -> False {'answer': 'sat'}
+[   30.7]   _prove_equal 1.68s -> None
+[   30.7] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   30.9]   light 0.18s -> miss budget=2000 parts=197
+[   33.0]   unsat_core 2.08s -> False {'answer': 'unknown'}
+[   34.4]     solve_query 29998ms 1.41s -> sat caller=_refute_by_cases
+[   34.4]   cases 1.41s -> False budget=30000
+[   34.4]   _prove_equal 3.78s -> None
+[   34.4] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   34.7]   light 0.21s -> miss budget=2000 parts=197
+[   36.8]   unsat_core 2.03s -> False {'answer': 'sat'}
+[   36.8]   _prove_equal 2.34s -> None
+[   36.8] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   37.0]   light 0.19s -> miss budget=2000 parts=197
+[   38.5]   unsat_core 1.41s -> False {'answer': 'sat'}
+[   38.5]   _prove_equal 1.70s -> None
+[   38.5] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   38.7]   light 0.17s -> miss budget=2000 parts=197
+[   40.8]   unsat_core 2.00s -> False {'answer': 'sat'}
+[   40.8]   _prove_equal 2.27s -> None
+[   40.8] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   41.0]   light 0.18s -> miss budget=2000 parts=197
+[   42.1]   unsat_core 1.01s -> False {'answer': 'sat'}
+[   42.1]   _prove_equal 1.29s -> None
+[   42.1] _prove_equal budget=30000 x=74:(concat #b00000 ((_ extract 63 5) blk5377_30_None_None_memory_size_bytes)) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   42.3]   light 0.19s -> miss budget=2000 parts=197
+[   43.3]   unsat_core 0.98s -> False {'answer': 'sat'}
+[   43.3]   _prove_equal 1.28s -> None
+[   43.3] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   43.6]   light 0.21s -> miss budget=2000 parts=197
+[   44.7]   unsat_core 1.01s -> False {'answer': 'sat'}
+[   44.7]   _prove_equal 1.32s -> None
+[   44.7] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   44.9]   light 0.18s -> miss budget=2000 parts=197
+[   45.6]   unsat_core 0.68s -> False {'answer': 'sat'}
+[   45.6]   _prove_equal 0.96s -> None
+[   45.6] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   45.9]   light 0.21s -> miss budget=2000 parts=197
+[   47.9]   unsat_core 1.94s -> False {'answer': 'sat'}
+[   47.9]   _prove_equal 2.25s -> None
+[   47.9] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   48.1]   light 0.19s -> miss budget=2000 parts=197
+[   50.3]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[   63.2]     solve_query 29998ms 12.94s -> sat caller=_refute_by_cases
+[   63.2]   cases 12.94s -> False budget=30000
+[   63.2]   _prove_equal 15.35s -> None
+[   63.2] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   63.5]   light 0.18s -> miss budget=2000 parts=197
+[   65.2]   unsat_core 1.73s -> False {'answer': 'sat'}
+[   65.2]   _prove_equal 2.01s -> None
+[   65.2] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   65.5]   light 0.21s -> miss budget=2000 parts=197
+[   66.7]   unsat_core 1.14s -> False {'answer': 'sat'}
+[   66.7]   _prove_equal 1.46s -> None
+[   66.7] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   67.0]   light 0.20s -> miss budget=2000 parts=197
+[   69.1]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[   70.4]     solve_query 29998ms 1.27s -> sat caller=_refute_by_cases
+[   70.4]   cases 1.28s -> False budget=30000
+[   70.4]   _prove_equal 3.68s -> None
+[   70.4] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   70.7]   light 0.21s -> miss budget=2000 parts=197
+[   72.1]   unsat_core 1.43s -> False {'answer': 'sat'}
+[   72.1]   _prove_equal 1.75s -> None
+[   72.1] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   72.4]   light 0.19s -> miss budget=2000 parts=197
+[   74.2]   unsat_core 1.81s -> False {'answer': 'sat'}
+[   74.2]   _prove_equal 2.11s -> None
+[   74.2] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   74.5]   light 0.22s -> miss budget=2000 parts=197
+[   76.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[   79.1]     solve_query 29998ms 2.42s -> sat caller=_refute_by_cases
+[   79.1]   cases 2.42s -> False budget=30000
+[   79.1]   _prove_equal 4.83s -> None
+[   79.1] _prove_equal budget=30000 x=586:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f blk5377_30_None_None_stack_19_z0 (concat (select blk5377_30_None_ y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   79.3]   light 0.18s -> miss budget=2000 parts=197
+[   80.2]   unsat_core 0.83s -> False {'answer': 'sat'}
+[   80.2]   _prove_equal 1.12s -> None
+[   80.2] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   80.4]   light 0.18s -> miss budget=2000 parts=197
+[   82.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[   83.8]     solve_query 29998ms 1.26s -> sat caller=_refute_by_cases
+[   83.8]   cases 1.26s -> False budget=30000
+[   83.8]   _prove_equal 3.64s -> None
+[   83.8] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   84.1]   light 0.18s -> miss budget=2000 parts=197
+[   84.8]   unsat_core 0.67s -> False {'answer': 'sat'}
+[   84.8]   _prove_equal 0.95s -> None
+[   84.8] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   85.0]   light 0.18s -> miss budget=2000 parts=197
+[   87.2]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[   89.7]     solve_query 29999ms 2.50s -> sat caller=_refute_by_cases
+[   89.7]   cases 2.50s -> False budget=30000
+[   89.7]   _prove_equal 4.90s -> None
+[   89.7] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   90.0]   light 0.22s -> miss budget=2000 parts=197
+[   90.5]   unsat_core 0.42s -> False {'answer': 'sat'}
+[   90.5]   _prove_equal 0.77s -> None
+[   90.5] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   90.7]   light 0.19s -> miss budget=2000 parts=197
+[   91.6]   unsat_core 0.85s -> False {'answer': 'sat'}
+[   91.6]   _prove_equal 1.14s -> None
+[   91.6] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   91.8]   light 0.18s -> miss budget=2000 parts=197
+[   94.0]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[   97.3]     solve_query 29999ms 3.33s -> sat caller=_refute_by_cases
+[   97.3]   cases 3.33s -> False budget=30000
+[   97.3]   _prove_equal 5.70s -> None
+[   97.3] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   97.5]   light 0.18s -> miss budget=2000 parts=197
+[   98.9]   unsat_core 1.35s -> False {'answer': 'sat'}
+[   98.9]   _prove_equal 1.63s -> None
+[   98.9] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[   99.2]   light 0.18s -> miss budget=2000 parts=197
+[   99.7]   unsat_core 0.51s -> False {'answer': 'sat'}
+[   99.7]   _prove_equal 0.80s -> None
+[   99.7] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  100.0]   light 0.19s -> miss budget=2000 parts=197
+[  100.8]   unsat_core 0.75s -> False {'answer': 'sat'}
+[  100.8]   _prove_equal 1.04s -> None
+[  100.8] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  101.0]   light 0.19s -> miss budget=2000 parts=197
+[  103.2]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  104.4]     solve_query 29999ms 1.24s -> sat caller=_refute_by_cases
+[  104.4]   cases 1.25s -> False budget=30000
+[  104.4]   _prove_equal 3.64s -> None
+[  104.4] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  104.7]   light 0.19s -> miss budget=2000 parts=197
+[  105.7]   unsat_core 0.94s -> False {'answer': 'sat'}
+[  105.7]   _prove_equal 1.23s -> None
+[  105.7] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  105.9]   light 0.19s -> miss budget=2000 parts=197
+[  108.0]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  109.3]     solve_query 29999ms 1.21s -> sat caller=_refute_by_cases
+[  109.3]   cases 1.22s -> False budget=30000
+[  109.3]   _prove_equal 3.60s -> None
+[  109.3] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  109.5]   light 0.21s -> miss budget=2000 parts=197
+[  110.7]   unsat_core 1.16s -> False {'answer': 'sat'}
+[  110.7]   _prove_equal 1.49s -> None
+[  110.7] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  111.0]   light 0.18s -> miss budget=2000 parts=197
+[  113.1]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  116.8]     solve_query 29999ms 3.73s -> sat caller=_refute_by_cases
+[  116.8]   cases 3.73s -> False budget=30000
+[  116.8]   _prove_equal 6.11s -> None
+[  116.9] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  117.1]   light 0.20s -> miss budget=2000 parts=197
+[  119.3]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  122.8]     solve_query 29999ms 3.51s -> sat caller=_refute_by_cases
+[  122.8]   cases 3.51s -> False budget=30000
+[  122.8]   _prove_equal 5.94s -> None
+[  122.8] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  123.0]   light 0.18s -> miss budget=2000 parts=197
+[  125.2]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  126.5]     solve_query 29999ms 1.35s -> sat caller=_refute_by_cases
+[  126.5]   cases 1.35s -> False budget=30000
+[  126.5]   _prove_equal 3.74s -> None
+[  126.5] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  126.8]   light 0.18s -> miss budget=2000 parts=197
+[  128.0]   unsat_core 1.22s -> False {'answer': 'sat'}
+[  128.0]   _prove_equal 1.50s -> None
+[  128.0] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  128.3]   light 0.18s -> miss budget=2000 parts=197
+[  130.4]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  131.8]     solve_query 29998ms 1.38s -> sat caller=_refute_by_cases
+[  131.8]   cases 1.38s -> False budget=30000
+[  131.8]   _prove_equal 3.77s -> None
+[  131.8] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  132.1]   light 0.20s -> miss budget=2000 parts=197
+[  134.1]   unsat_core 1.97s -> False {'answer': 'sat'}
+[  134.1]   _prove_equal 2.28s -> None
+[  134.1] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  134.3]   light 0.18s -> miss budget=2000 parts=197
+[  136.5]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  148.2]     solve_query 29999ms 11.73s -> sat caller=_refute_by_cases
+[  148.2]   cases 11.73s -> False budget=30000
+[  148.2]   _prove_equal 14.12s -> None
+[  148.2] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  148.4]   light 0.18s -> miss budget=2000 parts=197
+[  150.6]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  151.7]     solve_query 29999ms 1.16s -> sat caller=_refute_by_cases
+[  151.7]   cases 1.16s -> False budget=30000
+[  151.7]   _prove_equal 3.54s -> None
+[  151.7] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  152.0]   light 0.19s -> miss budget=2000 parts=197
+[  153.1]   unsat_core 1.07s -> False {'answer': 'sat'}
+[  153.1]   _prove_equal 1.39s -> None
+[  153.1] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  153.4]   light 0.18s -> miss budget=2000 parts=197
+[  155.5]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  157.0]     solve_query 29999ms 1.47s -> sat caller=_refute_by_cases
+[  157.0]   cases 1.47s -> False budget=30000
+[  157.0]   _prove_equal 3.85s -> None
+[  157.0] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  157.2]   light 0.19s -> miss budget=2000 parts=197
+[  158.0]   unsat_core 0.72s -> False {'answer': 'sat'}
+[  158.0]   _prove_equal 1.01s -> None
+[  158.0] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  158.3]   light 0.21s -> miss budget=2000 parts=197
+[  160.4]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  161.9]     solve_query 29999ms 1.47s -> sat caller=_refute_by_cases
+[  161.9]   cases 1.47s -> False budget=30000
+[  161.9]   _prove_equal 3.88s -> None
+[  161.9] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  162.1]   light 0.17s -> miss budget=2000 parts=197
+[  164.2]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  167.6]     solve_query 29999ms 3.33s -> sat caller=_refute_by_cases
+[  167.6]   cases 3.34s -> False budget=30000
+[  167.6]   _prove_equal 5.70s -> None
+[  167.6] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  167.8]   light 0.19s -> miss budget=2000 parts=197
+[  168.6]   unsat_core 0.75s -> False {'answer': 'sat'}
+[  168.6]   _prove_equal 1.04s -> None
+[  168.6] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  169.0]   light 0.28s -> miss budget=2000 parts=197
+[  171.2]   unsat_core 2.12s -> False {'answer': 'unknown'}
+[  172.4]     solve_query 29999ms 1.21s -> sat caller=_refute_by_cases
+[  172.4]   cases 1.21s -> False budget=30000
+[  172.4]   _prove_equal 3.77s -> None
+[  172.4] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  172.6]   light 0.19s -> miss budget=2000 parts=197
+[  174.8]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  176.3]     solve_query 29999ms 1.56s -> sat caller=_refute_by_cases
+[  176.3]   cases 1.57s -> False budget=30000
+[  176.3]   _prove_equal 3.95s -> None
+[  176.3] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  176.6]   light 0.18s -> miss budget=2000 parts=197
+[  178.7]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  181.1]     solve_query 29998ms 2.33s -> sat caller=_refute_by_cases
+[  181.1]   cases 2.33s -> False budget=30000
+[  181.1]   _prove_equal 4.73s -> None
+[  181.1] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  181.3]   light 0.18s -> miss budget=2000 parts=197
+[  181.9]   unsat_core 0.60s -> False {'answer': 'sat'}
+[  181.9]   _prove_equal 0.89s -> None
+[  181.9] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  182.2]   light 0.18s -> miss budget=2000 parts=197
+[  184.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  185.5]     solve_query 29999ms 1.15s -> sat caller=_refute_by_cases
+[  185.5]   cases 1.15s -> False budget=30000
+[  185.5]   _prove_equal 3.52s -> None
+[  185.5] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  185.7]   light 0.18s -> miss budget=2000 parts=197
+[  187.8]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  189.6]     solve_query 29999ms 1.75s -> sat caller=_refute_by_cases
+[  189.6]   cases 1.75s -> False budget=30000
+[  189.6]   _prove_equal 4.12s -> None
+[  189.6] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  189.8]   light 0.20s -> miss budget=2000 parts=197
+[  192.0]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  193.5]     solve_query 29999ms 1.48s -> sat caller=_refute_by_cases
+[  193.5]   cases 1.49s -> False budget=30000
+[  193.5]   _prove_equal 3.88s -> None
+[  193.5] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  193.7]   light 0.22s -> miss budget=2000 parts=197
+[  195.9]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  206.7]     solve_query 29999ms 10.83s -> sat caller=_refute_by_cases
+[  206.7]   cases 10.83s -> False budget=30000
+[  206.7]   _prove_equal 13.27s -> None
+[  206.7] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  207.0]   light 0.19s -> miss budget=2000 parts=197
+[  209.1]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  210.3]     solve_query 29999ms 1.19s -> sat caller=_refute_by_cases
+[  210.3]   cases 1.19s -> False budget=30000
+[  210.3]   _prove_equal 3.58s -> None
+[  210.3] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  210.5]   light 0.18s -> miss budget=2000 parts=197
+[  212.7]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  213.9]     solve_query 29999ms 1.20s -> sat caller=_refute_by_cases
+[  213.9]   cases 1.20s -> False budget=30000
+[  213.9]   _prove_equal 3.58s -> None
+[  213.9] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  214.1]   light 0.18s -> miss budget=2000 parts=197
+[  216.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  219.0]     solve_query 29999ms 2.74s -> sat caller=_refute_by_cases
+[  219.0]   cases 2.74s -> False budget=30000
+[  219.0]   _prove_equal 5.11s -> None
+[  219.0] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  219.3]   light 0.19s -> miss budget=2000 parts=197
+[  221.4]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  222.8]     solve_query 29999ms 1.36s -> sat caller=_refute_by_cases
+[  222.8]   cases 1.36s -> False budget=30000
+[  222.8]   _prove_equal 3.75s -> None
+[  222.8] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  223.0]   light 0.21s -> miss budget=2000 parts=197
+[  225.1]   unsat_core 2.05s -> False {'answer': 'sat'}
+[  225.1]   _prove_equal 2.39s -> None
+[  225.2] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  225.5]   light 0.24s -> miss budget=2000 parts=197
+[  227.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  231.1]     solve_query 29999ms 3.49s -> sat caller=_refute_by_cases
+[  231.1]   cases 3.49s -> False budget=30000
+[  231.1]   _prove_equal 5.95s -> None
+[  231.1] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  231.4]   light 0.20s -> miss budget=2000 parts=197
+[  233.5]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  234.7]     solve_query 29999ms 1.17s -> sat caller=_refute_by_cases
+[  234.7]   cases 1.17s -> False budget=30000
+[  234.7]   _prove_equal 3.59s -> None
+[  234.7] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  234.9]   light 0.18s -> miss budget=2000 parts=197
+[  235.8]   unsat_core 0.82s -> False {'answer': 'sat'}
+[  235.8]   _prove_equal 1.11s -> None
+[  235.8] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  236.1]   light 0.28s -> miss budget=2000 parts=197
+[  238.3]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  239.5]     solve_query 29998ms 1.20s -> sat caller=_refute_by_cases
+[  239.5]   cases 1.21s -> False budget=30000
+[  239.5]   _prove_equal 3.70s -> None
+[  239.5] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  239.8]   light 0.20s -> miss budget=2000 parts=197
+[  241.9]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  243.1]     solve_query 29998ms 1.22s -> sat caller=_refute_by_cases
+[  243.1]   cases 1.22s -> False budget=30000
+[  243.1]   _prove_equal 3.62s -> None
+[  243.1] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  243.3]   light 0.17s -> miss budget=2000 parts=197
+[  245.5]   unsat_core 2.08s -> False {'answer': 'unknown'}
+[  246.7]     solve_query 29999ms 1.24s -> sat caller=_refute_by_cases
+[  246.7]   cases 1.24s -> False budget=30000
+[  246.7]   _prove_equal 3.60s -> None
+[  246.7] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  247.0]   light 0.18s -> miss budget=2000 parts=197
+[  249.1]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  251.0]     solve_query 29999ms 1.91s -> sat caller=_refute_by_cases
+[  251.0]   cases 1.91s -> False budget=30000
+[  251.0]   _prove_equal 4.31s -> None
+[  251.0] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  251.3]   light 0.19s -> miss budget=2000 parts=197
+[  253.5]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  258.4]     solve_query 29999ms 4.98s -> sat caller=_refute_by_cases
+[  258.4]   cases 4.98s -> False budget=30000
+[  258.4]   _prove_equal 7.40s -> None
+[  258.4] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  258.7]   light 0.18s -> miss budget=2000 parts=197
+[  260.8]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  263.4]     solve_query 29999ms 2.54s -> sat caller=_refute_by_cases
+[  263.4]   cases 2.54s -> False budget=30000
+[  263.4]   _prove_equal 4.92s -> None
+[  263.4] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  263.6]   light 0.20s -> miss budget=2000 parts=197
+[  265.8]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  267.4]     solve_query 29999ms 1.65s -> sat caller=_refute_by_cases
+[  267.4]   cases 1.65s -> False budget=30000
+[  267.4]   _prove_equal 4.06s -> None
+[  267.4] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  267.7]   light 0.19s -> miss budget=2000 parts=197
+[  269.8]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  273.5]     solve_query 29999ms 3.69s -> sat caller=_refute_by_cases
+[  273.5]   cases 3.69s -> False budget=30000
+[  273.5]   _prove_equal 6.12s -> None
+[  273.5] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  273.8]   light 0.18s -> miss budget=2000 parts=197
+[  275.4]   unsat_core 1.59s -> False {'answer': 'sat'}
+[  275.4]   _prove_equal 1.87s -> None
+[  275.4] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  275.7]   light 0.24s -> miss budget=2000 parts=197
+[  277.9]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  282.9]     solve_query 29999ms 5.03s -> sat caller=_refute_by_cases
+[  282.9]   cases 5.03s -> False budget=30000
+[  282.9]   _prove_equal 7.47s -> None
+[  282.9] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  283.1]   light 0.18s -> miss budget=2000 parts=197
+[  285.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  287.6]     solve_query 29999ms 2.36s -> sat caller=_refute_by_cases
+[  287.6]   cases 2.37s -> False budget=30000
+[  287.6]   _prove_equal 4.75s -> None
+[  287.6] _prove_equal budget=30000 x=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) y=623:(let ((a!1 ((_ extract 63 5) (bvadd #x000000000000001f (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058)
+[  287.9]   light 0.23s -> miss budget=2000 parts=197
+[  289.6]   unsat_core 1.62s -> False {'answer': 'sat'}
+[  289.6]   _prove_equal 1.99s -> None
+[  289.6] _prove_equal budget=30000 x=984:(lambda ((alpha_b1_0 (_ BitVec 64))) (! (let ((a!1 (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) (se y=1266:(lambda ((alpha_b1_0 (_ BitVec 64))) (! (let ((a!1 (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) (se
+[  290.5]   light 0.86s -> hit budget=2000 parts=197
+[  290.5]   _prove_equal 0.91s -> proved
+[  321.3]     solve_query 30000ms 30.27s -> unknown caller=_refute_over_light_premise
+[  321.3]   light 30.31s -> miss budget=30000 parts=198
+[  351.5]     solve_query 30000ms 30.25s -> unknown caller=_retry_with_uf_unification
+[  356.6]   light 0.26s -> miss budget=2000 parts=197
+[  357.8]   unsat_core 1.13s -> False {'answer': 'sat'}
+[  358.1]   light 0.22s -> miss budget=2000 parts=197
+[  359.3]   unsat_core 1.18s -> False {'answer': 'sat'}
+[  359.6]   light 0.19s -> miss budget=2000 parts=197
+[  361.7]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  362.9]     solve_query 1999ms 1.24s -> sat caller=_refute_by_cases
+[  362.9]   cases 1.24s -> False budget=2000
+[  363.2]   light 0.18s -> miss budget=2000 parts=197
+[  365.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  366.6]     solve_query 1999ms 1.28s -> sat caller=_refute_by_cases
+[  366.6]   cases 1.28s -> False budget=2000
+[  366.9]   light 0.19s -> miss budget=2000 parts=197
+[  368.5]   unsat_core 1.56s -> False {'answer': 'sat'}
+[  368.7]   light 0.21s -> miss budget=2000 parts=197
+[  370.5]   unsat_core 1.74s -> False {'answer': 'sat'}
+[  370.8]   light 0.19s -> miss budget=2000 parts=197
+[  372.6]   unsat_core 1.78s -> False {'answer': 'sat'}
+[  372.9]   light 0.21s -> miss budget=2000 parts=197
+[  373.9]   unsat_core 0.98s -> False {'answer': 'sat'}
+[  374.2]   light 0.22s -> miss budget=2000 parts=197
+[  376.4]   unsat_core 2.13s -> False {'answer': 'unknown'}
+[  377.9]     solve_query 1999ms 1.52s -> sat caller=_refute_by_cases
+[  377.9]   cases 1.52s -> False budget=2000
+[  378.1]   light 0.22s -> miss budget=2000 parts=197
+[  380.3]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  381.9]     solve_query 1998ms 1.58s -> sat caller=_refute_by_cases
+[  381.9]   cases 1.58s -> False budget=2000
+[  382.1]   light 0.18s -> miss budget=2000 parts=197
+[  383.3]   unsat_core 1.09s -> False {'answer': 'sat'}
+[  383.6]   light 0.23s -> miss budget=2000 parts=197
+[  384.2]   unsat_core 0.58s -> False {'answer': 'sat'}
+[  384.5]   light 0.21s -> miss budget=2000 parts=197
+[  386.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  389.4]     solve_query 1999ms 2.82s -> unknown caller=_refute_by_cases
+[  389.4]   cases 2.83s -> False budget=2000
+[  389.7]   light 0.22s -> miss budget=2000 parts=197
+[  391.8]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  393.5]     solve_query 1999ms 1.64s -> sat caller=_refute_by_cases
+[  393.5]   cases 1.64s -> False budget=2000
+[  393.7]   light 0.20s -> miss budget=2000 parts=197
+[  394.7]   unsat_core 0.89s -> False {'answer': 'sat'}
+[  395.0]   light 0.20s -> miss budget=2000 parts=197
+[  397.1]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  398.5]     solve_query 1999ms 1.35s -> sat caller=_refute_by_cases
+[  398.5]   cases 1.35s -> False budget=2000
+[  398.8]   light 0.21s -> miss budget=2000 parts=197
+[  400.9]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  403.0]     solve_query 1998ms 2.09s -> unknown caller=_refute_by_cases
+[  403.0]   cases 2.09s -> False budget=2000
+[  403.3]   light 0.20s -> miss budget=2000 parts=197
+[  405.4]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  407.5]     solve_query 1999ms 2.08s -> unknown caller=_refute_by_cases
+[  407.5]   cases 2.08s -> False budget=2000
+[  407.8]   light 0.20s -> miss budget=2000 parts=197
+[  409.8]   unsat_core 1.91s -> False {'answer': 'sat'}
+[  410.0]   light 0.19s -> miss budget=2000 parts=197
+[  412.2]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  414.0]     solve_query 1998ms 1.82s -> sat caller=_refute_by_cases
+[  414.0]   cases 1.82s -> False budget=2000
+[  414.2]   light 0.19s -> miss budget=2000 parts=197
+[  416.4]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  418.5]     solve_query 1999ms 2.08s -> unknown caller=_refute_by_cases
+[  418.5]   cases 2.08s -> False budget=2000
+[  418.8]   light 0.24s -> miss budget=2000 parts=197
+[  419.8]   unsat_core 0.94s -> False {'answer': 'sat'}
+[  420.1]   light 0.19s -> miss budget=2000 parts=197
+[  422.2]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  423.3]     solve_query 1999ms 1.14s -> sat caller=_refute_by_cases
+[  423.3]   cases 1.14s -> False budget=2000
+[  423.6]   light 0.18s -> miss budget=2000 parts=197
+[  425.0]   unsat_core 1.34s -> False {'answer': 'sat'}
+[  425.2]   light 0.18s -> miss budget=2000 parts=197
+[  427.0]   unsat_core 1.77s -> False {'answer': 'sat'}
+[  427.2]   light 0.18s -> miss budget=2000 parts=197
+[  428.8]   unsat_core 1.54s -> False {'answer': 'sat'}
+[  429.1]   light 0.19s -> miss budget=2000 parts=197
+[  430.8]   unsat_core 1.69s -> False {'answer': 'sat'}
+[  431.1]   light 0.20s -> miss budget=2000 parts=197
+[  433.2]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  434.6]     solve_query 1999ms 1.41s -> sat caller=_refute_by_cases
+[  434.6]   cases 1.41s -> False budget=2000
+[  434.9]   light 0.20s -> miss budget=2000 parts=197
+[  437.0]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  438.2]     solve_query 1999ms 1.17s -> sat caller=_refute_by_cases
+[  438.2]   cases 1.17s -> False budget=2000
+[  438.4]   light 0.20s -> miss budget=2000 parts=197
+[  440.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  441.8]     solve_query 1999ms 1.18s -> sat caller=_refute_by_cases
+[  441.8]   cases 1.19s -> False budget=2000
+[  442.1]   light 0.23s -> miss budget=2000 parts=197
+[  443.9]   unsat_core 1.77s -> False {'answer': 'sat'}
+[  444.2]   light 0.23s -> miss budget=2000 parts=197
+[  445.3]   unsat_core 1.06s -> False {'answer': 'sat'}
+[  445.6]   light 0.19s -> miss budget=2000 parts=197
+[  447.7]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  449.0]     solve_query 1998ms 1.35s -> sat caller=_refute_by_cases
+[  449.0]   cases 1.35s -> False budget=2000
+[  449.3]   light 0.19s -> miss budget=2000 parts=197
+[  450.1]   unsat_core 0.74s -> False {'answer': 'sat'}
+[  450.3]   light 0.18s -> miss budget=2000 parts=197
+[  452.5]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  453.6]     solve_query 1999ms 1.13s -> sat caller=_refute_by_cases
+[  453.6]   cases 1.13s -> False budget=2000
+[  453.8]   light 0.18s -> miss budget=2000 parts=197
+[  455.6]   unsat_core 1.68s -> False {'answer': 'sat'}
+[  455.8]   light 0.19s -> miss budget=2000 parts=197
+[  457.9]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  459.0]     solve_query 1999ms 1.09s -> sat caller=_refute_by_cases
+[  459.0]   cases 1.09s -> False budget=2000
+[  459.3]   light 0.18s -> miss budget=2000 parts=197
+[  461.4]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  462.6]     solve_query 1999ms 1.18s -> sat caller=_refute_by_cases
+[  462.6]   cases 1.18s -> False budget=2000
+[  462.8]   light 0.18s -> miss budget=2000 parts=197
+[  464.9]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  467.5]     solve_query 1999ms 2.60s -> unknown caller=_refute_by_cases
+[  467.5]   cases 2.60s -> False budget=2000
+[  467.8]   light 0.22s -> miss budget=2000 parts=197
+[  470.0]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  471.5]     solve_query 1999ms 1.52s -> sat caller=_refute_by_cases
+[  471.5]   cases 1.52s -> False budget=2000
+[  471.7]   light 0.19s -> miss budget=2000 parts=197
+[  473.3]   unsat_core 1.54s -> False {'answer': 'sat'}
+[  473.6]   light 0.24s -> miss budget=2000 parts=197
+[  475.5]   unsat_core 1.84s -> False {'answer': 'sat'}
+[  475.7]   light 0.19s -> miss budget=2000 parts=197
+[  477.9]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  479.9]     solve_query 1999ms 1.99s -> sat caller=_refute_by_cases
+[  479.9]   cases 1.99s -> False budget=2000
+[  480.2]   light 0.27s -> miss budget=2000 parts=197
+[  482.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  483.5]     solve_query 1998ms 1.17s -> sat caller=_refute_by_cases
+[  483.5]   cases 1.17s -> False budget=2000
+[  483.8]   light 0.22s -> miss budget=2000 parts=197
+[  485.1]   unsat_core 1.29s -> False {'answer': 'sat'}
+[  485.4]   light 0.21s -> miss budget=2000 parts=197
+[  487.4]   unsat_core 1.94s -> False {'answer': 'sat'}
+[  487.7]   light 0.20s -> miss budget=2000 parts=197
+[  489.2]   unsat_core 1.47s -> False {'answer': 'sat'}
+[  489.4]   light 0.19s -> miss budget=2000 parts=197
+[  491.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  492.7]     solve_query 1999ms 1.12s -> sat caller=_refute_by_cases
+[  492.7]   cases 1.12s -> False budget=2000
+[  492.9]   light 0.19s -> miss budget=2000 parts=197
+[  494.5]   unsat_core 1.53s -> False {'answer': 'sat'}
+[  494.7]   light 0.19s -> miss budget=2000 parts=197
+[  496.0]   unsat_core 1.24s -> False {'answer': 'sat'}
+[  496.3]   light 0.19s -> miss budget=2000 parts=197
+[  497.8]   unsat_core 1.43s -> False {'answer': 'sat'}
+[  498.0]   light 0.19s -> miss budget=2000 parts=197
+[  499.0]   unsat_core 0.93s -> False {'answer': 'sat'}
+[  499.2]   light 0.19s -> miss budget=2000 parts=197
+[  501.4]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  502.5]     solve_query 1999ms 1.13s -> sat caller=_refute_by_cases
+[  502.5]   cases 1.13s -> False budget=2000
+[  502.7]   light 0.19s -> miss budget=2000 parts=197
+[  504.0]   unsat_core 1.20s -> False {'answer': 'sat'}
+[  504.2]   light 0.18s -> miss budget=2000 parts=197
+[  506.4]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  507.9]     solve_query 1998ms 1.55s -> sat caller=_refute_by_cases
+[  507.9]   cases 1.55s -> False budget=2000
+[  508.2]   light 0.19s -> miss budget=2000 parts=197
+[  510.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  511.4]     solve_query 1998ms 1.15s -> sat caller=_refute_by_cases
+[  511.4]   cases 1.15s -> False budget=2000
+[  511.7]   light 0.19s -> miss budget=2000 parts=197
+[  513.2]   unsat_core 1.46s -> False {'answer': 'sat'}
+[  513.5]   light 0.19s -> miss budget=2000 parts=197
+[  515.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  517.7]     solve_query 1999ms 2.09s -> unknown caller=_refute_by_cases
+[  517.7]   cases 2.09s -> False budget=2000
+[  518.0]   light 0.28s -> miss budget=2000 parts=197
+[  520.2]   unsat_core 2.13s -> False {'answer': 'unknown'}
+[  521.7]     solve_query 1999ms 1.47s -> sat caller=_refute_by_cases
+[  521.7]   cases 1.48s -> False budget=2000
+[  521.9]   light 0.19s -> miss budget=2000 parts=197
+[  524.1]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  526.0]     solve_query 1999ms 1.91s -> sat caller=_refute_by_cases
+[  526.0]   cases 1.91s -> False budget=2000
+[  526.3]   light 0.22s -> miss budget=2000 parts=197
+[  528.2]   unsat_core 1.90s -> False {'answer': 'sat'}
+[  528.5]   light 0.23s -> miss budget=2000 parts=197
+[  530.7]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  531.9]     solve_query 1999ms 1.27s -> sat caller=_refute_by_cases
+[  531.9]   cases 1.28s -> False budget=2000
+[  532.2]   light 0.19s -> miss budget=2000 parts=197
+[  532.8]   unsat_core 0.54s -> False {'answer': 'sat'}
+[  533.0]   light 0.19s -> miss budget=2000 parts=197
+[  535.2]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  536.4]     solve_query 1998ms 1.27s -> sat caller=_refute_by_cases
+[  536.4]   cases 1.27s -> False budget=2000
+[  536.7]   light 0.20s -> miss budget=2000 parts=197
+[  538.8]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  540.2]     solve_query 1998ms 1.34s -> sat caller=_refute_by_cases
+[  540.2]   cases 1.35s -> False budget=2000
+[  540.4]   light 0.18s -> miss budget=2000 parts=197
+[  542.4]   unsat_core 1.95s -> False {'answer': 'sat'}
+[  542.7]   light 0.20s -> miss budget=2000 parts=197
+[  544.8]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  546.1]     solve_query 1999ms 1.28s -> sat caller=_refute_by_cases
+[  546.1]   cases 1.29s -> False budget=2000
+[  546.3]   light 0.18s -> miss budget=2000 parts=197
+[  547.2]   unsat_core 0.85s -> False {'answer': 'sat'}
+[  547.5]   light 0.20s -> miss budget=2000 parts=197
+[  549.6]   unsat_core 2.11s -> False {'answer': 'unknown'}
+[  551.1]     solve_query 1999ms 1.44s -> sat caller=_refute_by_cases
+[  551.1]   cases 1.44s -> False budget=2000
+[  551.4]   light 0.20s -> miss budget=2000 parts=197
+[  553.5]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  554.7]     solve_query 1999ms 1.17s -> sat caller=_refute_by_cases
+[  554.7]   cases 1.17s -> False budget=2000
+[  554.9]   light 0.18s -> miss budget=2000 parts=197
+[  557.1]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  558.5]     solve_query 1998ms 1.43s -> sat caller=_refute_by_cases
+[  558.5]   cases 1.43s -> False budget=2000
+[  558.8]   light 0.23s -> miss budget=2000 parts=197
+[  560.8]   unsat_core 1.99s -> False {'answer': 'sat'}
+[  561.1]   light 0.21s -> miss budget=2000 parts=197
+[  563.3]   unsat_core 2.12s -> False {'answer': 'unknown'}
+[  564.7]     solve_query 1999ms 1.43s -> sat caller=_refute_by_cases
+[  564.7]   cases 1.43s -> False budget=2000
+[  565.0]   light 0.19s -> miss budget=2000 parts=197
+[  567.1]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  568.7]     solve_query 1999ms 1.63s -> sat caller=_refute_by_cases
+[  568.7]   cases 1.63s -> False budget=2000
+[  569.0]   light 0.21s -> miss budget=2000 parts=197
+[  571.1]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  572.3]     solve_query 1999ms 1.14s -> sat caller=_refute_by_cases
+[  572.3]   cases 1.14s -> False budget=2000
+[  572.5]   light 0.18s -> miss budget=2000 parts=197
+[  573.3]   unsat_core 0.77s -> False {'answer': 'sat'}
+[  573.6]   light 0.19s -> miss budget=2000 parts=197
+[  575.2]   unsat_core 1.59s -> False {'answer': 'sat'}
+[  575.5]   light 0.18s -> miss budget=2000 parts=197
+[  577.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  578.8]     solve_query 1999ms 1.23s -> sat caller=_refute_by_cases
+[  578.8]   cases 1.24s -> False budget=2000
+[  579.1]   light 0.20s -> miss budget=2000 parts=197
+[  581.0]   unsat_core 1.88s -> False {'answer': 'sat'}
+[  581.2]   light 0.18s -> miss budget=2000 parts=197
+[  582.2]   unsat_core 0.93s -> False {'answer': 'sat'}
+[  582.5]   light 0.24s -> miss budget=2000 parts=197
+[  584.7]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  585.9]     solve_query 1999ms 1.22s -> sat caller=_refute_by_cases
+[  585.9]   cases 1.22s -> False budget=2000
+[  586.1]   light 0.19s -> miss budget=2000 parts=197
+[  588.3]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  589.8]     solve_query 1999ms 1.49s -> sat caller=_refute_by_cases
+[  589.8]   cases 1.49s -> False budget=2000
+[  590.0]   light 0.18s -> miss budget=2000 parts=197
+[  590.6]   unsat_core 0.54s -> False {'answer': 'sat'}
+[  590.9]   light 0.20s -> miss budget=2000 parts=197
+[  591.4]   unsat_core 0.48s -> False {'answer': 'sat'}
+[  591.7]   light 0.21s -> miss budget=2000 parts=197
+[  593.8]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  595.9]     solve_query 1999ms 2.08s -> unknown caller=_refute_by_cases
+[  595.9]   cases 2.08s -> False budget=2000
+[  596.2]   light 0.24s -> miss budget=2000 parts=197
+[  597.9]   unsat_core 1.72s -> False {'answer': 'sat'}
+[  598.2]   light 0.20s -> miss budget=2000 parts=197
+[  600.3]   unsat_core 2.05s -> False {'answer': 'sat'}
+[  600.5]   light 0.18s -> miss budget=2000 parts=197
+[  601.9]   unsat_core 1.33s -> False {'answer': 'sat'}
+[  602.2]   light 0.18s -> miss budget=2000 parts=197
+[  603.2]   unsat_core 0.94s -> False {'answer': 'sat'}
+[  603.4]   light 0.22s -> miss budget=2000 parts=197
+[  605.6]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  607.4]     solve_query 1999ms 1.83s -> sat caller=_refute_by_cases
+[  607.4]   cases 1.83s -> False budget=2000
+[  607.7]   light 0.19s -> miss budget=2000 parts=197
+[  609.8]   unsat_core 2.13s -> False {'answer': 'unknown'}
+[  611.3]     solve_query 1999ms 1.48s -> sat caller=_refute_by_cases
+[  611.3]   cases 1.48s -> False budget=2000
+[  611.6]   light 0.19s -> miss budget=2000 parts=197
+[  612.1]   unsat_core 0.53s -> False {'answer': 'sat'}
+[  612.4]   light 0.18s -> miss budget=2000 parts=197
+[  614.5]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  615.8]     solve_query 1999ms 1.27s -> sat caller=_refute_by_cases
+[  615.8]   cases 1.27s -> False budget=2000
+[  616.0]   light 0.21s -> miss budget=2000 parts=197
+[  617.7]   unsat_core 1.63s -> False {'answer': 'sat'}
+[  618.0]   light 0.20s -> miss budget=2000 parts=197
+[  620.1]   unsat_core 2.10s -> False {'answer': 'unknown'}
+[  621.9]     solve_query 1999ms 1.73s -> sat caller=_refute_by_cases
+[  621.9]   cases 1.74s -> False budget=2000
+[  622.2]   light 0.23s -> miss budget=2000 parts=197
+[  624.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  626.9]     solve_query 1999ms 2.62s -> unknown caller=_refute_by_cases
+[  626.9]   cases 2.62s -> False budget=2000
+[  627.2]   light 0.24s -> miss budget=2000 parts=197
+[  627.9]   unsat_core 0.64s -> False {'answer': 'sat'}
+[  628.2]   light 0.19s -> miss budget=2000 parts=197
+[  630.3]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  631.7]     solve_query 1999ms 1.34s -> sat caller=_refute_by_cases
+[  631.7]   cases 1.34s -> False budget=2000
+[  631.9]   light 0.19s -> miss budget=2000 parts=197
+[  634.0]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  636.5]     solve_query 1999ms 2.44s -> unknown caller=_refute_by_cases
+[  636.5]   cases 2.44s -> False budget=2000
+[  636.8]   light 0.22s -> miss budget=2000 parts=197
+[  638.9]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  640.3]     solve_query 1999ms 1.39s -> sat caller=_refute_by_cases
+[  640.3]   cases 1.39s -> False budget=2000
+[  640.6]   light 0.21s -> miss budget=2000 parts=197
+[  642.7]   unsat_core 2.09s -> False {'answer': 'unknown'}
+[  644.8]     solve_query 1999ms 2.08s -> unknown caller=_refute_by_cases
+[  644.8]   cases 2.08s -> False budget=2000
+[  645.0]   light 0.19s -> miss budget=2000 parts=197
+[  646.8]   unsat_core 1.75s -> False {'answer': 'sat'}
+[  647.1]   light 0.21s -> miss budget=2000 parts=197
+[  648.5]   unsat_core 1.32s -> False {'answer': 'sat'}
+[  648.7]   light 0.18s -> miss budget=2000 parts=197
+[  650.8]   unsat_core 1.99s -> False {'answer': 'sat'}
+[  651.0]   light 0.20s -> miss budget=2000 parts=197
+[  653.0]   unsat_core 1.93s -> False {'answer': 'sat'}
+[  653.3]   light 0.19s -> miss budget=2000 parts=197
+[  654.9]   unsat_core 1.64s -> False {'answer': 'sat'}
+[  655.3]   light 0.26s -> miss budget=2000 parts=197
+[  657.4]   unsat_core 2.06s -> False {'answer': 'sat'}
+[  657.7]   light 0.28s -> miss budget=2000 parts=197
+[  659.7]   unsat_core 1.97s -> False {'answer': 'sat'}
+[  660.0]   light 0.19s -> miss budget=2000 parts=197
+[  662.1]   unsat_core 2.05s -> False {'answer': 'sat'}
+[  662.3]   light 0.19s -> miss budget=2000 parts=197

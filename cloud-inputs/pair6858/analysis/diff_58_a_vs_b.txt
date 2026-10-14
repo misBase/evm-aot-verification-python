@@ -1,0 +1,10 @@
+premise conjuncts A 237 B 237 common 237
+===== ONLY A 0
+===== ONLY B 0
+goal[0] same=True sizes 5512 5512
+goal[1] same=True sizes 3487 3487
+goal[2] same=False sizes 3947755 3858251
+goal[3] same=True sizes 19 19
+goal[4] same=True sizes 37 37
+goal[5] same=True sizes 45 45
+goal[6] same=True sizes 82074 82074

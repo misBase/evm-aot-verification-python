@@ -1918,7 +1918,7 @@ def peel_matching_stores(formula):
     (a SAT F' says nothing: the stores may cover where A and B differ).
     Safe 5377 d30 pair_68_58: both memories put the same 320 bytes at fmp + k
     (x86: R15 + fmp + k) over CALLDATACOPY lambdas; the opaque query needs 140s+
-    through the chains, its peeled form ~5s.
+    through the chains, its peeled form 7-14s.
     """
     out, changed = [], False
     for c in _conjuncts(formula):
@@ -3227,7 +3227,7 @@ class BlockEquivalenceProver:
             query = simplify(substitute(unified, *opaque))
             # Matching stores peeled off the memory disequality first (F ⊨ F', see
             # peel_matching_stores): Safe 5377 d30 pair_68_58, 140s+ through the two
-            # 320-store chains, ~5s on the CALLDATACOPY lambdas below them. Anything
+            # 320-store chains, 7-14s on the CALLDATACOPY lambdas below them. Anything
             # but UNSAT falls through to the unpeeled queries (the stores may hide a
             # difference of the bases).
             peeled = peel_matching_stores(query)

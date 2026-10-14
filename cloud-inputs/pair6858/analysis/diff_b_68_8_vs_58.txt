@@ -1,0 +1,16 @@
+premise conjuncts A 237 B 237 common 234
+===== ONLY A 3
+   (not (= (bvor blk5377_30_None_None_stack_18_z1 blk5377_30_None_None_stack_18_z2 blk5377_30_None_None_stack_18_z3) #x0000000000000000))
+   (let ((a!1 (= ((_ extract 64 64) (bvadd #b10000000000000000000000000000000000000000000000000000000000000001 (concat #b0 CallDataSize))) #b0))) (not a!1))
+   (let ((a!1 ((_ extract 63 37) (bvadd (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) (select blk5377_30_None_None_evm_mem0 #x0000000000000059) (select blk5377_30_None_None_evm_mem0 #x000000000000005a) (select blk5377_30_None_None_evm_mem0 #x000000000000005b) (select blk5377_30_None_None_evm_mem0 #x000000000000005c) (select blk5377_30_None_None_evm_mem0 #x000000000000005d) (select blk5377_30_None_None_evm_mem0 #x000000000000005e) (select blk5377_30_None_None_evm_mem0 #x000000000000005f)) blk5377_30_None_None_stack_19_z0)))) (or (= a!1 #b000000000000000000000000000) (= blk5377_30_None_None_stack_19_z0 #x0000000000000000)))
+===== ONLY B 3
+   (= (bvor blk5377_30_None_None_stack_18_z1 blk5377_30_None_None_stack_18_z2 blk5377_30_None_None_stack_18_z3) #x0000000000000000)
+   (let ((a!1 ((_ extract 64 64) (bvadd (concat #b0 CallDataSize) (bvmul #b11111111111111111111111111111111111111111111111111111111111111111 (concat #b0 blk5377_30_None_None_stack_18_z0)))))) (= a!1 #b0))
+   (let ((a!1 ((_ extract 63 37) (bvadd (concat (select blk5377_30_None_None_evm_mem0 #x0000000000000058) (select blk5377_30_None_None_evm_mem0 #x0000000000000059) (select blk5377_30_None_None_evm_mem0 #x000000000000005a) (select blk5377_30_None_None_evm_mem0 #x000000000000005b) (select blk5377_30_None_None_evm_mem0 #x000000000000005c) (select blk5377_30_None_None_evm_mem0 #x000000000000005d) (select blk5377_30_None_None_evm_mem0 #x000000000000005e) (select blk5377_30_None_None_evm_mem0 #x000000000000005f)) blk5377_30_None_None_stack_19_z0)))) (or (= blk5377_30_None_None_stack_19_z0 #x0000000000000000) (= a!1 #b000000000000000000000000000)))
+goal[0] same=True sizes 5512 5512
+goal[1] same=True sizes 3487 3487
+goal[2] same=False sizes 3853751 3858251
+goal[3] same=True sizes 19 19
+goal[4] same=True sizes 37 37
+goal[5] same=True sizes 45 45
+goal[6] same=True sizes 82074 82074

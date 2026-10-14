@@ -1,0 +1,3 @@
+[  720.5] b-pair_68_58.smt2_goal_2_of_7 @unify* array _prove_equal caller=unify_uf_arguments conj=197 cached=[] -> proved 1.48s
+[  732.3]   light caller=_retry_with_uf_unification budget=30000 -> True 11.37s
+b-pair_68_58.smt2 b-pair_68_58.smt2 proved 786.1s

@@ -1,0 +1,301 @@
+{
+ "name": "a-pair_68_58.smt2",
+ "file": "a-pair_68_58.smt2",
+ "answer": "unknown",
+ "seconds": 2676.3,
+ "frames": [
+  {
+   "name": "a-pair_68_58.smt2",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.49
+    ],
+    [
+     "split",
+     "unknown",
+     2671.17
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_68_58.smt2_goal_0_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.01
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_68_58.smt2_goal_1_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unsat",
+     0.01
+    ],
+    [
+     "pin",
+     "unsat",
+     0.0
+    ],
+    [
+     "tail",
+     "unsat",
+     0.0
+    ]
+   ]
+  },
+  {
+   "name": "a-pair_68_58.smt2_goal_2_of_7",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.48
+    ],
+    [
+     "pin",
+     "unknown",
+     0.16
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "lia",
+     "unknown",
+     38.22
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "pre-normalize",
+     null,
+     0.0
+    ],
+    [
+     "normalize",
+     null,
+     12.04
+    ],
+    [
+     "quick*",
+     "unknown",
+     3.29
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "blast*",
+     "unknown",
+     189.2
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "alias*",
+     "unknown",
+     0.17
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "potential*",
+     "unknown",
+     127.9
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs*",
+     "unknown",
+     5.87
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs",
+     "unknown",
+     16.59
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "exact*",
+     "unknown",
+     60.31
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "mul",
+     "unknown",
+     30.81
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "mul*",
+     "unknown",
+     31.04
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "unify*",
+     "unknown",
+     1026.05
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "unify",
+     "unknown",
+     1032.4
+    ],
+    [
+     "tail",
+     "unknown",
+     93.39
+    ]
+   ]
+  }
+ ],
+ "probes": {
+  "light<_prove_equal@blast*": {
+   "hit": 1,
+   "miss": 11,
+   "hit_s": 0.84,
+   "miss_s": 3.02
+  },
+  "unsat_core:sat": {
+   "n": 177,
+   "s": 244.87
+  },
+  "unsat_core<_prove_equal@blast*": {
+   "hit": 0,
+   "miss": 11,
+   "hit_s": 0.0,
+   "miss_s": 19.45
+  },
+  "unsat_core:unknown": {
+   "n": 287,
+   "s": 608.95
+  },
+  "cases<_prove_equal@blast*": {
+   "hit": 0,
+   "miss": 6,
+   "hit_s": 0.0,
+   "miss_s": 5.31
+  },
+  "cases<_retry_over_nonlinear_mul@mul*": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 30.43
+  },
+  "light<_prove_equal@unify*": {
+   "hit": 0,
+   "miss": 303,
+   "hit_s": 0.0,
+   "miss_s": 67.47
+  },
+  "unsat_core<_prove_equal@unify*": {
+   "hit": 0,
+   "miss": 303,
+   "hit_s": 0.0,
+   "miss_s": 517.91
+  },
+  "cases<_prove_equal@unify*": {
+   "hit": 0,
+   "miss": 140,
+   "hit_s": 0.0,
+   "miss_s": 282.74
+  },
+  "cases<_retry_with_uf_unification@unify*": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 119.13
+  },
+  "light<_prove_equal@unify": {
+   "hit": 9,
+   "miss": 150,
+   "hit_s": 4.5,
+   "miss_s": 57.14
+  },
+  "unsat_core<_prove_equal@unify": {
+   "hit": 0,
+   "miss": 150,
+   "hit_s": 0.0,
+   "miss_s": 316.45
+  },
+  "cases<_prove_equal@unify": {
+   "hit": 0,
+   "miss": 141,
+   "hit_s": 0.0,
+   "miss_s": 613.87
+  },
+  "light<_retry_with_uf_unification@unify": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 0.04
+  },
+  "cases<_retry_with_uf_unification@unify": {
+   "hit": 0,
+   "miss": 1,
+   "hit_s": 0.0,
+   "miss_s": 0.23
+  }
+ }
+}
