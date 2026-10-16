@@ -14,7 +14,7 @@ from verification.block_equivalence import (BlockEquivalenceProver, Obligation,
     _solver, digest, state_digest, paths_digest, host_model_axioms, obligation_manifest)
 from verification.block_partition import split_at_cutpoints
 from verification.block_relation import PLATFORM_SCOPE, platform_premises
-from verification.block_specialization import BlockSpecialization
+from verification.block_specialization import BlockSpecialization, project, sensitive_slots, terminal_block
 from verification.cutpoint_relation import read_evm_memory_word
 from verification.loop_induction import (SegmentPath, run_evm_segment, run_x86_segment,
                                         terminal_observable_conditions)
@@ -166,11 +166,29 @@ class BlockProgramResult:
         return "INCONCLUSIVE: " + "; ".join(self.reasons or ("incomplete certificate graph",)) + ". " + self.scope
 
 
+def pushed_code_addresses(blocks):
+    """PUSH immediates that are jump destinations: code addresses used as data.
+
+    Static jumps carry their target in the JUMP/JUMPI itself, so a pushed
+    JUMPDEST is a return address or a function pointer. A dynamic JUMP whose
+    IR immediate_set is empty (Go left it to the jump table) contributes no
+    return tags, so its return addresses look like plain constants: discovery
+    widens them away and the return JUMP then forks to every JUMPDEST of the
+    complete jump domain (DABEManager: 13 such JUMPs, ~626 successors per
+    widened return context). A literal that merely equals a JUMPDEST is kept
+    too; that only makes a context more specific.
+    """
+    jumpdests = {b.pc for b in blocks if b.is_jump_target}
+    return {op.immediate for b in blocks for op in b.operations
+            if op.kind.upper() == "PUSH" and op.immediate in jumpdests}
+
+
 class BlockProgramVerifier:
     def __init__(self, *, gas_check=GasCheck.FIXED_BUDGET, timeout_ms=30_000,
                  max_depth=400, max_instances=2048, max_values_per_edge=32,
                  wall_timeout_seconds=300, schema=None, fallback="none", summary_config=None, progress_callback=None, node_timeout_seconds=60,
-                 max_parameter_values=8, first_pass_node_seconds=None):
+                 max_parameter_values=8, first_pass_node_seconds=None, pushed_code_return_tags=False,
+                 terminal_constant_projection=False, context_constant_projection=False):
         self.gas_check = GasCheck(gas_check)
         self.timeout_ms = timeout_ms
         self.max_depth = max_depth
@@ -190,6 +208,19 @@ class BlockProgramVerifier:
         if first_pass_node_seconds is not None and first_pass_node_seconds <= 0:
             raise ValueError("first_pass_node_seconds must be positive")
         self.first_pass_node_seconds = first_pass_node_seconds
+        # Opt-in proposal hint (_setup): also keep pushed code addresses as return tags.
+        self.pushed_code_return_tags = bool(pushed_code_return_tags)
+        # Opt-in proposal hint (_discover): a terminal-only block's context
+        # keeps only the constants the block consumes.
+        self.terminal_constant_projection = bool(terminal_constant_projection)
+        # Opt-in proposal hint (_discover): every context keeps its return tags
+        # and only the other constants the block consumes. Without pushed code
+        # addresses as return tags it would drop return addresses of JUMPs
+        # lacking an immediate_set and fork them over the whole jump domain.
+        if context_constant_projection and not pushed_code_return_tags:
+            raise ValueError("context_constant_projection requires pushed_code_return_tags")
+        self.context_constant_projection = bool(context_constant_projection)
+        self._terminal_slots, self._block_slots = {}, {}
         self._constant_domains = {}
 
     def verify_program_pair(self, evm_program, x86_program, initial_state, *, candidates=None):
@@ -378,6 +409,12 @@ class BlockProgramVerifier:
         # a predicate that must be established by actual H0/H2 states.
         self._return_tags = {target for b in evm for op in b.operations
                              for target in (op.immediate_set or ())}
+        if self.pushed_code_return_tags:
+            self._return_tags |= pushed_code_addresses(evm)
+        self._terminal_slots = ({b.pc: sensitive_slots(b) for b in evm if terminal_block(b)}
+                                if self.terminal_constant_projection else {})
+        self._block_slots = ({b.pc: sensitive_slots(b) for b in evm}
+                             if self.context_constant_projection else {})
         if not evm or not x86_program.instructions:
             raise ValueError("empty program")
         for b in evm:
@@ -520,6 +557,10 @@ class BlockProgramVerifier:
                 if is_bv_value(v := simplify(state.evm_stack.peek(i))))
             returns = tuple(c for c in constants if c[1] in self._return_tags)
             extra = tuple(c for c in constants if c[1] not in self._return_tags)
+            if pc in self._block_slots:
+                # Before the widening check: a changing constant the block never
+                # consumes no longer widens away the ones it does.
+                extra = tuple(c for c in extra if c[0] in self._block_slots[pc])
             domain_key = (pc, depth, returns)
             # Retain literal buffer offsets too, but widen changing constants
             # once so an incrementing counter cannot create infinite instances.
@@ -542,7 +583,15 @@ class BlockProgramVerifier:
                     parameters = (None, None)
                 else:
                     seen.add(parameters)
-            return BlockSpecialization(pc, depth, *parameters, constants)
+            spec = BlockSpecialization(pc, depth, *parameters, constants)
+            # Both projections register a weakening of the proposed context
+            # (_block_slots: the extra constants filtered above): R_π(c) is weaker
+            # than R_c, so every exit that met R_c meets it (premise weakening, as
+            # for k = π(c)). A terminal-only block has no successor to propose
+            # from its exits, so there nothing downstream changes either.
+            if pc in self._terminal_slots:
+                return project(spec, self._terminal_slots[pc])
+            return spec
 
         depth = simplify(expressions[0])
         if is_int_value(depth):

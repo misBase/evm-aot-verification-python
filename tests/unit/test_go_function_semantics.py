@@ -877,6 +877,71 @@ class TestSha3Memory:
         assert hash_5.arg(0).size() == 40
         assert hash_6.arg(0).size() == 48
 
+    def test_sha3_single_byte_fast_path_hashes_the_byte(self):
+        """length=1: z3py Concat needs two parts; the byte itself is the 8-bit argument."""
+        from z3 import BitVec, BitVecSort, K, SolverFor, Store
+        from common import uninterpreted
+
+        byte, other = BitVec("sha3_one_byte", 8), BitVec("sha3_other_byte", 8)
+        mem = Store(K(BitVecSort(64), BitVecVal(0, 8)), BitVecVal(7, 64), byte)
+        noisy = Store(mem, BitVecVal(8, 64), BitVecVal(0xAB, 8))  # outside the 1-byte slice
+        changed = Store(mem, BitVecVal(7, 64), other)
+
+        def hash_at(memory):
+            return uninterpreted.sha3_semantics(
+                memory, BitVecVal(4, 64), BitVecVal(3, 256), BitVecVal(1, 256)
+            )
+
+        h = hash_at(mem)
+        assert h.decl().name() == "sha3_bytes_1"
+        assert h.arg(0).size() == 8
+
+        def check(*constraints):
+            solver = SolverFor("QF_AUFBV")
+            solver.set("timeout", 5000)
+            solver.add(*constraints)
+            return solver.check()
+
+        # Same slice byte → same hash; a different byte stays unconstrained
+        # (no hash property is assumed: equal and distinct are both possible).
+        assert check(h != hash_at(noisy)) == unsat
+        assert check(byte == other, h != hash_at(changed)) == unsat
+        assert check(byte != other, h != hash_at(changed)) == sat
+        assert check(byte != other, h == hash_at(changed)) == sat
+        # A 1-byte and a 2-byte hash are different UFs.
+        two = uninterpreted.sha3_semantics(mem, BitVecVal(4, 64), BitVecVal(3, 256), BitVecVal(2, 256))
+        assert two.decl().name() == "sha3_bytes_2"
+
+    def test_sha3_single_byte_x86_handler_matches_shared_semantics(self):
+        """The x86 sha3 host call with length=1 builds the same UF term as the EVM side."""
+        from z3 import SolverFor
+        from common import uninterpreted
+
+        sem = GoFunctionSemantics(_make_profile_with_host({1: "sha3"}))
+        state = SMTState()
+        state.x86_registers.set_register(Register.R13, BitVecVal(R13_BASE, 64))
+        state.x86_registers.set_register(Register.R14, BitVecVal(R14_BASE, 64))
+        r15_base = 0x30000
+        state.x86_registers.set_register(Register.R15, BitVecVal(r15_base, 64))
+        state.x86_memory = state.x86_memory.store_256bit(
+            BitVecVal(r15_base, 64), BitVecVal(0xAB << 248, 256), domain=MemoryDomain.EVM,
+        )
+        sp = 0
+        sp, state = sem._push_uint256(sp, BitVecVal(1, 256), state)  # length
+        sp, state = sem._push_uint256(sp, BitVecVal(0, 256), state)  # offset
+        state = sem.apply(4, 1, sp, state)
+
+        expected = uninterpreted.sha3_semantics(
+            state.x86_memory.evm_mem, BitVecVal(r15_base, 64), BitVecVal(0, 256), BitVecVal(1, 256)
+        )
+        assert expected.decl().name() == "sha3_bytes_1"
+        result_addr = _compute_stack_addr(R14_BASE, sp - 2 * LIMBS_PER_UINT256)
+        result = state.x86_memory.load_256bit(BitVecVal(result_addr, 64), domain=MemoryDomain.STACK)
+        solver = SolverFor("QF_AUFBV")
+        solver.set("timeout", 5000)
+        solver.add(result != expected)
+        assert solver.check() == unsat
+
     def test_sha3_length_identity_keeps_same_padding_unconstrained(self):
         from z3 import BitVecSort, K, SolverFor
         from common import uninterpreted

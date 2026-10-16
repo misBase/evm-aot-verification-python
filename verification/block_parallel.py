@@ -78,7 +78,10 @@ def build_inputs(stem, options):
                                     max_instances=options["max_instances"], wall_timeout_seconds=options["wall_seconds"],
                                     summary_config=config, node_timeout_seconds=options["node_seconds"],
                                     max_parameter_values=options["max_parameter_values"],
-                                    first_pass_node_seconds=options["first_pass_node_seconds"])
+                                    first_pass_node_seconds=options["first_pass_node_seconds"],
+                                    pushed_code_return_tags=options.get("pushed_code_return_tags", False),
+                                    terminal_constant_projection=options.get("terminal_constant_projection", False),
+                                    context_constant_projection=options.get("context_constant_projection", False))
     return evm, x86, state, verifier
 
 
