@@ -21,7 +21,7 @@ from z3 import (And, Not, Or, Solver, SolverFor, sat, unsat, simplify, is_bool, 
                 is_and, is_array, FreshConst, Select, BoolVal, Z3_OP_ITE, is_false, is_bv, BitVecVal,
                 Implies, ULT, Var, substitute_funs, Extract, If, Z3_OP_EXTRACT, Z3_OP_BADD, Z3_OP_CONCAT, Z3_OP_EQ, Z3_OP_SELECT, is_true,
                 is_store, is_select, substitute_vars, Concat, Z3_OP_BUDIV, Z3_OP_BUDIV_I, Z3_OP_BOR, Store,
-                is_not, is_eq, is_distinct, ForAll, Z3_get_array_arity, Then, Lambda, ArraySort, Const)
+                is_not, is_eq, is_distinct, ForAll, Z3_get_array_arity, Then, Lambda, ArraySort, Const, FuncDeclRef)
 from concurrent.futures import TimeoutError as FutureTimeout
 from concurrent.futures import BrokenExecutor
 from random import Random
@@ -109,6 +109,59 @@ def _solve_query(formula, timeout_ms):
         solver.add(formula)
         answer = str(solver.check())
     return answer
+
+
+def _array_argument_ufs(formula):
+    """Uninterpreted functions of arity >= 1 with an array-sorted parameter,
+    including applications under lambda/quantifier binders; None when some
+    function is referenced as a value (as-array, map), which substitute_funs
+    does not rewrite."""
+    seen, found, work = set(), {}, [formula]
+    while work:
+        term = work.pop()
+        if term.get_id() in seen:
+            continue
+        seen.add(term.get_id())
+        if is_quantifier(term):
+            work.append(term.body())
+            continue
+        if not is_app(term):
+            continue
+        f = term.decl()
+        if any(isinstance(p, FuncDeclRef) for p in f.params()):
+            return None
+        if (f.kind() == Z3_OP_UNINTERPRETED and f.arity() > 0
+                and any(f.domain(i).kind() == Z3_ARRAY_SORT for i in range(f.arity()))):
+            found[f.get_id()] = f
+        work.extend(term.children())
+    return sorted(found.values(), key=lambda f: (f.name(), f.get_id()))
+
+
+def sat_by_constant_array_ufs(formula, timeout_ms):
+    """"sat" with a checked witness, else "unknown"; never "unsat".
+
+    An uninterpreted function applied to a lambda array (sha3_slice over a
+    memory window) makes Z3's array theory incomplete: such a query is never
+    answered "sat" (even ULE(g(h(lambda i. m[x+i])), 100) is unknown), while
+    "unsat" is unaffected. A witness restricts every such function f to a
+    constant function c_f (a fresh constant of its range): F' = F[f := c_f]
+    has no array arguments left under UFs. A model M of F' extended with
+    f := (lambda args. M(c_f)) is a model of F (substitution lemma; f does
+    not occur in F'), so SAT(F') implies SAT(F). The model is evaluated on F'
+    and only a literal True counts. UNSAT(F') proves nothing (F may need f
+    non-constant) and is reported as "unknown".
+    """
+    functions = _array_argument_ufs(formula)
+    if not functions or timeout_ms <= 0:
+        return "unknown"
+    restricted = substitute_funs(formula, *[(f, FreshConst(f.range(), "const_uf")) for f in functions])
+    if _array_argument_ufs(restricted) != []:
+        return "unknown"
+    solver = _solver(timeout_ms, restricted)
+    solver.add(restricted)
+    if solver.check() != sat:
+        return "unknown"
+    return "sat" if is_true(solver.model().eval(restricted, model_completion=True)) else "unknown"
 
 
 def unsat_core(assertions, goal, timeout_ms, outcome=None):
@@ -2822,6 +2875,11 @@ class BlockEquivalenceProver:
                     proved, answer, lemmas = pending[0], "unsat", pending[2] + pending[1]
             if answer != "unsat":
                 proved, lemmas = formula, ()
+        if expected == "sat" and answer == "unknown":
+            # UFs over lambda arrays (sha3_slice in host-gas oracle arguments)
+            # leave every direct query unknown; a checked constant-function
+            # witness proves satisfiability (sat_by_constant_array_ufs).
+            answer = sat_by_constant_array_ufs(formula, min(timeout, _QUICK_EXACT_MS))
         if answer not in ("unsat", "sat"):
             if self.deadline is not None:
                 timeout = min(timeout, int((self.deadline - monotonic()) * 1000))
