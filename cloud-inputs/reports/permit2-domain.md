@@ -67,12 +67,53 @@
 - 抓取公式：`check_obligation.py` 的同款脚本（改为 `expected="sat"`）→ `md1327.smt2 proved 0.4s`（修改前：30s 预算 unknown）。
 - 全量快测 `poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider`：
 
-FULLSUITE_PLACEHOLDER
+  - 第 1 轮（`-n 4`，机器空闲，4 核；代码为加上 `Map`/`as-array` 防护之前的版本，防护只会让路由更早放弃）：
+    **1702 passed, 1 failed, 2 skipped**（641s）。失败：
+    `test_mcopy_induction.py::test_symbolic_length_mcopy_has_complete_certificate[mcopy-high-word]`（`step_1_other: unknown`）。
+  - 第 2 轮（`-n 3`，最终代码，同时有一个单线程 probe 在跑）：1701 passed, 3 failed, 2 skipped（770s）。
+    多出的失败：`test_block_uf_unification.py::test_alias_split_keeps_satisfiable_pairs_open`（`assert unknown == sat`）、
+    `test_div_summary.py::test_apply_rejects_unproved_stack_geometry`（`solver=unknown`）；这两个在第 1 轮通过。
+  - **这些失败都不是本改动引入的**，都已在未修改的基线代码上复现（6cc0431 的独立 worktree，同一 venv）：
+    - mcopy-high-word：基线单独运行同样失败（47s，同一错误 `step_1_other: unknown`）。它走
+      `VerifiedSummaryRuntime._solve` → `solve_query`，不经过 `_check`，和改动代码没有交集。
+      它和 mcopy-low-word 一起跑时，基线通过过一次（273s），所以是卡在 20s 单查询预算边缘、对计时敏感的测试。
+    - alias_split / div_summary：在相同负载下基线也都失败（89s）；第 1 轮机器空闲时两者都通过。
+    - 最开始用 `-n 8` 跑基线也有 2 个失败（`test_div_summary.py::test_lemma_proves_every_path_including_builtin_bridge`
+      和 mcopy-high-word），原因相同。
+  - 结论：在本机（4 核云容器）上有 1～3 个对计时敏感的预存失败，本改动引入的失败为 0；没有达到"0 失败"的目标，见第 6 节。
+  - COMMON.md 提到的 msize_absint 例外这次没有出现。
 
 ## 5. 离线验证数据
 
-PROBE_PLACEHOLDER
+用 `tools/probe_block_obligations.py` 对这个节点做了端到端运行（单进程，没有 pair worker，
+`--timeout-ms 30000 --node-seconds 3600 --keep-going`，输入 Permit2.{json,hex}）：
+
+| 项 | 值 |
+|---|---|
+| spec | pc=1327, stack_depth=10, memory_size=None, free_memory_pointer=None |
+| model_domain_nonempty | **通过**（修改前在这一步抛 `oracle model and entry domain inconsistent or unknown`） |
+| evm_paths / x86_paths | 61 / 68 |
+| queries | 1888 |
+| terminals_proved / paired_transitions | 347 / 2 |
+| failed_obligations / keep_going_failures | 无 / 无 |
+| status | inconclusive：`ProofBudgetExceeded: proof wall budget exhausted`（3600s） |
+
+也就是说，入口检查已经放行，节点进入了配对阶段，期间没有任何义务失败；只是单进程在 1 小时预算内没做完 61×68 的配对。
+完整证明需要在服务器上用生产配置（并行 pair worker、正式预算）来跑。
+任务描述写的是 64 条 x86 路径，这里是 68 条。推测原因是 probe 工具和生产运行的配置不同（例如摘要配置）；
+本改动不影响符号执行，所以和这个差异无关。
+
+单条公式数据：
+- `md1327.smt2` 走生产 `_check(expected="sat")`：修改前 30s 返回 unknown，修改后 0.3–0.4s 返回 sat。
+- 见证路由本身（`sat_by_constant_array_ufs`）耗时 0.08s；限制后的公式 F' 用 QF_AUFBV 0.01s 得到 sat。
+- 被限制的函数只有 `sha3_slice`。host_gas_* 的参数都是 BitVec，不受影响，仍由求解器自由解释。
 
 ## 6. 未解决的问题
 
-UNRESOLVED_PLACEHOLDER
+1. 快测里对计时敏感的失败（mcopy-high-word 单独运行时每次都失败；alias_split、div_summary 在负载下失败）在基线代码上同样存在，本任务没有动它们。
+   如果服务器上也出现，需要单独处理：调高这些测试的单查询预算，或者查清 `step_1_other` 为什么卡在 20s 边缘。
+2. 节点 1327 的完整证明还没跑完（见第 5 节），需要在服务器上做全量验证。配对阶段 61×68 的规模本身可能要较多预算。
+3. 见证路由只覆盖"把数组参数 UF 取成常函数就能满足"的情形。如果将来入口前提要求两个不同内存窗口的 sha3 结果不同
+   （`sha3(L1) ≠ sha3(L2)`），常函数限制会 UNSAT，路由返回 unknown，检查仍然失败，但不会误证。
+   到那时可以扩展成"按参数有限分段的函数"作为见证。
+4. 这次只接入了 `_check(expected="sat")`。`VerifiedSummaryRuntime._solve` 等其它 sat 检查如果遇到同样的 lambda-UF 结构，需要另行接入。
