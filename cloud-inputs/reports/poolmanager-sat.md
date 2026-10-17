@@ -125,7 +125,11 @@ gas = 0x7cb45800000400，memory_size = 0
 
 ## 6. 测试
 
-- 全量快测 `poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider`：（待补）
+- 全量快测（串行，`poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider`）：**1694 passed, 2 skipped, 10 deselected, 0 failed**（1100 秒）。msize_absint 相关测试在这个云端环境中也通过了，没有出现 COMMON.md 提到的已知例外。
+- 偶发 solver unknown 记录：
+  - 一次 `-n 8` 并行运行中，`test_mcopy_induction.py::test_symbolic_length_mcopy_has_complete_certificate[mcopy-high-word]` 得到 `step_1_other: unknown`。
+  - 一次带 `-x` 的串行运行中，`test_div_summary.py::test_block_runtime_instantiates_the_lemma_with_a_complete_certificate` 得到 `effect_1 … (solver=unknown)`。
+  - 两者单独重跑都通过（分别 174 秒和 60 秒），上面那次完整串行运行中也都通过。都是超时预算下的 unknown，与本次改动无关（本分支没有改动任何模型源码）。
 - 本次没有改 `verification/ state/ x86_64/ evm_ir/ common/`，`model_sources_sha256` 与 caa01b1 相同，Safe/ENS 证书不受影响。
 
 ## 7. 给编译器侧的建议（不改 Go，仅供参考）
