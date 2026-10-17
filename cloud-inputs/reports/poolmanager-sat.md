@@ -88,7 +88,15 @@ EVM 片段就是 Uniswap v4 的 `tickSpacingToMaxLiquidityPerTick`（`ts = signe
 - 普查/求解器层面：7329 的 SAT 是 `x86_maps_0_0`，即 x86 path 0 没有蕴含 evm path 1 的跳转条件。具体执行给出了跳转确实分叉的输入：`tickSpacing=60, L=⌊(2¹²⁸−1)/29576⌋+1` 时 EVM 跳 7528，x86 落到 7456。
 - 随机差分测试：3000 组随机输入中 2648 组不一致。
 
-求解器模型：（待补，见第 6 节）
+求解器模型（单独重跑 `premise ∧ x86_0 ∧ ¬c0(evm_1)`，sat；Z3 的两次运行给出的模型不同，这里列第二次的，因为它读出了内存）：
+
+```
+stack_1 (e1) = 0x198822c7a0   -> mload(0x198822c820) = 0xe0…e0ebab180   => tickSpacing = signextend(2, 0xbab180) = -4542080
+stack_8 (e8) = 0x1894929200   -> mload(0x1894929220) = 0xe0…e090e082b2…19a06 => L = 0x90e082b25950f65b18b270402119a06
+gas = 0x7cb45800000400，memory_size = 0
+```
+
+把这两个内存字搬到映射窗口内具体重放（`concrete_replay.py` 的 `compare`）：EVM 端 `minTick = 0 − slt(smod(MIN_TICK,ts),0) = −1`，`maxTick = 0`，`numTicks = 2`，`max = 2¹²⁷−1 ≥ L`，不跳转，到 7456。x86 端丢失了 minTick（第二处写回缺失，ts<0），读到旧值 ts，算成 `numTicks = 0 − ts + 1 = 4542081`，`max = 0x3b19838221b2acd0eab694c369b < L`，跳到 7528。与求解器结论一致：x86 path 0 出口 7528，EVM 走 path 0（7456）。第一次运行的模型给出的栈值（`stack_8 = −20` 等）属于同一类反例，只是没有导出内存。
 
 ## 4. pc=7024 的 H2
 
