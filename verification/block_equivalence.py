@@ -21,7 +21,8 @@ from z3 import (And, Not, Or, Solver, SolverFor, sat, unsat, simplify, is_bool, 
                 is_and, is_array, FreshConst, Select, BoolVal, Z3_OP_ITE, is_false, is_bv, BitVecVal,
                 Implies, ULT, Var, substitute_funs, Extract, If, Z3_OP_EXTRACT, Z3_OP_BADD, Z3_OP_CONCAT, Z3_OP_EQ, Z3_OP_SELECT, is_true,
                 is_store, is_select, substitute_vars, Concat, Z3_OP_BUDIV, Z3_OP_BUDIV_I, Z3_OP_BOR, Store,
-                is_not, is_eq, is_distinct, ForAll, Z3_get_array_arity, Then, Lambda, ArraySort, Const, FuncDeclRef)
+                is_not, is_eq, is_distinct, ForAll, Z3_get_array_arity, Then, Lambda, ArraySort, Const, FuncDeclRef,
+                UGT, Z3_OP_BSHL, Z3_OP_BLSHR, Z3_OP_BASHR)
 from concurrent.futures import TimeoutError as FutureTimeout
 from concurrent.futures import BrokenExecutor
 from random import Random
@@ -77,17 +78,19 @@ def _solver(timeout_ms, formula=None):
     return solver
 
 
-def solve_query(formula, timeout_ms):
+def solve_query(formula, timeout_ms, trust_unknown=True):
     """Retry incomplete array tactics with the same query and remaining budget.
 
     Answers go through proof_cache (env BLOCK_PROOF_CACHE): an alpha-equivalent
     query decided in any earlier run, or timed out with at least this budget,
-    is not solved again.
+    is not solved again. trust_unknown=False solves a cached timeout again:
+    for checks expected SAT (entry_nonempty), where one timeout under load
+    would otherwise fail every later node of that shape at once.
     """
     key = proof_cache.query_key("check", formula) if proof_cache.enabled() else None
     if key is not None:
         cached = proof_cache.cached_answer(key, timeout_ms)
-        if cached is not None:
+        if cached is not None and (trust_unknown or cached != "unknown"):
             return cached
     answer = _solve_query(formula, timeout_ms)
     if key is not None:
@@ -137,6 +140,75 @@ def _array_argument_ufs(formula):
     return sorted(found.values(), key=lambda f: (f.name(), f.get_id()))
 
 
+def _binder_argument_ufs(formula):
+    """Uninterpreted functions of arity >= 1 with an application (outside
+    binders) whose arguments contain a lambda/quantifier: sha3_bytes_N over
+    bytes read through the R15 offset view λa. M[a - R15] (PoolManager 5802),
+    and every UF applied to such a term (host_gas_sload of that hash)."""
+    found, binder, seen, work = {}, {}, set(), [(formula, False)]
+    order = []
+    while work:  # post-order: a term's binder flag needs its children's
+        term, ready = work.pop()
+        if term.get_id() in seen:
+            continue
+        if is_quantifier(term):
+            seen.add(term.get_id())
+            binder[term.get_id()] = True
+            continue
+        if not is_app(term):
+            seen.add(term.get_id())
+            binder[term.get_id()] = False
+            continue
+        if not ready:
+            work.append((term, True))
+            work.extend((c, False) for c in term.children() if c.get_id() not in seen)
+            continue
+        seen.add(term.get_id())
+        inner = any(binder[c.get_id()] for c in term.children())
+        binder[term.get_id()] = inner
+        f = term.decl()
+        if inner and f.kind() == Z3_OP_UNINTERPRETED and f.arity() > 0 and f.get_id() not in found:
+            found[f.get_id()] = f
+            order.append(f)
+    return sorted(order, key=lambda f: (f.name(), f.get_id()))
+
+
+def _all_ufs(formula):
+    """Every uninterpreted function of arity >= 1, under binders too."""
+    seen, found, work = set(), {}, [formula]
+    while work:
+        term = work.pop()
+        if term.get_id() in seen:
+            continue
+        seen.add(term.get_id())
+        if is_quantifier(term):
+            work.append(term.body())
+            continue
+        if not is_app(term):
+            continue
+        f = term.decl()
+        if f.kind() == Z3_OP_UNINTERPRETED and f.arity() > 0:
+            found[f.get_id()] = f
+        work.extend(term.children())
+    return sorted(found.values(), key=lambda f: (f.name(), f.get_id()))
+
+
+def _witness_tiers(formula):
+    """Growing sets of functions to restrict to constants (sat_by_constant_array_ufs):
+    array-parameter UFs, then also UFs over binder terms, then every UF; each set
+    strictly larger than the last. [] if some function is referenced as a value."""
+    arrays = _array_argument_ufs(formula)
+    if arrays is None:
+        return []
+    tiers, chosen = [], {}
+    for group in (arrays, _binder_argument_ufs(formula), _all_ufs(formula)):
+        grown = {**chosen, **{f.get_id(): f for f in group}}
+        if len(grown) > len(chosen):
+            chosen = grown
+            tiers.append(sorted(chosen.values(), key=lambda f: (f.name(), f.get_id())))
+    return tiers
+
+
 def sat_by_constant_array_ufs(formula, timeout_ms):
     """"sat" with a checked witness, else "unknown"; never "unsat".
 
@@ -150,18 +222,26 @@ def sat_by_constant_array_ufs(formula, timeout_ms):
     not occur in F'), so SAT(F') implies SAT(F). The model is evaluated on F'
     and only a literal True counts. UNSAT(F') proves nothing (F may need f
     non-constant) and is reported as "unknown".
+
+    The lemma holds for any set of UFs, so the restriction grows in tiers
+    (_witness_tiers) until one is SAT: the same incompleteness arises with a
+    lambda inside a bit-vector argument (sha3_bytes_58 of bytes read through
+    the R15 offset view, PoolManager 5802 model_domain_nonempty: no
+    array-parameter UF, so the first tier is empty), and host_gas_sload of
+    that hash is only bounded above, so a constant one always fits.
     """
-    functions = _array_argument_ufs(formula)
-    if not functions or timeout_ms <= 0:
-        return "unknown"
-    restricted = substitute_funs(formula, *[(f, FreshConst(f.range(), "const_uf")) for f in functions])
-    if _array_argument_ufs(restricted) != []:
-        return "unknown"
-    solver = _solver(timeout_ms, restricted)
-    solver.add(restricted)
-    if solver.check() != sat:
-        return "unknown"
-    return "sat" if is_true(solver.model().eval(restricted, model_completion=True)) else "unknown"
+    tiers = _witness_tiers(formula)
+    end = monotonic() + timeout_ms / 1000
+    for n, functions in enumerate(tiers):
+        left = int((end - monotonic()) * 1000)
+        if left <= 0:
+            break
+        restricted = substitute_funs(formula, *[(f, FreshConst(f.range(), "const_uf")) for f in functions])
+        solver = _solver(left // (len(tiers) - n), restricted)  # an equal share of what is left
+        solver.add(restricted)
+        if solver.check() == sat and is_true(solver.model().eval(restricted, model_completion=True)):
+            return "sat"
+    return "unknown"
 
 
 def unsat_core(assertions, goal, timeout_ms, outcome=None):
@@ -1522,6 +1602,152 @@ def pin_split(formula, timeout_ms, deadline=None):
     return residual, tuple(lemmas)
 
 
+# ponytail: one limb's worth of shift amounts (x86 splits a 256-bit shift at multiples of 64).
+_SHIFT_MAX_CASES = 64
+_SHIFT_KINDS = (Z3_OP_BSHL, Z3_OP_BLSHR, Z3_OP_BASHR)
+
+
+def _scalar_constants(term):
+    """Uninterpreted bit-vector constants of `term` outside binders, by id."""
+    found, seen, work = {}, set(), [term]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen or not is_app(t):
+            continue
+        seen.add(t.get_id())
+        if _substitutable(t) and is_bv(t):
+            found[t.get_id()] = t
+        work.extend(t.children())
+    return found
+
+
+def _shift_amount_constants(formula):
+    """Constants in the non-literal amount of a shift outside binders, sorted by name."""
+    found, seen, work = {}, set(), [formula]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen or not is_app(t):
+            continue
+        seen.add(t.get_id())
+        if t.decl().kind() in _SHIFT_KINDS and not is_bv_value(t.arg(1)):
+            found.update(_scalar_constants(t.arg(1)))
+        work.extend(t.children())
+    return sorted(found.values(), key=lambda c: (str(c), c.get_id()))
+
+
+def _small_conjuncts(conjuncts, v, max_size=4096):
+    """Top-level conjuncts mentioning v that are small pure bit-vector formulas."""
+    return [c for c in conjuncts if v.get_id() in _scalar_constants(c) and _pure_bv(c)
+            and len(c.sexpr()) <= max_size]
+
+
+def _refuted(query, timeout_ms, name):
+    started = monotonic()
+    if solve_query(query, timeout_ms) != "unsat":
+        return None
+    return Obligation(name, query.sexpr(), "unsat", elapsed_seconds=monotonic() - started)
+
+
+def _shift_bounds(premise, v, timeout_ms):
+    """(lo, hi, lemmas): premise ⊨ lo <= v <= hi (unsigned), the lemmas refuting
+    premise ∧ v < lo and premise ∧ v > hi; binary search, any non-UNSAT answer
+    counted as "not a bound" (bounds only widen, never wrongly narrow). Only
+    the two final refutations are proof; the search steps merely pick them."""
+    n = v.size()
+    solver = _solver(timeout_ms, premise)
+    solver.add(premise)
+
+    def refuted(bound):
+        solver.push()
+        solver.add(bound)
+        answer = solver.check()
+        solver.pop()
+        return answer == unsat
+    good, bad = 0, 1 << n  # premise ∧ v < good is UNSAT (trivially for 0)
+    while bad - good > 1:
+        mid = (good + bad) // 2
+        good, bad = (mid, bad) if refuted(ULT(v, mid)) else (good, mid)
+    lo = good
+    good, bad = (1 << n) - 1, -1  # premise ∧ v > good is UNSAT (trivially for the maximum)
+    while good - bad > 1:
+        mid = (good + bad) // 2
+        good, bad = (mid, bad) if refuted(UGT(v, mid)) else (good, mid)
+    hi = good
+    lemmas = []
+    for name, query, trivial in (("shift_lower", And(premise, ULT(v, lo)), lo == 0),
+                                 ("shift_upper", And(premise, UGT(v, hi)), hi == (1 << n) - 1)):
+        if not trivial:
+            lemma = _refuted(query, timeout_ms, name)
+            if lemma is None:
+                return None
+            lemmas.append(lemma)
+    return lo, hi, lemmas
+
+
+def shift_split(formula, timeout_ms, deadline=None):
+    """Refute F by one case per value of a shift-amount constant: "sat", lemmas or None.
+
+    x86 shifts a 256-bit word limb by limb (amount v mod 64, the limb offset
+    from range compares on v), EVM shifts the whole word: bit-blasting the
+    256-bit barrel shifter against the 64-bit ones stalls (Permit2 4837
+    x86_maps_12_0 / 14_0: every route unknown for 2400s), while with v a
+    literal both sides become constant shifts (~2s per value).
+
+    Each constant v of a symbolic shift amount gets bounds lo <= v <= hi from
+    F's small pure bit-vector top-level conjuncts (the two bound refutations
+    are lemmas, so F ⊨ lo <= v <= hi). A constant with one value is fixed
+    (F ≡ F ∧ v = lo; the high limbs of EVM's 256-bit amount). Of the others,
+    the one with the fewest values is split: F ≡ ∨_{lo<=c<=hi} (F ∧ v = c ∧
+    fixed), and the models of that case are exactly the models of
+    F[v := c, fixed] extended by those values (substitution of equals; none
+    of them occurs in it). So F is UNSAT iff every case query is (the case
+    lemmas), and a SAT case is a model of F. Empty bounds (lo > hi) refute F
+    by the bound lemmas alone. Nothing fixed or split, more than
+    _SHIFT_MAX_CASES values, a case unknown, or out of time: None.
+    """
+    candidates = _shift_amount_constants(formula)
+    if not candidates:
+        return None
+    end = monotonic() + 1e9 if deadline is None else deadline
+    conjuncts = _conjuncts(formula)
+    fixed, lemmas, best = [], [], None
+    for v in candidates:
+        premise = _small_conjuncts(conjuncts, v)
+        if not premise or monotonic() >= end:
+            continue
+        bounds = _shift_bounds(And(*premise), v, min(_QUICK_EXACT_MS, timeout_ms))
+        if bounds is None:
+            continue
+        lo, hi, found = bounds
+        if lo > hi:
+            return tuple(found)  # the small conjuncts alone are UNSAT
+        if lo == hi:
+            fixed.append((v, BitVecVal(lo, v.size())))
+            lemmas += found
+        elif hi - lo < _SHIFT_MAX_CASES and (best is None or hi - lo < best[2] - best[1]):
+            best = (v, lo, hi, found)
+    if best is None and not fixed:
+        return None
+    values = [None]
+    if best is not None:
+        v, lo, hi, found = best
+        lemmas += found
+        values = [BitVecVal(c, v.size()) for c in range(lo, hi + 1)]
+    for c in values:
+        left = int((end - monotonic()) * 1000)
+        if left <= 0:
+            return None
+        started = monotonic()
+        query = simplify(substitute(formula, *fixed, *(() if c is None else ((best[0], c),))), bv_sort_ac=True)
+        answer = "unsat" if is_false(query) else solve_query(query, min(timeout_ms, left))
+        if answer == "sat":
+            return "sat"
+        if answer != "unsat":
+            return None
+        lemmas.append(Obligation(f"shift_case_{len(lemmas)}", query.sexpr(), "unsat", elapsed_seconds=monotonic() - started))
+    return tuple(lemmas)
+
+
 def _conjuncts(formula):
     work, out = [formula], []
     while work:
@@ -2161,6 +2387,23 @@ def restore_rewritten_conjuncts(before, after):
     return And(after, *lost) if lost else after
 
 
+def _uf_nesting(term, decl, memo):
+    """How deep applications of `decl` nest in `term` (binder bodies included)."""
+    work = [(term, False)]
+    while work:
+        t, ready = work.pop()
+        if t.get_id() in memo:
+            continue
+        kids = [t.body()] if is_quantifier(t) else (t.children() if is_app(t) else [])
+        if not ready:
+            work.append((t, True))
+            work.extend((c, False) for c in kids if c.get_id() not in memo)
+            continue
+        own = int(is_app(t) and t.decl().eq(decl))
+        memo[t.get_id()] = own + max((memo[c.get_id()] for c in kids), default=0)
+    return memo[term.get_id()]
+
+
 def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=None):
     """Merge differing arguments of same-declaration UF applications.
 
@@ -2170,25 +2413,34 @@ def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=
     F ⊨ x = y. Every model of F then satisfies F[big := small]: only
     UNSAT of the result transfers back. Unproved pairs are left untouched.
     Smallest pairs first, so inner merges (e.g. squared word counts under the
-    multiplication UF) make outer arguments syntactically closer.
+    multiplication UF) make outer arguments syntactically closer. Pairs whose
+    applications nest the function equally deep come before all others
+    (only the order changes): a chain h_k = f(..h_{k-1}..) built by each side
+    pairs level by level, while a cross-level pair is rarely equal and costs
+    its full budget to fail (Permit2 1327 x86_maps_0_0: three sha3_slice
+    levels per side, each level pair proved in <1s, but the 30s failures of
+    the smaller cross-level pairs ran the route out before level 3).
     """
     lemmas, failed = [], set()
     while len(lemmas) < max_lemmas:
         premise = And(*(c for c in _conjuncts(formula) if _no_binder(c)))
-        pairs, owners = {}, {}  # arg key -> (x, y); arg key -> key lists of the app pairs needing it
+        pairs, owners = {}, {}  # arg key -> (x, y, depth gap); arg key -> key lists of the app pairs needing it
         for apps in _uf_applications(formula):
+            memo = {}
             for i, first in enumerate(apps):
                 for other in apps[i + 1:]:
                     diff = [(x, y) for x, y in zip(first.children(), other.children()) if not x.eq(y)]
                     keys = [(x.get_id(), y.get_id()) for x, y in diff]
+                    gap = abs(_uf_nesting(first, first.decl(), memo) - _uf_nesting(other, first.decl(), memo))
                     for (x, y), key in zip(diff, keys):
                         owners.setdefault(key, []).append(keys)
                         if key not in failed:
-                            pairs[key] = (x, y)
+                            pairs[key] = (x, y, min(gap, pairs.get(key, (0, 0, gap))[2]))
         if not pairs:
             break
         merged = False
-        for key, (x, y) in sorted(pairs.items(), key=lambda kv: len(kv[1][0].sexpr()) + len(kv[1][1].sexpr())):
+        for key, (x, y, _) in sorted(pairs.items(), key=lambda kv: (
+                kv[1][2] > 0, len(kv[1][0].sexpr()) + len(kv[1][1].sexpr()))):
             if all(any(k in failed for k in keys) for keys in owners[key]):
                 continue  # these applications can no longer become one term (Safe 5377 hash1 vs hash2)
             budget = timeout_ms
@@ -2766,10 +3018,10 @@ class BlockEquivalenceProver:
             # it returns at once unless memory-cost sums are present.
             # "lia" (_retry_over_lia, own caps, no share) first: the LIA reading of
             # product limbs, before the SAT routes.
-            routes = ([("lia", False), ("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
+            routes = ([("lia", False), ("quick", True), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
                        ("mul", False), ("mul", True), ("unify", True), ("unify", False)]
                       if not self._node_needed_unification else
-                      [("lia", False), ("quick", True), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("unify", True),
+                      [("lia", False), ("quick", True), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("unify", True),
                        ("exact", True), ("unify", False), ("mul", True), ("mul", False)])
             # Routes that refuted this class of obligation before go first (_winners_first);
             # with no history the table above is unchanged.
@@ -2850,6 +3102,16 @@ class BlockEquivalenceProver:
                             if node_deadline is not None:
                                 self.deadline = monotonic() + (node_deadline - monotonic()) / 3
                             proved, answer, lemmas = self._retry_over_potential(target)
+                    elif route == "shift":
+                        # Half of what is left when it applies (Permit2 4837 x86_maps_12_0: 63
+                        # cases, ~2s each, past one equal share); no symbolic shift amount with
+                        # few values: returns at once. A SAT case is a model of F (shift_split).
+                        if node_deadline is not None:
+                            self.deadline = monotonic() + (node_deadline - monotonic()) / 2
+                        cases = shift_split(target, self.timeout_ms, self.deadline)
+                        proved, answer, lemmas = ((target, "sat", ()) if cases == "sat" else
+                                                  (target, "unsat", cases) if cases is not None else
+                                                  (formula, "unknown", ()))
                     elif route == "mul":
                         proved, answer, lemmas = self._retry_over_nonlinear_mul(target, "unknown", split=norm)
                     else:
@@ -2869,6 +3131,8 @@ class BlockEquivalenceProver:
                 if answer == "unsat":
                     lemmas = rewrites + lemmas
                     break
+                if route == "shift" and answer == "sat":
+                    break  # a model of F: no route can refute it (other routes' "sat" may be abstract)
             if answer != "unsat" and pending is not None and node_deadline is not None:
                 # Every route failed: resume the capped potential solve with what they left,
                 # keeping one per-query share for the direct query below.
@@ -2880,15 +3144,17 @@ class BlockEquivalenceProver:
         if expected == "sat" and answer == "unknown":
             # UFs over lambda arrays (sha3_slice in host-gas oracle arguments)
             # leave every direct query unknown; a checked constant-function
-            # witness proves satisfiability (sat_by_constant_array_ufs).
-            answer = sat_by_constant_array_ufs(formula, min(timeout, _QUICK_EXACT_MS))
+            # witness proves satisfiability (sat_by_constant_array_ufs). Up to three
+            # tiers share the budget, so each keeps the quick budget one tier had.
+            answer = sat_by_constant_array_ufs(formula, min(timeout, 3 * _QUICK_EXACT_MS))
         if answer not in ("unsat", "sat"):
             if self.deadline is not None:
                 timeout = min(timeout, int((self.deadline - monotonic()) * 1000))
                 if timeout <= 0:
                     raise ProofBudgetExceeded("proof wall budget exhausted")
             query = simplify(formula)
-            answer = solve_query(query, timeout)
+            answer = (solve_query(query, timeout, trust_unknown=False) if expected == "sat"
+                      else solve_query(query, timeout))
         record = Obligation(name, proved.sexpr(), answer, expected, monotonic() - started,
                             witnesses + pinned + lemmas)
         records.append(record)
