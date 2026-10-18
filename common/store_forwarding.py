@@ -87,6 +87,12 @@ def _memoized(name, args, compute):
     return value
 
 
+def clear_memo():
+    """Drop every memoized term. Pure caches, so only speed changes; long-lived
+    worker processes call this between nodes, since entries keep their ASTs alive."""
+    _MEMO.clear()
+
+
 def linearize_address(addr) -> Optional[Tuple[_AddrKey, int]]:
     if not is_bv(addr):
         return None

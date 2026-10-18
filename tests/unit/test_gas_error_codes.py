@@ -529,9 +529,8 @@ class TestPerOpcodeWiring:
         ("MLOAD", [1 << 200], None),
         ("RETURN", [1, 1 << 200], None),
         ("REVERT", [1, 1 << 200], None),
-        # SHA3 的 length 取 32：sha3_semantics 在 length=1 时 Concat 参数不足（既有
-        # 限制，与 gas 无关），换个合法长度即可，溢出仍由 offset=2^200 触发。
-        ("SHA3", [32, 1 << 200], None),
+        # length=1 也覆盖单字节 SHA3 快路径（曾因 Concat 只有一个参数而抛 Z3Exception）。
+        ("SHA3", [1, 1 << 200], None),
         ("CALLDATACOPY", [1, 0, 1 << 200], None),
         ("CODECOPY", [1, 0, 1 << 200], None),
         ("RETURNDATACOPY", [1, 0, 1 << 200], None),

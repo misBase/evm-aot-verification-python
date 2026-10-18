@@ -64,7 +64,12 @@ def sha3_semantics(memory, base: BitVecRef, offset: BitVecRef,
             bytes_list = []
             for i in range(concrete_length):
                 bytes_list.append(Select(memory, start + BitVecVal(i, 64)))
-            data_arg = Concat(*bytes_list) if bytes_list else BitVecVal(0, 8)
+            # z3py Concat needs >= 2 parts: one byte is its own 8-bit argument
+            # (keccak256 of a single byte, e.g. abi.encodePacked(bytes1)).
+            if len(bytes_list) >= 2:
+                data_arg = Concat(*bytes_list)
+            else:
+                data_arg = bytes_list[0] if bytes_list else BitVecVal(0, 8)
             f = Function(
                 f"sha3_bytes_{concrete_length}",
                 BitVecSort(data_arg.size()),

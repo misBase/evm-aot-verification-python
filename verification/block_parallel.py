@@ -36,6 +36,7 @@ constants as `assumed`.
 """
 from __future__ import annotations
 
+import gc
 import os
 import pickle
 import zlib  # obligation texts compress ~15x: R30 wrote 15GB for 1188 nodes uncompressed
@@ -78,7 +79,10 @@ def build_inputs(stem, options):
                                     max_instances=options["max_instances"], wall_timeout_seconds=options["wall_seconds"],
                                     summary_config=config, node_timeout_seconds=options["node_seconds"],
                                     max_parameter_values=options["max_parameter_values"],
-                                    first_pass_node_seconds=options["first_pass_node_seconds"])
+                                    first_pass_node_seconds=options["first_pass_node_seconds"],
+                                    pushed_code_return_tags=options.get("pushed_code_return_tags", False),
+                                    terminal_constant_projection=options.get("terminal_constant_projection", False),
+                                    context_constant_projection=options.get("context_constant_projection", False))
     return evm, x86, state, verifier
 
 
@@ -376,6 +380,19 @@ def close_edge(prover, name, base, goals):
     return records[-1]
 
 
+def reset_node_caches(prover):
+    """Bound a long-lived worker's memory: drop the term-keyed caches between nodes.
+
+    They keep their ASTs alive (needed so recycled ids never alias), so without
+    this a worker grows by GBs per hour. Pure caches: only speed changes; shape
+    lemmas and summary templates, which are expensive and small, are kept.
+    """
+    from common.store_forwarding import clear_memo
+    clear_memo()
+    prover._lemma_cache.clear()
+    gc.collect()
+
+
 def prove_instance(spec, node_seconds, deadline_epoch, contexts=None):
     """Worker task: the proof of `spec` (a proof instance k), then for every
     context c of k (default: k itself) its H2 edges into the frozen set, on
@@ -383,6 +400,7 @@ def prove_instance(spec, node_seconds, deadline_epoch, contexts=None):
     contexts = (spec,) if contexts is None else tuple(contexts)
     setup = _WORKER["setup"]
     prover, identity = setup.prover, _WORKER["identity"]
+    reset_node_caches(prover)
     started = monotonic()
     prover.deadline = started + max(0.0, deadline_epoch - time.time())
     prover.node_timeout_seconds = node_seconds

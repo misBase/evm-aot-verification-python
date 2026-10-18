@@ -103,6 +103,17 @@ def sensitive_slots(block):
     return frozenset(used)
 
 
+def terminal_block(block):
+    """The block's live control op ends execution (no successor block).
+
+    Same convention as evm_ir.cfg_executor: the first control op after
+    TAG/BLOCKEND decides; a block without one falls through.
+    """
+    from verification.loop_pairing import _EVM_TERMINAL_OPS, _evm_control_op
+    op = _evm_control_op(block)
+    return op is not None and op.kind.upper() in _EVM_TERMINAL_OPS
+
+
 def project(spec, slots):
     """Proof instance π(c): only the constants at `slots` are kept."""
     return replace(spec, stack_constants=tuple(c for c in spec.stack_constants if c[0] in slots))

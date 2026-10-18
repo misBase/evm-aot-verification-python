@@ -109,7 +109,10 @@ def _verify(stem, options, channel):
             node_timeout_seconds=options["node_seconds"],
             max_parameter_values=options["max_parameter_values"],
             first_pass_node_seconds=options["first_pass_node_seconds"],
-            fallback=options["fallback"], progress_callback=progress).verify_program_pair(evm, x86, state)
+            fallback=options["fallback"], progress_callback=progress,
+            pushed_code_return_tags=options["pushed_code_return_tags"],
+            terminal_constant_projection=options["terminal_constant_projection"],
+            context_constant_projection=options["context_constant_projection"]).verify_program_pair(evm, x86, state)
         channel.send(_final_report(r, len(evm.blocks)))
     except BaseException as exc:
         report = _interrupted_report(latest, f"{type(exc).__name__}: {exc}")
@@ -144,7 +147,15 @@ def main():
     p.add_argument("--results-dir", type=Path, help="--discover-first: persist finished nodes here and resume from them")
     p.add_argument("--constant-insensitive", action="store_true",
                    help="--discover-first only: prove each block once per proof instance that drops the stack constants it never consumes (docs/块级实例常量去敏化方案.md)")
+    p.add_argument("--pushed-code-return-tags", action="store_true",
+                   help="Discovery hint: also keep pushed JUMPDEST constants (return addresses of JUMPs without an IR immediate_set) as return tags, never widened")
+    p.add_argument("--terminal-constant-projection", action="store_true",
+                   help="Discovery hint: a block ending in STOP/RETURN/REVERT/INVALID/SELFDESTRUCT is registered with only the stack constants it consumes")
+    p.add_argument("--context-constant-projection", action="store_true",
+                   help="Discovery hint (needs --pushed-code-return-tags): register each context with its return tags and only the other stack constants its block consumes")
     args = p.parse_args()
+    if args.context_constant_projection and not args.pushed_code_return_tags:
+        p.error("--context-constant-projection needs --pushed-code-return-tags")
     options = {k: v for k, v in vars(args).items() if k not in ("stem", "output")}
     if options["results_dir"] is not None:
         options["results_dir"] = str(options["results_dir"])  # report metadata is JSON
