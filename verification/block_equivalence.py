@@ -1691,7 +1691,8 @@ def shift_split(formula, timeout_ms, deadline=None):
     from range compares on v), EVM shifts the whole word: bit-blasting the
     256-bit barrel shifter against the 64-bit ones stalls (Permit2 4837
     x86_maps_12_0 / 14_0: every route unknown for 2400s), while with v a
-    literal both sides become constant shifts (~2s per value).
+    literal (and the amount's high limbs fixed) both sides become constant
+    shifts (63 cases, 6s in all).
 
     Each constant v of a symbolic shift amount gets bounds lo <= v <= hi from
     F's small pure bit-vector top-level conjuncts (the two bound refutations
@@ -2404,7 +2405,7 @@ def _uf_nesting(term, decl, memo):
     return memo[term.get_id()]
 
 
-def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=None):
+def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=None, on_merge=None):
     """Merge differing arguments of same-declaration UF applications.
 
     For a pair (x, y) of closed arguments, `P ∧ x ≠ y` (array: at a fresh
@@ -2420,6 +2421,9 @@ def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=
     its full budget to fail (Permit2 1327 x86_maps_0_0: three sha3_slice
     levels per side, each level pair proved in <1s, but the 30s failures of
     the smaller cross-level pairs ran the route out before level 3).
+    `on_merge(F', lemmas, merged)`, if given, is called after each merge (merged:
+    the term both arguments now are); a true result stops merging (the caller
+    has what it needs from F').
     """
     lemmas, failed = [], set()
     while len(lemmas) < max_lemmas:
@@ -2460,7 +2464,7 @@ def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=
             formula = substitute(formula, (big, small))
             merged = True
             break
-        if not merged:
+        if not merged or (on_merge is not None and on_merge(formula, tuple(lemmas), small)):
             break
     return formula, tuple(lemmas)
 
@@ -3104,8 +3108,9 @@ class BlockEquivalenceProver:
                             proved, answer, lemmas = self._retry_over_potential(target)
                     elif route == "shift":
                         # Half of what is left when it applies (Permit2 4837 x86_maps_12_0: 63
-                        # cases, ~2s each, past one equal share); no symbolic shift amount with
-                        # few values: returns at once. A SAT case is a model of F (shift_split).
+                        # cases, 6s; a case can need ~2s when the amount is not fully fixed); no
+                        # symbolic shift amount with few values: returns at once. A SAT case is a
+                        # model of F (shift_split).
                         if node_deadline is not None:
                             self.deadline = monotonic() + (node_deadline - monotonic()) / 2
                         cases = shift_split(target, self.timeout_ms, self.deadline)
@@ -3563,6 +3568,51 @@ class BlockEquivalenceProver:
         return abstraction, "unsat", tuple(
             Obligation(f"case_{n}", q.sexpr(), "unsat", elapsed_seconds=t) for n, (q, t) in enumerate(cases))
 
+    def _after_unification(self, unified, lemmas, cap):
+        """(refuted target, "unsat", lemmas) for F' = unified (F ⊨ F', lemmas: the
+        merges), each attempt with at most `cap` ms; or None.
+
+        Merged arguments make both sides' UF applications one term, but memory
+        (lambda) arguments keep the array theory incomplete: make those
+        applications opaque (only adds models) and try once before the sweep
+        (Safe 5377 pair: 1253s unknown -> 171s, the opaque query 4.5s). Last,
+        F' with reads through store chains blasted into ites (an equivalent
+        formula, as in the "blast" route): with the hashes merged, the memory
+        words both sides charge gas for are compared there (Permit2 1327
+        x86_maps_0_0, where the opaque queries stay unknown).
+        """
+        opaque = [(t, c) for t, c in _uf_app_constants(unified) if any(_is_array_term(a) for a in t.children())]
+        started = monotonic()
+        budget = cap if self.deadline is None else min(cap, int((self.deadline - started) * 1000))
+        attempts = ()
+        if opaque:
+            query = simplify(substitute(unified, *opaque))
+            # Both memories' matching top stores peeled off first (a weakening, see
+            # peel_matching_stores; Safe 5377 d30 pair_68_58: 113-126s -> 5s). If the
+            # weaker query is not refuted, the unpeeled one is tried as before.
+            peeled = peel_matching_stores(query)
+            attempts = ((("opaque_array_uf_peeled",) + peeled,) if peeled is not None else ()) + (
+                ("opaque_array_uf", query, ()),)
+        attempts += (("blasted", None, ()),)
+        for tag, target, peel_lemmas in attempts:
+            if target is None:
+                target = simplify(unified, blast_select_store=True)
+            else:
+                # Gas sums out first (Safe 5377 d30 pair_68_9: 10s here, 60s+ with them).
+                light = _refute_over_light_premise(_conjuncts(target), BoolVal(True), budget)
+                if light is not None:
+                    (light_query, seconds), = light[0]
+                    return light_query, "unsat", lemmas + peel_lemmas + (
+                        Obligation(f"{tag}_light", light_query.sexpr(), "unsat", elapsed_seconds=seconds),)
+            if self.deadline is not None:
+                budget = min(budget, int((self.deadline - monotonic()) * 1000))
+            if budget > 0 and solve_query(target, budget) == "unsat":
+                return target, "unsat", lemmas + peel_lemmas + (
+                    Obligation(tag, target.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
+            if self.deadline is not None:
+                budget = min(cap, int((self.deadline - monotonic()) * 1000))
+        return None
+
     def _retry_with_uf_unification(self, formula, answer):
         """Rewrite F by entailed equalities, then refute it by case splits.
 
@@ -3575,37 +3625,24 @@ class BlockEquivalenceProver:
         """
         functions = self._mul_functions
         base = abstract_nonlinear_mul(formula, functions=functions)[0]
-        unified, lemmas = unify_uf_arguments(base, self.timeout_ms, self.deadline, cache=self._lemma_cache)
-        # Merged arguments make both sides' UF applications one term, but memory (lambda)
-        # arguments keep the array theory incomplete: make those applications opaque
-        # (only adds models) and try once before the sweep (Safe 5377 pair: 1253s unknown
-        # -> 171s, the opaque query 4.5s).
-        opaque = [(t, c) for t, c in _uf_app_constants(unified) if any(_is_array_term(a) for a in t.children())]
-        if lemmas and opaque:
-            started = monotonic()
-            budget = self.timeout_ms if self.deadline is None else min(
-                self.timeout_ms, int((self.deadline - started) * 1000))
-            query = simplify(substitute(unified, *opaque))
-            # Both memories' matching top stores peeled off first (a weakening, see
-            # peel_matching_stores; Safe 5377 d30 pair_68_58: 113-126s -> 5s). If the
-            # weaker query is not refuted, the unpeeled one is tried as before.
-            peeled = peel_matching_stores(query)
-            attempts = ((("opaque_array_uf_peeled",) + peeled,) if peeled is not None else ()) + (
-                ("opaque_array_uf", query, ()),)
-            for tag, target, peel_lemmas in attempts:
-                # Gas sums out first (Safe 5377 d30 pair_68_9: 10s here, 60s+ with them).
-                light = _refute_over_light_premise(_conjuncts(target), BoolVal(True), budget)
-                if light is not None:
-                    (light_query, seconds), = light[0]
-                    return light_query, "unsat", lemmas + peel_lemmas + (
-                        Obligation(f"{tag}_light", light_query.sexpr(), "unsat", elapsed_seconds=seconds),)
-                if self.deadline is not None:
-                    budget = min(budget, int((self.deadline - monotonic()) * 1000))
-                if budget > 0 and solve_query(target, budget) == "unsat":
-                    return target, "unsat", lemmas + peel_lemmas + (
-                        Obligation(tag, target.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
-                if self.deadline is not None:
-                    budget = min(self.timeout_ms, int((self.deadline - monotonic()) * 1000))
+        early = []
+
+        def probe(merged, merged_lemmas, term):
+            # After each merge of memory (lambda) arguments, the attempts below with the
+            # quick budget: the merges that matter can come long before the pairs that
+            # never merge are exhausted (Permit2 1327 x86_maps_0_0: the level-3 sha3_slice
+            # merge, then ~35 failing host-gas argument pairs for 900s; the blasted query
+            # of the merged formula is refuted at once).
+            if _is_array_term(term):
+                early.extend(filter(None, [self._after_unification(merged, merged_lemmas, _QUICK_EXACT_MS)]))
+            return bool(early)
+        unified, lemmas = unify_uf_arguments(base, self.timeout_ms, self.deadline, cache=self._lemma_cache,
+                                             on_merge=probe)
+        if early:
+            return early[0]
+        found = self._after_unification(unified, lemmas, self.timeout_ms) if lemmas else None
+        if found is not None:
+            return found
         before = unified
         unified, swept = sweep_equalities(unified, self.timeout_ms, self.deadline, cache=self._lemma_cache)
         if swept:  # merged subterms can make more UF arguments syntactically equal

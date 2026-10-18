@@ -146,6 +146,7 @@ xs = [BitVec(f"ub_x{i}", 64) for i in range(4)]
 ss = [BitVec(f"ub_s{i}", 64) for i in range(4)]
 X, S = Concat(*reversed(xs)), Concat(*reversed(ss))
 s6 = Extract(5, 0, ss[0])
+_DECLS.update({str(c): c for c in (*xs, *ss)})  # for _refuted: lemma texts name these
 
 
 def _limb(k):
@@ -169,7 +170,6 @@ def test_shift_split_refutes_limbwise_shl():
     names = [l.name for l in lemmas]
     assert names.count("shift_upper") == 4 and names.count("shift_lower") == 1  # s1..s3 fixed, s0 split
     assert sum(n.startswith("shift_case_") for n in names) == 63  # s0 in 1..63
-    _DECLS.update({str(c): c for c in (*xs, *ss)})
     assert all(_refuted(l) for l in lemmas)
     records = []
     assert be.BlockEquivalenceProver([], [], {}, timeout_ms=30000)._check("x86_maps_0_0", formula, records)
@@ -194,7 +194,6 @@ def test_shift_split_needs_small_bounds():
     # bound search alone already refutes it, since the goal is a small conjunct too).
     valid = And((ss[1] | ss[2] | ss[3]) == 0, ULT(ss[0], 1000), (X << S) != (X << ZeroExt(192, ss[0])))
     lemmas = be.shift_split(valid, 30000)
-    _DECLS.update({str(c): c for c in (*xs, *ss)})
     assert isinstance(lemmas, tuple) and lemmas and all(_refuted(l) for l in lemmas)
     assert be.shift_split(And(*X86_PATH, xs[0] == 1), 30000) is None  # no symbolic shift
 
@@ -249,3 +248,51 @@ def test_nesting_counts_binder_bodies():
     inner = f(Lambda([a], Extract(7, 0, a + p)))
     outer = f(Lambda([a], Extract(7, 0, inner + a)))
     assert be._uf_nesting(inner, f, {}) == 1 and be._uf_nesting(outer, f, {}) == 2
+
+
+# --- unification: probe the merged formula after each memory merge --------------
+
+hash_ = Function("ub_hash", be.ArraySort(BV64, BV8), BV64)
+gas = Function("ub_gas", BV64, BV64)
+q = BitVec("ub_q", 64)
+# One byte stored at p, read back as two different terms (equal windows).
+evm_window = Lambda([a], Select(be.Store(M, p, BitVecVal(7, 8)), p + a))
+x86_window = Lambda([a], If(a == 0, BitVecVal(7, 8), Select(M, p + a)))
+
+
+def test_on_merge_can_stop_merging():
+    formula = And(gas(hash_(evm_window)) != gas(hash_(x86_window)), gas(q + 1) != gas(1 + q + 0 * p))
+    seen = []
+    unified, lemmas = be.unify_uf_arguments(formula, 5000, on_merge=lambda f, l, t: seen.append(t) or True)
+    assert len(seen) == 1 and lemmas  # stopped after the first merge
+
+
+def test_memory_merge_probe_refutes_early(monkeypatch):
+    # After the window merge the formula is refuted; the later pairs (q vs 2q) never merge
+    # and are not tried once the probe succeeds.
+    formula = And(ULT(p, 1 << 20), ULT(r15, 1 << 47),
+                  gas(hash_(evm_window)) != gas(hash_(x86_window)), gas(q) != gas(2 * q))
+    calls = []
+    real = be.BlockEquivalenceProver._after_unification
+
+    def spy(self, unified, lemmas, cap):
+        calls.append(cap)
+        return real(self, unified, lemmas, cap)
+    monkeypatch.setattr(be.BlockEquivalenceProver, "_after_unification", spy)
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=5000)
+    proved, answer, lemmas = prover._retry_with_uf_unification(formula, "unknown")
+    assert answer == "unsat" and calls == [be._QUICK_EXACT_MS]  # the per-merge probe, quick budget
+    assert any(l.name.startswith("unify_") for l in lemmas)
+
+
+def test_bitvector_merges_are_not_probed(monkeypatch):
+    c = BitVec("ub_c", 64)
+    formula = And(c != 0, h64(If(c == 0, 5, c + 1)) != h64(c + 1))
+    calls = []
+    monkeypatch.setattr(be.BlockEquivalenceProver, "_after_unification",
+                        lambda self, u, l, cap: calls.append(cap))
+    be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)._retry_with_uf_unification(formula, "unknown")
+    assert calls == [3000]  # only the final attempt, as before
+
+
+h64 = Function("ub_h64", BV64, BV64)
