@@ -22,18 +22,18 @@
 
 - **修法 A：SAT 期望的检查不信任缓存的 unknown**
   - `solve_query(..., trust_unknown=True)`：L81–L96。`trust_unknown=False` 时，缓存里的 `{"unknown": N}` 不再直接返回，而是重新求解；缓存里已判定的 sat/unsat 照常使用。
-  - `_check` 在 `expected == "sat"` 时以 `trust_unknown=False` 调用：L3159–L3160。
+  - `_check` 在 `expected == "sat"` 时以 `trust_unknown=False` 调用：L3161–L3162。
   - 诊断工具 `tools/entry_cache_probe.py`（新增）：输出某个节点的 entry 查询在服务器缓存里的记录，以及新进程求解的结果，可用来直接确认根因（见 §7）。
 - **修法 B：常函数见证分档**
   - `_binder_argument_ufs`：L143；`_all_ufs`：L176；`_witness_tiers`：L196；`sat_by_constant_array_ufs`：L212（逐档尝试，预算均分）。
-  - `_check` 给见证的总预算从 `_QUICK_EXACT_MS` 提高到 `3 * _QUICK_EXACT_MS`，三档平分后，每档仍有原来一档的 3s：L3152。
+  - `_check` 给见证的总预算从 `_QUICK_EXACT_MS` 提高到 `3 * _QUICK_EXACT_MS`，三档平分后，每档仍有原来一档的 3s：L3154。
 - **修法 C：移位量分情况 `shift_split`**
-  - `_SHIFT_MAX_CASES = 64`、`_scalar_constants`、`_shift_amount_constants`、`_small_conjuncts`、`_refuted`、`_shift_bounds`、`shift_split`：L1605–L1748。
-  - 路线表加入 `("shift", False)`，位于 `("quick", True)` 之后、`blast` 之前：L3024、L3027。
-  - 路线分支 L3108–L3117：不适用时立即返回；适用时取剩余时间的一半。另在 L3137 加了一行：只有 `shift` 路线报 sat 时才停止（这里的 sat 是 F 的真模型；其他路线的 sat 可能来自抽象，仍照旧往下试）。
+  - `_SHIFT_MAX_CASES = 64`、`_scalar_constants`、`_shift_amount_constants`、`_small_conjuncts`、`_refuted`、`_shift_bounds`、`shift_split`：L1605–L1749。
+  - 路线表加入 `("shift", False)`，位于 `("quick", True)` 之后、`blast` 之前：L3025、L3028。
+  - 路线分支 L3109–L3119：不适用时立即返回；适用时取剩余时间的一半。另在 L3139 加了一行：只有 `shift` 路线报 sat 时才停止（这里的 sat 是 F 的真模型；其他路线的 sat 可能来自抽象，仍照旧往下试）。
 - **修法 D：unify 调度**
-  - `_uf_nesting`：L2390；`unify_uf_arguments` 的排序键改为 `(层差>0, 大小)`，新增 `on_merge` 回调：L2407–L2468。
-  - `_after_unification`（从 `_retry_with_uf_unification` 抽出原有的 opaque 尝试，并新增 blasted 尝试）：L3569；`_retry_with_uf_unification` 中，内存（lambda）参数每合并一次就探测一次：L3614–L3645。
+  - `_uf_nesting`：L2391；`unify_uf_arguments` 的排序键改为 `(层差>0, 大小)`，新增 `on_merge` 回调：L2408–L2469。
+  - `_after_unification`（从 `_retry_with_uf_unification` 抽出原有的 opaque 尝试，并新增 blasted 尝试）：L3571；`_retry_with_uf_unification` 中，内存（lambda）参数每合并一次就探测一次：L3616–L3645。
 - 测试：`tests/unit/test_block_unknown_blocks.py`（新增，17 条）。
 
 ## 3. 健全性论证
@@ -51,7 +51,7 @@
   - 修法 B：lambda 位于位向量参数中时能被限制；分档顺序正确；UNSAT 或需要非常函数时不报 sat；5802 的 SMT2 能证出。
   - 修法 C：limb 移位与 256 位 SHL 的合成义务（63 个 case，所有引理从文本重解均为 unsat）；构造真反例时报 sat，`_check` 记录为 sat，不算证出；界过大时不展开；空界时反驳；4837 14_0 的 SMT2。
   - 修法 D：三层链中同层 pair 先试（已确认旧的按大小排序会先试跨层 pair，测试能区分新旧行为）；`on_merge` 能停止合并；内存合并后用 quick 预算探测；纯位向量合并不触发探测。
-- 全量快测 `pytest tests/unit -m "not slow"`：见 §5 末尾的最终结果。
+- 全量快测 `pytest tests/unit -m "not slow" -p no:cacheprovider`：**1732 passed, 3 skipped, 0 failed**（基线为 1715 passed + 新增 17 条）。
 - `test_block_uf_unification.py` 中两条 `slow` 用例（Safe 9733 / 11803）缺数据文件 `tests/data/block_obligations/*.smt2`，报 `file access error`。在基线 60d55f9 上也一样失败，与本次改动无关。
 
 ## 5. 离线验证数据（本机：4 核，z3 4.15.4，每查询 30s）
@@ -74,14 +74,14 @@
 |---|---|---|
 | Permit2 4837 d9 符号 | 6100s inconclusive（2 条 unknown） | **proved 259s**（EVM 3 条路径 / x86 31 条路径，379 个查询） |
 | Permit2 4837 d9 m=384 f=256 | 0s，entry unknown | **proved 256s** |
-| Permit2 1327 d10 符号 | 7269s inconclusive | 运行中，见 §8 |
-| Permit2 1327 d10 m=192 f=128 | 88s，entry unknown | 运行中，见 §8 |
-| PoolManager 5802 d14 | 98s，`model_domain_nonempty` unknown | 运行中，见 §8 |
+| Permit2 1327 d10 符号 | 7269s inconclusive（2 条 unknown） | 7222s inconclusive，**0 条失败**，只是串行跑完节点预算（EVM 61 条路径 / x86 70 条路径，1895 个查询） |
+| Permit2 1327 d10 m=192 f=128 | 88s，entry unknown | entry 已通过；7207s inconclusive，`x86_maps_0_0` 1476s unknown（见 §8） |
+| PoolManager 5802 d14 | 98s，`model_domain_nonempty` unknown | 7258s inconclusive，**0 条失败**，只是串行跑完节点预算（EVM 55 条路径 / x86 23 条路径，1279 个查询，1060 个 terminal 已证） |
 
 ## 6. 已证义务的回归
 
 - 4837 两个节点的全部 379 个查询都通过了。其中其他行原来就是证出的，可算作 `shift` 路线和 unify 调度改动下的回归样本。
-- 全量快测 0 失败（见 §8）。这些单元测试覆盖了 unify、路线顺序、pin、alias、potential、见证等已有路径。
+- 全量快测 0 失败（1732 passed）。这些单元测试覆盖了 unify、路线顺序、pin、alias、potential、见证等已有路径。
 - 未能回归的部分：其他合约（Safe / CErc20 等）已证块的 SMT2 不在仓库里，`tests/data/block_obligations` 也不存在。建议服务器在全量验证中重点看这两类节点的耗时：一是 unify 获胜的节点（Safe 5377、CErc20 4236），排序和每次内存合并后的 quick 探测可能改变它们的耗时；二是含符号移位的节点。
 
 ## 7. 在服务器上确认修法 A 的根因
@@ -93,6 +93,10 @@ BLOCK_PROOF_CACHE=<服务器缓存路径> PYTHONPATH=. poetry run python tools/e
 
 如果输出 `cached: {'unknown': 30000} fresh: sat`，即可确认。注意：所有 msize 为具体值的节点共用这一条记录。修法 A 之后，这条记录对 SAT 期望的检查不再生效，无需手动清理缓存。至于 1327 m=192 那次为什么花了 67s 并超时，可能是机器负载（上一个节点的 pair worker 仍在运行），也可能是 sqlite 锁等待加上更早的一条缓存记录。本机无法复现，因为新进程里只要 0.019s。
 
-## 8. 未解决的问题与运行中的验证
+## 8. 未解决的问题
 
-（本节在运行结束后补充）
+1. **Permit2 1327 m=192 f=128 的 `x86_maps_0_0`**（具体实例）仍是 1476s unknown。入口问题已修好，节点进入了 pair 阶段。这一条的公式与符号实例的不同：msize 和 fmp 是具体值，内存视图和 gas 项都会变化。我没有抓到它的 SMT2，因为 probe 只在节点结束时才写 `--formula-dir`，重跑一次又要 2 小时，所以无法断定它是同一个调度问题（预算不够），还是另有卡点。建议服务器用 `--formula-dir` 重跑这个节点，再用 `cloud-inputs/r3c/tools/route_trace.py` 剖析。
+2. **整节点预算**：1327 符号实例和 5802 在本机都是串行跑（`BLOCK_PAIR_WORKERS=1`），没有任何义务失败，只是用完了 7200s 的节点预算。服务器上若用 pair worker 并行，应能跑完；否则这两个节点和 PoolManager 4418 属于同一类问题（预算，而非 unknown）。需要服务器做全量验证来确认。
+3. **对其他合约的耗时影响**：unify 排序、每次内存合并后的 quick 探测，以及新加的 `shift` 路线，都可能改变其他合约已证块的耗时。健全性不受影响，但可能变快或变慢。本机没有它们的 SMT2，无法回归（见 §6）。
+4. **1327 的 unify 仍然偏慢**（获胜前约 300–450s）：在 L3 合并之前，同层的 host-gas 参数 pair（约 15s/个，都会失败）排在前面。如果服务器上仍然紧张，下一步可以考虑剪掉死的 host-gas 上界公理（只出现在 `ULE(host_gas_*(…), 上界)` 中、别处不用的应用；去掉一个合取项是弱化，对 UNSAT 是健全的）。这样那批 pair 就不会出现。这一步本次没有做。
+5. 修法 A 的根因（缓存里有超时记录）是推断出来的：0s 的 unknown 只能来自缓存，而所有具体 msize 的入口查询完全相同，这一点本机已复现。服务器上可用 §7 的命令直接确认。
