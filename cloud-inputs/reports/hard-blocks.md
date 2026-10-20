@@ -4,7 +4,7 @@
 
 ## 1. 结论
 
-**没有任何 SAT。** 三个块的义务全部成立：1327 `x86_maps_0_46`（两个实例）和 Aave `pair_0_1` 已在本机证出（UNSAT），8750 的 H2 出边已逐条闭合（见 §2.3）。没有出现反例，所以不需要做具体执行，也没有编译器问题。
+**没有任何 SAT。** 任务列出的义务全部成立：1327 `x86_maps_0_46`（两个实例）和 Aave `pair_0_1` 已在本机证出（UNSAT），8750 的 H2 出边已逐条闭合（见 §2.3）。没有出现反例，所以不需要做具体执行，也没有编译器问题。
 
 | 合约 | 块 / 实例 | 义务 | 成立？ | 根因 | 修法 | 修法前 | 修法后（本机） |
 |---|---|---|---|---|---|---|---|
@@ -19,6 +19,7 @@
 - 1327 符号实例中，前缀 pass 没有消掉的 maps，除了 `0_46` 还有：第 0 行和第 4 行各 63 条（0..5、9..50、56..60、81..85、106..110），第 38 行 15 条，第 39 行 10 条，第 40 行 5 条，以及 42、43、54、59 行各 1–2 条。服务器上这些是按 0_0、0_1、…… 的顺序逐条跑的，`0_46` 是第一条失败的，**它后面的都没有尝试过**。修法 1 之后，整节点结果见 §6.4。
 - 1327 m=192 f=128 实例：前缀 pass 没消掉的有 347 条（第 0、3、41、42、43 行各约 60 条）。
 - 任务 L 的 1327 `x86_maps_0_0` / `0_1`（812s / 840s）在修法 1 之后是 **82.4s / 58.5s**：lambda 规范化同样让三层 `sha3_slice` 碰面了。
+- 1327 符号实例整节点（本机串行，21600s）：**所有 `x86_maps` 都通过了**。节点预算耗在两条服务器从未跑到的 all 行 pair 上：`pair_0_6` / `pair_0_7`，x86 在 SSTORE 一类的 gas 检查上 OOG，EVM 正常退出。两条都是 unknown，不是 SAT。这是新暴露出来、尚未解决的问题，见 §6.4、§8。
 
 ## 2. 逐块分析
 
@@ -131,17 +132,26 @@
 
 修法 4 的效果混在上表里，没有单独拆出来：路线类名改为 `H2_memory` 等之后，第一条出边上赢的路线（`blast*`），在后面的出边上会先试。(0,7)/(0,9)/(0,11) 的 `memory_0_shared` 只要 12.7–14.3s，其中有多少来自路线顺序、多少因为这几种复制情形本身就容易，本次没有分开测。修法 1 让 (0,1) 的 `memory_0` 从 169.5s 降到 148.1s（单独 route_trace）。
 
-### 6.4 整节点（`probe_block_obligations.py --timeout-ms 30000 --node-seconds 21600 --keep-going`，串行，修法 1–2）
+### 6.4 整节点（`probe_block_obligations.py --timeout-ms 30000 --node-seconds 21600 --keep-going`，串行，修法 1–2，`BLOCK_SUMMARY_LEMMAS=1 PYTHONHASHSEED=0`）
 
-TBD
+| 节点 | 结果 |
+|---|---|
+| Permit2 1327 d10 符号 | 21722s 用完节点预算，inconclusive。**没有任何 `x86_maps` 失败**（2064 个查询，EVM 61 条路径 / x86 65 条路径，233 个 terminal 已证）。keep-going 记下两条 unknown：`pair_0_6`（5925s）和 `pair_0_7`（1943s），都是 `exit@1273 / terminal@75335`。这两条在服务器上从来没有被尝试过，因为节点在 `0_46` 就停了 |
+| Aave 8248 d17 m=352 | 本机**被内存 cgroup 的 OOM 杀掉**（约 6.6h 时 RSS 6.6GB，dmesg：`Memory cgroup out of memory: Killed process … (python)`），没有输出。单条义务上的结论见 §6.1、§6.5。整节点要在服务器上验证 |
+| Permit2 1327 m=192 f=128 | 本机在报告提交时还没有跑完（与上面两个节点并行），未纳入 |
+
+`pair_0_6` / `pair_0_7` 是 all 行（correspondence 提议为 all）：x86 路径 6、7 等于 x86 路径 0 的前缀加上**最后一个 gas 检查取反**（181KB 的合取项，含三层 `sha3_slice` 和 `host_gas_sstore`），即 x86 在 SSTORE 一类的检查上 OOG，而 EVM 路径 0 的所有检查都通过。这和 `x86_maps_0_46` 是同一个 gas 等价关系，只是方向相反（EVM 通过 ⇒ x86 通过）。本机试过：整条公式做 lambda 规范化 + blast，120s unknown；单独拿 EVM 合取项 0/9/17/46 与 x86_6 求合取，各 60s unknown。公式已存为 `cloud-inputs/m/smt2/permit2_1327_pair_0_6.smt2`，见 §8。
 
 ### 6.5 其他
 
 - Aave `pair_0_1` **只走 `_check`**（不经节点级合并，模拟 x86_maps 或 H2 部分这类不走 `_unify_node` 的义务）：修法前 1801.4s unknown，修法后 **1227.9s proved**。获胜路线是 `unify`（plain，73.4s），恒等合并后 quick 即可证出。之所以这么晚，是因为 `unify` 在路线表的最后。生产里 pair 会先经过 `_unify_node`，那一步就能合并（79s）。
 - 8750 (0,5) 的 `memory_0`：新代码 route_trace 2581.6s proved。路线全部失败，收尾的直接查询 756s 证出。单独试过：blast 过的规范式直接解 578s unsat，未规范化的直接查询 1500s unknown。
 
-## 7. 诊断工具（scratchpad 脚本思路，供服务器复现）
+## 7. 诊断工具（`cloud-inputs/m/tools/`，仅用于诊断，供服务器复现）
 
+- `capture_pairs.py STEM NODE.json OUTDIR`：跑到 pair 阶段为止，导出 premise、每条路径条件、correspondence、前缀 pass 与卡住组的结果（`meta.json`）以及各个 pair 的 SMT2，然后中止。用 `CAPTURE_ONLY=<正则>` 限定导出哪些 pair。`build_maps.py CAPDIR J K|all OUTDIR` 再按 `_check_rows` 的做法重建 `x86_maps_J_K`。
+- `h2_probe.py STEM PC DEPTH CONSTS OUTDIR [--skip-pairs] [--digests]`：discover → `proof_groups` → `load_worker` → `prove_instance`，记录每个 H2 部分的耗时。`H2_SAVE=<正则>` 时只导出匹配的部分、不求解。`--digests` 时输出每条出边的 base / 目标合取项摘要，用于找共用合取项。
+- `joint_norm.py`：某义务中，哪些 UF 参数对在联合规范化之后是恒等式。`l2diff.py`：逐层列出 `sha3_slice` 参数的最小差异。`shared_try.py`：用若干出边的部分公式算公共 base 上的查询，跑生产 `_check`。
 - 抓取 pair 阶段的义务：给 `_check_rows` 打补丁，在 `_check_all` 之前把各个 pair 写成 SMT2，然后中止。注意要跳过 `_discharge_all_rows` 的 `pair_group_*` 试验。另外，前缀 pass、卡住组的结果和 correspondence 都能直接从 `_pair_phase` 里拿到。
 - H2：`discover` → `proof_groups(..., True)` → `load_worker` → `prove_instance`，并对 `close_edge` 和 `_check` 打计时补丁。若只关心 H2，可以把 `_pair_phase` 替换成直接返回 correspondence（只用于诊断，**不是证明**）。
 
@@ -154,5 +164,7 @@ TBD
 2. **8750 的另外两个实例**（d11 (0,0)、d15 (0,0)）本机没有单独跑。它们和 d11 符号是同一个块，出边结构相同，修法 3、4 同样适用，需要服务器确认。服务器上 H2 和 3 个实例并行，单条出边的耗时会比本机高。
 3. **跨出边共用的前提是公共 base 足够强。** 8750 上 36 次共用证明全部成功。若在别的合约上公共 base 太弱，共用尝试失败后要按出边各自再证一次，这部分时间就浪费了（这是耗时问题，不影响健全性）。如果服务器上发现这种情况，可以给共用尝试加一个预算上限。
 4. **对其他合约耗时的影响**：修法 1 扩大了 normalize 的作用范围（每个单变量 lambda 体都要规范化一次）。修法 2 在每次 unify 路线和每个节点的 `_unify_node` 上多做一次规范化（上限 4 个查询超时）。在 1327 上 lambda 规范化只要 1–2s。但对 lambda 很多的大公式，normalize 本身可能变慢。本机能回归的只有任务 L 和本任务的 SMT2（全部变快或持平，§6.2），其他合约（Safe / CErc20 / PoolManager）已证块的耗时需要服务器全量验证来确认。
-5. 1327 m=192 f=128 和 Aave 8248 的整节点结果见 §6.4。整节点还会遇到排在 `0_46` / `pair_0_1` 之后、服务器上从未尝试过的义务。
+5. **1327 符号实例的 `pair_0_6` / `pair_0_7`**（x86 在 SSTORE 一类的 gas 检查上 OOG，EVM 正常退出；见 §6.4）是本次整节点运行中新暴露出来的。义务应当成立：gas 表达式与 `0_46` 相同，只是方向相反。但本机没有证出。下一步可以先在 `permit2_1327_pair_0_6.smt2` 上做同形比较：x86 那个取反的检查和 EVM 合取项 46（及 0/9/17）在 lambda 规范化之后的差别，看是否需要把 x86 的 L3b 链和 EVM 的链按层合并（任务 L 的 unify 加上本次修法 1）。
+6. **Aave 8248 整节点**在本机因内存限制被 OOM 杀掉，没有整节点结果。1800 个 pair 是全积，节点级 `unify_identities` 会在所有 host pair 上做一次联合规范化（上限 4 个查询超时），需要在服务器上看它的耗时和内存。
+7. 1327 m=192 f=128 整节点本机未跑完。
 
