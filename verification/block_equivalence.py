@@ -22,7 +22,7 @@ from z3 import (And, Not, Or, Solver, SolverFor, sat, unsat, simplify, is_bool, 
                 Implies, ULT, Var, substitute_funs, Extract, If, Z3_OP_EXTRACT, Z3_OP_BADD, Z3_OP_CONCAT, Z3_OP_EQ, Z3_OP_SELECT, is_true,
                 is_store, is_select, substitute_vars, Concat, Z3_OP_BUDIV, Z3_OP_BUDIV_I, Z3_OP_BOR, Store,
                 is_not, is_eq, is_distinct, ForAll, Z3_get_array_arity, Then, Lambda, ArraySort, Const, FuncDeclRef,
-                UGT, Z3_OP_BSHL, Z3_OP_BLSHR, Z3_OP_BASHR)
+                UGT, Z3_OP_BSHL, Z3_OP_BLSHR, Z3_OP_BASHR, BoolSort)
 from concurrent.futures import TimeoutError as FutureTimeout
 from concurrent.futures import BrokenExecutor
 from random import Random
@@ -942,6 +942,56 @@ def _join_and_decide(formula, lemmas):
     return simplify(And(*top), bv_sort_ac=True), True
 
 
+def _normalized_lambda(t, lemmas, deadline):
+    """λk. b' for t = λi. b, b' = normalize_word_arith of b[i := k] (k fresh), or None.
+
+    The rewrites of b[i := k] are proved for every value of k (a free constant
+    there), so b[i := k] = b' is valid and λi. b = λk. b' by extensionality. The
+    body sits under an uninterpreted Bool `hold` so that normalising it rewrites
+    terms only (hold(b) is no ite guard and nothing else decides it)."""
+    k = FreshConst(t.var_sort(0), "lam_k")
+    body = substitute_vars(t.body(), k)
+    hold = FreshFunction(body.sort(), BoolSort())
+    started = monotonic()
+    out, inner = normalize_word_arith(hold(body), deadline=deadline)
+    if not (is_app(out) and out.decl().eq(hold)) or out.arg(0).eq(body):
+        return None
+    new = Lambda([k], out.arg(0))
+    lemmas.append(Obligation(f"normalize_{len(lemmas)}_lambda", Not(t == new).sexpr(), "unsat",
+                             elapsed_seconds=monotonic() - started, lemmas=inner))
+    return new
+
+
+def _normalize_lambdas(formula, lemmas, deadline=None):
+    """F with every outermost one-variable lambda replaced by _normalized_lambda
+    (inner ones are normalised with their body), binders renamed canonically, F' ≡ F.
+
+    The rounds below never enter binders, but x86 memory reaches its hashes
+    inside lambdas: sha3_slice(λi. If(len <= i, 0, A[R15 + o + i])) reads the
+    R15 offset view where EVM reads M[o + i], so the two sides' hash arguments
+    never met (Permit2 1327 x86_maps_0_46: three nested sha3_slice levels per
+    side; every route unknown for 1800s, here the blasted normal form is
+    refuted in 0.4s). canon_binders: the rebuilt lambdas of both sides are
+    then alpha-equal terms, so equal ones hash-cons."""
+    pairs, seen, work = [], set(), [formula]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen:
+            continue
+        seen.add(t.get_id())
+        if is_quantifier(t):
+            if t.is_lambda() and t.num_vars() == 1 and (deadline is None or monotonic() < deadline):
+                new = _normalized_lambda(t, lemmas, deadline)
+                if new is not None:
+                    pairs.append((t, new))
+            continue
+        if is_app(t):
+            work.extend(t.children())
+    if not pairs:
+        return formula
+    return simplify(canon_binders(substitute(formula, *pairs)), bv_sort_ac=True)
+
+
 def normalize_word_arith(formula, rounds=32, deadline=None):
     """Rewrite F into an equivalent F' whose word counts / gas sums are syntactic.
 
@@ -954,8 +1004,10 @@ def normalize_word_arith(formula, rounds=32, deadline=None):
     A replacement is built from the old children, so each nesting level of
     rewrites costs a round: run to a fixpoint (rounds is only a cap; Safe 8915
     H2 gas_0 needs 10, the old cap 6 left x86 byte splits and R15 views).
+    Lambda bodies are normalised first, each on its own (_normalize_lambdas).
     """
     formula, lemmas = simplify(formula, bv_sort_ac=True), []
+    formula = _normalize_lambdas(formula, lemmas, deadline)
     for _ in range(rounds):
         # Joined zero tests and decided guards expose word arithmetic for this round.
         formula, _ = _join_and_decide(formula, lemmas)
@@ -2469,6 +2521,73 @@ def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=
     return formula, tuple(lemmas)
 
 
+def _constant_names(term):
+    """Names of the 0-ary uninterpreted constants in `term` (binder bodies included)."""
+    names, seen, work = set(), set(), [term]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen:
+            continue
+        seen.add(t.get_id())
+        if is_quantifier(t):
+            work.append(t.body())
+        elif is_app(t):
+            if t.num_args() == 0 and t.decl().kind() == Z3_OP_UNINTERPRETED:
+                names.add(t.decl().name())
+            work.extend(t.children())
+    return names
+
+
+def unify_identities(formulas, deadline=None):
+    """(formulas', lemmas): same-declaration UF applications whose differing
+    arguments are identities (x = y for every value of the leaves, no premise)
+    merged into one term, in every formula.
+
+    Both sides often build a host-call argument from the same values in
+    different spellings (x86 byte-split sums Concat(s[63:8], s[7:0]' ) and
+    R15 offset views against EVM words and offsets), so the argument pair is
+    an identity that normalize_word_arith proves rewrite by rewrite, while the
+    whole formula's normalisation (its guards decided by the path conditions)
+    leaves the two spellings apart and every premise query on x ≠ y stays
+    unknown (Aave Pool 8248 pair_0_1: DELEGATECALL gas / in-offset / in-size /
+    memory, 4 pairs, 68s here; whole-formula normalisation 140s left the gas
+    apart; _prove_equal 128s unknown for each).
+
+    One normalisation over G = ∧_k (m_k ⇒ x_k = y_k), m_k fresh Booleans: it
+    returns N ≡ G (each rewrite proved, the lemmas). If m_k does not occur in
+    N, then x_k = y_k ≡ G[m_k := ⊤, m_j := ⊥] ≡ N[m_j := ⊥] ≡ G[all := ⊥] ≡ ⊤:
+    a valid identity, so F ≡ F[big := small] for every formula F. A deadline
+    only stops rewriting (N is still ≡ G; fewer markers vanish)."""
+    pairs = {}
+    for f in formulas:
+        for apps in _uf_applications(f):
+            for i, first in enumerate(apps):
+                for other in apps[i + 1:]:
+                    for x, y in zip(first.children(), other.children()):
+                        if not x.eq(y):
+                            pairs.setdefault((x.get_id(), y.get_id()), (x, y))
+    if not pairs or (deadline is not None and monotonic() >= deadline):
+        return list(formulas), ()
+    started = monotonic()
+    marks = [FreshConst(BoolSort(), "ident") for _ in pairs]
+    joint, rewrites = normalize_word_arith(
+        And(*(Implies(m, x == y) for m, (x, y) in zip(marks, pairs.values()))), deadline=deadline)
+    live = _constant_names(joint)
+    merges = [(x, y) for m, (x, y) in zip(marks, pairs.values()) if m.decl().name() not in live]
+    if not merges:
+        return list(formulas), ()
+    lemma = Obligation(f"unify_identities_{len(merges)}", Not(And(*(x == y for x, y in merges))).sexpr(), "unsat",
+                       elapsed_seconds=monotonic() - started, lemmas=rewrites)
+    # Larger term := smaller, as unify_uf_arguments; the largest first, so a pair nested in
+    # another is not rewritten inside it before the outer one matches (each swap is valid alone).
+    swaps = sorted((tuple(sorted((x, y), key=lambda t: -len(t.sexpr()))) for x, y in merges),
+                   key=lambda s: -len(s[0].sexpr()))
+    out = list(formulas)
+    for big, small in swaps:
+        out = [substitute(f, (big, small)) for f in out]
+    return out, (lemma,)
+
+
 # ponytail: fixed 3s probe before the rewrite routes; tune if easy queries start missing it.
 _QUICK_EXACT_MS = 3000
 # ponytail: fixed 300s cap for the last-resort direct query; raise it if a node fails only on these.
@@ -3307,18 +3426,23 @@ class BlockEquivalenceProver:
                  if name.startswith("pair_") and name not in skip and _uf_applications(f)]
         if not hosts:
             return pairs, (), set()
+        # Valid argument identities first (unify_identities): no premise, so every sibling is
+        # rewritten by one normalisation. ponytail: capped at 4 query timeouts.
+        cap = monotonic() + 4 * self.timeout_ms / 1000
+        concrete, identities = unify_identities([pairs[n][1] for n in hosts],
+                                                cap if self.deadline is None else min(cap, self.deadline))
         functions = self._mul_functions
-        abstract = [abstract_nonlinear_mul(pairs[n][1], functions=functions)[0] for n in hosts]
+        abstract = [abstract_nonlinear_mul(f, functions=functions)[0] for f in concrete]
         unified, lemmas = unify_across(abstract, self.timeout_ms, self.deadline, cache=self._lemma_cache)
-        if not lemmas:
+        if not lemmas and not identities:
             return pairs, (), set()
         out, rewritten = list(pairs), set()
-        for n, a, u in zip(hosts, abstract, unified):
-            if not u.eq(a):
+        for n, c, a, u in zip(hosts, concrete, abstract, unified):
+            if not u.eq(a) or not c.eq(pairs[n][1]):
                 name, _, where = pairs[n]
-                out[n] = (name, concretize_mul(u, functions), where)
+                out[n] = (name, concretize_mul(u, functions) if not u.eq(a) else c, where)
                 rewritten.add(name)
-        return out, lemmas, rewritten
+        return out, identities + lemmas, rewritten
 
     def _correspondence(self, evm, x86, premise, records):
         """Map each x86 path to its EVM path instead of pairing every (i, j).
@@ -3623,6 +3747,25 @@ class BlockEquivalenceProver:
         square_monotonicity axioms (valid for bvmul) are conjoined. The
         record is proved only if every lemma and every leaf case was refuted.
         """
+        # Valid argument identities first (unify_identities, F ≡ F'): the applications they
+        # merge need no premise query at all; a contradiction between them is then syntactic.
+        # ponytail: capped at 4 query timeouts (Aave 8248 pair_0_1 needs ~70s).
+        cap = monotonic() + 4 * self.timeout_ms / 1000
+        (merged,), identities = unify_identities([formula], cap if self.deadline is None else min(cap, self.deadline))
+        if not identities:
+            return self._unify_and_split(formula, answer)
+        started = monotonic()
+        budget = _QUICK_EXACT_MS if self.deadline is None else min(
+            _QUICK_EXACT_MS, int((self.deadline - started) * 1000))
+        query = simplify(merged)
+        if budget > 0 and solve_query(query, budget) == "unsat":
+            return merged, "unsat", identities + (
+                Obligation("identities_quick", query.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
+        proved, got, lemmas = self._unify_and_split(merged, answer)
+        return (proved, got, identities + lemmas) if got == "unsat" else (formula, answer, ())
+
+    def _unify_and_split(self, formula, answer):
+        """The unification and case-split attempts of _retry_with_uf_unification on F."""
         functions = self._mul_functions
         base = abstract_nonlinear_mul(formula, functions=functions)[0]
         early = []
