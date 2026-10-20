@@ -258,7 +258,37 @@ def _congruent_arguments(conjunct):
     return leaves(left, right, [])
 
 
-def close_edge(prover, name, base, goals):
+def shared_bases(bases, goals):
+    """{conjunct id: common base} for the goal conjuncts of two or more edges.
+
+    bases[n] is edge n's base, goals[n] its [(target, RelationGoals)]. Edges
+    of one node often end in states whose goal conjuncts are the same terms
+    (Permit2 8750 d11: 12 edges; memory_0 and return_data_source_* each
+    shared by 2, memory_size / memory_gas / gas by 6), their bases differing
+    only in branch literals (the STATICCALL success flag). The common base is
+    the conjunction of the conjuncts every such base has (first edge's order),
+    so each base implies it: base_n ∧ ¬c is a strengthening of common ∧ ¬c,
+    and one refutation of the latter proves c on every one of those edges."""
+    from verification.block_equivalence import _conjuncts
+    owners = {}
+    for n, targets in enumerate(goals):
+        for _, relation in targets:
+            for g in relation:
+                for c in _conjuncts(g.condition):
+                    owners.setdefault(c.get_id(), set()).add(n)
+    conjuncts = [_conjuncts(b) for b in bases]
+    ids = [{c.get_id() for c in cs} for cs in conjuncts]
+    out = {}
+    for key, edges in owners.items():
+        if len(edges) < 2:
+            continue
+        first, *rest = sorted(edges)
+        common = set.intersection(*(ids[n] for n in rest)) if rest else ids[first]
+        out[key] = And(*(c for c in conjuncts[first] if c.get_id() in common))
+    return out
+
+
+def close_edge(prover, name, base, goals, shared=None):
     """The edge record for base ⇒ ∨_t R_t, goals = [(target, RelationGoals)].
 
     One target at a time: base ⇒ R_t implies the disjunction, and R_t is a
@@ -282,6 +312,11 @@ def close_edge(prover, name, base, goals):
     whole-disjunction fallback still covers) — Safe 8915 t0 needs entry slot
     14 = 0 which no base conjunct mentions: 0.0s, where base ∧ ¬c ran 3635s
     unknown looking for a model of the whole premise.
+
+    `shared` (optional, one per context: {"bases": shared_bases(...), "done": {}})
+    carries conjuncts across the context's edges: one that other edges also
+    need is refuted once over the common base (each edge's base implies it);
+    a failed shared attempt leaves the edge to its own base.
     """
     from verification.block_equivalence import (_QUICK_EXACT_MS, Obligation, _conjuncts, _generalize_products,
                                                 refute_over_bv_abstraction, solve_query)
@@ -358,6 +393,17 @@ def close_edge(prover, name, base, goals):
                         for i, (a, b) in enumerate(pairs):
                             hard.append((f"{part}_arg{i}", And(base, a != b), ""))
                             owners.append(key)
+                        continue
+                # A conjunct other edges also need (shared_bases): refuted once over the
+                # common base, a weakening of this one; failing that, on this base as before.
+                if shared is not None and key in shared["bases"]:
+                    if key not in shared["done"]:
+                        mine = []
+                        prover._check(f"{part}_shared", And(shared["bases"][key], Not(conjunct)), mine)
+                        shared["done"][key] = mine if mine[-1].proved else None
+                    if shared["done"][key] is not None:
+                        outcome[key] = shared["done"][key]
+                        parts.extend(outcome[key])
                         continue
                 hard.append((part, And(base, Not(conjunct)), ""))
                 owners.append(key)
@@ -448,8 +494,10 @@ def prove_instance(spec, node_seconds, deadline_epoch, contexts=None):
                 if assumed and not prover._check(f"context_nonempty_{tag}", base, [], expected="sat"):
                     reasons.append(f"context {c!r}: premise ∧ E_c empty or unknown")
                     continue
-                for i, j, e, x, targets, goals in pairs:
-                    record = close_edge(prover, f"H2_{tag}{i}_{j}", And(base, e.condition, x.condition), goals)
+                bases = [And(base, e.condition, x.condition) for _, _, e, x, _, _ in pairs]
+                shared = dict(bases=shared_bases(bases, [goals for *_, goals in pairs]), done={})
+                for (i, j, e, x, targets, goals), edge_base in zip(pairs, bases):
+                    record = close_edge(prover, f"H2_{tag}{i}_{j}", edge_base, goals, shared)
                     if not record.proved:
                         reasons.append(f"H2 {tag}({i},{j}) not closed into pc={e.location} (solver={record.answer})")
                     edges.append(EdgeCertificate(c, (i, j), e.location, targets, digest(targets), identity,

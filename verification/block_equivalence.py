@@ -1839,10 +1839,14 @@ def _route_class(name):
     """Obligations whose routes behave alike: the name without its path
     indices, goal-split parts kept apart (pair_67_9_goal_2_of_7 ->
     pair_goal_2_of_7, x86_maps_3_5 -> x86_maps). Siblings of one node share
-    the relation goals, so part k of every pair has the same shape."""
+    the relation goals, so part k of every pair has the same shape.
+    H2/H0 edge parts lose their context / edge / target indices too
+    (H2_c0_0_5_t1_memory_0 -> H2_memory): one goal behaves alike on every
+    edge, and with the indices each edge was a class of its own, so what
+    refuted it on the first edge never went first on the next."""
     m = _GOAL_NAME.search(name)
     base = name[:m.start()] if m else name
-    return re.sub(r"(_\d+)+$", "", base) + (m.group(0) if m else "")
+    return re.sub(r"_[ct]?\d+(?=_|$)", "", base) + (m.group(0) if m else "")
 
 
 def _winners_first(routes, stats):

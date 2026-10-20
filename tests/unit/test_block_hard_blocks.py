@@ -158,3 +158,60 @@ def test_aave_8248_pair_0_1_by_identities():
     assert rewritten == {"pair_0_1"} and all(l.proved for l in lemmas)
     records = []
     assert prover._check("pair_0_1", out[0][1], records) and records[-1].proved
+
+
+# --- H2: route classes and shared goal conjuncts ---------------------------------
+
+
+def test_route_class_drops_edge_indices():
+    assert be._route_class("H2_c0_0_5_t1_memory_0") == be._route_class("H2_c1_3_2_t0_memory_1") == "H2_memory"
+    assert be._route_class("H2_c0_0_5_t1_memory_0_shared") == "H2_memory_shared"
+    assert be._route_class("H0_3_t2_gas_0") == "H0_gas"
+    assert be._route_class("pair_67_9_goal_2_of_7") == "pair_goal_2_of_7"
+    assert be._route_class("x86_maps_group_12") == "x86_maps_group"
+    assert be._route_class("evm_coverage") == "evm_coverage"
+
+
+def _edges(prefix):
+    from verification.cutpoint_relation import RelationGoal
+    x, y, s = (BitVec(f"{prefix}_{n}", 64) for n in ("x", "y", "s"))
+    premise = And(y == x + 1, ULE(x, 100))
+    bases = [And(premise, s == 0), And(premise, s != 0)]   # the edges differ in a branch literal only
+    goal = ("target", (RelationGoal("gas", y - x == 1),))
+    return bases, [[goal], [goal]], s, y - x == 1
+
+
+def test_shared_bases_keep_the_common_conjuncts():
+    from verification.block_parallel import shared_bases
+    bases, goals, s, c = _edges("sb")
+    out = shared_bases(bases, goals)
+    assert list(out) == [c.get_id()]
+    common = be._conjuncts(out[c.get_id()])
+    assert len(common) == 2 and not any(be._mentions(k, s) for k in common)
+    assert all(be.solve_query(And(b, Not(out[c.get_id()])), 5000) == "unsat" for b in bases)  # each base implies it
+    assert shared_bases(bases[:1], goals[:1]) == {}                      # one edge: nothing shared
+
+
+def test_close_edge_proves_a_shared_conjunct_once(monkeypatch):
+    from verification.block_parallel import close_edge, shared_bases
+    bases, goals, _, _ = _edges("ce")
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)
+    names, real = [], prover._check
+    monkeypatch.setattr(prover, "_check", lambda n, f, r, **k: names.append(n) or real(n, f, r, **k))
+    shared = dict(bases=shared_bases(bases, goals), done={})
+    records = [close_edge(prover, f"H2_0_{n}", b, g, shared) for n, (b, g) in enumerate(zip(bases, goals))]
+    assert all(r.proved for r in records)
+    assert names == ["H2_0_0_t0_gas_0_shared"]                       # the second edge reuses it
+
+
+def test_close_edge_falls_back_when_the_shared_base_is_too_weak():
+    from verification.block_parallel import close_edge, shared_bases
+    from verification.cutpoint_relation import RelationGoal
+    x, s = BitVec("cf_x", 64), BitVec("cf_s", 64)
+    # Both bases fix x = 7, each in its own spelling: the common base is ULE(x, 100) alone.
+    bases = [And(ULE(x, 100), s == 0, x == 7), And(ULE(x, 100), s != 0, x - 7 == 0)]
+    goal = ("target", (RelationGoal("gas", x == 7),))
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)
+    shared = dict(bases=shared_bases(bases, [[goal], [goal]]), done={})
+    records = [close_edge(prover, f"H2_0_{n}", b, [goal], shared) for n, b in enumerate(bases)]
+    assert all(r.proved for r in records) and shared["done"] == {(x == 7).get_id(): None}
