@@ -1,0 +1,116 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "../r3cd/fixtures/Pool",
+  "started_at_utc": "2026-10-20T03:01:06.371381+00:00",
+  "configuration": {
+    "nodes": "../probe-aave/nodes.json",
+    "output": "../probe-aave/out.json",
+    "timeout_ms": "30000",
+    "node_seconds": "21600.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "../probe-aave/f",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "8b7ff12132610ce147c70ccc257dca54555b72993d506c7f73e62588c867a5d2",
+    ".hex": "d2eb08889d21b32720c41c50fac21c6de7100c46b44be526599e0005cc6e2f40"
+  },
+  "model_sources_sha256": "92b2dc92ca9cd2244a59086a00f1f96f17399d45e818f27fb5efb62b5633b876",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 8248,
+        "stack_depth": 17,
+        "memory_size": 352,
+        "free_memory_pointer": null,
+        "stack_constants": [
+          [
+            1,
+            224
+          ],
+          [
+            2,
+            128
+          ],
+          [
+            3,
+            55
+          ],
+          [
+            4,
+            54
+          ],
+          [
+            5,
+            52
+          ],
+          [
+            6,
+            653010751
+          ],
+          [
+            7,
+            91343852333181432387730302044767688728495783942
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            9,
+            0
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            11,
+            0
+          ],
+          [
+            12,
+            0
+          ],
+          [
+            13,
+            0
+          ],
+          [
+            15,
+            1767
+          ]
+        ]
+      },
+      "scope": "block-local",
+      "status": "inconclusive",
+      "seconds": 7005.952624457888,
+      "wall_seconds": 7005.979751617648,
+      "queries": 51,
+      "evm_paths": 60,
+      "x86_paths": 30,
+      "paired_transitions": 2,
+      "terminals_proved": 1624,
+      "reasons": [
+        "ValueError: outcome mismatch pair_0_1: exit@8414 / exit@539522 (solver=unknown)"
+      ],
+      "failed_obligations": [
+        {
+          "name": "pair_0_1",
+          "answer": "unknown",
+          "expected": "unsat",
+          "seconds": 5324.602642697282,
+          "formula_file": "../probe-aave/f/pc8248_d17_pair_0_1_8880e848e7b540dd.sexpr"
+        }
+      ],
+      "keep_going_failures": [],
+      "summary_hits": 0
+    }
+  ],
+  "locally_proved": 0,
+  "ended_at_utc": "2026-10-20T04:57:58.470390+00:00"
+}

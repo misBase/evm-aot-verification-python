@@ -1,0 +1,75 @@
+{
+ "1327": [
+  {
+   "spec": "BlockSpecialization(pc=1327, stack_depth=10, memory_size=None, free_memory_pointer=None, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: outcome mismatch x86_maps_0_46: x86 path 0 implies conjunct 46 of evm path 0 (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 11292.946229156107,
+   "queries": 1932,
+   "failed_obligations": [
+    {
+     "name": "x86_maps_0_46",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 4025.3125101896003
+    }
+   ]
+  },
+  {
+   "spec": "BlockSpecialization(pc=1327, stack_depth=10, memory_size=192, free_memory_pointer=128, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: outcome mismatch x86_maps_0_46: x86 path 0 implies conjunct 46 of evm path 0 (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 13463.546770544723,
+   "queries": 1931,
+   "failed_obligations": [
+    {
+     "name": "x86_maps_0_46",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 6352.335094291717
+    }
+   ]
+  }
+ ],
+ "8750": [
+  {
+   "spec": "BlockSpecialization(pc=8750, stack_depth=11, memory_size=None, free_memory_pointer=None, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 32663.317389359698,
+   "queries": 3500,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=8750, stack_depth=11, memory_size=None, free_memory_pointer=None, stack_constants=((0, 0),))",
+   "status": "inconclusive",
+   "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 23610.07777584158,
+   "queries": 3511,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=8750, stack_depth=15, memory_size=None, free_memory_pointer=None, stack_constants=((0, 0),))",
+   "status": "inconclusive",
+   "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 27754.796833473258,
+   "queries": 3511,
+   "failed_obligations": []
+  }
+ ]
+}
