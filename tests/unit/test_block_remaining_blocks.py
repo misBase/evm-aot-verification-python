@@ -250,6 +250,32 @@ def test_summary_entry_falls_back_to_the_blasted_query(monkeypatch):
     assert record.answer == "sat" and len(queries) == 2
 
 
+def test_summary_unsat_check_falls_back_to_the_blasted_query(monkeypatch):
+    import verification.block_summaries as bs
+    from tests.unit.test_memgas_summary import RENAMED_HEX, _blocks
+    from x86_64.summaries import X86SummaryConfig
+    runtime = bs.VerifiedSummaryRuntime(_blocks(RENAMED_HEX), X86SummaryConfig.enabled(memgas="strict"), timeout_ms=30000)
+    real, queries = bs.solve_query, []
+
+    def solve(query, timeout_ms, *a, **k):
+        queries.append(query)
+        return "unknown" if len(queries) == 1 else real(query, timeout_ms, *a, **k)
+    monkeypatch.setattr(bs, "solve_query", solve)
+    infeasible = _store_chain_path("su", feasible=False)
+    record = runtime._solve("copy_domain", And(infeasible[-1], *infeasible[:-1]))  # not decided syntactically
+    assert record.proved and len(queries) == 2
+
+
+def test_aave_7200_hit_premise_is_sat_once_blasted():
+    from z3 import SolverFor, sat
+    premise = And(*parse_smt2_file(str(SMT2 / "aave_7200_entry_71f8d.smt2")))
+    solver = SolverFor("QF_AUFBV")
+    solver.set("timeout", 60000)
+    solver.add(simplify(premise, blast_select_store=True))
+    assert solver.check() == sat
+    assert is_true(solver.model().eval(premise, model_completion=True))   # a model of the premise itself
+
+
 def test_copy_precondition_falls_back_to_the_blasted_query(monkeypatch):
     import x86_64.summaries.copy_loop as copy_loop
     from z3 import unknown, unsat
