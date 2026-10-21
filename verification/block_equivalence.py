@@ -324,6 +324,46 @@ def _generalize_products(formula):
     return substitute(formula, *[(p, FreshConst(p.sort(), "gen")) for p in products.values()]) if products else formula
 
 
+def _generalize_product_words(formula, min_width=128):
+    """formula with every maximal concat of >= min_width bits that contains a
+    bvmul replaced by a fresh constant (None when there is none).
+
+    A limb-wise 256-bit product is one such word; a borrow-chain hint about it
+    (Aave 11831 rayDiv: `P == 1e27` iff neither `P - 1e27` nor `1e27 - P`
+    borrows) is a tautology about the word, while _generalize_products leaves
+    the limbs as sums of fresh products with carries (30s unknown -> 0.0s).
+    Valid(result) implies Valid(formula), which is a substitution instance.
+    """
+    with_mul, seen, words, work = {}, set(), {}, [formula]
+
+    def has_mul(t):
+        stack = [t]
+        while stack:
+            u = stack[-1]
+            if u.get_id() in with_mul:
+                stack.pop()
+                continue
+            kids = [c for c in u.children() if c.get_id() not in with_mul] if is_app(u) else []
+            if kids:
+                stack.extend(kids)
+                continue
+            stack.pop()
+            with_mul[u.get_id()] = is_app(u) and (u.decl().kind() == Z3_OP_BMUL
+                                                  or any(with_mul[c.get_id()] for c in u.children()))
+        return with_mul[t.get_id()]
+
+    while work:
+        t = work.pop()
+        if t.get_id() in seen or not is_app(t):
+            continue
+        seen.add(t.get_id())
+        if is_bv(t) and t.decl().kind() == Z3_OP_CONCAT and t.size() >= min_width and has_mul(t):
+            words[t.get_id()] = t
+            continue
+        work.extend(t.children())
+    return substitute(formula, *[(w, FreshConst(w.sort(), "word")) for w in words.values()]) if words else None
+
+
 def div_quotient_axioms(expressions):
     """y != 0 => q[2n-1:n] == 0 for every q = x / y whose operands both fit n bits.
 
@@ -1198,6 +1238,65 @@ def telescope_potential(formula, rounds=32):
                 break
             formula = simplify(substitute(formula, *pairs), bv_sort_ac=True)
     return formula, tuple(lemmas), tuple(axioms[k] for k in sorted(axioms)), steps
+
+
+_POTENTIAL_WORDS = (1 << 32) - 1  # C(w) for w <= this fits 64 bits without wrap-around
+_POTENTIAL_MONOTONE_APPS = 32  # ponytail: pairwise monotonicity only up to this many P(w) (O(k^2) axioms)
+
+
+def potential_range_axioms(formula):
+    """Valid facts about the memory potential P (abstract_memory_potential) read as C.
+
+    For n >= 64 bits and w <= 2^32 - 1: w*w < 2^64 and 3w + (w*w >> 9) < 2^n,
+    so C(w) = 3w + E(w) never wraps there and is non-decreasing. Hence, for every
+    P(a), P(b) of F:  a <= W ⇒ P(a) <= C(W)  and  a <= b <= W ⇒ P(a) <= P(b)
+    (W = 2^32 - 1). Each instance holds when P is read as C, so conjoining keeps
+    every model of F. A charge C(new) - C(old) that the x86 side checks for 64-bit
+    overflow (Permit2 1327 x86 paths 6/7: LOG2 cost 8*len + 1125 + expansion) is
+    bounded only with these: P alone is any function, so the overflow is
+    abstract-SAT, and the squares stall the exact solver.
+    """
+    decls = {f.get_id() for f in _POTENTIAL.values()}
+    apps, seen, work = {}, set(), [formula]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen or not is_app(t):
+            continue
+        seen.add(t.get_id())
+        if t.decl().get_id() in decls and t.size() >= 64:
+            apps[t.get_id()] = t
+        work.extend(t.children())
+    apps = list(apps.values())
+    axioms = []
+    for a in apps:
+        top = BitVecVal(_POTENTIAL_WORDS, a.size())
+        axioms.append(Implies(ULE(a.arg(0), top), ULE(a, simplify(_memory_cost(top)))))
+    if len(apps) <= _POTENTIAL_MONOTONE_APPS:
+        axioms += [Implies(And(ULE(a.arg(0), b.arg(0)), ULE(b.arg(0), BitVecVal(_POTENTIAL_WORDS, b.size()))),
+                           ULE(a, b))
+                   for a in apps for b in apps if not a.eq(b) and a.size() == b.size()]
+    return axioms
+
+
+def refute_over_bounded_potential(formula, timeout_ms):
+    """(query, answer, lemmas): F over the telescoped potential P with
+    potential_range_axioms, refuted by refute_over_bv_abstraction.
+
+    Every step only adds models (abstract_memory_potential, the bv abstraction)
+    or is an equivalence under axioms true of P read as C (telescope_potential,
+    whose identity proofs are `lemmas`; potential_range_axioms). So only "unsat"
+    means anything, and then F is UNSAT. Not applicable (no memory-cost sum, or
+    nothing to bound): (F, "unknown", ()) at once.
+    """
+    abstract, changed = abstract_memory_potential(formula)
+    if not changed or timeout_ms <= 0:
+        return formula, "unknown", ()
+    target, lemmas, axioms, _ = telescope_potential(abstract)
+    bounds = potential_range_axioms(target)
+    if not bounds:
+        return formula, "unknown", ()
+    query, answer = refute_over_bv_abstraction(And(target, *axioms, *bounds), timeout_ms)
+    return (query, "unsat", lemmas) if answer == "unsat" else (formula, "unknown", ())
 
 
 def _random_leaf_values(terms, seeds):
@@ -3537,7 +3636,12 @@ class BlockEquivalenceProver:
         bvabs route refutes; "all" made 25 pairs of it). A proposal only: the
         x86_empty_j obligation is still proved by _check."""
         left = self.timeout_ms if self.deadline is None else int((self.deadline - monotonic()) * 1000)
-        return refute_over_bv_abstraction(And(premise, x.condition), min(self.timeout_ms, left))[1] == "unsat"
+        if refute_over_bv_abstraction(And(premise, x.condition), min(self.timeout_ms, left))[1] == "unsat":
+            return True
+        # A memory charge the x86 path checks for overflow (Permit2 1327 x86 paths 6/7): only
+        # bounded through the potential (refute_over_bounded_potential). Returns at once without one.
+        left = self.timeout_ms if self.deadline is None else int((self.deadline - monotonic()) * 1000)
+        return refute_over_bounded_potential(And(premise, x.condition), min(self.timeout_ms, left))[1] == "unsat"
 
     def _check_all(self, obligations, records):
         """Yield `_check` answers for (name, formula, _) in order.
@@ -3634,7 +3738,9 @@ class BlockEquivalenceProver:
         equivalence given its axioms (true of P read as C); unify_potential_arguments
         keeps every model. So UNSAT transfers back; anything else is (F, "unknown", ()).
         Not applicable (no memory-cost sum to telescope): returns at once.
-        No monotonicity axioms: every case measured refuted without them, faster.
+        No monotonicity axioms in the main attempts: every case measured refuted without
+        them, faster. Only when those fail, one bit-blasted attempt with
+        potential_range_axioms (valid for P read as C, so UNSAT still transfers).
         """
         abstract, changed = abstract_memory_potential(formula)
         if not changed:
@@ -3661,6 +3767,17 @@ class BlockEquivalenceProver:
                 return target, "unsat", lemmas + merged
             if answer == "unknown" and self._potential_pending is None:
                 self._potential_pending = (formula, target, lemmas + merged)  # _check may resume it
+        # Last: charges bounded through P's range and monotonicity (potential_range_axioms),
+        # bit-blasted over the bv abstraction (Permit2 1327 x86 path 6 cost overflow: 3-10s; the
+        # exact solve without the axioms is unknown, the abstraction abstract-SAT). After the
+        # attempts above, so what they prove costs nothing more. One per-query budget.
+        budget, bounds = self.timeout_ms, potential_range_axioms(target)
+        if self.deadline is not None:
+            budget = min(budget, int((self.deadline - monotonic()) * 1000))
+        if bounds and budget > 0:
+            query, answer = refute_over_bv_abstraction(And(target, *bounds), budget)
+            if answer == "unsat":
+                return query, "unsat", lemmas + merged
         return formula, "unknown", ()
 
     def _retry_over_nonlinear_mul(self, formula, answer, split=False):
@@ -4099,9 +4216,14 @@ class BlockEquivalenceProver:
                     # tautologies about the limbs; generalising every product
                     # to a fresh constant proves them for ALL values, hence for
                     # these (the hint is a substitution instance).
+                    # A hint over a whole product word (a 256-bit compare of a limb-wise
+                    # product) is a tautology about the word: generalised words prove it
+                    # (Aave 11831; tried first: the generalised query is tiny, a miss is quick).
                     hints = div_quotient_axioms([assumption])
                     goal = And(premise, Not(assumption))
-                    for candidate in (Not(_generalize_products(assumption)), And(*hints, Not(assumption))):
+                    words = _generalize_product_words(assumption)
+                    for candidate in (*(() if words is None else (Not(words),)),
+                                      Not(_generalize_products(assumption)), And(*hints, Not(assumption))):
                         if solve_query(candidate, min(self.timeout_ms, 5000)) == "unsat":
                             goal = candidate
                             break

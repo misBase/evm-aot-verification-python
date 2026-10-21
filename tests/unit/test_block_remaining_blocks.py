@@ -1,0 +1,188 @@
+"""Task N (remaining blocks): generic fixes.
+
+- Product-word generalisation (_generalize_product_words): an execution
+  assumption that bridges a 256-bit compare of a limb-wise product (EQ / LT
+  borrow chains) is a tautology about the whole word; generalising each bvmul
+  alone leaves the limbs as carry sums and stays unknown (Aave 11831
+  evm_assumption_7).
+- Potential range axioms (potential_range_axioms / refute_over_bounded_potential):
+  the memory-cost potential P read as C is bounded and non-decreasing on
+  w <= 2^32 - 1; an x86 path that fails a 64-bit overflow check on a memory
+  charge is empty only with these (Permit2 1327 x86 paths 6/7).
+"""
+from pathlib import Path
+from random import Random
+
+import pytest
+from z3 import (And, BitVec, BitVecVal, BoolVal, Concat, Extract, If, Implies, Not, ULE, ULT, ZeroExt, is_app,
+                is_true, parse_smt2_file, simplify, substitute, substitute_funs, Var, Z3_OP_BMUL)
+
+import verification.block_equivalence as be
+from state.smt_state import SMTState
+from verification.loop_induction import SegmentPath
+
+SMT2 = Path(__file__).resolve().parents[2] / "cloud-inputs" / "n" / "smt2"
+
+
+@pytest.fixture(autouse=True)
+def _no_cache(monkeypatch):
+    monkeypatch.delenv("BLOCK_PROOF_CACHE", raising=False)
+    monkeypatch.delenv("BLOCK_PAIR_WORKERS", raising=False)
+
+
+def _has_mul(t):
+    seen, work = set(), [t]
+    while work:
+        u = work.pop()
+        if u.get_id() in seen or not is_app(u):
+            continue
+        seen.add(u.get_id())
+        if u.decl().kind() == Z3_OP_BMUL:
+            return True
+        work.extend(u.children())
+    return False
+
+
+def _limb_product(prefix):
+    """A 128-bit product of two 64-bit limbs pairs, assembled limb-wise (low, high with carry)."""
+    a0, a1, b0, b1 = (BitVec(f"{prefix}_{s}", 64) for s in ("a0", "a1", "b0", "b1"))
+    full = ZeroExt(64, a0) * ZeroExt(64, b0)
+    low = Extract(63, 0, full)
+    high = Extract(127, 64, full) + a1 * b0 + a0 * b1
+    return Concat(high, low)
+
+
+def _borrow_free(x, y):
+    """No borrow out of x - y, in 129-bit arithmetic (the bridge's spelling)."""
+    return Extract(128, 128, ZeroExt(1, x) - ZeroExt(1, y)) == 0
+
+
+def test_product_words_are_generalised():
+    word = _limb_product("gw")
+    c = BitVecVal(10**27, 128)
+    hint = (word == c) == And(_borrow_free(word, c), _borrow_free(c, word))
+    generalised = be._generalize_product_words(hint)
+    assert generalised is not None and not _has_mul(generalised)
+    assert be.solve_query(Not(generalised), 5000) == "unsat"   # valid for every word, hence for the product
+
+
+def test_no_word_without_a_product():
+    a, b = BitVec("nw_a", 64), BitVec("nw_b", 64)
+    assert be._generalize_product_words(Concat(a, b) == Concat(b, a)) is None
+    assert be._generalize_product_words(Extract(7, 0, a * b) == 0) is None  # a product, but no wide word
+
+
+def test_generalised_words_do_not_prove_a_non_tautology():
+    word = _limb_product("nt")
+    hint = ULT(word, BitVecVal(5, 128))   # holds for some products only
+    generalised = be._generalize_product_words(hint)
+    assert be.solve_query(Not(generalised), 5000) == "sat"
+
+
+def test_aave_11831_evm_assumption_7_is_proved_by_word_generalisation(monkeypatch):
+    query = And(*parse_smt2_file(str(SMT2 / "aave_11831_evm_assumption_7.smt2")))
+    goal = [c for c in be._conjuncts(query) if c.decl().name() == "not"][-1]
+    assumption = goal.arg(0)
+    premise = And(*[c for c in be._conjuncts(query) if not c.eq(goal)])
+    path = SegmentPath("terminal", None, BoolVal(True), SMTState.create_initial_state(num_inputs=0))
+    path.state.assumptions = [assumption]
+    initial = SMTState.create_initial_state(num_inputs=0)
+    initial.assumptions = []
+    other = SegmentPath("terminal", None, BoolVal(True), SMTState.create_initial_state(num_inputs=0))
+    other.state.assumptions = []
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=5000)
+    goals, real_check = [], prover._check
+
+    def check(name, formula, records, **kw):
+        if name.startswith("evm_assumption"):
+            goals.append(formula)
+        return real_check(name, formula, records, **kw)
+    monkeypatch.setattr(prover, "_check", check)
+    records = []
+    prover.check_paths([path], [other], premise, initial, records)
+    assert len(goals) == 1 and not _has_mul(goals[0])       # the generalised word query, not the premise one
+    assumption_record = [r for r in records if r.name.startswith("evm_assumption")]
+    assert len(assumption_record) == 1 and assumption_record[0].proved
+    assert assumption_record[0].elapsed_seconds < 5
+
+
+# --- memory potential range ----------------------------------------------------
+
+
+def _words(prefix):
+    """Word count of a 32-byte-rounded end offset fmp + len (x86: (31 + end) >> 5)."""
+    fmp, n = BitVec(f"{prefix}_fmp", 64), BitVec(f"{prefix}_len", 64)
+    end = fmp + n
+    return fmp, n, Concat(BitVecVal(0, 5), Extract(63, 5, 31 + end))
+
+
+def _overflowing_log_charge(prefix):
+    """premise ∧ path of an x86 LOG whose cost 8*len + 1125 + expansion overflows 64 bits, after the
+    path bounded fmp and len below 2^35, so w < 2^32 (Permit2 1327 x86 path 6 checks 32w < 2^37)."""
+    fmp, n, w = _words(prefix)
+    old = BitVec(f"{prefix}_old_words", 64)
+    charge = If(ULE(w, old), BitVecVal(0, 64), be._memory_cost(w) - be._memory_cost(old))
+    return And(ULE(old, 1 << 32), ULT(fmp, 1 << 35), ULT(n, 1 << 35),
+               Extract(127, 64, 8 * ZeroExt(64, n)) == 0,
+               Extract(64, 64, ZeroExt(1, 8 * n) + ZeroExt(1, 1125 + charge)) == 1)
+
+
+def test_overflowing_charge_is_refuted_only_with_the_range_axioms(monkeypatch):
+    formula = _overflowing_log_charge("ov")
+    query, answer, _ = be.refute_over_bounded_potential(formula, 10000)
+    assert answer == "unsat"
+    monkeypatch.setattr(be, "potential_range_axioms", lambda f: [])
+    assert be.refute_over_bounded_potential(formula, 10000)[1] == "unknown"   # nothing to bound: not applicable
+    abstract, _ = be.abstract_memory_potential(formula)
+    target, _, axioms, _ = be.telescope_potential(abstract)
+    assert be.refute_over_bv_abstraction(And(target, *axioms), 10000)[1] == "sat"  # P alone: any function
+
+
+def test_range_axioms_hold_for_the_memory_cost():
+    formula = _overflowing_log_charge("va")
+    abstract, _ = be.abstract_memory_potential(formula)
+    target, _, _, _ = be.telescope_potential(abstract)
+    axioms = be.potential_range_axioms(target)
+    assert axioms
+    p = be._potential(64)
+    cost = And(*axioms)
+    read = substitute_funs(cost, (p, be._memory_cost(Var(0, p.domain(0)))))  # P read as C
+    leaves = sorted({str(c) for c in _leaves(read)})
+    rng = Random(7)
+    for _ in range(200):
+        values = [(BitVec(name, 64), BitVecVal(rng.choice((rng.getrandbits(64), rng.getrandbits(33), rng.getrandbits(20))), 64))
+                  for name in leaves]
+        assert is_true(simplify(substitute(read, *values)))
+
+
+def _leaves(t):
+    seen, work, out = set(), [t], []
+    while work:
+        u = work.pop()
+        if u.get_id() in seen or not is_app(u):
+            continue
+        seen.add(u.get_id())
+        if u.num_args() == 0 and u.decl().kind() == be.Z3_OP_UNINTERPRETED:
+            out.append(u)
+        work.extend(u.children())
+    return out
+
+
+def test_no_range_axioms_below_64_bits():
+    w = BitVec("nb_w", 32)
+    abstract, changed = be.abstract_memory_potential(ULT(be._memory_cost(w), 100))
+    assert changed and be.potential_range_axioms(abstract) == []
+
+
+def test_monotonicity_is_capped(monkeypatch):
+    ws = [BitVec(f"mc_w{k}", 64) for k in range(4)]
+    abstract, _ = be.abstract_memory_potential(And(*(ULT(be._memory_cost(w), 100) for w in ws)))
+    assert len(be.potential_range_axioms(abstract)) == 4 + 4 * 3
+    monkeypatch.setattr(be, "_POTENTIAL_MONOTONE_APPS", 3)
+    assert len(be.potential_range_axioms(abstract)) == 4
+
+
+@pytest.mark.parametrize("row", [6, 7])
+def test_permit2_1327_x86_row_is_empty(row):
+    query = And(*parse_smt2_file(str(SMT2 / "permit2_1327" / f"x86_empty_{row}.smt2")))
+    assert be.refute_over_bounded_potential(query, 30000)[1] == "unsat"
