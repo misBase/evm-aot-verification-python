@@ -1,0 +1,48 @@
+{
+ "6182": [
+  {
+   "spec": "BlockSpecialization(pc=6182, stack_depth=14, memory_size=None, free_memory_pointer=None, stack_constants=((0, 128), (3, 54), (4, 52), (5, 1778129887), (6, 91343852333181432387730302044767688728495783942), (12, 663)))",
+   "status": "inconclusive",
+   "reasons": [
+    "ProofBudgetExceeded: proof wall budget exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 21621.35970956087,
+   "queries": 4640,
+   "failed_obligations": []
+  }
+ ],
+ "7200": [
+  {
+   "spec": "BlockSpecialization(pc=7200, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=((11, 663),))",
+   "status": "inconclusive",
+   "reasons": [
+    "TimeoutError: x86 segment execution deadline exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 21603.298482518643,
+   "queries": 258,
+   "failed_obligations": []
+  }
+ ],
+ "11831": [
+  {
+   "spec": "BlockSpecialization(pc=11831, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=((3, 3909), (7, 3961), (10, 673)))",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: evm: unproved execution assumption"
+   ],
+   "contexts": 1,
+   "seconds": 208.99425961449742,
+   "queries": 9,
+   "failed_obligations": [
+    {
+     "name": "evm_assumption_7",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 202.85853010043502
+    }
+   ]
+  }
+ ]
+}

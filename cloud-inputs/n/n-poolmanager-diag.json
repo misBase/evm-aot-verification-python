@@ -1,0 +1,120 @@
+{
+ "4418": [
+  {
+   "spec": "BlockSpecialization(pc=4418, stack_depth=15, memory_size=None, free_memory_pointer=None, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "ProofBudgetExceeded: pair workers outran the node deadline"
+   ],
+   "contexts": 1,
+   "seconds": 21632.856600541156,
+   "queries": 2604,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=4418, stack_depth=15, memory_size=None, free_memory_pointer=320, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "ProofBudgetExceeded: pair workers outran the node deadline"
+   ],
+   "contexts": 1,
+   "seconds": 21631.283164499793,
+   "queries": 1917,
+   "failed_obligations": []
+  }
+ ],
+ "6084": [
+  {
+   "spec": "BlockSpecialization(pc=6084, stack_depth=13, memory_size=864, free_memory_pointer=768, stack_constants=((7, 6222), (8, 6240)))",
+   "status": "inconclusive",
+   "reasons": [
+    "ProofBudgetExceeded: proof wall budget exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 21607.33170025004,
+   "queries": 1667,
+   "failed_obligations": []
+  }
+ ],
+ "9089": [
+  {
+   "spec": "BlockSpecialization(pc=9089, stack_depth=2, memory_size=None, free_memory_pointer=None, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: outcome mismatch pair_34_25: terminal@9089 / terminal@410567 (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 9654.485320957843,
+   "queries": 1141,
+   "failed_obligations": [
+    {
+     "name": "x86_maps_7_0",
+     "answer": "sat",
+     "expected": "unsat",
+     "seconds": 142.96126008406281
+    },
+    {
+     "name": "x86_maps_8_0",
+     "answer": "sat",
+     "expected": "unsat",
+     "seconds": 131.77931008394808
+    },
+    {
+     "name": "pair_34_25",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 3634.417732999893
+    }
+   ]
+  }
+ ],
+ "16670": [
+  {
+   "spec": "BlockSpecialization(pc=16670, stack_depth=16, memory_size=None, free_memory_pointer=None, stack_constants=((3, 7296),))",
+   "status": "inconclusive",
+   "reasons": [
+    "ProofBudgetExceeded: pair workers outran the node deadline"
+   ],
+   "contexts": 1,
+   "seconds": 21630.516661667032,
+   "queries": 338,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=16670, stack_depth=16, memory_size=768, free_memory_pointer=768, stack_constants=((3, 7324),))",
+   "status": "split",
+   "reasons": [
+    "ValueError: outcome mismatch pair_2_74: terminal@16670 / terminal@708748 (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 16802.933662791038,
+   "queries": 181,
+   "failed_obligations": [
+    {
+     "name": "pair_2_74",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 9855.692654208979
+    }
+   ]
+  },
+  {
+   "spec": "BlockSpecialization(pc=16670, stack_depth=16, memory_size=None, free_memory_pointer=None, stack_constants=((3, 7324),))",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: outcome mismatch pair_4_84: terminal@16670 / terminal@708748 (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 21601.57357737492,
+   "queries": 312,
+   "failed_obligations": [
+    {
+     "name": "pair_4_84",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 15828.710688583087
+    }
+   ]
+  }
+ ]
+}
