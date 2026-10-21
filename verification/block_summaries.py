@@ -938,9 +938,18 @@ class VerifiedSummaryRuntime:
                 required = ["entry"]
             except ValueError:
                 from verification.mcopy_induction import dead_hit
-                if not dead_hit(self, summary, before, premise, records):
+                if dead_hit(self, summary, before, premise, records):
+                    return before
+                if records[-1].answer != "unknown":
                     raise
-                return before
+                # Undecided entry (a SAT premise the solver could not decide in budget: Aave 7200
+                # x86 needs 36.5s, the budget is 30s): proceed, recorded as undecided. Rejecting
+                # made the raw fallback unroll symbolic-length copy loops hit by hit until the
+                # 6h node budget ran out. The entry check only shows the hit is not vacuous;
+                # every obligation below is an UNSAT query over the premise and holds whether or
+                # not it is satisfiable (an infeasible hit is vacuous), so nothing rests on it.
+                records[-1] = replace(records[-1], expected="unknown")
+                required = ["entry"]
             # Fixed codegen (sub size, offset) cannot wrap; the raw replay below
             # still proves the summary on the full domain.
             if summary.kind == "calldataload" and not summary.payload.wrap_free:

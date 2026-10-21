@@ -114,11 +114,26 @@ def segment(*a, **k):
             try:
                 result = orig_apply(summary, *aa, **kk)
                 summaries["seconds"] += time.monotonic() - started
+                if time.monotonic() - started > 5:
+                    slow = [(r.name, r.answer, round(r.elapsed_seconds or 0, 1))
+                            for r in getattr(runtime, "last_records", []) if (r.elapsed_seconds or 0) > 1]
+                    print(f"[{time.monotonic() - T0:8.1f}s] applied {summary.kind}@{summary.entry_addr:#x} in "
+                          f"{time.monotonic() - started:.1f}s: slow records {slow}", flush=True)
                 summaries[f"{summary.kind}@{hex(summary.entry_addr)}"] += 1
                 return result
             except Exception as exc:
                 summaries["seconds"] += time.monotonic() - started
                 summaries[f"REJECT {summary.kind}@{hex(summary.entry_addr)}: {type(exc).__name__}"] += 1
+                failed = [(r.name, r.answer, round(r.elapsed_seconds or 0, 1))
+                          for r in getattr(runtime, "last_records", []) if not r.proved]
+                print(f"[{time.monotonic() - T0:8.1f}s] rejected {summary.kind}@{summary.entry_addr:#x} after "
+                      f"{time.monotonic() - started:.1f}s: {str(exc)[:200]} failed={failed}", flush=True)
+                premise = getattr(exc, "premise", None)
+                if premise is not None and any(r.name == "entry" and not r.proved
+                                               for r in getattr(runtime, "last_records", [])):
+                    path = Path(f"rejected_entry_{summary.entry_addr:x}_{summaries['seconds']:.0f}.smt2")
+                    path.write_text(be._to_smt2(premise))
+                    print("   entry premise ->", path, flush=True)
                 raise
         runtime.apply = apply
     try:

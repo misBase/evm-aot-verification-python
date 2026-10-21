@@ -10,6 +10,7 @@
   w <= 2^32 - 1; an x86 path that fails a 64-bit overflow check on a memory
   charge is empty only with these (Permit2 1327 x86 paths 6/7).
 """
+from dataclasses import replace
 from pathlib import Path
 from random import Random
 
@@ -180,6 +181,56 @@ def test_monotonicity_is_capped(monkeypatch):
     assert len(be.potential_range_axioms(abstract)) == 4 + 4 * 3
     monkeypatch.setattr(be, "_POTENTIAL_MONOTONE_APPS", 3)
     assert len(be.potential_range_axioms(abstract)) == 4
+
+
+# --- undecided summary entry ---------------------------------------------------
+
+
+def _memgas_runtime(monkeypatch, entry_answer):
+    """The memgas summary of test_memgas_summary with the hit's entry check forced to `entry_answer`."""
+    from tests.unit.test_memgas_summary import RENAMED_HEX, _blocks
+    from verification.block_summaries import VerifiedSummaryRuntime
+    from x86_64.summaries import X86SummaryConfig
+    from x86_64.summaries.memgas import exit_guard
+    from x86_64.summaries.memgas_proof import clear_proof_cache, generic_memgas_state
+
+    clear_proof_cache()
+    runtime = VerifiedSummaryRuntime(_blocks(RENAMED_HEX), X86SummaryConfig.enabled(memgas="strict"), timeout_ms=30000)
+    real = runtime._solve
+
+    def solve(name, formula, expected="unsat"):
+        record = real(name, formula, expected)
+        return replace(record, answer=entry_answer) if name == "entry" else record
+    monkeypatch.setattr(runtime, "_solve", solve)
+    [summary] = runtime.summaries
+    state = generic_memgas_state()
+    return runtime, summary, state, exit_guard(summary.payload, state)
+
+
+def test_undecided_entry_still_applies_the_summary(monkeypatch):
+    runtime, summary, state, guard = _memgas_runtime(monkeypatch, "unknown")
+    runtime.apply(summary, state, path_condition=Not(guard))
+    [certificate] = runtime.certificates
+    entry = next(o for o in certificate.obligations if o.name == "entry")
+    assert (entry.answer, entry.expected) == ("unknown", "unknown")     # recorded as undecided, not as SAT
+    assert certificate.complete
+    assert all(o.proved and o.answer == "unsat" for o in certificate.obligations if o.name != "entry")
+
+
+def test_undecided_entry_does_not_excuse_a_failed_obligation(monkeypatch):
+    from x86_64.summaries.base import SummaryPreconditionError
+    runtime, summary, state, _ = _memgas_runtime(monkeypatch, "unknown")
+    with pytest.raises(SummaryPreconditionError, match="memgas_exit_guard_excluded"):
+        runtime.apply(summary, state)               # the exit guard is not excluded on this path
+    assert not runtime.certificates
+
+
+def test_refuted_entry_is_still_rejected(monkeypatch):
+    from x86_64.summaries.base import SummaryPreconditionError
+    runtime, summary, state, guard = _memgas_runtime(monkeypatch, "unsat")
+    with pytest.raises(SummaryPreconditionError, match="entry: unsat"):
+        runtime.apply(summary, state, path_condition=Not(guard))
+    assert not runtime.certificates
 
 
 @pytest.mark.parametrize("row", [6, 7])
