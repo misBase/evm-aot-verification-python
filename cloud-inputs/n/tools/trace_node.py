@@ -45,6 +45,29 @@ def pair_phase(evm, x86, premise, pair, found, records):
 
 
 prover._pair_phase = pair_phase
+orig_unify_node, orig_prove_equal = prover._unify_node, be._prove_equal
+equal_stats = {"proved": 0, "failed": 0, "seconds": 0.0}
+
+
+def prove_equal(*a, **k):
+    started = time.monotonic()
+    proofs = orig_prove_equal(*a, **k)
+    equal_stats["proved" if proofs is not None else "failed"] += 1
+    equal_stats["seconds"] += time.monotonic() - started
+    return proofs
+
+
+def unify_node(pairs, skip=frozenset()):
+    started, before = time.monotonic(), dict(equal_stats)
+    out = orig_unify_node(pairs, skip)
+    print(f"[{time.monotonic() - T0:8.1f}s] _unify_node over {len(pairs)} obligations: "
+          f"{time.monotonic() - started:.1f}s, {len(out[1])} lemmas, {len(out[2])} rewritten, _prove_equal "
+          f"{ {k: round(v - before[k], 1) for k, v in equal_stats.items()} }", flush=True)
+    return out
+
+
+be._prove_equal = prove_equal
+prover._unify_node = unify_node
 result = prover.prove(spec)
 print(f"[{time.monotonic() - T0:8.1f}s] result", result.status, result.reasons, "queries", result.queries,
       "kept", [(f["name"], f["answer"], round(f["seconds"])) for f in getattr(result, "kept_failures", ())], flush=True)

@@ -62,7 +62,7 @@ class McopyInductionCertificate:
 
 @dataclass(frozen=True)
 class DeadHitCertificate:
-    """An MCOPY hit reached on an UNSAT path: the only obligation is that proof."""
+    """A copy-loop hit reached on an UNSAT path: the only obligation is that proof."""
     identity: str
     obligations: tuple
 
@@ -74,9 +74,13 @@ class DeadHitCertificate:
 
 def dead_hit(runtime, summary, before, premise, records):
     """The executor reaches hits on infeasible paths (it prunes syntactically).
-    Raw fallback there replays an unbounded loop; the hit is vacuous instead."""
-    from verification.block_equivalence import digest, state_digest
-    if (summary.kind != "copy_loop" or summary.payload.template not in TEMPLATES
+    Raw fallback there replays an unbounded loop; the hit is vacuous instead.
+
+    Every copy-loop template, not only MCOPY: a symbolic-length CALLDATACOPY
+    byte loop on an UNSAT path (Aave 7200 x86 0x72fc8) was replayed hit by hit
+    until the node budget ran out. The UNSAT entry is the whole proof: no state
+    satisfies the premise, so any successor is vacuously correct."""
+    if (summary.kind != "copy_loop"
             or [(r.name, r.answer) for r in records] != [("entry", "unsat")]):
         return False
     from verification.block_summaries import hit_identity

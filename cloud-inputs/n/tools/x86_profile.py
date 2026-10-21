@@ -148,6 +148,23 @@ def segment(*a, **k):
 be.run_x86_segment = segment
 
 import verification.block_summaries as bs  # noqa: E402
+_orig_solve = bs.VerifiedSummaryRuntime._solve
+last_formula = {}
+
+
+def solve(self, name, formula, expected="unsat"):
+    """Keep each summary query's formula; a failed one is written as SMT2 (diagnostics)."""
+    record = _orig_solve(self, name, formula, expected)
+    last_formula[name] = formula
+    if not record.proved and name != "entry":
+        path = Path(f"failed_{name}_{int(time.monotonic() - T0)}.smt2")
+        path.write_text(be._to_smt2(formula))
+        print(f"[{time.monotonic() - T0:8.1f}s] summary query {name} {record.answer} "
+              f"{record.elapsed_seconds:.1f}s -> {path}", flush=True)
+    return record
+
+
+bs.VerifiedSummaryRuntime._solve = solve
 _orig_complement = bs.refuted_by_complement
 complement = collections.Counter()
 

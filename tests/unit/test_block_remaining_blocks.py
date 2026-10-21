@@ -300,6 +300,39 @@ def test_refuted_entry_is_still_rejected(monkeypatch):
     assert not runtime.certificates
 
 
+def test_byte_copy_hit_on_infeasible_path_is_vacuous(monkeypatch):
+    from tests.unit.test_block_summary_certificates import copy_case
+    from verification.mcopy_induction import DeadHitCertificate
+    runtime, summary, state = copy_case(7)
+    assert summary.kind == "copy_loop" and not summary.payload.template.startswith("mcopy")
+    monkeypatch.setattr("verification.block_summaries.run_x86_segment",
+                        lambda *a, **k: pytest.fail("an infeasible hit must not be replayed"))
+    assert runtime.apply(summary, state, path_condition=BoolVal(False)) is not None
+    [certificate] = runtime.certificates
+    assert isinstance(certificate, DeadHitCertificate) and certificate.complete
+
+
+# --- node-level unification cap -------------------------------------------------
+
+
+def test_node_unification_gets_a_quarter_of_what_is_left(monkeypatch):
+    from time import monotonic
+    from z3 import Function, BitVecSort
+    f = Function("nu_host", BitVecSort(64), BitVecSort(64))
+    x, y = BitVec("nu_x", 64), BitVec("nu_y", 64)
+    pairs = [(f"pair_0_{k}", And(f(x + k) == 1, f(y) == 2), "") for k in range(2)]
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=1000)
+    prover.deadline = monotonic() + 400
+    seen = []
+
+    def unify(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64):
+        seen.append(deadline)
+        return formulas, ()
+    monkeypatch.setattr(be, "unify_across", unify)
+    prover._unify_node(pairs)
+    assert len(seen) == 1 and seen[0] is not None and seen[0] <= monotonic() + 100 + 1
+
+
 @pytest.mark.parametrize("row", [6, 7])
 def test_permit2_1327_x86_row_is_empty(row):
     query = And(*parse_smt2_file(str(SMT2 / "permit2_1327" / f"x86_empty_{row}.smt2")))

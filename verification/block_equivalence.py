@@ -3536,7 +3536,11 @@ class BlockEquivalenceProver:
                                                 cap if self.deadline is None else min(cap, self.deadline))
         functions = self._mul_functions
         abstract = [abstract_nonlinear_mul(f, functions=functions)[0] for f in concrete]
-        unified, lemmas = unify_across(abstract, self.timeout_ms, self.deadline, cache=self._lemma_cache)
+        # ponytail: 1/4 of what is left. Uncapped, PoolManager 16670 (83 host-call pairs) spent
+        # over 50 of its 90 minutes here before checking any obligation; an unmerged pair only
+        # goes to its own routes (its unify route included), so the cap costs no proof.
+        until = None if self.deadline is None else monotonic() + (self.deadline - monotonic()) / 4
+        unified, lemmas = unify_across(abstract, self.timeout_ms, until, cache=self._lemma_cache)
         if not lemmas and not identities:
             return pairs, (), set()
         out, rewritten = list(pairs), set()
