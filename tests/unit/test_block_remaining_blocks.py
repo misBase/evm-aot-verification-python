@@ -183,6 +183,73 @@ def test_monotonicity_is_capped(monkeypatch):
     assert len(be.potential_range_axioms(abstract)) == 4
 
 
+# --- blasted witness -----------------------------------------------------------
+
+
+def _store_chain_path(prefix, feasible=True):
+    """A path condition reading through a store chain over a lambda array (as copy results are)."""
+    from z3 import Array, BitVecSort, Lambda, Select, Store
+    m = Array(f"{prefix}_m", BitVecSort(64), BitVecSort(8))
+    i, a, b, n = (BitVec(f"{prefix}_{s}", 64) for s in ("i", "a", "b", "n"))
+    copied = Lambda([i], If(ULT(i - a, n), Select(m, i + 1), Select(m, i)))
+    mem = Store(Store(copied, b, BitVecVal(7, 8)), b + 1, BitVecVal(9, 8))
+    constraints = [ULT(n, 64), ULT(a, 1 << 20), Select(mem, b) == 7, Select(mem, a) == 3]
+    if not feasible:
+        constraints.append(Select(mem, b + 1) == 8)
+    return constraints
+
+
+def _reachability(monkeypatch, constraints, answers):
+    """is_possible on `constraints` with the incremental check (and, if given, the blasted one) forced."""
+    import x86_64.cfg_state as cfg_state
+    from x86_64.cfg_state import PrefixSolver, X86Constraints
+    real = cfg_state._bounded_check
+    tags = []
+
+    def bounded(solver, timeout_ms, tag, wall_ms=None):
+        tags.append(tag)
+        return answers[tag] if tag in answers else real(solver, timeout_ms, tag, wall_ms)
+    monkeypatch.setattr(cfg_state, "_bounded_check", bounded)
+    path = X86Constraints()
+    for c in constraints:
+        path.add(c)
+    return path, path.is_possible(prefix_solver=PrefixSolver()), tags
+
+
+def test_blasted_query_restores_the_witness(monkeypatch):
+    from z3 import unknown
+    path, kept, tags = _reachability(monkeypatch, _store_chain_path("bw"), {"incremental": unknown})
+    assert kept and tags[:2] == ["incremental", "blast"]
+    assert path._witness is not None and is_true(path._witness.eval(path.as_bool(), model_completion=True))
+
+
+def test_blasted_unsat_prunes(monkeypatch):
+    from z3 import unknown
+    path, kept, tags = _reachability(monkeypatch, _store_chain_path("bu", feasible=False), {"incremental": unknown})
+    assert not kept and tags == ["incremental", "blast"]
+
+
+def test_blasted_unknown_falls_through_and_keeps_the_path(monkeypatch):
+    from z3 import unknown
+    path, kept, tags = _reachability(monkeypatch, _store_chain_path("bk"), {"incremental": unknown, "blast": unknown})
+    assert kept and path._witness is None                    # unknown never prunes, never invents a witness
+
+
+def test_summary_entry_falls_back_to_the_blasted_query(monkeypatch):
+    import verification.block_summaries as bs
+    from tests.unit.test_memgas_summary import RENAMED_HEX, _blocks
+    from x86_64.summaries import X86SummaryConfig
+    runtime = bs.VerifiedSummaryRuntime(_blocks(RENAMED_HEX), X86SummaryConfig.enabled(memgas="strict"), timeout_ms=30000)
+    real, queries = bs.solve_query, []
+
+    def solve(query, timeout_ms, *a, **k):
+        queries.append(query)
+        return "unknown" if len(queries) == 1 else real(query, timeout_ms, *a, **k)
+    monkeypatch.setattr(bs, "solve_query", solve)
+    record = runtime._solve("entry", And(*_store_chain_path("se")), "sat")
+    assert record.answer == "sat" and len(queries) == 2
+
+
 # --- undecided summary entry ---------------------------------------------------
 
 

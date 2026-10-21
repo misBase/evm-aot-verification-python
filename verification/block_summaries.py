@@ -856,6 +856,15 @@ class VerifiedSummaryRuntime:
             return Obligation(name, formula.sexpr(), "unsat", expected, monotonic() - started)
         query = simplify(formula, expand_select_store=True)
         answer = solve_query(query, timeout)
+        if answer == "unknown" and expected == "sat":
+            # Reads through store chains over lambda arrays (x86 copy results) defeat model
+            # construction; blasted into ites (an exact rewrite, so its SAT is SAT of the
+            # premise) Aave 7200 hit premises are SAT in ~4s where this query is unknown.
+            budget = self.timeout_ms
+            if self.deadline is not None:
+                budget = min(budget, int((self.deadline - monotonic()) * 1000))
+            if budget > 0 and solve_query(simplify(formula, blast_select_store=True), budget) == "sat":
+                answer = "sat"
         if answer == "unknown" and expected == "unsat":
             relaxed, changed = abstract_nonlinear_mul(formula)
             budget = self.timeout_ms

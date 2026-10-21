@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import time
 from typing import List, Optional, Dict, TYPE_CHECKING
-from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, unknown, is_true, And
+from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, unknown, is_true, And, simplify
 
 from state.smt_state import SMTState
 
@@ -207,7 +207,24 @@ class X86Constraints:
             self._witness = prefix_solver.solver.model() if result == sat else None
             if result != unknown:
                 return result == sat
-            relaxed, changed = abstract_nonlinear_mul(self.as_bool())
+            # Reads through store chains over lambda arrays (symbolic-length copy
+            # results) defeat model construction: Aave 7200 x86 paths stay unknown at
+            # 30-40s, so the path loses its witness and every later check and summary
+            # entry pays a full solve. Blasted into ites (an exact rewrite) the same
+            # query is SAT in ~4s. Its UNSAT is exact; a model counts as the path's
+            # witness only if it makes the path condition literally true.
+            path = self.as_bool()
+            blasted = SolverFor("QF_AUFBV")
+            blasted.add(simplify(path, blast_select_store=True))
+            result = _bounded_check(blasted, timeout_ms, "blast")
+            if result == unsat:
+                return False
+            if result == sat:
+                model = blasted.model()
+                if is_true(model.eval(path, model_completion=True)):
+                    self._witness = model
+                return True
+            relaxed, changed = abstract_nonlinear_mul(path)
             if changed:
                 probe = SolverFor("QF_AUFBV")
                 probe.add(relaxed)

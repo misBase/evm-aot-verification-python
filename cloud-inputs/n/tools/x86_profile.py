@@ -39,6 +39,7 @@ def report(tag):
     print("   top blocks:", [(hex(a), n) for a, n in executed.most_common(12)], flush=True)
     print("   top forks:", [(hex(a), n) for a, n in forks.most_common(12)], flush=True)
     print("   summaries:", dict(summaries), flush=True)
+    print("   complement:", dict(globals().get("complement", {})), flush=True)
 
 
 orig_execute = cx.X86SymbolicExecutor.execute
@@ -145,6 +146,38 @@ def segment(*a, **k):
 
 
 be.run_x86_segment = segment
+
+import verification.block_summaries as bs  # noqa: E402
+_orig_complement = bs.refuted_by_complement
+complement = collections.Counter()
+
+
+def refuted(premise, goal):
+    """Count refuted_by_complement hits/misses; on a miss dump the goal and the window."""
+    started = time.monotonic()
+    hit = _orig_complement(premise, goal)
+    caller = sys._getframe(1).f_locals.get("name", "?")
+    if caller != "memgas_exit_guard_excluded":
+        return hit
+    complement["hit" if hit else "miss"] += 1
+    complement["seconds"] += time.monotonic() - started
+    if not hit and complement["miss"] <= 3:
+        from z3 import is_and, simplify, Not
+        work, conjuncts = [premise], []
+        while work:
+            t = work.pop()
+            if is_and(t):
+                work.extend(reversed(t.children()))
+            else:
+                conjuncts.append(t)
+        path = Path(f"complement_miss_{complement['miss']}.txt")
+        path.write_text("TARGET " + simplify(goal).sexpr() + "\n" + "\n".join(
+            "WINDOW " + simplify(Not(c)).sexpr()[:20000] for c in conjuncts[-16:]) + "\n")
+        print(f"[{time.monotonic() - T0:8.1f}s] complement miss -> {path}", flush=True)
+    return hit
+
+
+bs.refuted_by_complement = refuted
 spec = parse_nodes(json.loads(Path(node_json).read_text()))[index]
 print("spec", spec, flush=True)
 prover = build_prover(stem, base_addr=0x1000, timeout_ms=30000, node_seconds=seconds, max_depth=400,
