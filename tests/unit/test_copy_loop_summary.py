@@ -601,7 +601,8 @@ def test_structural_fact_fallback_reuses_one_forward_cache(monkeypatch):
         timeout_ms=1,
     )
 
-    assert len(solver_checks) == 1
+    # One plain query plus its blasted (select-over-store) fallback, both unknown here.
+    assert len(solver_checks) == 2
     assert cache_ids
     assert len(set(cache_ids)) == 1
 

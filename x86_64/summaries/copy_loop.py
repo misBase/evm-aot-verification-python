@@ -652,12 +652,16 @@ def _implication_result(
             continue
     negated_premise = simplify(Not(normalized_premise))
 
-    def check(terms, budget_ms):
+    def check(terms, budget_ms, blast=False):
         solver = SolverFor("QF_AUFBV")
         solver.set("timeout", budget_ms)
-        solver.add(*assumption_terms)
-        solver.add(*(simplify(term) for term in terms))
-        solver.add(negated_premise)
+        if blast:
+            solver.add(*(simplify(term, blast_select_store=True)
+                         for term in (*assumption_terms, *terms, negated_premise)))
+        else:
+            solver.add(*assumption_terms)
+            solver.add(*(simplify(term) for term in terms))
+            solver.add(negated_premise)
         return solver.check()
 
     # Local memory-grow/dispatch constraints sit near the tail.  Proving the
@@ -669,7 +673,13 @@ def _implication_result(
         result = check(path_terms[-size:], slice_budget)
         if result == unsat:
             return result
-    return check(path_terms, timeout_ms)
+    result = check(path_terms, timeout_ms)
+    if result == unknown:
+        # Copy operands read through store chains over lambda arrays (earlier copy
+        # results): blasted into ites (an exact rewrite, so its UNSAT is exact) the
+        # query is decided where this one is not (Aave 7200 x86 0x72fc8 no-wrap: unknown).
+        result = check(path_terms, timeout_ms, blast=True)
+    return result
 
 
 def _prove_implied(path_condition, assumptions, premise, timeout_ms: int = 5000) -> bool:

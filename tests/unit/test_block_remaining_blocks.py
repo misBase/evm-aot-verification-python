@@ -250,6 +250,28 @@ def test_summary_entry_falls_back_to_the_blasted_query(monkeypatch):
     assert record.answer == "sat" and len(queries) == 2
 
 
+def test_copy_precondition_falls_back_to_the_blasted_query(monkeypatch):
+    import x86_64.summaries.copy_loop as copy_loop
+    from z3 import unknown, unsat
+    x, y = BitVec("cp_x", 64), BitVec("cp_y", 64)
+    real, calls = copy_loop.SolverFor, []
+
+    class Undecided:
+        """The first (plain) full query answers unknown; later ones are real."""
+        def __init__(self, logic):
+            self.solver, self.n = real(logic), len(calls)
+            calls.append(self)
+
+        def __getattr__(self, name):
+            return getattr(self.solver, name)
+
+        def check(self):
+            return unknown if self.n == 0 else self.solver.check()
+    monkeypatch.setattr(copy_loop, "SolverFor", Undecided)
+    result = copy_loop._implication_result(And(ULT(x, 10), y == x + 1), [], ULT(y, 12), timeout_ms=5000)
+    assert result == unsat and len(calls) == 2
+
+
 # --- undecided summary entry ---------------------------------------------------
 
 
