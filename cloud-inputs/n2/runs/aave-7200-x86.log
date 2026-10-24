@@ -1,1 +1,0 @@
-spec BlockSpecialization(pc=7200, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=((11, 663),))
