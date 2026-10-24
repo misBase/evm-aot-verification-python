@@ -176,7 +176,11 @@
 
 ### 9.1 全量快测
 
-（运行中）
+- 开工时（6bbad7f，即任务 N 的最终代码）：1 failed, 1768 passed, 3 skipped（`-n 4`，524s）。唯一的失败已在 §5.1 说明并修正，只改了测试。
+- 最终代码（修法 1–8 + 测试修正，`poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider -n 2 --dist=loadscope`，同时有两个整节点证明在跑）：**1775 passed, 3 skipped, 0 failed（693s）**。新增的 6 条测试都在 `tests/unit/test_block_remaining_blocks_2.py` 中，逐个按节点 ID 单独运行均为 1 passed。
+- 修法 8 的 6 条测试在旧代码上：3 条失败（只查一次、同一次调用内不重试、兄弟义务复用证明），说明能区分新旧行为；另外 3 条是不变量（失败后会重试、不会证出非恒等式、`clear_memo` 会清空），新旧代码上都通过。
+- 并行运行时有一条负载敏感的测试失败：`test_block_uf_unification.py::test_alias_split_keeps_satisfiable_pairs_open`（与 4 个重进程一起运行时）。单独重跑通过。在上面的最终全量运行中也通过了。
+- `-m slow` 中有两条测试（`test_safe_9733_*`、`test_safe_11803_*`）读取 `tests/data/block_obligations/`，该目录不在仓库中，所以报 `file access error`。这是已有问题，与本任务无关，也不在快测范围内。
 
 ### 9.2 Permit2 1327（冻结版）
 
