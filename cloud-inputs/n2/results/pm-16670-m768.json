@@ -1,0 +1,63 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "cloud-inputs/n2/fixtures/PoolManager",
+  "started_at_utc": "2026-10-24T03:47:27.570738+00:00",
+  "configuration": {
+    "nodes": "cloud-inputs/n2/nodes/pm-16670-m768.json",
+    "output": "cloud-inputs/n2/runs/pm-16670-m768.json",
+    "timeout_ms": "30000",
+    "node_seconds": "21600.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "None",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "1d40b9d12b04c2984c95621b8093f59dd0687892a8aa4d1baa13616a94d15a03",
+    ".hex": "1ae33a365dabbdb8a22451bd57d029cbb04074a87d3e1b6a3de6722492e33c1a"
+  },
+  "model_sources_sha256": "3770a6f6d2fec5a6469dbef11f3374f24fd76da826762a8f03acab343493d3d7",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 16670,
+        "stack_depth": 16,
+        "memory_size": 768,
+        "free_memory_pointer": 768,
+        "stack_constants": [
+          [
+            3,
+            7324
+          ]
+        ]
+      },
+      "scope": "block-local",
+      "status": "inconclusive",
+      "seconds": 16405.014972418,
+      "wall_seconds": 16405.022514188,
+      "queries": 182,
+      "evm_paths": 3,
+      "x86_paths": 83,
+      "paired_transitions": 69,
+      "terminals_proved": 14,
+      "reasons": [
+        "ValueError: outcome mismatch pair_2_74: terminal@16670 / terminal@689761 (solver=unknown)"
+      ],
+      "failed_obligations": [
+        {
+          "name": "pair_2_74",
+          "answer": "unknown",
+          "expected": "unsat",
+          "seconds": 10668.463179766
+        }
+      ],
+      "keep_going_failures": [],
+      "summary_hits": 0
+    }
+  ],
+  "locally_proved": 0,
+  "ended_at_utc": "2026-10-24T08:21:02.151066+00:00"
+}
