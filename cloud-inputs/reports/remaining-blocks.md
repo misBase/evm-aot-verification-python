@@ -169,7 +169,7 @@
 
 ## 9. 冻结版机器码复核（任务 N2）
 
-输入：`cloud-inputs/n2/fixtures/`（Permit2、Pool=Aave、PoolManager；已用 `sha256sum -c` 对照 `cloud-inputs/n2/FROZEN_SHA256SUMS` 核对，一致）。代码：本分支 = 任务 N 的 6bbad7f（修法 1–7）+ §5.1 的一处测试修正，**生产代码没有改动**。本机 4 核 / 15GB，z3 4.15.4，capstone 5.0.6；每个查询 30s，`BLOCK_SUMMARY_LEMMAS=1 PYTHONHASHSEED=0`。长任务通常 3 个并行。
+输入：`cloud-inputs/n2/fixtures/`（Permit2、Pool=Aave、PoolManager；已用 `sha256sum -c` 对照 `cloud-inputs/n2/FROZEN_SHA256SUMS` 核对，一致）。代码：本分支 = 任务 N 的 6bbad7f（修法 1–7）+ §5.1 的一处测试修正 + **修法 8**（§9.7，d28298f 起：已证恒等式跨义务记忆化，只影响耗时）。各次运行用的是哪个版本，在相应小节中注明。本机 4 核 / 15GB，z3 4.15.4，capstone 5.0.6；每个查询 30s，`BLOCK_SUMMARY_LEMMAS=1 PYTHONHASHSEED=0`。长任务通常 3 个并行。
 
 运行脚本：`cloud-inputs/n2/tools/run_probe.sh`，它调用 `probe_traced.py`：原样运行 `tools/probe_block_obligations.py`，另外给每个 `_check` 记一行耗时日志。节点文件在 `cloud-inputs/n2/nodes/`，完成的结果在 `cloud-inputs/n2/results/`。
 会话中途容器重启过一次，当时在跑的任务全部中断。中断前的日志保存在 `results/partial-r1/`，这些任务之后从头重跑。
@@ -191,24 +191,88 @@
 - 节点级合并：第一次运行（被重启中断）中，`_unify_node` 对 924 个义务用了 1590.0s，得到 9 条引理；之后 `x86_maps_0_*` 逐个 unsat，每个约 33–36s。
 - 整节点结果：（运行中）
 
-### 9.3 SMT2 回归（修法 1–7，生产 `_check`）
+### 9.3 SMT2 回归（生产 `_check`）
 
-用 `cloud-inputs/n/tools/regress.py` 运行，每个义务上限 1800s，与 1327 整节点、Aave 7200 并行。日志见 `results/regress-smt2.log`。
+用 `cloud-inputs/n/tools/regress.py` 运行：每个文件一个新的 prover，每个义务上限 1800s，同一进程内按表中顺序依次运行。与 1–2 个整节点证明并行。日志见 `results/regress-smt2.log`（修法 1–7）和 `results/regress-smt2-fix8.log`（修法 1–8）。
 
-| 来源 | 义务 | 之前 | 现在 |
-|---|---|---|---|
-| r3c | 5802 `model_domain_nonempty`（预期 sat） | 0.3s sat | 0.4s sat |
-| r3c | 4837 `x86_maps_12_0` | 23.4s | 24.4s proved |
-| r3c | 4837 `x86_maps_14_0` | 13.7s | 13.9s proved |
-| r3c | 1327 `x86_maps_0_0` | 76.9s | 78.4s proved |
-| r3c | 1327 `x86_maps_0_1` | 51.7s | 57.7s proved |
-| m | 1327 `x86_maps_0_46` | 85.4s | 96.0s proved |
-| m | 1327 m192 `x86_maps_0_46` | 95.2s | 96.0s proved |
-| m | 1327 `pair_0_6`（任务 M：5925s unknown） | — | **191.0s proved**（修法 2 在 `_retry_over_potential` 中起作用） |
-| m | Aave 8248 `pair_0_1` | 1231.5s | 1244.2s proved |
-| n | Aave 11831 `evm_assumption_7`（只走 `_check`，不经过乘积字候选） | — | 12.9s proved |
-| n | 1327 `x86_empty_6` | 147.4s | 154.9s proved |
-| n | 1327 `x86_empty_7` | 127.9s | 157.5s proved |
-| n | Aave 7200 被拒命中前提（预期 sat） | 直接查询 30.4s unknown | 直接查询 30.3s unknown；常函数 UF 0.4s unknown；**blast 5.9s sat，模型在原式上求值为 true** |
+| 来源 | 义务 | 任务 N 报告 | 修法 1–7 | 修法 1–8 |
+|---|---|---|---|---|
+| r3c | 5802 `model_domain_nonempty`（预期 sat） | 0.3s sat | 0.4s sat | 0.3s sat |
+| r3c | 4837 `x86_maps_12_0` | 23.4s | 24.4s | 18.4s |
+| r3c | 4837 `x86_maps_14_0` | 13.7s | 13.9s | 14.2s |
+| r3c | 1327 `x86_maps_0_0` | 76.9s | 78.4s | 76.6s |
+| r3c | 1327 `x86_maps_0_1` | 51.7s | 57.7s | 45.8s |
+| m | 1327 `x86_maps_0_46` | 85.4s | 96.0s | 77.8s |
+| m | 1327 m192 `x86_maps_0_46` | 95.2s | 96.0s | 85.2s |
+| m | 1327 `pair_0_6`（任务 M：5925s unknown） | — | **191.0s** | **172.4s** |
+| m | Aave 8248 `pair_0_1` | 1231.5s | 1244.2s | 1236.5s |
+| n | Aave 11831 `evm_assumption_7`（只走 `_check`，见下） | — | 12.9s | **1029.9s unknown** |
+| n | 1327 `x86_empty_6` | 147.4s | 154.9s | 167.9s |
+| n | 1327 `x86_empty_7` | 127.9s | 157.5s | 153.0s |
+| n2 | 冻结版 1327 `x86_empty_3` | — | 140.8s（`empty_row.py`） | 142.5s |
+| n | Aave 7200 被拒命中前提（预期 sat） | 直接查询 30.4s unknown | 直接查询 30.3s unknown；常函数 UF 0.4s unknown；**blast 5.9s sat，模型在原式上求值为 true** | （修法 8 不涉及） |
 
-全部与预期一致，没有退化。耗时差异在并行负载的波动范围内。
+除 11831 外，其余结果都与预期一致，没有退化；耗时差异在并行负载的波动范围内。修法 8 之后，Permit2 / 4837 的几条 maps 义务快了 0–20%。
+
+**11831 `evm_assumption_7` 的 unknown 不是修法 8 造成的退化**（`results/regress-11831/`）：
+- 这个文件只走普通 `_check`，结果取决于计时。成功的那次（12.9s，1 条引理）是在 `lia` 路线中证出的；该路线的 LIA 查询上限 `_LIA_MS = 10s`，证出时贴着这个上限。
+- 单独运行（上限 300s）：修法 8 之前和之后都是 unknown（236s / 235s）。
+- 前面只放一个 `x86_maps_14_0`：修法 8 之前和之后也都是 unknown（241s / 238s）。
+- 前面放与回归相同的 7 个文件，用 `trace_after.py` 逐路线计时：修法 8 之前和之后都是 unknown（411s / 409s），两边 `lia` 都在约 12s 时给出 unknown，各路线耗时几乎相同。
+- 前缀相同、上限 1800s 时，修法 8 之前的版本在 `results/regress-pre8-prefix.log` 中证出（12.9s），但这一结果不能稳定复现。
+- 生产中这条执行假设走 `check_paths` 的候选列表，乘积字泛化（修法 1）排在最前，0.0s 证出。对应测试 `test_aave_11831_evm_assumption_7_is_proved_by_word_generalisation` 在最终全量快测中通过。
+
+### 9.4 Aave 7200 x86 分段（冻结版 Pool，修法 1–7）
+
+`x86_profile.py --seconds 10800`。两次都没有跑完：第一次被容器重启打断（`results/partial-r1/aave-7200-x86.log`）；第二次（`results/aave-7200-x86-r2-oom.log`）在 9464s 时被内核 OOM 杀掉，当时 RSS 7.8GB，同时还有 Permit2 1327 的 7GB 进程在跑。
+- **修法 3–7 在冻结版上起了作用**：没有任何 summary 命中被拒，也没有回退到原始的复制循环。每个命中都照常应用：`copy_loop@0x6ee68`（340–360s，其中 `copy_domain` 60–70s）、7 个 `memgas`（每个 60–80s，其中 `entry` sat 35–55s、`memgas_exit_guard_excluded` 23–28s）、2 个 `div`（每个 490–570s，其中 `entry` sat 41–58s）。补集检查共命中 46 次（22.6s）。
+- **瓶颈是同一段代码被反复执行**：上面这组命中按 copy_loop → memgas×3 → div → memgas×3 → div → memgas 的顺序循环出现，每圈约 2600s，每圈对应一条新的路径。9464s 时共执行 817 个基本块，可达性检查 449 次（2315s），剪掉 117 个分支，还没有任何路径到达终点。
+- 修法 3–7 之前（任务 N 服务器）的失败原因是 `x86 segment execution deadline exhausted`，当时的卡点是 summary 被拒后逐圈展开复制循环。现在的卡点是每条路径都要单独付全部 summary 的代价（`entry` 求解与 `div` 的义务）。可行的通用方向是在同一节点内复用 summary 命中的证书（前提相同时），本任务没有实现。
+- 整段要单独跑才能跑完（内存 8GB 以上），这需要等 Permit2 1327 m192 结束之后（§9.9）。
+
+### 9.5 PoolManager 16670 m=768、6084（冻结版）
+
+**16670 m=768 整节点**（修法 1–7，`results/pm-16670-m768.{json,log}`）：**inconclusive**，16405s，原因 `outcome mismatch pair_2_74: terminal@16670 / terminal@689761 (solver=unknown)`，与服务器上的失败是同一个义务。
+- 时间线：pair 阶段 212s（EVM 3 / x86 83，对应关系完整）；`_unify_node` 对 87 个义务用了 5418.2s（修法 6 给的上限，即剩余预算的 1/4），只得到 2 条引理；之后 `x86_maps_*` 很快，`pair_2_74` 的 goal 0、1 各 0.1s，**goal 2 单独用了 10664.8s，结果 unknown**。
+- **根因**（`results/pm16670/`、`cloud-inputs/n2/smt2/pm16670/pair_2_74_goal_2_of_7.smt2`）：块 16670 是 `SDIV; …; SAR 8; MSTORE ×2; SHA3(0,0x40)`，goal 2 是内存观测量。EVM 端的 SDIV 是 `holiman_udiv(|a|, |b|)`，其中 `|x| = If(sign(x), 0−x, x)`；x86 端是按符号分支的树，每个分支各有一个 UF 应用，参数为 `(a,b)`、`(−a,b)`、`(a,−b)`、`(|a|,|b|)`，共 6 个 `holiman_udiv` 应用。这些参数**只在对应的符号分支下才相等**，无条件比较时并不相等。`uf_args.py` 显示：同一类的参数对 0.1–1.2s 就能证等，跨类的参数对 20s unknown。所有路线都失败（单独运行 1289s unknown；unify 路线 30 个 `_prove_equal` 中只成功 2–3 个）。
+- **候选通用修法（已离线验证，未进生产）**：在 UF 参数合并**之前**，先按 UF 应用之上的 ite 守卫分情形（`guard_split.py`），每个情形内再做 `unify_uf_arguments`，然后求解。只按最小的守卫（两个操作数符号相同）分 2 个情形：**两个情形都 unsat**（622s、601s，分别合并 21 次、34 次）。按 4 个守卫分 16 个情形时，前 3 个情形各 100–500s。
+  - 健全性：与 `_refute_by_cases` 相同。c 与 ¬c 覆盖所有模型，`F[c:=v]` 在对应文字下与 F 等价，每个情形里的合并仍由被反驳的查询支持。所以所有情形都 unsat 时 F unsat。
+  - 未进生产的原因：每个内存目标约 1200s，而 83 个 pair 都有这个目标，6h 放不下。还需要让情形之间、兄弟 pair 之间共享合并结果（`_lemma_cache`），本任务没有完成。
+- 另外两个 16670 实例（符号 7296 / 7324）没有跑。
+
+**6084 m=864 f=768**（修法 1–7，`results/pm-6084-triage.log`）：pair 阶段 593s（EVM 56 / x86 114），节点共 **4028 个 pair 阶段义务**，`_unify_node` 用了 11.4s。第一个义务 `x86_maps_0_0` 在 `_check` 中卡了 2800s 以上（py-spy 看到在 unify 路线中），之后由会话停止。单独运行 `route_trace`：1800s 内所有路线 unknown（`results/pm6084/trace_maps_0_0.json`）。EVM 0 的第 0 个合取项是 gas 检查：约 10 级内存扩展费（围绕 `stack_1`/`stack_2` 的符号偏移做 MLOAD/MSTORE）之和 ≤ `gas_remaining`。这和任务 N 中 9089 `x86_maps_0_9`（5 级）是同一类，但链更长：potential 路线 231s unknown。即使这一项能证出，4028 个义务在 6h 内也跑不完，所以 **6084 属于预算类，另有一个卡住的 gas 链义务**。SMT2 存于 `cloud-inputs/n2/smt2/pm6084/x86_maps_0_0.smt2`。
+
+### 9.6 PoolManager 9089、4418（冻结版）
+
+- **9089 整节点（修法 1–8）：proved**，10643s，4932 个查询，29 次 summary 命中（`results/pm-9089.{json,log}`）。
+  - pair 阶段 683s：EVM 35 / x86 50，对应关系中只有 1 个 "all" 行。
+  - `_unify_node`：728 个义务，3.8s。
+  - 最慢的义务：`pair_34_0` 212.5s，`x86_maps_0_9` 196.3s（即任务 N §2.6 中节点内 1100s unknown 的那个），`x86_maps_2_7` 188.1s。
+  - r4 失败的 `pair_34_25` 没有出现：本次 x86 行 25 被提议为空行，`x86_empty_25` 57.1s 证出。
+  - 1h 分诊（修法 1–7，`--keep-going`，`results/pm-9089-1h.*`）：没有失败，平均每个义务约 11s，当时按此估计整节点约 9400s。
+- **4418 符号，1h 分诊**（修法 1–8，`--keep-going`，`results/pm-4418-sym-1h.*`）：EVM 63 / **x86 877** 条路径，548 个查询，**1h 内没有进入 pair 阶段**，也没有任何失败。时间全部花在 x86 路径枚举和对应关系上。瓶颈仍然是路径数（任务 N 为 885 条），修法 1–8 没有改善。
+- **4418 f=320，1h 分诊**：见 §9.9。
+
+### 9.7 修法 8：已证恒等式跨义务记忆化
+
+- 问题：`normalize_word_arith` 对每个候选改写证明 old == new（`_identity_proof`，每次最多 1s）。同一节点的兄弟义务共享前提和路径项，会反复遇到相同的改写。冻结版 1327 的 `x86_maps_0_5/0_10/0_20`（`normalize_profile.py`）：每个义务 199 次恒等式证明，第二个起有 191–192 次是之前证过的（约 23s，占 24s 中的大部分）；即使在同一个义务内，各轮之间也重复了 81 次。
+- 改动：
+  - `verification/block_equivalence.py:828` `_identity_proof`：证出的结果按 (old, new) 的 AST id 记忆化，放在 `common.store_forwarding` 的节点级 memo 中（每个节点开始时 `clear_memo` 清空，并有条目上限）。失败**不**跨调用缓存。
+  - `verification/block_equivalence.py:1069` `normalize_word_arith`：同一次调用内，不重试已失败的 (t, new)，这是同一个查询。
+  - `common/store_forwarding.py:78` `_memoized`：新增可选参数 `keep`，只缓存满足条件的值。
+  - 非 AST 参数（如 new 为 None）不走记忆化。
+- 健全性：old == new 是否恒真只取决于这两个项，与它出现在哪个义务中无关，所以一次证出的结果在所有义务中都成立。记忆的值就是原来的证明（引理），证书结构不变。memo 保留 AST 引用，id 不会被复用。不重试只可能少证一个改写，不会多证。失败不跨调用缓存，是因为第一版缓存了失败时，`x86_maps_0_20` 少了 1 条改写（160 → 159 条引理）；现在的版本引理数与修法前一致。
+- 效果（`--plain`，离线）：兄弟义务的 normalize 从 23.5s / 26.1s 降到 16.8s / 15.4s。在节点内，冻结版 1327 每个 maps 义务平均从 24.7s（修法前，sym 实例前 150 个）降到 21.0s（修法后，m192 实例），提升有限：节点内还有其他固定开销（`quick0` 约 3s、blast 查询、pin）。
+- 测试：`tests/unit/test_block_remaining_blocks_2.py` 共 6 条（见 §9.1）。回归见 §9.3。
+
+### 9.8 Permit2 1327 整节点
+
+- **sym（修法 1–7，`results/p2-1327-sym-oom.log`）**：没有任何义务失败，但在 20405s 时被内核 OOM 杀掉（RSS 10.5GB，内存随运行时间持续增长：14000s 时 7GB）。
+  - 时间线：pair 阶段 852s，`_unify_node` 1524.8s（924 个义务，9 条引理），4551s 起开始检查义务。
+  - 进度：到 20405s 共证出 **588/924** 个义务：498 个 maps（10412s）、86 个 pair（4987s）、4 个空行（453.8s，其中 `x86_empty_3` 174.5s），unknown 为 0。
+  - 剩余 336 个义务按当时的速度还需约 9000s，所以修法 8 之前整节点约需 29000s，**超出 6h 预算**。即使没有 OOM，也会以预算耗尽结束，而不是卡在某个义务上。
+- **m192（修法 1–8）**：见 §9.9。
+
+### 9.9 汇总（冻结版）
+
+（运行中，最后更新）
