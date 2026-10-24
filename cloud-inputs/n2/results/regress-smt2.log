@@ -1,0 +1,16 @@
+model_domain_nonempty_e765d561caaa expected=sat proved 0.4s lemmas=0
+x86_maps_12_0_bb35805d9c63 expected=unsat proved 24.4s lemmas=68
+x86_maps_14_0_3cedcf6f0591 expected=unsat proved 13.9s lemmas=2
+x86_maps_0_0_29de495a80ca expected=unsat proved 78.4s lemmas=162
+x86_maps_0_1_fd3e98561987 expected=unsat proved 57.7s lemmas=160
+permit2_1327_x86_maps_0_46 expected=unsat proved 96.0s lemmas=158
+permit2_1327_m192_f128_x86_maps_0_46 expected=unsat proved 96.0s lemmas=160
+aave_11831_evm_assumption_7 expected=unsat proved 12.9s lemmas=1
+x86_empty_6 expected=unsat proved 154.9s lemmas=177
+x86_empty_7 expected=unsat proved 157.5s lemmas=185
+permit2_1327_pair_0_6 expected=unsat proved 191.0s lemmas=190
+aave_8248_pair_0_1 expected=unsat proved 1244.2s lemmas=2
+size 305238 ufs [] tiers []
+direct unknown 30.3s
+constant-ufs unknown 0.4s
+blast sat 5.9 s orig-true
