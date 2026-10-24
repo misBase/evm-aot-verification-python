@@ -1,0 +1,6 @@
+[     7.9s] entry_nonempty sat 0.0s
+[     8.1s] havoc_relation unsat 0.2s
+[  3315.3s] model_domain_nonempty sat 0.3s
+{'spec': {'pc': 4418, 'stack_depth': 15, 'memory_size': None, 'free_memory_pointer': None, 'stack_constants': ()}, 'scope': 'block-local', 'status': 'inconclusive', 'seconds': 3730.6687676459987, 'wall_seconds': 3730.6760455080002, 'queries': 548, 'evm_paths': 63, 'x86_paths': 877, 'paired_transitions': 0, 'terminals_proved': 0, 'reasons': ['ProofBudgetExceeded: proof wall budget exhausted'], 'keep_going_failures': [], 'summary_hits': 0}
+LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.
+pm-4418-sym-1h exit 1
