@@ -19,6 +19,15 @@
 | 5 | 所有复制循环模板的"空命中" | `dead_hit` | Aave 7200（第三层） |
 | 6 | 节点级 UF 参数合并限时 1/4 | `_unify_node` | PoolManager 16670 |
 | 7 | 复制循环前提蕴含的 blast 回退 | `copy_loop._implication_result` | Aave 7200（第四层） |
+| 8（N2） | 已证恒等式跨义务记忆化 | `_identity_proof`、`normalize_word_arith` | 1327 等节点的 maps 义务耗时（§9.7） |
+
+**任务 N2（冻结版机器码）摘要**（详见 §9.9）：
+- Permit2 1327 中 r4 的 `pair_0_3` 已由修法 2 消除，`x86_empty_3` 证出。两个实例 6h 内都没有失败的义务，只是预算不够（约需 7–8h，且内存持续增长）。
+- PoolManager 9089 整节点**证出**（10643s）。
+- PoolManager 16670 m=768 卡在 `pair_2_74` goal 2：SDIV 符号守卫下的 UF 参数合并。已离线验证“先按守卫分情形再合并”可以证出，但这个修法没有进生产。
+- 6084、4418 两个实例属于预算 / 路径数类。
+- Aave 7200 的 x86 分段：修法 3–7 生效，summary 不再被拒，但每条路径都要重复付 summary 代价，6h 内跑不完。
+- 全量快测 0 失败；SMT2 回归没有退化。
 
 逐块结论（本机：4 核，z3 4.15.4，每查询 30s，多进程并行；"1h 分诊"= `--node-seconds 3600 --keep-going`）：
 
@@ -86,6 +95,12 @@
 - 测试：`tests/unit/test_block_remaining_blocks.py`（新增 20 条）；`tests/unit/test_copy_loop_summary.py::test_structural_fact_fallback_reuses_one_forward_cache` 的查询次数断言 1 → 2（修法 7 有意增加了一次回退查询，测试的本意"复用同一个 forward 缓存"不变）。
 - 数据：`cloud-inputs/n/smt2/`（`aave_11831_evm_assumption_7.smt2`、`permit2_1327/x86_empty_6.smt2`、`x86_empty_7.smt2`）。
 - 诊断工具：`cloud-inputs/n/tools/`（§7）。
+- **任务 N2**：
+  - 修法 8：`verification/block_equivalence.py:828`（`_identity_proof`），`:1069`（`normalize_word_arith` 的 `unproved`），`common/store_forwarding.py:78`（`_memoized` 的 `keep` 参数）。
+  - 测试：`tests/unit/test_block_remaining_blocks_2.py`（6 条）；`tests/unit/test_block_speedups.py::test_prefix_unknown_pruned_only_by_probe_unsat` 把 blast 查询也强制为 unknown（§5.1）。
+  - 数据：`cloud-inputs/n2/smt2/`（冻结版 1327 `x86_empty_3`、PoolManager 16670 `pair_2_74_goal_2_of_7`、6084 `x86_maps_0_0`）。
+  - 工具：`cloud-inputs/n2/tools/`：`run_probe.sh`、`probe_traced.py`、`goal_parts.py`、`uf_args.py`、`guard_split.py`、`normalize_profile.py`、`show_conjunct.py`、`trace_after.py`。
+  - 运行结果：`cloud-inputs/n2/results/`。
 
 ## 4. 健全性论证
 
@@ -96,6 +111,7 @@
 - **修法 5**：入口 unsat ⇒ 没有状态满足命中前提，任何后继都空洞地正确；证书仍是只含该 unsat 证明的 `DeadHitCertificate`。与 MCOPY 已有的论证相同，只是去掉了模板限制。
 - **修法 6**：`unify_across` 的每次合并都由被反驳的查询支持；提前停止只是少合并，未合并的 pair 照常走自己的全部路线（其中也有 unify 路线）。只影响耗时。
 - **修法 7**：同修法 4，blast 是等价改写，`_implication_result` 只有 unsat 才算证出。
+- **修法 8**（任务 N2）：`_identity_proof(old, new)` 的结果是“old == new 对其中 UF 应用 / 乘积的所有取值都成立”的证明，只取决于这两个项，所以一次证出可以在任何义务中复用。记忆的是原来的引理对象，证书结构不变。memo 保留 AST 引用，id 不会被复用；条目有上限，并在每个节点开始时清空。失败不跨调用缓存；同一次 `normalize_word_arith` 调用内不重试同一个 (t, new)，只可能少一个改写，不会多证。只影响耗时（§9.7）。
 - 没有"提议出错就会误证"的通道：乘积字、公理实例、空行、见证、合并顺序都只是候选或加速；每个结论最终都落到被反驳的查询，或落到对所有解释都成立的公理上。
 
 ## 5. 测试结果
