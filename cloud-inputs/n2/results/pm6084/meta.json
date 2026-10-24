@@ -1,0 +1,1088 @@
+{
+ "found": [
+  0,
+  0,
+  0,
+  0,
+  "all",
+  54,
+  53,
+  52,
+  51,
+  50,
+  46,
+  45,
+  41,
+  40,
+  36,
+  35,
+  31,
+  30,
+  29,
+  28,
+  27,
+  22,
+  21,
+  20,
+  16,
+  15,
+  14,
+  13,
+  12,
+  "all",
+  54,
+  53,
+  52,
+  51,
+  50,
+  "all",
+  45,
+  41,
+  40,
+  36,
+  35,
+  31,
+  30,
+  29,
+  28,
+  27,
+  22,
+  21,
+  20,
+  16,
+  15,
+  14,
+  13,
+  12,
+  11,
+  10,
+  55,
+  54,
+  53,
+  52,
+  51,
+  50,
+  46,
+  45,
+  41,
+  40,
+  36,
+  35,
+  31,
+  30,
+  29,
+  28,
+  27,
+  22,
+  21,
+  20,
+  16,
+  15,
+  14,
+  13,
+  12,
+  "all",
+  54,
+  53,
+  52,
+  51,
+  50,
+  46,
+  45,
+  41,
+  40,
+  36,
+  35,
+  31,
+  30,
+  29,
+  28,
+  27,
+  22,
+  21,
+  20,
+  16,
+  15,
+  14,
+  13,
+  12,
+  11,
+  10,
+  6,
+  5,
+  4,
+  3,
+  2,
+  1
+ ],
+ "evm": [
+  {
+   "kind": "exit",
+   "location": 14427,
+   "conjuncts": 140
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 10
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 11
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 14
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 15
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 16
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 18
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 19
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 22
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 23
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 24
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 26
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 27
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 30
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 31
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 32
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 34
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 35
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 38
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 39
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 40
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 42
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 43
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 46
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 47
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 48
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 50
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 51
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 75
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 76
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 77
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 79
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 80
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 83
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 84
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 85
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 87
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 88
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 91
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 92
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 93
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 95
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 96
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 99
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 100
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 101
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 103
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 104
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 128
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 130
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 132
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 133
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 136
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 137
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 138
+  },
+  {
+   "kind": "terminal",
+   "location": 6084,
+   "conjuncts": 140
+  }
+ ],
+ "x86": [
+  {
+   "kind": "exit",
+   "location": 601583,
+   "conjuncts": 120
+  },
+  {
+   "kind": "exit",
+   "location": 601583,
+   "conjuncts": 120
+  },
+  {
+   "kind": "exit",
+   "location": 601583,
+   "conjuncts": 120
+  },
+  {
+   "kind": "exit",
+   "location": 601583,
+   "conjuncts": 120
+  },
+  {
+   "kind": "terminal",
+   "location": 280883,
+   "conjuncts": 120
+  },
+  {
+   "kind": "terminal",
+   "location": 280761,
+   "conjuncts": 122
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 118
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 115
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 113
+  },
+  {
+   "kind": "terminal",
+   "location": 280291,
+   "conjuncts": 112
+  },
+  {
+   "kind": "terminal",
+   "location": 279315,
+   "conjuncts": 96
+  },
+  {
+   "kind": "terminal",
+   "location": 279193,
+   "conjuncts": 98
+  },
+  {
+   "kind": "terminal",
+   "location": 278813,
+   "conjuncts": 88
+  },
+  {
+   "kind": "terminal",
+   "location": 278693,
+   "conjuncts": 90
+  },
+  {
+   "kind": "terminal",
+   "location": 278291,
+   "conjuncts": 80
+  },
+  {
+   "kind": "terminal",
+   "location": 278169,
+   "conjuncts": 82
+  },
+  {
+   "kind": "terminal",
+   "location": 277779,
+   "conjuncts": 72
+  },
+  {
+   "kind": "terminal",
+   "location": 277657,
+   "conjuncts": 74
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 70
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 67
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 65
+  },
+  {
+   "kind": "terminal",
+   "location": 277196,
+   "conjuncts": 58
+  },
+  {
+   "kind": "terminal",
+   "location": 276659,
+   "conjuncts": 57
+  },
+  {
+   "kind": "terminal",
+   "location": 276537,
+   "conjuncts": 59
+  },
+  {
+   "kind": "terminal",
+   "location": 276147,
+   "conjuncts": 49
+  },
+  {
+   "kind": "terminal",
+   "location": 276025,
+   "conjuncts": 51
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 47
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 44
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 42
+  },
+  {
+   "kind": "terminal",
+   "location": 280883,
+   "conjuncts": 120
+  },
+  {
+   "kind": "terminal",
+   "location": 280761,
+   "conjuncts": 122
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 118
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 115
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 113
+  },
+  {
+   "kind": "terminal",
+   "location": 280291,
+   "conjuncts": 112
+  },
+  {
+   "kind": "terminal",
+   "location": 279315,
+   "conjuncts": 96
+  },
+  {
+   "kind": "terminal",
+   "location": 279193,
+   "conjuncts": 98
+  },
+  {
+   "kind": "terminal",
+   "location": 278813,
+   "conjuncts": 88
+  },
+  {
+   "kind": "terminal",
+   "location": 278693,
+   "conjuncts": 90
+  },
+  {
+   "kind": "terminal",
+   "location": 278291,
+   "conjuncts": 80
+  },
+  {
+   "kind": "terminal",
+   "location": 278169,
+   "conjuncts": 82
+  },
+  {
+   "kind": "terminal",
+   "location": 277779,
+   "conjuncts": 72
+  },
+  {
+   "kind": "terminal",
+   "location": 277657,
+   "conjuncts": 74
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 70
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 67
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 65
+  },
+  {
+   "kind": "terminal",
+   "location": 277196,
+   "conjuncts": 58
+  },
+  {
+   "kind": "terminal",
+   "location": 276659,
+   "conjuncts": 57
+  },
+  {
+   "kind": "terminal",
+   "location": 276537,
+   "conjuncts": 59
+  },
+  {
+   "kind": "terminal",
+   "location": 276147,
+   "conjuncts": 49
+  },
+  {
+   "kind": "terminal",
+   "location": 276025,
+   "conjuncts": 51
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 47
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 44
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 42
+  },
+  {
+   "kind": "terminal",
+   "location": 275268,
+   "conjuncts": 37
+  },
+  {
+   "kind": "terminal",
+   "location": 275148,
+   "conjuncts": 39
+  },
+  {
+   "kind": "terminal",
+   "location": 280883,
+   "conjuncts": 120
+  },
+  {
+   "kind": "terminal",
+   "location": 280761,
+   "conjuncts": 122
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 118
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 115
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 113
+  },
+  {
+   "kind": "terminal",
+   "location": 280291,
+   "conjuncts": 112
+  },
+  {
+   "kind": "terminal",
+   "location": 279315,
+   "conjuncts": 96
+  },
+  {
+   "kind": "terminal",
+   "location": 279193,
+   "conjuncts": 98
+  },
+  {
+   "kind": "terminal",
+   "location": 278813,
+   "conjuncts": 88
+  },
+  {
+   "kind": "terminal",
+   "location": 278693,
+   "conjuncts": 90
+  },
+  {
+   "kind": "terminal",
+   "location": 278291,
+   "conjuncts": 80
+  },
+  {
+   "kind": "terminal",
+   "location": 278169,
+   "conjuncts": 82
+  },
+  {
+   "kind": "terminal",
+   "location": 277779,
+   "conjuncts": 72
+  },
+  {
+   "kind": "terminal",
+   "location": 277657,
+   "conjuncts": 74
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 70
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 67
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 65
+  },
+  {
+   "kind": "terminal",
+   "location": 277196,
+   "conjuncts": 58
+  },
+  {
+   "kind": "terminal",
+   "location": 276659,
+   "conjuncts": 57
+  },
+  {
+   "kind": "terminal",
+   "location": 276537,
+   "conjuncts": 59
+  },
+  {
+   "kind": "terminal",
+   "location": 276147,
+   "conjuncts": 49
+  },
+  {
+   "kind": "terminal",
+   "location": 276025,
+   "conjuncts": 51
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 47
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 44
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 42
+  },
+  {
+   "kind": "terminal",
+   "location": 280883,
+   "conjuncts": 120
+  },
+  {
+   "kind": "terminal",
+   "location": 280761,
+   "conjuncts": 122
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 118
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 115
+  },
+  {
+   "kind": "terminal",
+   "location": 280866,
+   "conjuncts": 113
+  },
+  {
+   "kind": "terminal",
+   "location": 280291,
+   "conjuncts": 112
+  },
+  {
+   "kind": "terminal",
+   "location": 279315,
+   "conjuncts": 96
+  },
+  {
+   "kind": "terminal",
+   "location": 279193,
+   "conjuncts": 98
+  },
+  {
+   "kind": "terminal",
+   "location": 278813,
+   "conjuncts": 88
+  },
+  {
+   "kind": "terminal",
+   "location": 278693,
+   "conjuncts": 90
+  },
+  {
+   "kind": "terminal",
+   "location": 278291,
+   "conjuncts": 80
+  },
+  {
+   "kind": "terminal",
+   "location": 278169,
+   "conjuncts": 82
+  },
+  {
+   "kind": "terminal",
+   "location": 277779,
+   "conjuncts": 72
+  },
+  {
+   "kind": "terminal",
+   "location": 277657,
+   "conjuncts": 74
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 70
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 67
+  },
+  {
+   "kind": "terminal",
+   "location": 277762,
+   "conjuncts": 65
+  },
+  {
+   "kind": "terminal",
+   "location": 277196,
+   "conjuncts": 58
+  },
+  {
+   "kind": "terminal",
+   "location": 276659,
+   "conjuncts": 57
+  },
+  {
+   "kind": "terminal",
+   "location": 276537,
+   "conjuncts": 59
+  },
+  {
+   "kind": "terminal",
+   "location": 276147,
+   "conjuncts": 49
+  },
+  {
+   "kind": "terminal",
+   "location": 276025,
+   "conjuncts": 51
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 47
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 44
+  },
+  {
+   "kind": "terminal",
+   "location": 276130,
+   "conjuncts": 42
+  },
+  {
+   "kind": "terminal",
+   "location": 275268,
+   "conjuncts": 37
+  },
+  {
+   "kind": "terminal",
+   "location": 275148,
+   "conjuncts": 39
+  },
+  {
+   "kind": "terminal",
+   "location": 274355,
+   "conjuncts": 25
+  },
+  {
+   "kind": "terminal",
+   "location": 274233,
+   "conjuncts": 27
+  },
+  {
+   "kind": "terminal",
+   "location": 274338,
+   "conjuncts": 23
+  },
+  {
+   "kind": "terminal",
+   "location": 274338,
+   "conjuncts": 20
+  },
+  {
+   "kind": "terminal",
+   "location": 274338,
+   "conjuncts": 19
+  },
+  {
+   "kind": "terminal",
+   "location": 273250,
+   "conjuncts": 10
+  }
+ ],
+ "proposed": [
+  0,
+  0,
+  0,
+  0,
+  55,
+  54,
+  53,
+  52,
+  51,
+  50,
+  46,
+  45,
+  41,
+  40,
+  36,
+  35,
+  31,
+  30,
+  29,
+  28,
+  27,
+  22,
+  21,
+  20,
+  16,
+  15,
+  14,
+  13,
+  12,
+  55,
+  54,
+  53,
+  52,
+  51,
+  50,
+  46,
+  45,
+  41,
+  40,
+  36,
+  35,
+  31,
+  30,
+  29,
+  28,
+  27,
+  22,
+  21,
+  20,
+  16,
+  15,
+  14,
+  13,
+  12,
+  11,
+  10,
+  55,
+  54,
+  53,
+  52,
+  51,
+  50,
+  46,
+  45,
+  41,
+  40,
+  36,
+  35,
+  31,
+  30,
+  29,
+  28,
+  27,
+  22,
+  21,
+  20,
+  16,
+  15,
+  14,
+  13,
+  12,
+  55,
+  54,
+  53,
+  52,
+  51,
+  50,
+  46,
+  45,
+  41,
+  40,
+  36,
+  35,
+  31,
+  30,
+  29,
+  28,
+  27,
+  22,
+  21,
+  20,
+  16,
+  15,
+  14,
+  13,
+  12,
+  11,
+  10,
+  6,
+  5,
+  4,
+  3,
+  2,
+  1
+ ]
+}
