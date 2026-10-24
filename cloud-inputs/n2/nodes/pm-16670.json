@@ -1,0 +1,38 @@
+[
+ {
+  "pc": 16670,
+  "stack_depth": 16,
+  "memory_size": null,
+  "free_memory_pointer": null,
+  "stack_constants": [
+   [
+    3,
+    7296
+   ]
+  ]
+ },
+ {
+  "pc": 16670,
+  "stack_depth": 16,
+  "memory_size": 768,
+  "free_memory_pointer": 768,
+  "stack_constants": [
+   [
+    3,
+    7324
+   ]
+  ]
+ },
+ {
+  "pc": 16670,
+  "stack_depth": 16,
+  "memory_size": null,
+  "free_memory_pointer": null,
+  "stack_constants": [
+   [
+    3,
+    7324
+   ]
+  ]
+ }
+]
