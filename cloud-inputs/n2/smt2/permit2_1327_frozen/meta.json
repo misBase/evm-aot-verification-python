@@ -1,0 +1,616 @@
+{
+ "found": [
+  0,
+  0,
+  "all",
+  null,
+  null,
+  null,
+  "all",
+  "all",
+  "all",
+  "all",
+  "all",
+  "all",
+  "all",
+  "all",
+  "all",
+  "all",
+  39,
+  28,
+  17,
+  null,
+  16,
+  15,
+  14,
+  60,
+  54,
+  53,
+  49,
+  48,
+  47,
+  46,
+  45,
+  12,
+  11,
+  10,
+  9,
+  8,
+  7,
+  6,
+  5,
+  4,
+  3,
+  2,
+  1
+ ],
+ "evm": [
+  {
+   "kind": "exit",
+   "location": 1273,
+   "conjuncts": 141
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 10
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 11
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 14
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 15
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 16
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 18
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 19
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 22
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 23
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 24
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 26
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 27
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 31
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 32
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 32
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 33
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 35
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 36
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 41
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 43
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 44
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 49
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 51
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 52
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 56
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 57
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 58
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 60
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 61
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 66
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 68
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 69
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 74
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 76
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 77
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 81
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 82
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 83
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 85
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 88
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 91
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 92
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 93
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 95
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 96
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 120
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 121
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 122
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 124
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 125
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 128
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 129
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 130
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 132
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 133
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 137
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 138
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 138
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 139
+  },
+  {
+   "kind": "terminal",
+   "location": 1327,
+   "conjuncts": 141
+  }
+ ],
+ "x86": [
+  {
+   "kind": "exit",
+   "location": 63388,
+   "conjuncts": 137
+  },
+  {
+   "kind": "exit",
+   "location": 63388,
+   "conjuncts": 120
+  },
+  {
+   "kind": "terminal",
+   "location": 73660,
+   "conjuncts": 137
+  },
+  {
+   "kind": "terminal",
+   "location": 73543,
+   "conjuncts": 136
+  },
+  {
+   "kind": "terminal",
+   "location": 73543,
+   "conjuncts": 133
+  },
+  {
+   "kind": "terminal",
+   "location": 73543,
+   "conjuncts": 132
+  },
+  {
+   "kind": "terminal",
+   "location": 73413,
+   "conjuncts": 134
+  },
+  {
+   "kind": "terminal",
+   "location": 72660,
+   "conjuncts": 121
+  },
+  {
+   "kind": "terminal",
+   "location": 72540,
+   "conjuncts": 123
+  },
+  {
+   "kind": "terminal",
+   "location": 72147,
+   "conjuncts": 113
+  },
+  {
+   "kind": "terminal",
+   "location": 72025,
+   "conjuncts": 115
+  },
+  {
+   "kind": "terminal",
+   "location": 72130,
+   "conjuncts": 111
+  },
+  {
+   "kind": "terminal",
+   "location": 72130,
+   "conjuncts": 108
+  },
+  {
+   "kind": "terminal",
+   "location": 72130,
+   "conjuncts": 106
+  },
+  {
+   "kind": "terminal",
+   "location": 71604,
+   "conjuncts": 105
+  },
+  {
+   "kind": "terminal",
+   "location": 71484,
+   "conjuncts": 107
+  },
+  {
+   "kind": "terminal",
+   "location": 70860,
+   "conjuncts": 96
+  },
+  {
+   "kind": "terminal",
+   "location": 69068,
+   "conjuncts": 68
+  },
+  {
+   "kind": "terminal",
+   "location": 67244,
+   "conjuncts": 40
+  },
+  {
+   "kind": "terminal",
+   "location": 67131,
+   "conjuncts": 39
+  },
+  {
+   "kind": "terminal",
+   "location": 67001,
+   "conjuncts": 37
+  },
+  {
+   "kind": "terminal",
+   "location": 67227,
+   "conjuncts": 33
+  },
+  {
+   "kind": "terminal",
+   "location": 67227,
+   "conjuncts": 30
+  },
+  {
+   "kind": "terminal",
+   "location": 73660,
+   "conjuncts": 120
+  },
+  {
+   "kind": "terminal",
+   "location": 72660,
+   "conjuncts": 109
+  },
+  {
+   "kind": "terminal",
+   "location": 72540,
+   "conjuncts": 111
+  },
+  {
+   "kind": "terminal",
+   "location": 72147,
+   "conjuncts": 101
+  },
+  {
+   "kind": "terminal",
+   "location": 72025,
+   "conjuncts": 103
+  },
+  {
+   "kind": "terminal",
+   "location": 72130,
+   "conjuncts": 99
+  },
+  {
+   "kind": "terminal",
+   "location": 72130,
+   "conjuncts": 96
+  },
+  {
+   "kind": "terminal",
+   "location": 72130,
+   "conjuncts": 94
+  },
+  {
+   "kind": "terminal",
+   "location": 67227,
+   "conjuncts": 27
+  },
+  {
+   "kind": "terminal",
+   "location": 66557,
+   "conjuncts": 26
+  },
+  {
+   "kind": "terminal",
+   "location": 66437,
+   "conjuncts": 28
+  },
+  {
+   "kind": "terminal",
+   "location": 66540,
+   "conjuncts": 24
+  },
+  {
+   "kind": "terminal",
+   "location": 66540,
+   "conjuncts": 21
+  },
+  {
+   "kind": "terminal",
+   "location": 66540,
+   "conjuncts": 20
+  },
+  {
+   "kind": "terminal",
+   "location": 66035,
+   "conjuncts": 19
+  },
+  {
+   "kind": "terminal",
+   "location": 65913,
+   "conjuncts": 21
+  },
+  {
+   "kind": "terminal",
+   "location": 66018,
+   "conjuncts": 17
+  },
+  {
+   "kind": "terminal",
+   "location": 66018,
+   "conjuncts": 14
+  },
+  {
+   "kind": "terminal",
+   "location": 66018,
+   "conjuncts": 13
+  },
+  {
+   "kind": "terminal",
+   "location": 65341,
+   "conjuncts": 10
+  }
+ ],
+ "proposed": [
+  0,
+  0,
+  60,
+  null,
+  null,
+  null,
+  "all",
+  54,
+  53,
+  49,
+  48,
+  "all",
+  "all",
+  "all",
+  "all",
+  "all",
+  39,
+  28,
+  17,
+  null,
+  16,
+  15,
+  14,
+  60,
+  54,
+  53,
+  49,
+  48,
+  47,
+  46,
+  45,
+  12,
+  11,
+  10,
+  9,
+  8,
+  7,
+  6,
+  5,
+  4,
+  3,
+  2,
+  1
+ ]
+}
