@@ -255,7 +255,11 @@
 - **修法 3–7 在冻结版上起了作用**：没有任何 summary 命中被拒，也没有回退到原始的复制循环。每个命中都照常应用：`copy_loop@0x6ee68`（340–360s，其中 `copy_domain` 60–70s）、7 个 `memgas`（每个 60–80s，其中 `entry` sat 35–55s、`memgas_exit_guard_excluded` 23–28s）、2 个 `div`（每个 490–570s，其中 `entry` sat 41–58s）。补集检查共命中 46 次（22.6s）。
 - **瓶颈是同一段代码被反复执行**：上面这组命中按 copy_loop → memgas×3 → div → memgas×3 → div → memgas 的顺序循环出现，每圈约 2600s，每圈对应一条新的路径。9464s 时共执行 817 个基本块，可达性检查 449 次（2315s），剪掉 117 个分支，还没有任何路径到达终点。
 - 修法 3–7 之前（任务 N 服务器）的失败原因是 `x86 segment execution deadline exhausted`，当时的卡点是 summary 被拒后逐圈展开复制循环。现在的卡点是每条路径都要单独付全部 summary 的代价（`entry` 求解与 `div` 的义务）。可行的通用方向是在同一节点内复用 summary 命中的证书（前提相同时），本任务没有实现。
-- 整段要单独跑才能跑完（内存 8GB 以上），这需要等 Permit2 1327 m192 结束之后（§9.9）。
+- **第三次运行**：单独运行，`--seconds 10800`，代码为修法 1–8（修法 8 不涉及 x86 执行），见 `results/aave-7200-x86-r3.log`。
+  - 结果：`TimeoutError: x86 segment execution deadline exhausted`（10800s），RSS 约 7GB。
+  - summary 命中**被拒 0 次**。应用 summary 共用 7431s（69%），可达性检查 449 次共用 2995s（28%）。共执行 816 个基本块，剪掉 114 个分支。
+  - 段末一组命中（`copy_loop@0x6ee68`、7 个 memgas、`div@0x6fc70`/`div@0x70b93`）**各应用了 3 次**，即 3 条路径，每条路径都把这组 summary 完整重复一遍。前面的段落（`copy_loop@0x6afd0/0x6c270/0x6d510`、`mul`×3、10 多个 memgas、`div@0x6e22d`）各只应用了 1 次。
+  - 服务器上的 `deadline exhausted` 在冻结版上依旧，但原因变了：现在不是被拒后展开循环，而是每条路径都要重复付 summary 代价，其中 `div` 每次 490–630s，`entry` 求解每次 35–58s。
 
 ### 9.5 PoolManager 16670 m=768、6084（冻结版）
 
@@ -315,7 +319,7 @@
 | Permit2 | 1327 sym | `pair_0_3` unknown | 588/924 证出，没有失败，在 20405s 被 OOM 杀掉 | 修法 1–7 | 20405s | `pair_0_3` 已消除；预算类 |
 | Permit2 | 1327 m192 | `pair_0_3` unknown | 718/895 证出，没有失败，预算耗尽 | 修法 1–8 | 21600s | 同上；约需 26000s |
 | Permit2 | 1327 行 3 | — | `x86_empty_3` 证出 | 修法 1–7 / 1–8 | 140.8s（单独）/ 174.5s、179.4s（节点内） | 修法 2 生效 |
-| Aave | 7200 x86 分段 | — | 没有跑完（见 §9.4，结果见下面的补充） | 修法 1–7 / 1–8 | ≥ 9464s | summary 都能应用；每条路径重复付 summary 代价 |
+| Aave | 7200 x86 分段 | — | x86 分段 deadline exhausted（单独 3h） | 修法 1–8 | 10800s | 被拒 0 次；每条路径重复付 summary 代价（69% 时间） |
 | PoolManager | 9089 | `pair_34_25` unknown | **proved** | 修法 1–8 | 10643s | 已证出 |
 | PoolManager | 16670 m=768 | （任务 N 中为预算类） | `pair_2_74` goal 2 unknown | 修法 1–7 | 16405s | SDIV 符号守卫 + UF 合并；候选修法已离线验证 |
 | PoolManager | 6084 | （任务 N 中为预算类） | `x86_maps_0_0` 卡住，共 4028 个义务 | 修法 1–7 | 停止于约 4750s | 预算类，另有长 gas 链义务 |
