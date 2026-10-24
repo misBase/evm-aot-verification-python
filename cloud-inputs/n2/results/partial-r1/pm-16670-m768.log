@@ -1,0 +1,13 @@
+[    12.6s] entry_nonempty sat 0.0s
+[    12.9s] havoc_relation unsat 0.2s
+[   222.2s] model_domain_nonempty sat 2.5s
+[   224.0s] evm_assumption_7 unsat 1.0s
+[   225.5s] evm_assumption_8 unsat 0.7s
+[   227.1s] evm_coverage unsat 1.5s
+[   236.5s] x86_coverage unsat 9.3s
+[   236.5s] evm_disjoint_0_1 unsat 0.0s
+[   236.5s] evm_disjoint_0_2 unsat 0.0s
+[   236.5s] evm_disjoint_1_2 unsat 0.0s
+[   236.8s] pair phase: evm 3 x86 83 found [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1]
+[   275.3s] x86_maps_group_0 sat 1.9s
+[   277.4s] x86_maps_group_1 sat 2.1s
