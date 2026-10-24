@@ -1,0 +1,38 @@
+[
+ {
+  "pc": 4418,
+  "stack_depth": 15,
+  "memory_size": null,
+  "free_memory_pointer": null,
+  "stack_constants": [],
+  "r4_status": "inconclusive",
+  "r4_reasons": [
+   "ProofBudgetExceeded: proof wall budget exhausted"
+  ],
+  "r4_seconds": 21621
+ },
+ {
+  "pc": 4418,
+  "stack_depth": 15,
+  "memory_size": null,
+  "free_memory_pointer": 320,
+  "stack_constants": [],
+  "r4_status": "inconclusive",
+  "r4_reasons": [
+   "ProofBudgetExceeded: proof wall budget exhausted"
+  ],
+  "r4_seconds": 21605
+ },
+ {
+  "pc": 9089,
+  "stack_depth": 2,
+  "memory_size": null,
+  "free_memory_pointer": null,
+  "stack_constants": [],
+  "r4_status": "inconclusive",
+  "r4_reasons": [
+   "ValueError: outcome mismatch pair_34_25: terminal@9089 / terminal@398983 (solver=unknown)"
+  ],
+  "r4_seconds": 21601
+ }
+]

@@ -1,0 +1,26 @@
+[
+ {
+  "pc": 1327,
+  "stack_depth": 10,
+  "memory_size": null,
+  "free_memory_pointer": null,
+  "stack_constants": [],
+  "r4_status": "inconclusive",
+  "r4_reasons": [
+   "ValueError: outcome mismatch pair_0_3: exit@1273 / terminal@73543 (solver=unknown)"
+  ],
+  "r4_seconds": 9525
+ },
+ {
+  "pc": 1327,
+  "stack_depth": 10,
+  "memory_size": 192,
+  "free_memory_pointer": 128,
+  "stack_constants": [],
+  "r4_status": "inconclusive",
+  "r4_reasons": [
+   "ValueError: outcome mismatch pair_0_3: exit@1273 / terminal@73543 (solver=unknown)"
+  ],
+  "r4_seconds": 10287
+ }
+]
