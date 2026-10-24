@@ -1,0 +1,90 @@
+holiman_udiv: 6 applications
+  pair 406/1033 arg 0: sizes 12446/2410, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unsat 0.1s
+    blast: unsat 0.1s
+  pair 406/1033 arg 1: sizes 12446/2410, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unsat 1.2s
+    blast: unsat 0.6s
+  pair 406/1390 arg 0: sizes 12446/1941, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal True
+    direct: unsat 0.1s
+    blast: unsat 0.0s
+  pair 406/1390 arg 1: sizes 12446/1941, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal True
+    direct: unsat 0.1s
+    blast: unsat 0.0s
+  pair 406/1893 arg 0: sizes 12446/160, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.3s
+  pair 406/1893 arg 1: sizes 12446/1941, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal True
+    direct: unsat 0.1s
+    blast: unsat 0.0s
+  pair 406/2395 arg 0: sizes 12446/1941, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal True
+    direct: unsat 0.1s
+    blast: unsat 0.0s
+  pair 406/2395 arg 1: sizes 12446/160, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.3s
+  pair 406/2909 arg 0: sizes 12446/160, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.3s
+  pair 406/2909 arg 1: sizes 12446/160, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.4s
+  pair 1033/1390 arg 0: sizes 2410/1941, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unsat 0.2s
+    blast: unsat 0.1s
+  pair 1033/1390 arg 1: sizes 2410/1941, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unsat 0.7s
+    blast: unsat 0.7s
+  pair 1033/1893 arg 0: sizes 2410/160, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.4s
+  pair 1033/1893 arg 1: sizes 2410/1941, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unsat 0.8s
+    blast: unsat 0.7s
+  pair 1033/2395 arg 0: sizes 2410/1941, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unsat 0.1s
+    blast: unsat 0.1s
+  pair 1033/2395 arg 1: sizes 2410/160, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.4s
+  pair 1033/2909 arg 0: sizes 2410/160, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.4s
+  pair 1033/2909 arg 1: sizes 2410/160, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.4s
+  pair 1390/1893 arg 0: sizes 1941/160, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.3s
+  pair 1390/2395 arg 1: sizes 1941/160, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.4s
+  pair 1390/2909 arg 0: sizes 1941/160, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.3s
+  pair 1390/2909 arg 1: sizes 1941/160, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.3s
+  pair 1893/2395 arg 0: sizes 160/1941, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.5s
+  pair 1893/2395 arg 1: sizes 1941/160, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.3s
+  pair 1893/2909 arg 1: sizes 1941/160, consts ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'] / ['blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1', 'blk16670_16_768_768_stack_14_z2', 'blk16670_16_768_768_stack_14_z3'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.3s
+  pair 2395/2909 arg 0: sizes 1941/160, consts ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'] / ['blk16670_16_768_768_stack_15_z0', 'blk16670_16_768_768_stack_15_z1', 'blk16670_16_768_768_stack_15_z2', 'blk16670_16_768_768_stack_15_z3'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.3s
+host_gas_sstore: 65 applications
+  pair 1522/1528 arg 1: sizes 15845/15849, consts ['Storage', 'blk16670_16_768_768_stack_13_z0', 'blk16670_16_768_768_stack_13_z1', 'blk16670_16_768_768_stack_13_z2', 'blk16670_16_768_768_stack_13_z3', 'blk16670_16_768_768_stack_14_z0'] / ['Storage', 'blk16670_16_768_768_stack_13_z0', 'blk16670_16_768_768_stack_13_z1', 'blk16670_16_768_768_stack_13_z2', 'blk16670_16_768_768_stack_13_z3', 'blk16670_16_768_768_stack_14_z0'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.3s
+  pair 1522/1534 arg 1: sizes 15845/15849, consts ['Storage', 'blk16670_16_768_768_stack_13_z0', 'blk16670_16_768_768_stack_13_z1', 'blk16670_16_768_768_stack_13_z2', 'blk16670_16_768_768_stack_13_z3', 'blk16670_16_768_768_stack_14_z0'] / ['Storage', 'blk16670_16_768_768_stack_13_z0', 'blk16670_16_768_768_stack_13_z1', 'blk16670_16_768_768_stack_13_z2', 'blk16670_16_768_768_stack_13_z3', 'blk16670_16_768_768_stack_14_z0'], simplify-equal False
+    direct: unknown 20.4s
+    blast: unknown 20.3s
+  pair 1522/1539 arg 1: sizes 15845/15765, consts ['Storage', 'blk16670_16_768_768_stack_13_z0', 'blk16670_16_768_768_stack_13_z1', 'blk16670_16_768_768_stack_13_z2', 'blk16670_16_768_768_stack_13_z3', 'blk16670_16_768_768_stack_14_z0'] / ['Storage', 'blk16670_16_768_768_stack_13_z0', 'blk16670_16_768_768_stack_13_z1', 'blk16670_16_768_768_stack_13_z2', 'blk16670_16_768_768_stack_13_z3', 'blk16670_16_768_768_stack_14_z0'], simplify-equal False
+    direct: unknown 20.3s
+    blast: unknown 20.3s
+  pair 1522/1548 arg 0: sizes 15635/15635, consts ['blk16670_16_768_768_stack_13_z0', 'blk16670_16_768_768_stack_13_z1', 'blk16670_16_768_768_stack_13_z2', 'blk16670_16_768_768_stack_13_z3', 'blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1'] / ['blk16670_16_768_768_stack_13_z0', 'blk16670_16_768_768_stack_13_z1', 'blk16670_16_768_768_stack_13_z2', 'blk16670_16_768_768_stack_13_z3', 'blk16670_16_768_768_stack_14_z0', 'blk16670_16_768_768_stack_14_z1'], simplify-equal False
