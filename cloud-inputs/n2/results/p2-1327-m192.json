@@ -1,0 +1,51 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "cloud-inputs/n2/fixtures/Permit2",
+  "started_at_utc": "2026-10-24T09:09:42.278017+00:00",
+  "configuration": {
+    "nodes": "cloud-inputs/n2/nodes/permit2-1327-m192.json",
+    "output": "cloud-inputs/n2/runs/p2-1327-m192.json",
+    "timeout_ms": "30000",
+    "node_seconds": "21600.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "None",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "4adcdb781168d50e9d3f9be7848cc2f0f502e68c7b9121219edb899e6625aecf",
+    ".hex": "40f362e2e12dd8ab20c9fc2098c7c0d88747b3dafebe02f8e9461819362464e1"
+  },
+  "model_sources_sha256": "1c6901e944d44c96826d31d7a2bbc0791353850f6db1fba4a9574b6204866aaa",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 1327,
+        "stack_depth": 10,
+        "memory_size": 192,
+        "free_memory_pointer": 128,
+        "stack_constants": []
+      },
+      "scope": "block-local",
+      "status": "inconclusive",
+      "seconds": 21600.224435638,
+      "wall_seconds": 21600.318525038998,
+      "queries": 2601,
+      "evm_paths": 61,
+      "x86_paths": 43,
+      "paired_transitions": 2,
+      "terminals_proved": 165,
+      "reasons": [
+        "ProofBudgetExceeded: proof wall budget exhausted"
+      ],
+      "failed_obligations": [],
+      "keep_going_failures": [],
+      "summary_hits": 0
+    }
+  ],
+  "locally_proved": 0,
+  "ended_at_utc": "2026-10-24T15:09:45.707662+00:00"
+}
