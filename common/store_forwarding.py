@@ -75,15 +75,17 @@ _MEMO: Dict[tuple, tuple] = {}
 _MEMO_LIMIT = 200_000
 
 
-def _memoized(name, args, compute):
+def _memoized(name, args, compute, keep=None):
+    """compute(), memoized per (name, AST ids of args); with `keep`, only values it accepts."""
     key = (name, *(a.get_id() for a in args))
     hit = _MEMO.get(key)
     if hit is not None:
         return hit[1]
-    if len(_MEMO) >= _MEMO_LIMIT:
-        _MEMO.clear()
     value = compute()
-    _MEMO[key] = (args, value)
+    if keep is None or keep(value):
+        if len(_MEMO) >= _MEMO_LIMIT:
+            _MEMO.clear()
+        _MEMO[key] = (args, value)
     return value
 
 

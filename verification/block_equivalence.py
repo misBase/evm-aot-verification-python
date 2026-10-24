@@ -15,7 +15,7 @@ from enum import Enum
 from time import monotonic
 from typing import Tuple
 
-from z3 import (And, Not, Or, Solver, SolverFor, sat, unsat, simplify, is_bool, is_app, is_bv_value,
+from z3 import (And, Not, Or, is_expr, Solver, SolverFor, sat, unsat, simplify, is_bool, is_app, is_bv_value,
                 is_quantifier, Z3_BOOL_SORT, Z3_BV_SORT, Z3_ARRAY_SORT,
                 substitute, BitVecSort, FreshFunction, Z3_OP_BMUL, Z3_OP_UNINTERPRETED, ULE,
                 is_and, is_array, FreshConst, Select, BoolVal, Z3_OP_ITE, is_false, is_bv, BitVecVal,
@@ -827,7 +827,23 @@ def _offset_view_by_step_lemma(old, new):
 
 def _identity_proof(old, new, timeout_ms=1000):
     """Lemmas proving old == new for every value of the UF applications / products inside
-    (() when a direct query or the simplifier proves it); None when unproved."""
+    (() when a direct query or the simplifier proves it); None when unproved.
+
+    Proofs are memoized per (old, new): whether old == new is valid depends on the two
+    terms only, never on the obligation they occur in, so a proof found once proves the
+    identity everywhere. Failures are not cached (a 1s timeout under load can succeed on
+    a retry; caching it lost one rewrite on Permit2 1327 x86_maps_0_20). Sibling
+    obligations of a node share premise and path terms, so normalize_word_arith meets the
+    same rewrites again: Permit2 1327 x86_maps_0_10 / 0_20 repeat 191-192 of their 199
+    identity proofs (~23 of 24s), and one obligation repeats 81 of them across rounds.
+    """
+    if not (is_expr(old) and is_expr(new)):  # e.g. a rewrite that produced nothing: not memoized
+        return _identity_proof_uncached(old, new, timeout_ms)
+    return _memoized("identity_proof", (old, new), lambda: _identity_proof_uncached(old, new, timeout_ms),
+                     keep=lambda proof: proof is not None)
+
+
+def _identity_proof_uncached(old, new, timeout_ms):
     if _concat_matches(old, new):
         return ()
     if is_select(old) and is_select(new):
@@ -1048,6 +1064,9 @@ def normalize_word_arith(formula, rounds=32, deadline=None):
     """
     formula, lemmas = simplify(formula, bv_sort_ac=True), []
     formula = _normalize_lambdas(formula, lemmas, deadline)
+    # A rewrite whose identity failed is not retried in later rounds of this call (the same
+    # query again); other calls retry it. Proved identities are memoized (_identity_proof).
+    unproved = {}
     for _ in range(rounds):
         # Joined zero tests and decided guards expose word arithmetic for this round.
         formula, _ = _join_and_decide(formula, lemmas)
@@ -1063,7 +1082,10 @@ def normalize_word_arith(formula, rounds=32, deadline=None):
                 continue
             new = simplify(new, bv_sort_ac=True)
             started = monotonic()
-            proof = None if new.eq(t) else _identity_proof(t, new)
+            key = (t.get_id(), new.get_id())
+            proof = None if new.eq(t) or key in unproved else _identity_proof(t, new)
+            if proof is None:
+                unproved[key] = (t, new)  # kept alive: their ids are not recycled during the call
             if proof is not None:
                 # proof: the refuted lemmas this rewrite rests on (offset-view step lemma), else ().
                 pairs.append((t, new))
