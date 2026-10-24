@@ -186,17 +186,18 @@
 | 合约 | 块 / 实例 | 状态 | 原因 / 瓶颈 | 下一步 |
 |---|---|---|---|---|
 | Permit2 | 1327 sym / m192 | 见 §9.9 | r4 的 `pair_0_3` 已消除（`x86_empty_3` 证出）。剩下的是预算问题：924 个义务，每个 maps 义务约 21–25s，另外 `_unify_node` 要 1500–2200s；进程内存随运行时间增长（sym 在 20405s 时 10.5GB，被 OOM 杀掉） | 节点内并行（`BLOCK_PAIR_WORKERS`），或更大的预算/内存；进一步压缩 maps 义务的固定开销（`quick0`、normalize 中未缓存的部分） |
-| Aave | 7200 | 未跑完（§9.4） | x86 分段：summary 都能应用，但同一组 summary 在每条路径上重复（每圈约 2600s）；进程 8GB | summary 命中证书在节点内复用 |
+| Aave | 7200 | x86 分段 3h 未完成（§9.4） | summary 都能应用（被拒 0 次），但同一组 summary 在每条路径上重复（每条路径约 2600s，占 69% 时间）；进程 7–8GB | summary 命中证书在节点内复用 |
 | Aave | 6182、8248 | 未在冻结版上跑 | 本机内存与时间不够（6182 是预算类，8248 曾被 OOM） | 服务器 |
 | PoolManager | 16670 m=768 | inconclusive | `pair_2_74` goal 2：SDIV 符号分支下的 UF 参数合并（§9.5） | 实现“按守卫分情形后再合并”，并让各情形、兄弟 pair 共享合并结果 |
-| PoolManager | 16670 另外两个实例 | 未跑 | 时间不够 | 同上 |
+| PoolManager | 16670 符号 7324 | inconclusive（3h） | `pair_4_84` goal 2，与 m=768 同一类（§9.5） | 同上 |
+| PoolManager | 16670 符号 7296 | 未跑 | 时间不够 | 同上 |
 | PoolManager | 6084 | 预算类，另有卡住的义务 | 4028 个义务；`x86_maps_0_0` 是 10 级内存扩展费链，所有路线 unknown | potential 路线对长扩展链的支持 |
 | PoolManager | 4418 sym / f=320 | 预算类（路径数） | x86 877 条路径，1h 内进不了 pair 阶段 | x86 路径合并或 summary |
 | PoolManager | 9089 | **已证出**（10643s） | — | — |
 
 ## 9. 冻结版机器码复核（任务 N2）
 
-输入：`cloud-inputs/n2/fixtures/`（Permit2、Pool=Aave、PoolManager；已用 `sha256sum -c` 对照 `cloud-inputs/n2/FROZEN_SHA256SUMS` 核对，一致）。代码：本分支 = 任务 N 的 6bbad7f（修法 1–7）+ §5.1 的一处测试修正 + **修法 8**（§9.7，d28298f 起：已证恒等式跨义务记忆化，只影响耗时）。各次运行用的是哪个版本，在相应小节中注明。本机 4 核 / 15GB，z3 4.15.4，capstone 5.0.6；每个查询 30s，`BLOCK_SUMMARY_LEMMAS=1 PYTHONHASHSEED=0`。长任务通常 3 个并行。
+输入：`cloud-inputs/n2/fixtures/`（Permit2、Pool=Aave、PoolManager；已用 `sha256sum -c` 对照 `cloud-inputs/n2/FROZEN_SHA256SUMS` 核对，一致）。代码：本分支 = 任务 N 的 6bbad7f（修法 1–7）+ §5.1 的一处测试修正 + **修法 8**（§9.7，d28298f 起：已证恒等式跨义务记忆化，只影响耗时）。各次运行用的是哪个版本，在相应小节中注明；可以用 probe 输出 JSON 里的 `model_sources_sha256` 核对：修法 1–7 为 `3770a6f6d2fe…`，修法 1–8 为 `1c6901e944d4…`。本机 4 核 / 15GB，z3 4.15.4，capstone 5.0.6；每个查询 30s，`BLOCK_SUMMARY_LEMMAS=1 PYTHONHASHSEED=0`。长任务通常 3 个并行。
 
 运行脚本：`cloud-inputs/n2/tools/run_probe.sh`，它调用 `probe_traced.py`：原样运行 `tools/probe_block_obligations.py`，另外给每个 `_check` 记一行耗时日志。节点文件在 `cloud-inputs/n2/nodes/`，完成的结果在 `cloud-inputs/n2/results/`。
 会话中途容器重启过一次，当时在跑的任务全部中断。中断前的日志保存在 `results/partial-r1/`，这些任务之后从头重跑。
@@ -211,12 +212,12 @@
 
 ### 9.2 Permit2 1327（冻结版）
 
-- 两个实例的 pair 阶段相同（852s）：EVM 61 / **x86 43** 条路径（任务 N 的旧机器码为 65 条）。对应关系为 `[0, 0, all, None, None, None, all×10, 39, 28, 17, None, 16, 15, 14, 60, 54, 53, 49, 48, 47, 46, 45, 12..1]`。
+- 两个实例的 pair 阶段结果相同（sym 852s、m192 979s）：EVM 61 / **x86 43** 条路径（任务 N 的旧机器码为 65 条）。对应关系为 `[0, 0, all, None, None, None, all×10, 39, 28, 17, None, 16, 15, 14, 60, 54, 53, 49, 48, 47, 46, 45, 12..1]`。
 - **r4 的 `pair_0_3` 消失了**：x86 行 3 是 `terminal@73543`，即 r4 失败信息中的那条路径。它的首个合取项是 `Extract(64,64, zext(8·len) + zext(1125 + 扩展费)) == 1`，也就是任务 N §2.2 的 LOG2 费用溢出检查（旧编号 x86 路径 6）。修法 2 让空行提议成立（`_empty_by_bvabs` 用时 42.1s），对应关系从 `0` 变成 `None`（空行）。
 - `x86_empty_3`（`empty_row.py`，生产 `_check`）：**140.8s proved**（186 条引理）。SMT2 存于 `cloud-inputs/n2/smt2/permit2_1327_frozen/x86_empty_3.smt2`，与旧机器码的 `x86_empty_6.smt2` 大小相同，只有 let 绑定名不同。日志见 `results/p2-1327-row3.log`。
 - 其余 "all" 行（2、6–15）的首项都是普通错误路径：内存字数上限 `32w < 2^37`、gas 不足、`fmp+32` 溢出、零检查。**没有其他 LOG 费用溢出类的行。**
 - 节点级合并：第一次运行（被重启中断）中，`_unify_node` 对 924 个义务用了 1590.0s，得到 9 条引理；之后 `x86_maps_0_*` 逐个 unsat，每个约 33–36s。
-- 整节点结果：（运行中）
+- 整节点结果：见 §9.8。
 
 ### 9.3 SMT2 回归（生产 `_check`）
 
@@ -249,9 +250,9 @@
 - 前缀相同、上限 1800s 时，修法 8 之前的版本在 `results/regress-pre8-prefix.log` 中证出（12.9s），但这一结果不能稳定复现。
 - 生产中这条执行假设走 `check_paths` 的候选列表，乘积字泛化（修法 1）排在最前，0.0s 证出。对应测试 `test_aave_11831_evm_assumption_7_is_proved_by_word_generalisation` 在最终全量快测中通过。
 
-### 9.4 Aave 7200 x86 分段（冻结版 Pool，修法 1–7）
+### 9.4 Aave 7200 x86 分段（冻结版 Pool）
 
-`x86_profile.py --seconds 10800`。两次都没有跑完：第一次被容器重启打断（`results/partial-r1/aave-7200-x86.log`）；第二次（`results/aave-7200-x86-r2-oom.log`）在 9464s 时被内核 OOM 杀掉，当时 RSS 7.8GB，同时还有 Permit2 1327 的 7GB 进程在跑。
+`x86_profile.py --seconds 10800`。前两次（修法 1–7）都没有跑完：第一次被容器重启打断（`results/partial-r1/aave-7200-x86.log`）；第二次（`results/aave-7200-x86-r2-oom.log`）在 9464s 时被内核 OOM 杀掉，当时 RSS 7.8GB，同时还有 Permit2 1327 的 7GB 进程在跑。
 - **修法 3–7 在冻结版上起了作用**：没有任何 summary 命中被拒，也没有回退到原始的复制循环。每个命中都照常应用：`copy_loop@0x6ee68`（340–360s，其中 `copy_domain` 60–70s）、7 个 `memgas`（每个 60–80s，其中 `entry` sat 35–55s、`memgas_exit_guard_excluded` 23–28s）、2 个 `div`（每个 490–570s，其中 `entry` sat 41–58s）。补集检查共命中 46 次（22.6s）。
 - **瓶颈是同一段代码被反复执行**：上面这组命中按 copy_loop → memgas×3 → div → memgas×3 → div → memgas 的顺序循环出现，每圈约 2600s，每圈对应一条新的路径。9464s 时共执行 817 个基本块，可达性检查 449 次（2315s），剪掉 117 个分支，还没有任何路径到达终点。
 - 修法 3–7 之前（任务 N 服务器）的失败原因是 `x86 segment execution deadline exhausted`，当时的卡点是 summary 被拒后逐圈展开复制循环。现在的卡点是每条路径都要单独付全部 summary 的代价（`entry` 求解与 `div` 的义务）。可行的通用方向是在同一节点内复用 summary 命中的证书（前提相同时），本任务没有实现。
@@ -269,9 +270,14 @@
 - **候选通用修法（已离线验证，未进生产）**：在 UF 参数合并**之前**，先按 UF 应用之上的 ite 守卫分情形（`guard_split.py`），每个情形内再做 `unify_uf_arguments`，然后求解。只按最小的守卫（两个操作数符号相同）分 2 个情形：**两个情形都 unsat**（622s、601s，分别合并 21 次、34 次）。按 4 个守卫分 16 个情形时，前 3 个情形各 100–500s。
   - 健全性：与 `_refute_by_cases` 相同。c 与 ¬c 覆盖所有模型，`F[c:=v]` 在对应文字下与 F 等价，每个情形里的合并仍由被反驳的查询支持。所以所有情形都 unsat 时 F unsat。
   - 未进生产的原因：每个内存目标约 1200s，而 83 个 pair 都有这个目标，6h 放不下。还需要让情形之间、兄弟 pair 之间共享合并结果（`_lemma_cache`），本任务没有完成。
-- 另外两个 16670 实例（符号 7296 / 7324）没有跑。
+- **16670 符号 7324，3h**（修法 1–8，`--keep-going`，`results/pm-16670-sym7324-3h.*`）：
+  - pair 阶段 267s（EVM 5 / x86 109）；`_unify_node` 对 378 个义务用了 2638.2s，得到 2 条引理。
+  - **`pair_4_84` goal 2 用了 6610s，结果 unknown**。这正是任务 N 中服务器上失败的 `pair_4_84`，是同一类 SDIV 内存目标。
+  - 3h 内除此之外没有失败，预算在这之后用完。
+  - 所以 16670 已跑的两个实例（m=768、符号 7324）卡在同一个根因上，也适用同一个候选修法。
+- 16670 符号 7296 实例没有跑。
 
-**6084 m=864 f=768**（修法 1–7，`results/pm-6084-triage.log`）：pair 阶段 593s（EVM 56 / x86 114），节点共 **4028 个 pair 阶段义务**，`_unify_node` 用了 11.4s。第一个义务 `x86_maps_0_0` 在 `_check` 中卡了 2800s 以上（py-spy 看到在 unify 路线中），之后由会话停止。单独运行 `route_trace`：1800s 内所有路线 unknown（`results/pm6084/trace_maps_0_0.json`）。EVM 0 的第 0 个合取项是 gas 检查：约 10 级内存扩展费（围绕 `stack_1`/`stack_2` 的符号偏移做 MLOAD/MSTORE）之和 ≤ `gas_remaining`。这和任务 N 中 9089 `x86_maps_0_9`（5 级）是同一类，但链更长：potential 路线 231s unknown。即使这一项能证出，4028 个义务在 6h 内也跑不完，所以 **6084 属于预算类，另有一个卡住的 gas 链义务**。SMT2 存于 `cloud-inputs/n2/smt2/pm6084/x86_maps_0_0.smt2`。
+**6084 m=864 f=768**（修法 1–8，`results/pm-6084-triage.log`）：pair 阶段 593s（EVM 56 / x86 114），节点共 **4028 个 pair 阶段义务**，`_unify_node` 用了 11.4s。第一个义务 `x86_maps_0_0` 在 `_check` 中卡了 2800s 以上（py-spy 看到在 unify 路线中），之后由会话停止。单独运行 `route_trace`：1800s 内所有路线 unknown（`results/pm6084/trace_maps_0_0.json`）。EVM 0 的第 0 个合取项是 gas 检查：约 10 级内存扩展费（围绕 `stack_1`/`stack_2` 的符号偏移做 MLOAD/MSTORE）之和 ≤ `gas_remaining`。这和任务 N 中 9089 `x86_maps_0_9`（5 级）是同一类，但链更长：potential 路线 231s unknown。即使这一项能证出，4028 个义务在 6h 内也跑不完，所以 **6084 属于预算类，另有一个卡住的 gas 链义务**。SMT2 存于 `cloud-inputs/n2/smt2/pm6084/x86_maps_0_0.smt2`。
 
 ### 9.6 PoolManager 9089、4418（冻结版）
 
@@ -280,7 +286,7 @@
   - `_unify_node`：728 个义务，3.8s。
   - 最慢的义务：`pair_34_0` 212.5s，`x86_maps_0_9` 196.3s（即任务 N §2.6 中节点内 1100s unknown 的那个），`x86_maps_2_7` 188.1s。
   - r4 失败的 `pair_34_25` 没有出现：本次 x86 行 25 被提议为空行，`x86_empty_25` 57.1s 证出。
-  - 1h 分诊（修法 1–7，`--keep-going`，`results/pm-9089-1h.*`）：没有失败，平均每个义务约 11s，当时按此估计整节点约 9400s。
+  - 1h 分诊（修法 1–8，`--keep-going`，`results/pm-9089-1h.*`）：没有失败，平均每个义务约 11s，当时按此估计整节点约 9400s。
 - **4418 符号，1h 分诊**（修法 1–8，`--keep-going`，`results/pm-4418-sym-1h.*`）：EVM 63 / **x86 877** 条路径，548 个查询，**1h 内没有进入 pair 阶段**，也没有任何失败。时间全部花在 x86 路径枚举和对应关系上。瓶颈仍然是路径数（任务 N 为 885 条），修法 1–8 没有改善。
 - **4418 f=320，1h 分诊**（修法 1–8，`--keep-going`，`results/pm-4418-f320-1h.*`）：EVM 46 / **x86 657** 条路径，2062s 才进入 pair 阶段，节点共 **10437 个 pair 阶段义务**。`_unify_node` 用了 257.6s，得到 0 条引理。之后到 1h 只检查了 6 个 maps 义务（110s，全部 unsat），没有失败。按每个义务 10–20s 估计，整节点需要数十小时：**纯预算类（路径数 × 义务数）**，修法 1–8 不能改变量级。
 - 4418 两个实例的共同瓶颈是 x86 路径数（657–877 条）以及由它产生的义务数。r4 的“预算耗尽”在冻结版上依旧，原因没有变化。
@@ -322,7 +328,8 @@
 | Aave | 7200 x86 分段 | — | x86 分段 deadline exhausted（单独 3h） | 修法 1–8 | 10800s | 被拒 0 次；每条路径重复付 summary 代价（69% 时间） |
 | PoolManager | 9089 | `pair_34_25` unknown | **proved** | 修法 1–8 | 10643s | 已证出 |
 | PoolManager | 16670 m=768 | （任务 N 中为预算类） | `pair_2_74` goal 2 unknown | 修法 1–7 | 16405s | SDIV 符号守卫 + UF 合并；候选修法已离线验证 |
-| PoolManager | 6084 | （任务 N 中为预算类） | `x86_maps_0_0` 卡住，共 4028 个义务 | 修法 1–7 | 停止于约 4750s | 预算类，另有长 gas 链义务 |
+| PoolManager | 16670 符号 7324（3h） | — | `pair_4_84` goal 2 unknown（6610s） | 修法 1–8 | 10800s | 同上 |
+| PoolManager | 6084 | （任务 N 中为预算类） | `x86_maps_0_0` 卡住，共 4028 个义务 | 修法 1–8 | 停止于约 4750s | 预算类，另有长 gas 链义务 |
 | PoolManager | 4418 sym | 预算耗尽 | 1h 内没进入 pair 阶段（x86 877 条路径） | 修法 1–8 | 3731s | 路径数 |
 | PoolManager | 4418 f=320 | 预算耗尽 | 1h 只检查了 6/10437 个义务，没有失败 | 修法 1–8 | 3609s | 路径数 × 义务数 |
 
