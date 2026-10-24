@@ -64,8 +64,14 @@ def test_prefix_unknown_keeps_path_unless_probe_refutes(monkeypatch):
 
 
 def test_prefix_unknown_pruned_only_by_probe_unsat(monkeypatch):
-    # The exact answer is forced to unknown; only the bvmul->UF probe decides.
+    # The exact answers (incremental and blasted) are forced to unknown; only the
+    # bvmul->UF probe decides. The blasted query has its own tests in
+    # test_block_remaining_blocks.py (it alone would refute x*x == 6 exactly).
+    import x86_64.cfg_state as cfg_state
+    bounded = cfg_state._bounded_check
     monkeypatch.setattr(PrefixSolver, "check", lambda self, conjuncts, *a: unknown)
+    monkeypatch.setattr(cfg_state, "_bounded_check",
+                        lambda solver, ms, tag, *a: unknown if tag == "blast" else bounded(solver, ms, tag, *a))
     refuted = X86Constraints()          # x*y == 5 ∧ x*y == 6: UNSAT with x*y a UF
     refuted.add(x * y == 5)
     refuted.add(x * y == 6)
