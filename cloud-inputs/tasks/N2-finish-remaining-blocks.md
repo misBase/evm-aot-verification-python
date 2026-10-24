@@ -9,13 +9,16 @@
   - PoolManager（还在跑）目前确定 inconclusive 的有：4418 ×2（预算耗尽）、9089（预算耗尽）。见 `cloud-inputs/n2/poolmanager-r4-inconclusive-nodes.json`。
   - Aave 的服务器停机，还没有 r4 数据。
 
+## 机器码版本说明（重要）
+任务 L/M/N 用的 hex（`cloud-inputs/r3c/fixtures`、`cloud-inputs/m/fixtures`）是编译器**第一次修复（24 处统一写回）**的产物。现在冻结的是最终版：精确预留寄存器 + 编译期断言，精简了 DIV/MOD 的写回，修复了 BLOBHASH。两版的 x86 指令、路径编号和公式形状都不同。修法本身是验证器侧的通用改动，与机器码无关；但**本任务里所有的证明结果和耗时都必须在 `cloud-inputs/n2/fixtures/` 上取得**。SMT2 回归（m/n/r3c 下）只用来检查修法有没有破坏已证义务，不作为冻结版上的证据。
+
 ## 要做的（按优先级）
 1. **全量快测**：`poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider`，目标 0 失败。若有失败，先修，或说明原因。本地机器多进程并行时，有些测试对负载敏感（报告 §5 提过 mcopy-high-word），请单独重跑确认。
 2. **Permit2 1327（最高优先级，决定 Permit2 能不能拿到证书）**：在**冻结版** `cloud-inputs/n2/fixtures/Permit2` 上，用本分支代码（任务 N 的修法 1–7）跑两个节点的**整节点**证明：`probe_block_obligations.py --timeout-ms 30000 --node-seconds 21600`，串行，`BLOCK_SUMMARY_LEMMAS=1 PYTHONHASHSEED=0`。
    - 确认 `pair_0_3` 一类义务（x86 在 LOG2 费用溢出检查上走的那条路径）能被修法 2 消掉，例如变成空行；
    - 确认整节点证出。
    - 如果还有别的义务卡住，按任务 N 的方法定位，并给出通用修法。
-3. **把报告里"待最终运行"的各节补完**：Aave 7200 的 x86 分段（修法 3–7 之后）、PoolManager 16670 / 6084 的整节点。优先用冻结版机器码；时间不够就写明用的是哪个版本。
+3. **把报告里"待最终运行"的各节补完**：Aave 7200 的 x86 分段（修法 3–7 之后）、PoolManager 16670 / 6084 的整节点。**必须用冻结版机器码**（cloud-inputs/n2/fixtures/）。任务 N 在旧机器码（r3c/m 下的 hex，是第一版"24 处统一写回"编译器的产物）上测得的结论和耗时，只能作参考，不能当作冻结版上的结果。
 4. **PoolManager 4418、9089**：两者都是预算耗尽类。在冻结版机器码上跑 1 小时分诊，看修法 1–7 之后有没有改善。如果仍然只是预算问题，写清楚瓶颈在哪，例如路径数或是哪一类义务。
 5. 每个修法都要附健全性论证，并在已证义务的 SMT2 上做回归，`cloud-inputs/m/smt2`、`cloud-inputs/n/smt2`、`cloud-inputs/r3c/smt2` 都要跑。
 
