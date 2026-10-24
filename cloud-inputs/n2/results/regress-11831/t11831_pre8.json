@@ -1,0 +1,192 @@
+{
+ "name": "aave_11831_evm_assumption_7.smt2",
+ "file": "aave_11831_evm_assumption_7.smt2",
+ "answer": "unknown",
+ "seconds": 411.2,
+ "frames": [
+  {
+   "name": "aave_11831_evm_assumption_7.smt2",
+   "marks": [
+    [
+     "quick0",
+     "unknown",
+     3.13
+    ],
+    [
+     "pin",
+     "unknown",
+     0.01
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "lia",
+     "unknown",
+     11.97
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "pre-normalize",
+     null,
+     0.0
+    ],
+    [
+     "normalize",
+     null,
+     0.19
+    ],
+    [
+     "skip:quick",
+     null,
+     0.0
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "shift",
+     "unknown",
+     0.01
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "blast*",
+     "unknown",
+     37.07
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "alias*",
+     "unknown",
+     0.01
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "potential*",
+     "unknown",
+     0.01
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "skip:bvabs",
+     null,
+     0.0
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "bvabs",
+     "unknown",
+     78.32
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "skip:exact",
+     null,
+     0.0
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "mul",
+     "unknown",
+     30.07
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "skip:mul",
+     null,
+     0.0
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "skip:unify",
+     null,
+     0.0
+    ],
+    [
+     "gap",
+     null,
+     0.0
+    ],
+    [
+     "unify",
+     "unknown",
+     220.04
+    ],
+    [
+     "tail",
+     "unknown",
+     30.32
+    ]
+   ]
+  }
+ ],
+ "probes": {
+  "light<_prove_equal@unify": {
+   "hit": 0,
+   "miss": 7,
+   "hit_s": 0.0,
+   "miss_s": 0.33
+  },
+  "unsat_core:unknown": {
+   "n": 7,
+   "s": 14.15
+  },
+  "unsat_core<_prove_equal@unify": {
+   "hit": 0,
+   "miss": 7,
+   "hit_s": 0.0,
+   "miss_s": 14.15
+  },
+  "cases<_prove_equal@unify": {
+   "hit": 0,
+   "miss": 7,
+   "hit_s": 0.0,
+   "miss_s": 205.04
+  }
+ }
+}

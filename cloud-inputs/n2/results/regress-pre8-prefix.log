@@ -1,0 +1,8 @@
+model_domain_nonempty_e765d561caaa expected=sat proved 0.3s lemmas=0
+x86_maps_12_0_bb35805d9c63 expected=unsat proved 24.8s lemmas=68
+x86_maps_14_0_3cedcf6f0591 expected=unsat proved 13.8s lemmas=2
+x86_maps_0_0_29de495a80ca expected=unsat proved 79.9s lemmas=162
+x86_maps_0_1_fd3e98561987 expected=unsat proved 52.3s lemmas=160
+permit2_1327_x86_maps_0_46 expected=unsat proved 89.4s lemmas=158
+permit2_1327_m192_f128_x86_maps_0_46 expected=unsat proved 95.1s lemmas=160
+aave_11831_evm_assumption_7 expected=unsat proved 12.9s lemmas=1
