@@ -1,4 +1,6 @@
-分支：`claude/inputs-n-remaining-blocks-rm2fog`（会话只允许推送 `claude/...` 分支，未使用任务书建议的 `cloud/remaining-blocks`）。基线 = `cloud/inputs-n`（d15c606，即任务 M 的 3F）。
+分支（任务 N2 / remaining-blocks-2）：`claude/remaining-blocks-2-cn9veq`（会话只允许推送这个 `claude/...` 分支，未使用任务书建议的 `cloud/remaining-blocks-2`），基于 `cloud/inputs-n2`（4dd0baa）。任务 N2 的结果见 §9“冻结版机器码复核”。
+
+任务 N 的原分支：`claude/inputs-n-remaining-blocks-rm2fog`（会话只允许推送 `claude/...` 分支，未使用任务书建议的 `cloud/remaining-blocks`）。基线 = `cloud/inputs-n`（d15c606，即任务 M 的 3F）。
 
 # 任务 N：剩余块 —— 根因与通用修法
 
@@ -104,7 +106,12 @@
 
 ### 5.1 全量快测
 
-（待最终运行）
+任务 N2 在本分支上运行（`poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider -n 4 --dist=loadscope`，本机 4 核，机器上没有其他负载）：
+
+- 第一次运行：**1 failed, 1768 passed, 3 skipped（524s）**。失败的是 `test_block_speedups.py::test_prefix_unknown_pruned_only_by_probe_unsat`。
+  - 原因：修法 4 的预期结果，不是代码缺陷。这条测试只把增量检查强制成 unknown，想单独检验 bvmul→UF 探针。修法 4 之后，增量检查 unknown 时先跑 blast 过的**精确**查询；`x*x == 6` 在 8 位上本来就不可满足，blast 查询直接给出 unsat 并剪枝，所以断言“被保留”失败。这次剪枝是正确的：精确 unsat 就是路径不可行。
+  - 修复（只改测试）：同时把标签为 `"blast"` 的 `_bounded_check` 强制为 unknown，让这条测试重新只检验探针。blast 查询的行为另有 `test_block_remaining_blocks.py` 中三条专门测试（恢复见证、unsat 剪枝、unknown 时保留）。修复后按节点 ID 单独运行 1 passed；旧版本测试仍是 1 failed；整个文件 16 passed。
+- 修复后的全量结果见 §9.1。
 
 ## 6. 离线验证数据
 
@@ -159,3 +166,45 @@
 ## 8. 未完成的块及原因
 
 （待最终更新）
+
+## 9. 冻结版机器码复核（任务 N2）
+
+输入：`cloud-inputs/n2/fixtures/`（Permit2、Pool=Aave、PoolManager；已用 `sha256sum -c` 对照 `cloud-inputs/n2/FROZEN_SHA256SUMS` 核对，一致）。代码：本分支 = 任务 N 的 6bbad7f（修法 1–7）+ §5.1 的一处测试修正，**生产代码没有改动**。本机 4 核 / 15GB，z3 4.15.4，capstone 5.0.6；每个查询 30s，`BLOCK_SUMMARY_LEMMAS=1 PYTHONHASHSEED=0`。长任务通常 3 个并行。
+
+运行脚本：`cloud-inputs/n2/tools/run_probe.sh`，它调用 `probe_traced.py`：原样运行 `tools/probe_block_obligations.py`，另外给每个 `_check` 记一行耗时日志。节点文件在 `cloud-inputs/n2/nodes/`，完成的结果在 `cloud-inputs/n2/results/`。
+会话中途容器重启过一次，当时在跑的任务全部中断。中断前的日志保存在 `results/partial-r1/`，这些任务之后从头重跑。
+
+### 9.1 全量快测
+
+（运行中）
+
+### 9.2 Permit2 1327（冻结版）
+
+- 两个实例的 pair 阶段相同（852s）：EVM 61 / **x86 43** 条路径（任务 N 的旧机器码为 65 条）。对应关系为 `[0, 0, all, None, None, None, all×10, 39, 28, 17, None, 16, 15, 14, 60, 54, 53, 49, 48, 47, 46, 45, 12..1]`。
+- **r4 的 `pair_0_3` 消失了**：x86 行 3 是 `terminal@73543`，即 r4 失败信息中的那条路径。它的首个合取项是 `Extract(64,64, zext(8·len) + zext(1125 + 扩展费)) == 1`，也就是任务 N §2.2 的 LOG2 费用溢出检查（旧编号 x86 路径 6）。修法 2 让空行提议成立（`_empty_by_bvabs` 用时 42.1s），对应关系从 `0` 变成 `None`（空行）。
+- `x86_empty_3`（`empty_row.py`，生产 `_check`）：**140.8s proved**（186 条引理）。SMT2 存于 `cloud-inputs/n2/smt2/permit2_1327_frozen/x86_empty_3.smt2`，与旧机器码的 `x86_empty_6.smt2` 大小相同，只有 let 绑定名不同。日志见 `results/p2-1327-row3.log`。
+- 其余 "all" 行（2、6–15）的首项都是普通错误路径：内存字数上限 `32w < 2^37`、gas 不足、`fmp+32` 溢出、零检查。**没有其他 LOG 费用溢出类的行。**
+- 节点级合并：第一次运行（被重启中断）中，`_unify_node` 对 924 个义务用了 1590.0s，得到 9 条引理；之后 `x86_maps_0_*` 逐个 unsat，每个约 33–36s。
+- 整节点结果：（运行中）
+
+### 9.3 SMT2 回归（修法 1–7，生产 `_check`）
+
+用 `cloud-inputs/n/tools/regress.py` 运行，每个义务上限 1800s，与 1327 整节点、Aave 7200 并行。日志见 `results/regress-smt2.log`。
+
+| 来源 | 义务 | 之前 | 现在 |
+|---|---|---|---|
+| r3c | 5802 `model_domain_nonempty`（预期 sat） | 0.3s sat | 0.4s sat |
+| r3c | 4837 `x86_maps_12_0` | 23.4s | 24.4s proved |
+| r3c | 4837 `x86_maps_14_0` | 13.7s | 13.9s proved |
+| r3c | 1327 `x86_maps_0_0` | 76.9s | 78.4s proved |
+| r3c | 1327 `x86_maps_0_1` | 51.7s | 57.7s proved |
+| m | 1327 `x86_maps_0_46` | 85.4s | 96.0s proved |
+| m | 1327 m192 `x86_maps_0_46` | 95.2s | 96.0s proved |
+| m | 1327 `pair_0_6`（任务 M：5925s unknown） | — | **191.0s proved**（修法 2 在 `_retry_over_potential` 中起作用） |
+| m | Aave 8248 `pair_0_1` | 1231.5s | 1244.2s proved |
+| n | Aave 11831 `evm_assumption_7`（只走 `_check`，不经过乘积字候选） | — | 12.9s proved |
+| n | 1327 `x86_empty_6` | 147.4s | 154.9s proved |
+| n | 1327 `x86_empty_7` | 127.9s | 157.5s proved |
+| n | Aave 7200 被拒命中前提（预期 sat） | 直接查询 30.4s unknown | 直接查询 30.3s unknown；常函数 UF 0.4s unknown；**blast 5.9s sat，模型在原式上求值为 true** |
+
+全部与预期一致，没有退化。耗时差异在并行负载的波动范围内。
