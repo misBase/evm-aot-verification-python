@@ -1,0 +1,14 @@
+[     3.5s]   _retry_over_lia -> unknown 0.1s
+[    62.3s]   _retry_over_potential -> unknown 0.2s
+[    62.6s]   _retry_over_potential -> unknown 0.1s
+[   129.4s]   _retry_over_nonlinear_mul -> unknown 0.1s
+[   129.5s]   _retry_over_nonlinear_mul -> unknown 0.1s
+[   134.9s]   _retry_over_guard_cases -> unsat 5.4s
+Traceback (most recent call last):
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n3/tools/regress_traced.py", line 52, in <module>
+    print(f"   routes {cls}: " + ", ".join(f"{r}{'+norm' if n else ''} {w}w {t:.1f}s" for (r, n), (w, t) in stats.items()), flush=True)
+                                 ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n3/tools/regress_traced.py", line 52, in <genexpr>
+    print(f"   routes {cls}: " + ", ".join(f"{r}{'+norm' if n else ''} {w}w {t:.1f}s" for (r, n), (w, t) in stats.items()), flush=True)
+                                                                                          ^^^^^^
+ValueError: too many values to unpack (expected 2)

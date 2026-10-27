@@ -25,7 +25,7 @@
 - 生产 `_check`（`cloud-inputs/n3/tools/regress_traced.py`）：
   - 第一版每个情形走 `_unify_and_split`（乘法抽象 + 合并探针 + sweep）：m=768 510.6s proved；sym7296 情形 0 用完它的一半份额（834s）仍 unknown，嵌套拆分只剩 10s。
   - 定稿：每个情形走 `_unify_case`（直接合并 + 一次直接查询 + `_after_unification` 的 opaque/blasted 尝试），守卫路线在适用时拿剩余预算的一半（同 `alias`）。**sym7296 goal 2 1326.6s proved**（守卫路线 702.7s），m=768 923.6s proved（守卫路线 761.3s）。
-  - 补充观察：在**新进程**里直接对 m=768 goal 2（原式、skolemize 之后、`pin_split` 之后都一样）调用 `_retry_over_guard_cases`，两个情形都被 3s 的快速精确查询 unsat，整条路线 3.0–4.6s。生产 `_check` 中同一路线却在情形 0 走到合并（761s）。差别不在公式，而在此前各路线留下的进程状态（AST 创建顺序影响 simplify 的结果形状与求解器的运气）。所以守卫路线的耗时有很大的波动：快则几秒，慢则数百秒；本节的耗时数字都应按此理解。
+  - 补充观察：在**新进程**里直接对 m=768 goal 2（原式、skolemize 之后、`pin_split` 之后都一样）调用 `_retry_over_guard_cases`，两个情形都被 3s 的快速精确查询 unsat，整条路线 3.0–4.6s。生产 `_check` 中同一路线却在情形 0 走到合并（761s）。差别不在公式，而在此前各路线留下的进程状态（AST 创建顺序影响 simplify 的结果形状与求解器的运气）。所以守卫路线的耗时有很大的波动：快则几秒，慢则数百秒；本节的耗时数字都应按此理解。在 90de4cd 上用生产 `_check` 再跑一次 m=768 goal 2：前面各路线 129.5s 都 unknown，守卫路线 **5.4s** unsat（上次 761.3s）。
 
 ### 2.2 Aave 6182（`pair_63_2`）
 

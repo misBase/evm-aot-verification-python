@@ -49,7 +49,7 @@ for path in paths:
     except be.ProofBudgetExceeded:
         answer, lemmas, names = "budget", 0, []
     for cls, stats in prover._route_stats.items():
-        print(f"   routes {cls}: " + ", ".join(f"{r}{'+norm' if n else ''} {w}w {t:.1f}s" for (r, n), (w, t) in stats.items()), flush=True)
+        print(f"   routes {cls}: " + ", ".join(f"{r}{'+norm' if n else ''} {w}w {t:.1f}s" for (r, n), (w, t) in ((k, v) for k, v in stats.items() if len(k) == 2)), flush=True)
     for part in (records[-1].lemmas if records else ()):
         print(f"   part {part.name} {part.answer} {part.elapsed_seconds or 0:.1f}s lemmas={sorted(set(r.name.rstrip("0123456789_") for r in part.lemmas))}", flush=True)
     print(f"{name} expected={expected} {answer} {monotonic() - started:.1f}s lemmas={lemmas} {names}", flush=True)
