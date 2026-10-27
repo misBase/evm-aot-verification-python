@@ -4048,9 +4048,29 @@ class BlockEquivalenceProver:
         return unified, "unsat", lemmas + tuple(
             Obligation(f"case_{n}", q.sexpr(), "unsat", elapsed_seconds=t) for n, (q, t) in enumerate(cases))
 
+    def _unify_case(self, case):
+        """("unsat", lemmas) refuting one guard case by plain argument
+        unification (unify_uf_arguments, no multiplication abstraction) and
+        one direct query on the merged formula, then the _after_unification
+        attempts; else ("unknown", ()). The merges are the usual weakening
+        (F ⊨ F'), so only UNSAT transfers back. Plain, not _unify_and_split:
+        on PoolManager 16670 pair_4_84 goal 2 the cases need 304s / 42s this
+        way, while _unify_and_split (abstracted squares add argument pairs,
+        then sweeping) left case 0 unknown after 834s."""
+        unified, lemmas = unify_uf_arguments(case, self.timeout_ms, self.deadline, cache=self._lemma_cache)
+        started = monotonic()
+        budget = self.timeout_ms if self.deadline is None else min(
+            self.timeout_ms, int((self.deadline - started) * 1000))
+        query = simplify(unified)
+        if budget > 0 and solve_query(query, budget) == "unsat":
+            return "unsat", lemmas + (Obligation("direct", query.sexpr(), "unsat",
+                                                 elapsed_seconds=monotonic() - started),)
+        found = self._after_unification(unified, lemmas, self.timeout_ms) if lemmas else None
+        return ("unsat", found[2]) if found is not None else ("unknown", ())
+
     def _retry_over_guard_cases(self, formula, depth=0):
         """Split F on its smallest UF guard (uf_guards), then refute each case
-        by the unification route (_unify_and_split), splitting a case that is
+        by plain unification (_unify_case), splitting a case that is
         not refuted on its own smallest guard again, _GUARD_MAX_DEPTH levels
         at most. (F, "unsat", lemmas) only if every case is refuted, else
         (F, "unknown", ()); returns at once when F has no such guard.
@@ -4075,7 +4095,7 @@ class BlockEquivalenceProver:
                 if budget > 0 and solve_query(case, budget) == "unsat":
                     sub = (Obligation("quick", case.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
                 else:
-                    _, answer, sub = self._unify_and_split(case, "unknown")
+                    answer, sub = self._unify_case(case)
                     if answer != "unsat" and depth + 1 < _GUARD_MAX_DEPTH:
                         _, answer, sub = self._retry_over_guard_cases(case, depth + 1)
                     if answer != "unsat":
