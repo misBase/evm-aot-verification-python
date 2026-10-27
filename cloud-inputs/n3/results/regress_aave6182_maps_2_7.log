@@ -1,0 +1,13 @@
+[    53.5s]   _retry_over_lia -> unknown 50.1s
+[    76.5s]   _retry_over_guard_cases -> unknown 0.1s
+[   109.6s]   _retry_over_potential -> unknown 0.1s
+[   373.3s]   _retry_over_potential -> unknown 263.7s
+[   600.8s]   _retry_over_nonlinear_mul -> unknown 30.6s
+[   631.4s]   _retry_over_nonlinear_mul -> unknown 30.5s
+[   631.4s]   _retry_over_guard_cases -> unknown 0.1s
+[  1626.3s]   _unify_and_split -> unknown 994.8s
+[  1626.3s]   _retry_with_uf_unification -> unknown 994.9s
+[  2618.3s]   _unify_and_split -> unknown 991.9s
+[  2618.3s]   _retry_with_uf_unification -> unknown 992.0s
+   routes x86_maps: lia 0w 50.1s, quick+norm 0w 3.3s, guardsq 0w 0.1s, shift 0w 0.1s, blast+norm 0w 33.0s, alias+norm 0w 0.1s, potential+norm 0w 263.7s, bvabs+norm 0w 11.5s, bvabs 0w 124.9s, exact+norm 0w 60.5s, mul 0w 30.6s, mul+norm 0w 30.5s, guards 0w 0.1s, unify+norm 0w 994.9s, unify 0w 992.0s, resume 1w 235.9s
+x86_maps_2_7 expected=unsat proved 2854.3s lemmas=491 ['normalize_0_lambda', 'normalize_1', 'normalize_10', 'normalize_100', 'normalize_101', 'normalize_102', 'normalize_103', 'normalize_104', 'normalize_105', 'normalize_106', 'normalize_107', 'normalize_108']
