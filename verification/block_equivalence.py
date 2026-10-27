@@ -1369,7 +1369,7 @@ def unify_potential_arguments(formula, timeout_ms, deadline=None, cache=None, se
         if t.decl().get_id() in decls and not is_bv_value(t.arg(0)):
             args[t.arg(0).get_id()] = t.arg(0)
         work.extend(t.children())
-    args = sorted(args.values(), key=lambda t: len(t.sexpr()))
+    args = sorted(args.values(), key=_text_size)
     # Equal only under the premise (no wrap-around, msize >= 96) is common, and
     # random values violate it: any agreeing sample makes a candidate, most first.
     prints = _random_leaf_values(args, seeds)
@@ -1811,7 +1811,7 @@ def _shift_amount_constants(formula):
 def _small_conjuncts(conjuncts, v, max_size=4096):
     """Top-level conjuncts mentioning v that are small pure bit-vector formulas."""
     return [c for c in conjuncts if v.get_id() in _scalar_constants(c) and _pure_bv(c)
-            and len(c.sexpr()) <= max_size]
+            and _text_size(c) <= max_size]
 
 
 def _refuted(query, timeout_ms, name):
@@ -2233,7 +2233,7 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
                                 pairs[key] = (x, y)
                                 occurs.setdefault(key, set()).add(k)
         merged = False
-        for key, (x, y) in sorted(pairs.items(), key=lambda kv: len(kv[1][0].sexpr()) + len(kv[1][1].sexpr())):
+        for key, (x, y) in sorted(pairs.items(), key=lambda kv: _text_size(kv[1][0]) + _text_size(kv[1][1])):
             budget = timeout_ms if deadline is None else min(timeout_ms, int((deadline - monotonic()) * 1000))
             if budget <= 0:
                 return formulas, tuple(lemmas)
@@ -2247,7 +2247,7 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
             used = {c.get_id() for c in parts}
             lemmas.extend(Obligation(f"node_unify_{len(lemmas)}_case_{n}", q.sexpr(), "unsat", elapsed_seconds=t)
                           for n, (q, t) in enumerate(cases))
-            small, big = sorted((x, y), key=lambda t: len(t.sexpr()))
+            small, big = sorted((x, y), key=_text_size)
             formulas = [substitute(f, (big, small)) if used <= set(conj[k]) else f
                         for k, f in enumerate(formulas)]
             merged = True
@@ -2255,6 +2255,16 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
         if not merged:
             break
     return formulas, tuple(lemmas)
+
+
+def _text_size(term):
+    """len(term.sexpr()), memoized per term (pure; _memoized keeps the term alive).
+
+    The merge loops order candidate pairs by this size and re-sort every round:
+    unmemoized, printing the same large arguments again each round was 73% of
+    unify_uf_arguments on PoolManager 16670 pair_2_74 goal 2 (175s of 240s).
+    The value is the same, so the order and every merge are unchanged."""
+    return _memoized("text_size", (term,), lambda: len(term.sexpr()))
 
 
 def _no_binder(term):
@@ -2347,6 +2357,62 @@ def _refute_by_cases(premise, goal, budget_ms, deadline=None, probe_ms=2000, max
             work.append((And(literal, substitute(premise, (c, BoolVal(value)))),
                          simplify(substitute(goal, (c, BoolVal(value))), som=True, bv_sort_ac=True)))
     return proofs
+
+
+def uf_guards(formula):
+    """Guards to split on before UF argument unification, smallest first.
+
+    A guard is the condition of an ite (outside binders, itself binder-free)
+    with an application of a multiply-applied UF in a branch. Returns
+    [[raw condition terms]], grouped by their simplified form (equivalent
+    spellings), ordered by that form's size.
+
+    Branch-wise argument spellings agree only under their guard: x86 SDIV is a
+    sign-branch tree, one holiman_udiv(a, b) / (-a, b) / (a, -b) / (|a|, |b|)
+    per branch, against EVM's single holiman_udiv(|a|, |b|) (PoolManager 16670
+    pair_2_74 / pair_4_84 goal 2). Unconditionally the arguments differ, so
+    unify_uf_arguments cannot merge them (each such pair ~20s unknown); under
+    the sign guard the dead branches simplify away and the rest merge."""
+    multi = {apps[0].decl().get_id() for apps in _uf_applications(formula)}
+    if not multi:
+        return []
+    has, work = {}, [(formula, False)]
+    while work:  # has[id]: an application of a multiply-applied UF below (binders not entered)
+        t, ready = work.pop()
+        if t.get_id() in has:
+            continue
+        if not is_app(t):
+            has[t.get_id()] = False
+            continue
+        if not ready:
+            work.append((t, True))
+            work.extend((c, False) for c in t.children() if c.get_id() not in has)
+            continue
+        has[t.get_id()] = ((t.decl().kind() == Z3_OP_UNINTERPRETED and t.decl().get_id() in multi)
+                           or any(has[c.get_id()] for c in t.children()))
+    groups, seen, work = {}, set(), [formula]
+    while work:
+        t = work.pop()
+        if t.get_id() in seen or not is_app(t):
+            continue
+        seen.add(t.get_id())
+        if (t.decl().kind() == Z3_OP_ITE and (has[t.arg(1).get_id()] or has[t.arg(2).get_id()])
+                and _no_binder(t.arg(0))):
+            c = simplify(t.arg(0))
+            if not (is_true(c) or is_false(c)):
+                groups.setdefault(c.get_id(), (c, {}))[1].setdefault(t.arg(0).get_id(), t.arg(0))
+        work.extend(t.children())
+    return [list(raws.values()) for c, raws in sorted(groups.values(), key=lambda g: _text_size(g[0]))]
+
+
+def assume_guard(formula, raws, value):
+    """F under one guard literal: L ∧ simplify(F[r := value for each r]),
+    L = raws[0] (value True) or its negation. The raws simplify to one form,
+    so they are equivalent: under L each r has the value `value` and the
+    substitution is an equivalence; simplify is one too. The two cases
+    (value True / False) cover every model of F, so F is UNSAT iff both are."""
+    literal = raws[0] if value else Not(raws[0])
+    return And(literal, simplify(substitute(formula, *[(r, BoolVal(value)) for r in raws])))
 
 
 def _is_array_term(t):
@@ -2535,7 +2601,7 @@ def sweep_equalities(formula, timeout_ms, deadline=None, seeds=3, max_terms=1000
             groups.setdefault((t.size(), tuple(prints[t.get_id()])), []).append(t)
     lemmas = []
     for group in groups.values():
-        group.sort(key=lambda t: len(t.sexpr()))
+        group.sort(key=_text_size)
         for t in group[1:]:
             if deadline is not None and monotonic() >= deadline:
                 return formula, tuple(lemmas)
@@ -2621,7 +2687,7 @@ def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=
             break
         merged = False
         for key, (x, y, _) in sorted(pairs.items(), key=lambda kv: (
-                kv[1][2] > 0, len(kv[1][0].sexpr()) + len(kv[1][1].sexpr()))):
+                kv[1][2] > 0, _text_size(kv[1][0]) + _text_size(kv[1][1]))):
             if all(any(k in failed for k in keys) for keys in owners[key]):
                 continue  # these applications can no longer become one term (Safe 5377 hash1 vs hash2)
             budget = timeout_ms
@@ -2637,7 +2703,7 @@ def unify_uf_arguments(formula, timeout_ms, deadline=None, max_lemmas=64, cache=
                           for n, (q, t) in enumerate(cases))
             # Replace the larger term by the smaller: the smaller cannot contain
             # it, so the rewrite terminates (w := f(w) would grow forever).
-            small, big = sorted((x, y), key=lambda t: len(t.sexpr()))
+            small, big = sorted((x, y), key=_text_size)
             formula = substitute(formula, (big, small))
             merged = True
             break
@@ -2705,8 +2771,8 @@ def unify_identities(formulas, deadline=None):
                        elapsed_seconds=monotonic() - started, lemmas=rewrites)
     # Larger term := smaller, as unify_uf_arguments; the largest first, so a pair nested in
     # another is not rewritten inside it before the outer one matches (each swap is valid alone).
-    swaps = sorted((tuple(sorted((x, y), key=lambda t: -len(t.sexpr()))) for x, y in merges),
-                   key=lambda s: -len(s[0].sexpr()))
+    swaps = sorted((tuple(sorted((x, y), key=lambda t: -_text_size(t))) for x, y in merges),
+                   key=lambda s: -_text_size(s[0]))
     out = list(formulas)
     for big, small in swaps:
         out = [substitute(f, (big, small)) for f in out]
@@ -2721,6 +2787,8 @@ _LAST_RESORT_MS = 300_000
 _STUCK_MIN_MEMBERS = 3
 # ponytail: fixed 10s cap for the LIA route (runs before the SAT routes on every hard pair); raise if LIA wins start timing out.
 _LIA_MS = 10_000
+# ponytail: two guard levels (<= 4 cases); PoolManager 16670 needs one, 4 guards (16 cases) cost 100-500s each.
+_GUARD_MAX_DEPTH = 2
 _PAIR_POOL = None
 # Diagnostic: print each pair-phase obligation as it completes (main thread).
 _TRACE_OBLIGATIONS = bool(__import__("os").environ.get("BLOCK_TRACE_OBLIGATIONS"))
@@ -3267,10 +3335,10 @@ class BlockEquivalenceProver:
             # "lia" (_retry_over_lia, own caps, no share) first: the LIA reading of
             # product limbs, before the SAT routes.
             routes = ([("lia", False), ("quick", True), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
-                       ("mul", False), ("mul", True), ("unify", True), ("unify", False)]
+                       ("mul", False), ("mul", True), ("guards", False), ("unify", True), ("unify", False)]
                       if not self._node_needed_unification else
-                      [("lia", False), ("quick", True), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("unify", True),
-                       ("exact", True), ("unify", False), ("mul", True), ("mul", False)])
+                      [("lia", False), ("quick", True), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("guards", False),
+                       ("unify", True), ("exact", True), ("unify", False), ("mul", True), ("mul", False)])
             # Routes that refuted this class of obligation before go first (_winners_first);
             # with no history the table above is unchanged.
             stats = self._route_stats.setdefault(_route_class(name), {})
@@ -3363,6 +3431,8 @@ class BlockEquivalenceProver:
                                                   (formula, "unknown", ()))
                     elif route == "mul":
                         proved, answer, lemmas = self._retry_over_nonlinear_mul(target, "unknown", split=norm)
+                    elif route == "guards":
+                        proved, answer, lemmas = self._retry_over_guard_cases(target)
                     else:
                         proved, answer, lemmas = self._retry_with_uf_unification(target, "unknown")
                         self._node_needed_unification |= answer == "unsat"
@@ -3972,6 +4042,43 @@ class BlockEquivalenceProver:
                 Obligation("direct", query.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
         return unified, "unsat", lemmas + tuple(
             Obligation(f"case_{n}", q.sexpr(), "unsat", elapsed_seconds=t) for n, (q, t) in enumerate(cases))
+
+    def _retry_over_guard_cases(self, formula, depth=0):
+        """Split F on its smallest UF guard (uf_guards), then refute each case
+        by the unification route (_unify_and_split), splitting a case that is
+        not refuted on its own smallest guard again, _GUARD_MAX_DEPTH levels
+        at most. (F, "unsat", lemmas) only if every case is refuted, else
+        (F, "unknown", ()); returns at once when F has no such guard.
+
+        Sound by assume_guard: the cases cover F, each is equivalent to F
+        under its literal, and within a case unification is the usual
+        weakening (only UNSAT transfers back). The lemmas are every case's
+        refutations, named guard_<depth>_<case>_*. Each case gets an equal
+        share of what is left of the route's deadline."""
+        guards = uf_guards(formula)
+        if not guards:
+            return formula, "unknown", ()
+        lemmas, deadline = [], self.deadline
+        try:
+            for n, value in enumerate((True, False)):
+                started = monotonic()
+                case = assume_guard(formula, guards[0], value)
+                if deadline is not None:
+                    self.deadline = started + (deadline - started) / (2 - n)
+                budget = _QUICK_EXACT_MS if self.deadline is None else min(
+                    _QUICK_EXACT_MS, int((self.deadline - started) * 1000))
+                if budget > 0 and solve_query(case, budget) == "unsat":
+                    sub = (Obligation("quick", case.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
+                else:
+                    _, answer, sub = self._unify_and_split(case, "unknown")
+                    if answer != "unsat" and depth + 1 < _GUARD_MAX_DEPTH:
+                        _, answer, sub = self._retry_over_guard_cases(case, depth + 1)
+                    if answer != "unsat":
+                        return formula, "unknown", ()
+                lemmas.extend(replace(r, name=f"guard_{depth}_{n}_{r.name}") for r in sub)
+        finally:
+            self.deadline = deadline
+        return formula, "unsat", tuple(lemmas)
 
     def _pair_phase(self, evm, x86, premise, pair, found, records):
         """Pair-phase obligations for the correspondence `found`
