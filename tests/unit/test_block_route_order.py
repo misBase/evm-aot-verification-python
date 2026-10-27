@@ -129,7 +129,20 @@ def test_promoted_route_gets_half_of_what_is_left(monkeypatch):
     prover = BlockEquivalenceProver([], [], {}, timeout_ms=3000)
     routes = _Routes(monkeypatch, prover, {"mul*"})
     _check(prover, "pair_1_2_goal_2_of_7")
+    # N3: at most 8x the longest refutation the route needed in this class; one that
+    # needed 200s there may still take half of what is left.
+    prover._route_stats["pair_goal_2_of_7"][("mul", True, "longest")] = 200.0
     end = monotonic() + 1000
     prover.deadline = end
     _check(prover, "pair_3_4_goal_2_of_7")
     assert routes.deadlines["mul*"] - monotonic() == pytest.approx(500, abs=5)
+
+
+def test_promoted_route_with_cheap_wins_gets_its_cap(monkeypatch):
+    # The mocked win took ~0s: the promoted route gets 4 query timeouts (12s), not 500s.
+    prover = BlockEquivalenceProver([], [], {}, timeout_ms=3000)
+    routes = _Routes(monkeypatch, prover, {"mul*"})
+    _check(prover, "pair_1_2_goal_2_of_7")
+    prover.deadline = monotonic() + 1000
+    _check(prover, "pair_3_4_goal_2_of_7")
+    assert routes.deadlines["mul*"] - monotonic() == pytest.approx(12, abs=1)
