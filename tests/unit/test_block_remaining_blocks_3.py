@@ -5,6 +5,9 @@
   holiman_udiv(|a|, |b|); the arguments agree only under the sign guards, so the
   unification route never merges them (PoolManager 16670 pair_2_74 / pair_4_84 goal 2).
   Splitting on the guard first lets each case unify.
+- Guard cases' quick query again in a fresh z3 Context, and an early quick-only guard
+  route ("guardsq"): the quick case queries depend on the process's AST history (16670
+  goal 2: <3s fresh, 761s / failed inside a node).
 - _text_size: the merge loops' pair order by sexpr length, memoized (same values).
 - forward_selects_shared: the DIV summary's limb forwarding through one process-level
   cache (Aave Pool 7200: each hit re-forwarded the whole x86 memory chain per limb).
@@ -244,8 +247,8 @@ def test_resume_comes_first_once_it_refuted_the_class(monkeypatch):
     records = []
     assert prover._check("pair_1_2_goal_6_of_7", And(udiv(a, b) == 1, udiv(b, a) == 2), records, split=False)
     first = calls.index("potential")
-    assert calls[first + 1] == "resume"
-    assert "_retry_with_uf_unification" not in calls and "_retry_over_guard_cases" not in calls
+    assert calls[first + 1:] == ["resume"]                 # nothing after the potential route but the resume
+    assert "_retry_with_uf_unification" not in calls
     assert records[-1].proved and records[-1].formula == Bool("n3_pending_target").sexpr()
 
 
@@ -429,3 +432,29 @@ def test_productive_stuck_groups_run_past_the_cap(monkeypatch):
 def test_unproductive_stuck_groups_stop_at_the_cap(monkeypatch):
     done, spent = _stuck_phase(monkeypatch, lambda n: False)
     assert spent == 30 and not done
+
+
+def test_fresh_context_refutes_exactly_the_case():
+    evm, x86 = _sdiv_pair()
+    f = evm != x86
+    raws = be.uf_guards(f)[0]
+    for value in (True, False):
+        assert be._fresh_context_unsat(f, raws, value, 10000) == _unsat(be.assume_guard(f, raws, value))
+    g = And(If(_sign(a), udiv(a, b), udiv(b, a)) == 7, udiv(a, b) != udiv(b, a))   # satisfiable
+    raws = be.uf_guards(g)[0]
+    assert not any(be._fresh_context_unsat(g, raws, v, 10000) for v in (True, False))
+
+
+def test_quick_only_guard_route_never_unifies(monkeypatch):
+    evm, x86 = _sdiv_pair()
+    monkeypatch.setattr(be, "solve_query", lambda *a, **k: "unknown")
+    monkeypatch.setattr(be, "_fresh_context_unsat", lambda *a, **k: False)
+    monkeypatch.setattr(be.BlockEquivalenceProver, "_unify_case", lambda self, case: pytest.fail("no unification"))
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=5000)
+    assert prover._retry_over_guard_cases(evm != x86, quick_only=True)[1] == "unknown"
+
+
+def test_quick_only_guard_route_comes_right_after_quick():
+    import inspect
+    source = inspect.getsource(be.BlockEquivalenceProver._check)
+    assert source.count('("quick", True), ("guardsq", False)') == 2

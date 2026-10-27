@@ -2431,7 +2431,22 @@ def assume_guard(formula, raws, value):
     substitution is an equivalence; simplify is one too. The two cases
     (value True / False) cover every model of F, so F is UNSAT iff both are."""
     literal = raws[0] if value else Not(raws[0])
-    return And(literal, simplify(substitute(formula, *[(r, BoolVal(value)) for r in raws])))
+    return And(literal, simplify(substitute(formula, *[(r, BoolVal(value, ctx=formula.ctx)) for r in raws])))
+
+
+def _fresh_context_unsat(formula, raws, value, budget_ms):
+    """assume_guard(F, raws, value) refuted in a new z3 Context (F translated:
+    an exact copy), within budget_ms. The quick case query depends on the
+    process's AST history, not just the formula: PoolManager 16670 goal 2
+    cases are UNSAT in <3s in a fresh process (both instances) but went to
+    unification for 761s (m=768) or failed (sym7296) inside a node."""
+    from z3 import Context
+    ctx = Context()
+    case = assume_guard(formula.translate(ctx), [r.translate(ctx) for r in raws], value)
+    solver = SolverFor("QF_AUFBV", ctx=ctx) if _bv_array_formula(case) else Solver(ctx=ctx)
+    solver.set(timeout=budget_ms)
+    solver.add(case)
+    return solver.check() == unsat
 
 
 def _is_array_term(t):
@@ -3353,10 +3368,10 @@ class BlockEquivalenceProver:
             # it returns at once unless memory-cost sums are present.
             # "lia" (_retry_over_lia, own caps, no share) first: the LIA reading of
             # product limbs, before the SAT routes.
-            routes = ([("lia", False), ("quick", True), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
+            routes = ([("lia", False), ("quick", True), ("guardsq", False), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("exact", True),
                        ("mul", False), ("mul", True), ("guards", False), ("unify", True), ("unify", False)]
                       if not self._node_needed_unification else
-                      [("lia", False), ("quick", True), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("guards", False),
+                      [("lia", False), ("quick", True), ("guardsq", False), ("shift", False), ("blast", True), ("alias", True), ("potential", True), ("bvabs", True), ("bvabs", False), ("guards", False),
                        ("unify", True), ("exact", True), ("unify", False), ("mul", True), ("mul", False)])
             # Routes that refuted this class of obligation before go first (_winners_first);
             # with no history the table above is unchanged.
@@ -3458,6 +3473,9 @@ class BlockEquivalenceProver:
                                                   (formula, "unknown", ()))
                     elif route == "mul":
                         proved, answer, lemmas = self._retry_over_nonlinear_mul(target, "unknown", split=norm)
+                    elif route == "guardsq":
+                        # The guard cases' quick queries only (seconds; no guard: returns at once).
+                        proved, answer, lemmas = self._retry_over_guard_cases(target, quick_only=True)
                     elif route == "guards":
                         # Half of what is left when it applies, as "alias": every case already runs
                         # the unification route, and one share cut PoolManager 16670 pair_4_84 goal 2
@@ -4154,7 +4172,7 @@ class BlockEquivalenceProver:
         found = self._after_unification(unified, lemmas, self.timeout_ms) if lemmas else None
         return ("unsat", found[2]) if found is not None else ("unknown", ())
 
-    def _retry_over_guard_cases(self, formula, depth=0):
+    def _retry_over_guard_cases(self, formula, depth=0, quick_only=False):
         """Split F on its smallest UF guard (uf_guards), then refute each case
         by plain unification (_unify_case), splitting a case that is
         not refuted on its own smallest guard again, _GUARD_MAX_DEPTH levels
@@ -4165,7 +4183,10 @@ class BlockEquivalenceProver:
         under its literal, and within a case unification is the usual
         weakening (only UNSAT transfers back). The lemmas are every case's
         refutations, named guard_<depth>_<case>_*. Each case gets an equal
-        share of what is left of the route's deadline."""
+        share of what is left of the route's deadline. Each case's quick query
+        is tried again in a fresh z3 Context (_fresh_context_unsat) before any
+        unification. quick_only (the early "guardsq" route): those quick
+        queries only, unknown as soon as one case is not refuted by them."""
         guards = uf_guards(formula)
         if not guards:
             return formula, "unknown", ()
@@ -4178,8 +4199,11 @@ class BlockEquivalenceProver:
                     self.deadline = started + (deadline - started) / (2 - n)
                 budget = _QUICK_EXACT_MS if self.deadline is None else min(
                     _QUICK_EXACT_MS, int((self.deadline - started) * 1000))
-                if budget > 0 and solve_query(case, budget) == "unsat":
+                if budget > 0 and (solve_query(case, budget) == "unsat"
+                                   or _fresh_context_unsat(formula, guards[0], value, budget)):
                     sub = (Obligation("quick", case.sexpr(), "unsat", elapsed_seconds=monotonic() - started),)
+                elif quick_only:
+                    return formula, "unknown", ()
                 else:
                     answer, sub = self._unify_case(case)
                     if answer != "unsat" and depth + 1 < _GUARD_MAX_DEPTH:
