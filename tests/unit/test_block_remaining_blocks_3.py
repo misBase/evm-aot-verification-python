@@ -13,6 +13,8 @@
   other route (Aave Pool 6182 pair_63_2 goal 6: 2350s of failing routes first).
 - Entry model reuse: a summary hit keeps its entry model; the next hit tries it on its
   premise and the executor takes it as its path witness (Aave 7200: ~40s per entry).
+- Promoted route share capped at 8x its longest refutation in the class (PoolManager 16670:
+  unify won the easy rows in <12s, then held half the node on the hard row).
 - Normalisation memo: _rewrite_candidate / _inequality_text (Aave Pool 6182 x86_maps_0_85:
   normalisation 74.6s -> 34.9s, a sibling 65.1s -> 16.2s; same formula and lemmas).
 - _correspondence: a row whose quick solve is unknown gets its proposal from the
@@ -363,3 +365,35 @@ def test_normalisation_is_unchanged_by_the_memo():
     first, lemmas = be.normalize_word_arith(f)
     again, lemmas_again = be.normalize_word_arith(f)
     assert first.eq(again) and [r.formula for r in lemmas] == [r.formula for r in lemmas_again]
+
+
+def _share_harness(monkeypatch, stats):
+    from time import monotonic
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=1000)
+    prover.deadline = monotonic() + 600
+    seen = {}
+
+    def unify(self, formula, *a, **k):
+        seen.setdefault("unify", self.deadline - monotonic())
+        return formula, "unknown", ()
+
+    def fail(self, formula, *a, **k):
+        return formula, "unknown", ()
+    P = be.BlockEquivalenceProver
+    monkeypatch.setattr(P, "_retry_with_uf_unification", unify)
+    for name in ("_retry_over_lia", "_retry_over_potential", "_retry_over_nonlinear_mul", "_retry_over_guard_cases"):
+        monkeypatch.setattr(P, name, fail)
+    monkeypatch.setattr(be, "solve_query", lambda *a, **k: "unknown")
+    prover._route_stats[be._route_class("pair_1_2_goal_2_of_7")] = stats
+    prover._check("pair_1_2_goal_2_of_7", udiv(a, b) != udiv(b, a), [], split=False)
+    return seen["unify"]
+
+
+def test_promoted_route_is_capped_by_its_longest_refutation(monkeypatch):
+    share = _share_harness(monkeypatch, {("unify", False): (3, 15.0), ("unify", False, "longest"): 5.0})
+    assert share <= 40.5                                   # 8 x 5s, not half of the 600s node
+
+
+def test_promoted_route_without_cheap_history_keeps_half(monkeypatch):
+    share = _share_harness(monkeypatch, {("unify", False): (1, 200.0), ("unify", False, "longest"): 200.0})
+    assert 250 < share <= 300.5                            # min(half of what is left, 8 x 200s)

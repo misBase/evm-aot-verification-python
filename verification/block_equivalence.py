@@ -3380,9 +3380,17 @@ class BlockEquivalenceProver:
                 # query below keeps one share), so no route starves the rest.
                 # A promoted route (it refuted this class before) gets half: it is
                 # expected to need what it needed there (Safe 5377 unify: 190-320s).
+                # But at most 8x the longest refutation it needed in this class (at least
+                # 4 query timeouts): PoolManager 16670 unify refuted the easy SDIV rows'
+                # memory goal in <12s, and the hard row's promoted unify then held half
+                # the node (~7300s) before the guards route that refutes it was tried.
+                route_end = node_deadline
+                if node_deadline is not None and index < promoted:
+                    longest = stats.get((route, norm, "longest"), 0.0)
+                    route_end = min(node_deadline, monotonic() + max(8 * longest, 4 * self.timeout_ms / 1000))
                 if node_deadline is not None and route != "lia":
                     shares = 1 if index < promoted else sum(1 for r, _ in routes[index:] if r != "lia")
-                    self.deadline = monotonic() + (node_deadline - monotonic()) / (shares + 1)
+                    self.deadline = min(route_end, monotonic() + (node_deadline - monotonic()) / (shares + 1))
                 route_started = monotonic()
                 try:
                     if route == "lia":
@@ -3413,14 +3421,14 @@ class BlockEquivalenceProver:
                         # residual needs ~500s; the 1/8 share gave 283s, then the other
                         # routes spent 1600s for nothing). No split: returns at once.
                         if node_deadline is not None:
-                            self.deadline = monotonic() + (node_deadline - monotonic()) / 2
+                            self.deadline = monotonic() + (route_end - monotonic()) / 2
                         cases = _alias_split(target, self.timeout_ms, self.deadline, self._refute_further,
                                              parallel=True)
                         proved, answer, lemmas = (target, "unsat", cases) if cases else (formula, "unknown", ())
                     elif route == "potential":
                         # ponytail: 1/3 of what is left when it applies (CErc20 4571 needs ~95s); not applicable: returns at once.
                         if node_deadline is not None:
-                            self.deadline = monotonic() + (node_deadline - monotonic()) / 3
+                            self.deadline = monotonic() + (route_end - monotonic()) / 3
                         proved, answer, lemmas = self._retry_over_potential(target)
                     elif route == "blast":
                         # Reads through x86 store chains (symbolic addresses over the R15
@@ -3435,7 +3443,7 @@ class BlockEquivalenceProver:
                         proved, lemmas = target, ()
                         if answer != "unsat":
                             if node_deadline is not None:
-                                self.deadline = monotonic() + (node_deadline - monotonic()) / 3
+                                self.deadline = monotonic() + (route_end - monotonic()) / 3
                             proved, answer, lemmas = self._retry_over_potential(target)
                     elif route == "shift":
                         # Half of what is left when it applies (Permit2 4837 x86_maps_12_0: 63
@@ -3443,7 +3451,7 @@ class BlockEquivalenceProver:
                         # symbolic shift amount with few values: returns at once. A SAT case is a
                         # model of F (shift_split).
                         if node_deadline is not None:
-                            self.deadline = monotonic() + (node_deadline - monotonic()) / 2
+                            self.deadline = monotonic() + (route_end - monotonic()) / 2
                         cases = shift_split(target, self.timeout_ms, self.deadline)
                         proved, answer, lemmas = ((target, "sat", ()) if cases == "sat" else
                                                   (target, "unsat", cases) if cases is not None else
@@ -3455,7 +3463,7 @@ class BlockEquivalenceProver:
                         # the unification route, and one share cut PoolManager 16670 pair_4_84 goal 2
                         # off mid-case (833s per case of a 1666s share). No guard: returns at once.
                         if node_deadline is not None:
-                            self.deadline = monotonic() + (node_deadline - monotonic()) / 2
+                            self.deadline = monotonic() + (route_end - monotonic()) / 2
                         proved, answer, lemmas = self._retry_over_guard_cases(target)
                     else:
                         proved, answer, lemmas = self._retry_with_uf_unification(target, "unknown")
@@ -3468,6 +3476,9 @@ class BlockEquivalenceProver:
                     self.deadline = node_deadline
                 wins, seconds = stats.get((route, norm), (0, 0.0))
                 stats[(route, norm)] = (wins + (answer == "unsat"), seconds + monotonic() - route_started)
+                if answer == "unsat":  # the longest refutation by this route in this class (see route_end)
+                    stats[(route, norm, "longest")] = max(stats.get((route, norm, "longest"), 0.0),
+                                                           monotonic() - route_started)
                 ours = self._potential_pending
                 if pending is None and ours is not None and ours[0].eq(target):
                     pending = (ours[1], ours[2], rewrites)
