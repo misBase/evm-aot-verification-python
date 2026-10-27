@@ -1,0 +1,486 @@
+spec BlockSpecialization(pc=7200, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=())
+[    56.3s] applied copy_loop@0x6afd0 in 5.7s: slow records [('copy_param_result', 'unsat', 2.2)]
+[    65.2s] applied mul@0x6b756 in 6.2s: slow records [('effect_0', 'unsat', 3.3)]
+[    94.4s] reachability check 8.6s at 0x6c19b -> True
+[   134.1s] applied copy_loop@0x6c270 in 36.2s: slow records [('copy_domain', 'unsat', 3.9), ('copy_param_entry', 'unsat', 1.9), ('copy_param_result', 'unsat', 5.9)]
+[   141.3s] reachability check 7.1s at 0x6c4cc -> False
+[   146.6s] reachability check 5.2s at 0x6c4cc -> False
+[   154.2s] reachability check 6.4s at 0x6c3d1 -> True
+[   181.7s] applied mul@0x6c9f6 in 15.1s: slow records [('effect_0', 'unsat', 13.3)]
+[   190.2s] applied memgas@0x6cc00 in 7.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 6.8)]
+[   196.2s] reachability check 5.8s at 0x6cd04 -> False
+[   203.5s] reachability check 7.0s at 0x6cf42 -> False
+[   209.7s] reachability check 6.0s at 0x6cf42 -> False
+[   215.9s] reachability check 5.9s at 0x6ce2f -> False
+[   222.1s] reachability check 6.0s at 0x6ce4a -> False
+[   230.0s] reachability check 7.2s at 0x6ce4a -> False
+[   237.9s] applied memgas@0x6ce4d in 7.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 7.0)]
+[   246.2s] reachability check 8.0s at 0x6cf53 -> False
+[   254.5s] reachability check 8.0s at 0x6d49b -> True
+[   262.3s] reachability check 7.5s at 0x6d29d -> True
+[   269.2s] reachability check 6.7s at 0x6d49b -> False
+[   275.8s] reachability check 6.3s at 0x6d49b -> True
+[   283.2s] reachability check 7.0s at 0x6d2fd -> False
+[   291.5s] reachability check 8.1s at 0x6d318 -> False
+[   299.0s] reachability check 6.9s at 0x6d318 -> True
+[   307.2s] applied memgas@0x6d320 in 7.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 7.3)]
+[   312.9s] reachability check 5.7s at 0x6d3bd -> False
+[   325.9s] reachability check 11.4s at 0x6d43b -> True
+[   334.1s] reachability check 7.9s at 0x6d4ac -> True
+[   342.9s] reachability check 8.5s at 0x6d4e5 -> True
+[   468.4s] applied copy_loop@0x6d510 in 125.4s: slow records [('copy_domain', 'unsat', 29.1), ('copy_param_entry', 'unsat', 6.7), ('copy_param_result', 'unsat', 22.8)]
+[   476.7s] reachability check 8.1s at 0x6d76c -> False
+[   484.8s] reachability check 7.8s at 0x6d76c -> False
+[   490.7s] reachability check 5.7s at 0x6d656 -> False
+[   497.6s] reachability check 6.5s at 0x6d671 -> False
+[   506.4s] reachability check 8.1s at 0x6d671 -> True
+[   514.2s] applied memgas@0x6d674 in 7.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 6.9)]
+[   525.6s] reachability check 6.5s at 0x6d77d -> True
+[   536.2s] applied memgas@0x6d8d4 in 8.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 7.8)]
+[   545.7s] reachability check 9.2s at 0x6d9dd -> False
+[   555.7s] applied memgas@0x6de2d in 8.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 7.7)]
+[   565.6s] reachability check 9.4s at 0x6df33 -> False
+[   575.7s] applied memgas@0x6e06d in 7.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 7.3)]
+[   582.2s] reachability check 6.2s at 0x6e173 -> False
+[   680.9s] applied div@0x6e22d in 98.7s: slow records []
+[   748.9s] applied mul@0x6e383 in 68.0s: slow records [('effect_0', 'unsat', 46.9)]
+[   779.3s] applied memgas@0x6e5f4 in 25.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 24.7)]
+[   786.3s] reachability check 6.1s at 0x6e6fd -> False
+[   794.9s] reachability check 7.7s at 0x6e92c -> False
+[   809.4s] reachability check 13.7s at 0x6e92c -> True
+[   818.7s] reachability check 8.0s at 0x6e814 -> False
+[   826.5s] reachability check 6.9s at 0x6e831 -> False
+[   837.0s] reachability check 8.0s at 0x6e831 -> False
+[   864.6s] applied memgas@0x6e834 in 27.5s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.1)]
+[   880.6s] reachability check 15.1s at 0x6e93d -> True
+[   890.9s] reachability check 9.3s at 0x6edf2 -> True
+[   906.3s] reachability check 14.2s at 0x6ebf9 -> True
+[   913.7s] reachability check 6.3s at 0x6edf2 -> False
+[   928.7s] reachability check 15.0s at 0x6ec1e -> True
+[   945.9s] reachability check 15.1s at 0x6edf2 -> True
+[   960.5s] reachability check 14.5s at 0x6ec31 -> True
+[   975.6s] reachability check 14.3s at 0x6ec52 -> True
+[   989.5s] reachability check 13.9s at 0x6ec48 -> True
+[   997.7s] reachability check 7.3s at 0x6ec71 -> False
+[  1007.9s] reachability check 10.1s at 0x6ec65 -> True
+[  1025.9s] reachability check 14.5s at 0x6ec71 -> True
+[  1092.8s] applied memgas@0x6ec74 in 66.9s: slow records [('entry', 'sat', 37.2), ('memgas_exit_guard_excluded', 'unsat', 27.1)]
+[  1098.4s] reachability check 5.6s at 0x6ed16 -> False
+[  1106.7s] reachability check 5.6s at 0x6ed66 -> False
+[  1115.6s] reachability check 7.3s at 0x6ed7d -> False
+[  1135.2s] reachability check 16.2s at 0x6ed92 -> True
+[  1150.8s] reachability check 14.4s at 0x6ee03 -> True
+[  1168.3s] reachability check 16.1s at 0x6ee3c -> True
+[  1185.3s] reachability check 16.9s at 0x6ee65 -> True
+[  1643.3s] applied copy_loop@0x6ee68 in 458.1s: slow records [('entry', 'sat', 42.6), ('copy_domain', 'unsat', 65.3), ('copy_param_entry', 'unsat', 26.1), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 86.1)]
+[  1652.4s] reachability check 8.2s at 0x6f0c2 -> False
+[  1665.2s] reachability check 11.6s at 0x6f0c2 -> False
+[  1682.0s] reachability check 15.7s at 0x6efaf -> True
+[  1689.0s] reachability check 6.0s at 0x6efca -> False
+[  1705.0s] reachability check 13.6s at 0x6efca -> True
+[  1734.0s] applied memgas@0x6efcd in 27.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.5)]
+[  1739.0s] reachability check 5.0s at 0x6f06a -> False
+[  1753.1s] reachability check 14.1s at 0x6efd6 -> True
+[  1769.8s] reachability check 15.7s at 0x6f0d3 -> True
+[  1806.1s] applied memgas@0x6f22d in 27.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.3)]
+[  1806.1s] progress: executed 455 live 0 final/cut (0, 3) reach 321 checks 628.8s pruned 97
+   top blocks: [('0x699ca', 2), ('0x6a116', 2), ('0x6add8', 2), ('0x6afd0', 2), ('0x6aff2', 2), ('0x6b131', 2), ('0x6b1d6', 2), ('0x6c078', 2), ('0x6c270', 2), ('0x6c292', 2), ('0x6c3d1', 2), ('0x6d318', 2)]
+   top forks: [('0x6add8', 2), ('0x6b131', 2), ('0x6c078', 2), ('0x6c3d1', 2), ('0x6d318', 2), ('0x6d671', 2), ('0x6ec71', 2), ('0x6efca', 2), ('0x697fe', 1), ('0x6992d', 1), ('0x69936', 1), ('0x69945', 1)]
+   summaries: {'seconds': 1065.2559054829835, 'memgas@0x6992d': 1, 'memgas@0x69b4d': 1, 'memgas@0x6a075': 1, 'mul@0x6a2a1': 1, 'memgas@0x6a42d': 1, 'memgas@0x6a6c0': 1, 'memgas@0x6a9ed': 1, 'mul@0x6abf7': 1, 'memgas@0x6ade0': 1, 'copy_loop@0x6afd0': 1, 'memgas@0x6b134': 1, 'memgas@0x6b394': 1, 'memgas@0x6b5cd': 1, 'mul@0x6b756': 1, 'memgas@0x6b960': 1, 'memgas@0x6bbad': 1, 'memgas@0x6c080': 1, 'copy_loop@0x6c270': 1, 'memgas@0x6c3d4': 1, 'memgas@0x6c634': 1, 'memgas@0x6c86d': 1, 'mul@0x6c9f6': 1, 'memgas@0x6cc00': 1, 'memgas@0x6ce4d': 1, 'memgas@0x6d320': 1, 'copy_loop@0x6d510': 1, 'memgas@0x6d674': 1, 'memgas@0x6d8d4': 1, 'memgas@0x6de2d': 1, 'memgas@0x6e06d': 1, 'div@0x6e22d': 1, 'mul@0x6e383': 1, 'memgas@0x6e5f4': 1, 'memgas@0x6e834': 1, 'memgas@0x6ec74': 1, 'copy_loop@0x6ee68': 1, 'memgas@0x6efcd': 1, 'memgas@0x6f22d': 1}
+   complement: {'hit': 28, 'seconds': 8.355303685028048}
+[  1821.6s] reachability check 14.5s at 0x6f333 -> True
+[  1855.5s] applied memgas@0x6f4d6 in 28.0s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.3)]
+[  1870.0s] reachability check 13.6s at 0x6f5dd -> True
+[  1969.0s] applied div@0x6fc70 in 97.9s: slow records []
+[  2001.9s] applied memgas@0x6fee0 in 26.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 24.6)]
+[  2017.2s] reachability check 14.1s at 0x6ffe4 -> True
+[  2051.7s] applied memgas@0x7018d in 27.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.9)]
+[  2066.4s] reachability check 13.9s at 0x70293 -> True
+[  2098.9s] applied memgas@0x70720 in 25.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 24.2)]
+[  2113.4s] reachability check 13.5s at 0x70824 -> True
+[  2202.1s] applied div@0x70b93 in 88.5s: slow records []
+[  2235.0s] applied memgas@0x70e14 in 26.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.0)]
+[  2249.8s] reachability check 13.6s at 0x70f1d -> True
+[  2265.0s] reachability check 14.1s at 0x70f1d -> True
+[  2278.8s] reachability check 13.8s at 0x70824 -> True
+[  2294.2s] reachability check 15.4s at 0x70293 -> True
+[  2308.3s] reachability check 14.1s at 0x6ffe4 -> True
+[  2321.1s] reachability check 12.8s at 0x6f5dd -> True
+[  2333.8s] reachability check 12.7s at 0x6f333 -> True
+[  2347.3s] reachability check 13.6s at 0x6f0d3 -> True
+[  2361.9s] reachability check 13.7s at 0x6f059 -> True
+[  2367.6s] reachability check 5.6s at 0x6efe5 -> False
+[  2380.8s] reachability check 13.2s at 0x6f059 -> True
+[  2392.1s] reachability check 11.3s at 0x6f0c2 -> False
+[  2407.7s] reachability check 14.4s at 0x6ee65 -> True
+[  2927.2s] applied copy_loop@0x6ee68 in 519.5s: slow records [('entry', 'sat', 52.5), ('copy_domain', 'unsat', 73.2), ('copy_param_entry', 'unsat', 28.5), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 86.7)]
+[  2937.5s] reachability check 9.0s at 0x6f0c2 -> False
+[  2959.6s] reachability check 20.4s at 0x6f0c2 -> True
+[  2968.7s] reachability check 7.9s at 0x6efaf -> False
+[  2978.1s] reachability check 8.0s at 0x6efca -> False
+[  3000.7s] reachability check 17.9s at 0x6efca -> True
+[  3068.7s] applied memgas@0x6efcd in 67.9s: slow records [('entry', 'sat', 38.8), ('memgas_exit_guard_excluded', 'unsat', 26.1)]
+[  3075.3s] reachability check 6.7s at 0x6f06a -> False
+[  3093.8s] reachability check 17.2s at 0x6f0d3 -> True
+[  3132.4s] applied memgas@0x6f22d in 29.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.8)]
+[  3152.2s] reachability check 18.5s at 0x6f333 -> True
+[  3189.2s] applied memgas@0x6f4d6 in 28.7s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.0)]
+[  3208.2s] reachability check 17.9s at 0x6f5dd -> True
+[  3248.2s] applied memgas@0x6fee0 in 29.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.6)]
+[  3270.1s] reachability check 20.0s at 0x6ffe4 -> True
+[  3307.5s] applied memgas@0x7018d in 29.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.2)]
+[  3330.1s] reachability check 21.3s at 0x70293 -> True
+[  3369.0s] applied memgas@0x70720 in 28.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.0)]
+[  3387.9s] reachability check 17.5s at 0x70824 -> True
+[  3426.6s] applied memgas@0x70e14 in 29.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.0)]
+[  3445.5s] reachability check 17.6s at 0x70f1d -> True
+[  3462.9s] reachability check 15.8s at 0x70f1d -> True
+[  3482.5s] reachability check 19.6s at 0x70824 -> True
+[  3502.5s] reachability check 20.0s at 0x70293 -> True
+[  3519.7s] reachability check 17.2s at 0x6ffe4 -> True
+[  3534.9s] reachability check 15.2s at 0x6f5dd -> False
+[  3551.0s] reachability check 16.1s at 0x6f333 -> True
+[  3567.9s] reachability check 16.9s at 0x6f0d3 -> True
+[  3579.1s] reachability check 10.0s at 0x6efe5 -> False
+[  3597.3s] reachability check 18.1s at 0x6f0c2 -> True
+[  4049.3s] applied copy_loop@0x6ee68 in 451.9s: slow records [('copy_domain', 'unsat', 67.7), ('copy_param_entry', 'unsat', 29.9), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 90.1)]
+[  4049.4s] progress: executed 720 live 0 final/cut (0, 4) reach 417 checks 1219.9s pruned 108
+   top blocks: [('0x6ee68', 4), ('0x6efca', 4), ('0x6efb9', 3), ('0x6efbe', 3), ('0x699ca', 2), ('0x6a116', 2), ('0x6add8', 2), ('0x6afd0', 2), ('0x6aff2', 2), ('0x6b131', 2), ('0x6b1d6', 2), ('0x6c078', 2)]
+   top forks: [('0x6efca', 4), ('0x6add8', 2), ('0x6b131', 2), ('0x6c078', 2), ('0x6c3d1', 2), ('0x6d318', 2), ('0x6d671', 2), ('0x6ec71', 2), ('0x6ee43', 2), ('0x6ee96', 2), ('0x6ef69', 2), ('0x6ef89', 2)]
+   summaries: {'seconds': 2603.04036923698, 'memgas@0x6992d': 1, 'memgas@0x69b4d': 1, 'memgas@0x6a075': 1, 'mul@0x6a2a1': 1, 'memgas@0x6a42d': 1, 'memgas@0x6a6c0': 1, 'memgas@0x6a9ed': 1, 'mul@0x6abf7': 1, 'memgas@0x6ade0': 1, 'copy_loop@0x6afd0': 1, 'memgas@0x6b134': 1, 'memgas@0x6b394': 1, 'memgas@0x6b5cd': 1, 'mul@0x6b756': 1, 'memgas@0x6b960': 1, 'memgas@0x6bbad': 1, 'memgas@0x6c080': 1, 'copy_loop@0x6c270': 1, 'memgas@0x6c3d4': 1, 'memgas@0x6c634': 1, 'memgas@0x6c86d': 1, 'mul@0x6c9f6': 1, 'memgas@0x6cc00': 1, 'memgas@0x6ce4d': 1, 'memgas@0x6d320': 1, 'copy_loop@0x6d510': 1, 'memgas@0x6d674': 1, 'memgas@0x6d8d4': 1, 'memgas@0x6de2d': 1, 'memgas@0x6e06d': 1, 'div@0x6e22d': 1, 'mul@0x6e383': 1, 'memgas@0x6e5f4': 1, 'memgas@0x6e834': 1, 'memgas@0x6ec74': 1, 'copy_loop@0x6ee68': 3, 'memgas@0x6efcd': 2, 'memgas@0x6f22d': 2, 'memgas@0x6f4d6': 2, 'div@0x6fc70': 2, 'memgas@0x6fee0': 2, 'memgas@0x7018d': 2, 'memgas@0x70720': 2, 'div@0x70b93': 2, 'memgas@0x70e14': 2}
+   complement: {'hit': 40, 'seconds': 22.170820345025277}
+[  4061.9s] reachability check 11.2s at 0x6f0c2 -> False
+[  4078.4s] reachability check 15.0s at 0x6f0c2 -> False
+[  4096.5s] reachability check 16.7s at 0x6efaf -> True
+[  4106.2s] reachability check 8.1s at 0x6efca -> False
+[  4128.2s] reachability check 18.7s at 0x6efca -> True
+[  4159.0s] applied memgas@0x6efcd in 29.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.2)]
+[  4177.9s] reachability check 18.8s at 0x6efd6 -> True
+[  4200.6s] reachability check 21.5s at 0x6f0d3 -> True
+[  4236.8s] applied memgas@0x6f22d in 29.0s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.0)]
+[  4256.4s] reachability check 18.1s at 0x6f333 -> True
+[  4294.6s] applied memgas@0x6f4d6 in 29.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.1)]
+[  4315.1s] reachability check 19.1s at 0x6f5dd -> True
+[  4357.4s] applied memgas@0x6fee0 in 30.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 29.1)]
+[  4378.7s] reachability check 19.4s at 0x6ffe4 -> True
+[  4416.4s] applied memgas@0x7018d in 29.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.1)]
+[  4438.9s] reachability check 21.0s at 0x70293 -> True
+[  4476.4s] applied memgas@0x70720 in 28.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.8)]
+[  4496.6s] reachability check 18.5s at 0x70824 -> True
+[  4533.5s] applied memgas@0x70e14 in 28.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.6)]
+[  4552.6s] reachability check 17.7s at 0x70f1d -> True
+[  4571.4s] reachability check 17.4s at 0x70f1d -> True
+[  4589.8s] reachability check 18.4s at 0x70824 -> True
+[  4607.2s] reachability check 17.4s at 0x70293 -> True
+[  4623.8s] reachability check 16.6s at 0x6ffe4 -> True
+[  4642.4s] reachability check 18.6s at 0x6f5dd -> True
+[  4658.9s] reachability check 16.5s at 0x6f333 -> False
+[  4679.6s] reachability check 20.6s at 0x6f0d3 -> True
+[  4696.9s] reachability check 15.9s at 0x6f059 -> True
+[  4704.4s] reachability check 7.5s at 0x6efe5 -> False
+[  4720.8s] reachability check 16.4s at 0x6f059 -> True
+[  4729.6s] reachability check 8.8s at 0x6f0c2 -> False
+[  4747.4s] reachability check 17.8s at 0x6ee03 -> True
+[  4763.7s] reachability check 16.2s at 0x6ed92 -> True
+[  4772.1s] reachability check 7.3s at 0x6ec8c -> False
+[  4788.8s] reachability check 16.7s at 0x6edf2 -> True
+[  4805.1s] reachability check 16.3s at 0x6edf2 -> True
+[  4839.5s] applied memgas@0x6ec74 in 30.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.5)]
+[  4865.9s] reachability check 18.6s at 0x6ee3c -> True
+[  4883.5s] reachability check 17.5s at 0x6ee65 -> True
+[  5170.0s] applied copy_loop@0x6ee68 in 286.5s: slow records [('entry', 'sat', 38.9), ('copy_domain', 'unsat', 30.5), ('copy_param_entry', 'unsat', 27.1), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 83.8)]
+[  5177.4s] reachability check 6.2s at 0x6f0c2 -> False
+[  5186.4s] reachability check 7.8s at 0x6f0c2 -> False
+[  5205.2s] reachability check 17.4s at 0x6efaf -> True
+[  5213.1s] reachability check 6.5s at 0x6efca -> False
+[  5231.7s] reachability check 15.6s at 0x6efca -> True
+[  5262.4s] applied memgas@0x6efcd in 29.5s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.5)]
+[  5279.3s] reachability check 16.9s at 0x6efd6 -> True
+[  5296.9s] reachability check 16.2s at 0x6f0d3 -> True
+[  5337.8s] applied memgas@0x6f22d in 31.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 29.1)]
+[  5358.5s] reachability check 19.0s at 0x6f333 -> True
+[  5397.5s] applied memgas@0x6f4d6 in 30.5s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.7)]
+[  5416.7s] reachability check 18.0s at 0x6f5dd -> True
+[  5460.7s] applied memgas@0x6fee0 in 32.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 30.1)]
+[  5511.0s] applied memgas@0x7018d in 33.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 31.2)]
+[  5518.6s] reachability check 6.0s at 0x70293 -> False
+[  5560.6s] applied memgas@0x70720 in 31.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 29.7)]
+[  5603.2s] applied memgas@0x70e14 in 29.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.3)]
+[  5610.6s] reachability check 5.8s at 0x70f1d -> False
+[  5634.3s] reachability check 17.6s at 0x6f5dd -> True
+[  5651.0s] reachability check 16.6s at 0x6f333 -> False
+[  5671.2s] reachability check 20.2s at 0x6f0d3 -> True
+[  5681.5s] reachability check 9.1s at 0x6f059 -> True
+[  5686.5s] reachability check 5.0s at 0x6efe5 -> False
+[  5694.4s] reachability check 7.8s at 0x6f0c2 -> False
+[  5705.2s] reachability check 9.3s at 0x6ee65 -> True
+[  6001.3s] applied copy_loop@0x6ee68 in 296.1s: slow records [('copy_domain', 'unsat', 29.3), ('copy_param_entry', 'unsat', 28.3), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 91.0)]
+[  6001.5s] progress: executed 1010 live 0 final/cut (0, 4) reach 534 checks 1963.4s pruned 138
+   top blocks: [('0x6efca', 8), ('0x6efb9', 7), ('0x6efbe', 7), ('0x6ee68', 6), ('0x6ee43', 4), ('0x6ee65', 4), ('0x6ee96', 4), ('0x6ef69', 4), ('0x6ef89', 4), ('0x6efa5', 4), ('0x6efc7', 4), ('0x6f071', 4)]
+   top forks: [('0x6efca', 8), ('0x6ee43', 4), ('0x6ee96', 4), ('0x6ef69', 4), ('0x6ef89', 4), ('0x6efb9', 4), ('0x6efbe', 4), ('0x6f071', 4), ('0x6f2d1', 4), ('0x6f57d', 4), ('0x6ff84', 4), ('0x70231', 4)]
+   summaries: {'seconds': 3643.5788920469786, 'memgas@0x6992d': 1, 'memgas@0x69b4d': 1, 'memgas@0x6a075': 1, 'mul@0x6a2a1': 1, 'memgas@0x6a42d': 1, 'memgas@0x6a6c0': 1, 'memgas@0x6a9ed': 1, 'mul@0x6abf7': 1, 'memgas@0x6ade0': 1, 'copy_loop@0x6afd0': 1, 'memgas@0x6b134': 1, 'memgas@0x6b394': 1, 'memgas@0x6b5cd': 1, 'mul@0x6b756': 1, 'memgas@0x6b960': 1, 'memgas@0x6bbad': 1, 'memgas@0x6c080': 1, 'copy_loop@0x6c270': 1, 'memgas@0x6c3d4': 1, 'memgas@0x6c634': 1, 'memgas@0x6c86d': 1, 'mul@0x6c9f6': 1, 'memgas@0x6cc00': 1, 'memgas@0x6ce4d': 1, 'memgas@0x6d320': 1, 'copy_loop@0x6d510': 1, 'memgas@0x6d674': 1, 'memgas@0x6d8d4': 1, 'memgas@0x6de2d': 1, 'memgas@0x6e06d': 1, 'div@0x6e22d': 1, 'mul@0x6e383': 1, 'memgas@0x6e5f4': 1, 'memgas@0x6e834': 1, 'memgas@0x6ec74': 2, 'copy_loop@0x6ee68': 5, 'memgas@0x6efcd': 4, 'memgas@0x6f22d': 4, 'memgas@0x6f4d6': 4, 'div@0x6fc70': 4, 'memgas@0x6fee0': 4, 'memgas@0x7018d': 4, 'memgas@0x70720': 4, 'div@0x70b93': 4, 'memgas@0x70e14': 4}
+   complement: {'hit': 55, 'seconds': 42.23157606802852}
+[  6010.3s] reachability check 7.7s at 0x6f0c2 -> False
+[  6020.2s] reachability check 7.8s at 0x6f0c2 -> False
+[  6029.6s] reachability check 7.9s at 0x6efaf -> False
+[  6055.3s] reachability check 17.3s at 0x6efca -> True
+[  6089.3s] applied memgas@0x6efcd in 32.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.8)]
+[  6106.2s] reachability check 16.7s at 0x6efd6 -> True
+[  6129.8s] reachability check 20.0s at 0x6f0d3 -> True
+[  6166.2s] applied memgas@0x6f22d in 29.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.8)]
+[  6186.3s] reachability check 18.7s at 0x6f333 -> True
+[  6228.4s] applied memgas@0x6f4d6 in 33.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 30.8)]
+[  6249.5s] reachability check 19.3s at 0x6f5dd -> True
+[  6292.0s] applied memgas@0x6fee0 in 31.0s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.4)]
+[  6311.1s] reachability check 17.2s at 0x6ffe4 -> True
+[  6345.9s] applied memgas@0x7018d in 27.7s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.9)]
+[  6368.3s] reachability check 20.9s at 0x70293 -> True
+[  6407.1s] applied memgas@0x70720 in 29.7s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.0)]
+[  6426.7s] reachability check 17.5s at 0x70824 -> True
+[  6463.8s] applied memgas@0x70e14 in 28.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.0)]
+[  6484.4s] reachability check 19.3s at 0x70f1d -> True
+[  6506.1s] reachability check 16.6s at 0x70f1d -> True
+[  6522.6s] reachability check 16.4s at 0x70824 -> True
+[  6540.9s] reachability check 18.3s at 0x70293 -> True
+[  6559.2s] reachability check 18.3s at 0x6ffe4 -> True
+[  6576.2s] reachability check 17.0s at 0x6f5dd -> True
+[  6592.1s] reachability check 15.9s at 0x6f333 -> False
+[  6611.6s] reachability check 19.4s at 0x6f0d3 -> True
+[  6630.6s] reachability check 17.9s at 0x6f059 -> True
+[  6648.3s] reachability check 17.5s at 0x6f059 -> True
+[  6930.3s] applied copy_loop@0x6ee68 in 282.0s: slow records [('copy_domain', 'unsat', 30.0), ('copy_param_entry', 'unsat', 27.4), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 85.0)]
+[  6939.8s] reachability check 8.0s at 0x6f0c2 -> False
+[  6948.5s] reachability check 7.4s at 0x6f0c2 -> False
+[  6957.7s] reachability check 7.8s at 0x6efaf -> False
+[  6967.7s] reachability check 8.8s at 0x6efca -> False
+[  6987.1s] reachability check 16.9s at 0x6efca -> True
+[  7015.5s] applied memgas@0x6efcd in 27.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 24.6)]
+[  7035.6s] reachability check 19.9s at 0x6efd6 -> True
+[  7055.4s] reachability check 18.7s at 0x6f0d3 -> True
+[  7092.2s] applied memgas@0x6f22d in 29.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.7)]
+[  7111.5s] reachability check 18.3s at 0x6f333 -> False
+[  7152.2s] applied memgas@0x6f4d6 in 30.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.4)]
+[  7172.1s] reachability check 18.1s at 0x6f5dd -> True
+[  7214.1s] applied memgas@0x6fee0 in 31.5s: slow records [('memgas_exit_guard_excluded', 'unsat', 29.7)]
+[  7235.4s] reachability check 19.7s at 0x6ffe4 -> True
+[  7274.5s] applied memgas@0x7018d in 29.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.1)]
+[  7297.1s] reachability check 21.1s at 0x70293 -> True
+[  7335.4s] applied memgas@0x70720 in 28.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.2)]
+[  7354.4s] reachability check 17.8s at 0x70824 -> True
+[  7392.1s] applied memgas@0x70e14 in 28.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.0)]
+[  7413.5s] reachability check 19.9s at 0x70f1d -> True
+[  7436.9s] reachability check 18.4s at 0x70f1d -> True
+[  7457.8s] reachability check 20.9s at 0x70824 -> True
+[  7479.4s] reachability check 21.6s at 0x70293 -> True
+[  7498.4s] reachability check 19.0s at 0x6ffe4 -> True
+[  7518.0s] reachability check 19.6s at 0x6f5dd -> True
+[  7538.1s] reachability check 20.1s at 0x6f0d3 -> True
+[  7550.4s] reachability check 11.4s at 0x6f059 -> True
+[  7557.5s] reachability check 7.1s at 0x6efe5 -> False
+[  7576.2s] reachability check 18.5s at 0x6e93d -> True
+[  7594.5s] reachability check 18.3s at 0x6e92c -> True
+[  7604.6s] reachability check 9.6s at 0x6d68c -> False
+[  7615.0s] reachability check 9.8s at 0x6d50d -> True
+[  7767.2s] applied copy_loop@0x6d510 in 152.2s: slow records [('copy_domain', 'unsat', 20.7), ('copy_param_entry', 'unsat', 8.2), ('copy_param_result', 'unsat', 25.9)]
+[  7777.4s] reachability check 9.7s at 0x6d76c -> False
+[  7788.3s] reachability check 10.6s at 0x6d76c -> False
+[  7796.2s] reachability check 7.5s at 0x6d656 -> False
+[  7806.0s] reachability check 7.4s at 0x6d671 -> True
+[  7806.3s] progress: executed 1288 live 0 final/cut (0, 4) reach 643 checks 2752.8s pruned 160
+   top blocks: [('0x6efca', 12), ('0x6efb9', 9), ('0x6efbe', 9), ('0x6ee68', 7), ('0x6ee96', 6), ('0x6ef69', 6), ('0x6ef89', 6), ('0x6efa5', 6), ('0x6efc7', 6), ('0x6f071', 6), ('0x6f07a', 6), ('0x6f0b2', 6)]
+   top forks: [('0x6efca', 12), ('0x6ee96', 6), ('0x6ef69', 6), ('0x6ef89', 6), ('0x6efb9', 6), ('0x6efbe', 6), ('0x6f071', 6), ('0x6f2d1', 6), ('0x6f57d', 6), ('0x6ff84', 6), ('0x70231', 6), ('0x707c4', 6)]
+   summaries: {'seconds': 4499.841402254977, 'memgas@0x6992d': 1, 'memgas@0x69b4d': 1, 'memgas@0x6a075': 1, 'mul@0x6a2a1': 1, 'memgas@0x6a42d': 1, 'memgas@0x6a6c0': 1, 'memgas@0x6a9ed': 1, 'mul@0x6abf7': 1, 'memgas@0x6ade0': 1, 'copy_loop@0x6afd0': 1, 'memgas@0x6b134': 1, 'memgas@0x6b394': 1, 'memgas@0x6b5cd': 1, 'mul@0x6b756': 1, 'memgas@0x6b960': 1, 'memgas@0x6bbad': 1, 'memgas@0x6c080': 1, 'copy_loop@0x6c270': 1, 'memgas@0x6c3d4': 1, 'memgas@0x6c634': 1, 'memgas@0x6c86d': 1, 'mul@0x6c9f6': 1, 'memgas@0x6cc00': 1, 'memgas@0x6ce4d': 1, 'memgas@0x6d320': 1, 'copy_loop@0x6d510': 2, 'memgas@0x6d674': 1, 'memgas@0x6d8d4': 1, 'memgas@0x6de2d': 1, 'memgas@0x6e06d': 1, 'div@0x6e22d': 1, 'mul@0x6e383': 1, 'memgas@0x6e5f4': 1, 'memgas@0x6e834': 1, 'memgas@0x6ec74': 2, 'copy_loop@0x6ee68': 6, 'memgas@0x6efcd': 6, 'memgas@0x6f22d': 6, 'memgas@0x6f4d6': 6, 'div@0x6fc70': 6, 'memgas@0x6fee0': 6, 'memgas@0x7018d': 6, 'memgas@0x70720': 6, 'div@0x70b93': 6, 'memgas@0x70e14': 6}
+   complement: {'hit': 69, 'seconds': 61.14405320701917}
+[  7815.7s] applied memgas@0x6d674 in 9.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 8.4)]
+[  7824.5s] reachability check 8.3s at 0x6d77d -> True
+[  7835.6s] applied memgas@0x6d8d4 in 8.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 7.6)]
+[  7844.4s] reachability check 8.3s at 0x6d9dd -> False
+[  7854.7s] applied memgas@0x6de2d in 8.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 7.6)]
+[  7865.4s] reachability check 10.4s at 0x6df33 -> False
+[  7876.8s] applied memgas@0x6e06d in 8.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 8.3)]
+[  7956.3s] applied mul@0x6e383 in 74.7s: slow records [('effect_0', 'unsat', 51.0)]
+[  7989.7s] applied memgas@0x6e5f4 in 27.0s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.8)]
+[  8007.9s] reachability check 15.8s at 0x6e92c -> True
+[  8023.4s] reachability check 14.5s at 0x6e92c -> True
+[  8032.7s] reachability check 8.3s at 0x6e814 -> False
+[  8039.6s] reachability check 6.0s at 0x6e831 -> False
+[  8058.1s] reachability check 16.3s at 0x6e831 -> True
+[  8087.5s] applied memgas@0x6e834 in 28.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.8)]
+[  8106.4s] reachability check 18.7s at 0x6e83d -> True
+[  8123.5s] reachability check 15.9s at 0x6e93d -> True
+[  8142.9s] reachability check 18.3s at 0x6edf2 -> True
+[  8159.5s] reachability check 15.2s at 0x6ebf9 -> True
+[  8166.3s] reachability check 5.8s at 0x6edf2 -> False
+[  8181.3s] reachability check 15.0s at 0x6ec1e -> True
+[  8196.9s] reachability check 14.7s at 0x6edf2 -> True
+[  8205.9s] reachability check 8.9s at 0x6ec31 -> True
+[  8223.3s] reachability check 16.5s at 0x6ec52 -> True
+[  8243.0s] reachability check 14.4s at 0x6ec71 -> True
+[  8306.2s] applied memgas@0x6ec74 in 63.2s: slow records [('entry', 'sat', 36.1), ('memgas_exit_guard_excluded', 'unsat', 25.1)]
+[  8330.0s] reachability check 16.6s at 0x6ed92 -> True
+[  8347.0s] reachability check 14.9s at 0x6ee03 -> True
+[  8364.3s] reachability check 15.8s at 0x6ee3c -> True
+[  8380.4s] reachability check 16.0s at 0x6ee65 -> True
+[  8809.6s] applied copy_loop@0x6ee68 in 429.2s: slow records [('entry', 'sat', 38.9), ('copy_domain', 'unsat', 63.1), ('copy_param_entry', 'unsat', 26.7), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 82.5)]
+[  8819.2s] reachability check 8.2s at 0x6f0c2 -> False
+[  8842.5s] reachability check 16.0s at 0x6efca -> True
+[  8871.8s] applied memgas@0x6efcd in 28.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.6)]
+[  8887.0s] reachability check 15.1s at 0x6efd6 -> True
+[  8903.2s] reachability check 15.0s at 0x6f0d3 -> True
+[  8939.2s] applied memgas@0x6f22d in 27.7s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.1)]
+[  8954.4s] reachability check 14.1s at 0x6f333 -> False
+[  8992.4s] applied memgas@0x6f4d6 in 30.7s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.4)]
+[  9011.3s] reachability check 17.6s at 0x6f5dd -> True
+[  9035.9s] applied div@0x6fc70 in 23.0s: slow records []
+[  9075.6s] applied memgas@0x6fee0 in 30.5s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.2)]
+[  9118.5s] applied memgas@0x7018d in 30.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.9)]
+[  9136.5s] reachability check 16.8s at 0x70293 -> True
+[  9175.8s] applied memgas@0x70720 in 29.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.4)]
+[  9193.5s] reachability check 16.4s at 0x70824 -> True
+[  9199.9s] applied div@0x70b93 in 6.2s: slow records []
+[  9238.4s] applied memgas@0x70e14 in 30.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.7)]
+[  9261.5s] reachability check 16.6s at 0x70824 -> True
+[  9279.2s] reachability check 17.7s at 0x70293 -> True
+[  9296.9s] reachability check 17.7s at 0x6f5dd -> True
+[  9312.9s] reachability check 16.0s at 0x6f0d3 -> True
+[  9324.0s] reachability check 10.1s at 0x6f059 -> True
+[  9344.8s] reachability check 19.1s at 0x6ee65 -> True
+[  9836.2s] applied copy_loop@0x6ee68 in 491.4s: slow records [('entry', 'sat', 45.4), ('copy_domain', 'unsat', 62.8), ('copy_param_entry', 'unsat', 26.3), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 93.8)]
+[  9836.2s] progress: executed 1510 live 0 final/cut (0, 1) reach 757 checks 3279.6s pruned 188
+   top blocks: [('0x6efca', 14), ('0x6efb9', 10), ('0x6efbe', 10), ('0x6ee68', 9), ('0x6ee96', 7), ('0x6ef69', 7), ('0x6ef89', 7), ('0x6efa5', 7), ('0x6efc7', 7), ('0x6f071', 7), ('0x6f07a', 7), ('0x6f0b2', 7)]
+   top forks: [('0x6efca', 14), ('0x6ee96', 7), ('0x6ef69', 7), ('0x6ef89', 7), ('0x6efb9', 7), ('0x6efbe', 7), ('0x6f071', 7), ('0x6f2d1', 7), ('0x6f57d', 7), ('0x6ff84', 7), ('0x70231', 7), ('0x707c4', 7)]
+   summaries: {'seconds': 5888.890459464979, 'memgas@0x6992d': 1, 'memgas@0x69b4d': 1, 'memgas@0x6a075': 1, 'mul@0x6a2a1': 1, 'memgas@0x6a42d': 1, 'memgas@0x6a6c0': 1, 'memgas@0x6a9ed': 1, 'mul@0x6abf7': 1, 'memgas@0x6ade0': 1, 'copy_loop@0x6afd0': 1, 'memgas@0x6b134': 1, 'memgas@0x6b394': 1, 'memgas@0x6b5cd': 1, 'mul@0x6b756': 1, 'memgas@0x6b960': 1, 'memgas@0x6bbad': 1, 'memgas@0x6c080': 1, 'copy_loop@0x6c270': 1, 'memgas@0x6c3d4': 1, 'memgas@0x6c634': 1, 'memgas@0x6c86d': 1, 'mul@0x6c9f6': 1, 'memgas@0x6cc00': 1, 'memgas@0x6ce4d': 1, 'memgas@0x6d320': 1, 'copy_loop@0x6d510': 2, 'memgas@0x6d674': 2, 'memgas@0x6d8d4': 2, 'memgas@0x6de2d': 2, 'memgas@0x6e06d': 2, 'div@0x6e22d': 2, 'mul@0x6e383': 2, 'memgas@0x6e5f4': 2, 'memgas@0x6e834': 2, 'memgas@0x6ec74': 3, 'copy_loop@0x6ee68': 8, 'memgas@0x6efcd': 7, 'memgas@0x6f22d': 7, 'memgas@0x6f4d6': 7, 'div@0x6fc70': 7, 'memgas@0x6fee0': 7, 'memgas@0x7018d': 7, 'memgas@0x70720': 7, 'div@0x70b93': 7, 'memgas@0x70e14': 7}
+   complement: {'hit': 83, 'seconds': 74.10361504901084}
+[  9845.2s] reachability check 7.5s at 0x6f0c2 -> False
+[  9872.3s] reachability check 16.2s at 0x6efca -> True
+[  9936.4s] applied memgas@0x6efcd in 64.0s: slow records [('entry', 'sat', 36.2), ('memgas_exit_guard_excluded', 'unsat', 25.6)]
+[  9953.2s] reachability check 15.2s at 0x6f0d3 -> True
+[  9985.9s] applied memgas@0x6f22d in 26.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 24.9)]
+[ 10024.2s] applied memgas@0x6f4d6 in 26.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.0)]
+[ 10064.2s] applied memgas@0x6fee0 in 27.0s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.5)]
+[ 10100.4s] applied memgas@0x7018d in 26.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.3)]
+[ 10119.0s] reachability check 17.5s at 0x70293 -> True
+[ 10153.1s] applied memgas@0x70720 in 26.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 24.7)]
+[ 10169.7s] reachability check 15.6s at 0x70824 -> True
+[ 10206.6s] applied memgas@0x70e14 in 28.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.6)]
+[ 10224.4s] reachability check 16.6s at 0x70f1d -> True
+[ 10250.4s] reachability check 17.9s at 0x6f0d3 -> True
+[ 10709.8s] applied copy_loop@0x6ee68 in 457.7s: slow records [('copy_domain', 'unsat', 65.4), ('copy_param_entry', 'unsat', 30.5), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 88.1)]
+[ 10719.8s] reachability check 8.4s at 0x6f0c2 -> False
+[ 10729.5s] reachability check 8.0s at 0x6f0c2 -> False
+[ 10738.8s] reachability check 8.1s at 0x6efaf -> False
+[ 10762.3s] reachability check 17.4s at 0x6efca -> True
+[ 10792.9s] applied memgas@0x6efcd in 29.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.6)]
+[ 10810.1s] reachability check 17.1s at 0x6efd6 -> True
+[ 10827.9s] reachability check 16.6s at 0x6f0d3 -> True
+[ 10863.8s] applied memgas@0x6f22d in 28.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.3)]
+[ 10882.4s] reachability check 17.5s at 0x6f333 -> True
+[ 10918.4s] applied memgas@0x6f4d6 in 28.7s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.0)]
+[ 10938.5s] reachability check 18.7s at 0x6f5dd -> True
+[ 10979.2s] applied memgas@0x6fee0 in 31.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 29.6)]
+[ 10998.4s] reachability check 18.0s at 0x6ffe4 -> True
+[ 11033.7s] applied memgas@0x7018d in 29.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.5)]
+[ 11054.9s] reachability check 20.1s at 0x70293 -> True
+[ 11092.2s] applied memgas@0x70720 in 29.3s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.8)]
+[ 11110.6s] reachability check 17.4s at 0x70824 -> True
+[ 11149.9s] applied memgas@0x70e14 in 29.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.6)]
+[ 11161.5s] reachability check 10.5s at 0x70f1d -> False
+[ 11181.6s] reachability check 18.7s at 0x70824 -> True
+[ 11200.2s] reachability check 18.7s at 0x70293 -> True
+[ 11218.2s] reachability check 17.9s at 0x6ffe4 -> True
+[ 11235.9s] reachability check 17.8s at 0x6f5dd -> True
+[ 11253.6s] reachability check 17.6s at 0x6f333 -> False
+[ 11271.4s] reachability check 17.8s at 0x6f0d3 -> True
+[ 11283.9s] reachability check 11.5s at 0x6f059 -> True
+[ 11303.1s] reachability check 16.2s at 0x6ee03 -> True
+[ 11320.0s] reachability check 16.8s at 0x6ed92 -> True
+[ 11341.6s] reachability check 15.5s at 0x6edf2 -> True
+[ 11358.0s] reachability check 16.4s at 0x6edf2 -> True
+[ 11389.2s] applied memgas@0x6ec74 in 27.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.1)]
+[ 11413.1s] reachability check 15.9s at 0x6ee3c -> True
+[ 11430.1s] reachability check 17.0s at 0x6ee65 -> True
+[ 11717.9s] applied copy_loop@0x6ee68 in 287.8s: slow records [('entry', 'sat', 37.1), ('copy_domain', 'unsat', 29.8), ('copy_param_entry', 'unsat', 26.7), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 85.1)]
+[ 11717.9s] progress: executed 1786 live 0 final/cut (0, 1) reach 870 checks 3816.4s pruned 220
+   top blocks: [('0x6efca', 18), ('0x6efb9', 12), ('0x6efbe', 12), ('0x6ee68', 11), ('0x6ee96', 9), ('0x6ef69', 9), ('0x6ef89', 9), ('0x6efa5', 9), ('0x6efc7', 9), ('0x6f071', 9), ('0x6f07a', 9), ('0x6f0b2', 9)]
+   top forks: [('0x6efca', 18), ('0x6ee96', 9), ('0x6ef69', 9), ('0x6ef89', 9), ('0x6efb9', 9), ('0x6efbe', 9), ('0x6f071', 9), ('0x6f2d1', 9), ('0x6f57d', 9), ('0x6ff84', 9), ('0x70231', 9), ('0x707c4', 9)]
+   summaries: {'seconds': 7097.601674622005, 'memgas@0x6992d': 1, 'memgas@0x69b4d': 1, 'memgas@0x6a075': 1, 'mul@0x6a2a1': 1, 'memgas@0x6a42d': 1, 'memgas@0x6a6c0': 1, 'memgas@0x6a9ed': 1, 'mul@0x6abf7': 1, 'memgas@0x6ade0': 1, 'copy_loop@0x6afd0': 1, 'memgas@0x6b134': 1, 'memgas@0x6b394': 1, 'memgas@0x6b5cd': 1, 'mul@0x6b756': 1, 'memgas@0x6b960': 1, 'memgas@0x6bbad': 1, 'memgas@0x6c080': 1, 'copy_loop@0x6c270': 1, 'memgas@0x6c3d4': 1, 'memgas@0x6c634': 1, 'memgas@0x6c86d': 1, 'mul@0x6c9f6': 1, 'memgas@0x6cc00': 1, 'memgas@0x6ce4d': 1, 'memgas@0x6d320': 1, 'copy_loop@0x6d510': 2, 'memgas@0x6d674': 2, 'memgas@0x6d8d4': 2, 'memgas@0x6de2d': 2, 'memgas@0x6e06d': 2, 'div@0x6e22d': 2, 'mul@0x6e383': 2, 'memgas@0x6e5f4': 2, 'memgas@0x6e834': 2, 'memgas@0x6ec74': 4, 'copy_loop@0x6ee68': 10, 'memgas@0x6efcd': 9, 'memgas@0x6f22d': 9, 'memgas@0x6f4d6': 9, 'div@0x6fc70': 9, 'memgas@0x6fee0': 9, 'memgas@0x7018d': 9, 'memgas@0x70720': 9, 'div@0x70b93': 9, 'memgas@0x70e14': 9}
+   complement: {'hit': 98, 'seconds': 91.84189564701228}
+[ 11726.5s] reachability check 7.3s at 0x6f0c2 -> False
+[ 11752.1s] reachability check 15.7s at 0x6efca -> True
+[ 11784.2s] applied memgas@0x6efcd in 30.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.3)]
+[ 11800.9s] reachability check 16.7s at 0x6efd6 -> True
+[ 11820.8s] reachability check 18.7s at 0x6f0d3 -> True
+[ 11857.6s] applied memgas@0x6f22d in 29.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.5)]
+[ 11873.9s] reachability check 15.1s at 0x6f333 -> False
+[ 11913.4s] applied memgas@0x6f4d6 in 31.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 28.3)]
+[ 11919.9s] reachability check 5.2s at 0x6f5dd -> False
+[ 11958.0s] applied memgas@0x6fee0 in 28.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.3)]
+[ 11977.9s] reachability check 18.9s at 0x6ffe4 -> True
+[ 12012.7s] applied memgas@0x7018d in 28.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.7)]
+[ 12053.3s] applied memgas@0x70720 in 26.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.4)]
+[ 12094.5s] applied memgas@0x70e14 in 27.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.4)]
+[ 12100.9s] reachability check 5.2s at 0x70f1d -> False
+[ 12126.7s] reachability check 16.9s at 0x6f0d3 -> True
+[ 12145.3s] reachability check 17.6s at 0x6f059 -> True
+[ 12150.3s] reachability check 5.0s at 0x6efe5 -> False
+[ 12167.8s] reachability check 17.5s at 0x6f059 -> True
+[ 12177.4s] reachability check 8.5s at 0x6ee65 -> True
+[ 12444.3s] applied copy_loop@0x6ee68 in 266.9s: slow records [('copy_domain', 'unsat', 28.0), ('copy_param_entry', 'unsat', 25.0), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 82.9)]
+[ 12451.5s] reachability check 5.9s at 0x6f0c2 -> False
+[ 12458.8s] reachability check 6.4s at 0x6f0c2 -> False
+[ 12466.7s] reachability check 6.8s at 0x6efaf -> False
+[ 12485.7s] reachability check 15.0s at 0x6efca -> True
+[ 12514.3s] applied memgas@0x6efcd in 27.5s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.0)]
+[ 12530.0s] reachability check 15.5s at 0x6efd6 -> True
+[ 12546.2s] reachability check 15.1s at 0x6f0d3 -> True
+[ 12579.2s] applied memgas@0x6f22d in 26.6s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.1)]
+[ 12596.5s] reachability check 16.0s at 0x6f333 -> False
+[ 12630.0s] applied memgas@0x6f4d6 in 26.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.3)]
+[ 12647.1s] reachability check 15.9s at 0x6f5dd -> True
+[ 12682.8s] applied memgas@0x6fee0 in 27.1s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.6)]
+[ 12699.9s] reachability check 15.9s at 0x6ffe4 -> True
+[ 12732.1s] applied memgas@0x7018d in 25.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 24.4)]
+[ 12771.5s] applied memgas@0x70720 in 26.4s: slow records [('memgas_exit_guard_excluded', 'unsat', 24.7)]
+[ 12811.5s] applied memgas@0x70e14 in 27.7s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.0)]
+[ 12818.3s] reachability check 5.2s at 0x70f1d -> False
+[ 12843.8s] reachability check 15.5s at 0x6f0d3 -> True
+[ 12860.4s] reachability check 15.5s at 0x6f059 -> True
+[ 12870.6s] reachability check 10.2s at 0x6f059 -> True
+[ 13156.3s] applied copy_loop@0x6ee68 in 285.7s: slow records [('copy_domain', 'unsat', 28.7), ('copy_param_entry', 'unsat', 26.4), ('copy_progress_0', 'unsat', 1.2), ('effect_2_other', 'unsat', 1.2), ('copy_param_result', 'unsat', 88.7)]
+[ 13165.0s] reachability check 7.6s at 0x6f0c2 -> False
+[ 13181.3s] reachability check 8.8s at 0x6efca -> True
+[ 13212.6s] applied memgas@0x6efcd in 30.2s: slow records [('memgas_exit_guard_excluded', 'unsat', 27.1)]
+[ 13232.1s] reachability check 17.9s at 0x6f0d3 -> True
+[ 13266.0s] applied memgas@0x6f22d in 26.9s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.4)]
+[ 13283.3s] reachability check 16.3s at 0x6f333 -> True
+[ 13316.8s] applied memgas@0x6f4d6 in 27.0s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.6)]
+[ 13333.3s] reachability check 15.5s at 0x6f5dd -> True
+[ 13369.1s] applied memgas@0x6fee0 in 26.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.1)]
+[ 13385.8s] reachability check 15.5s at 0x6ffe4 -> True
+[ 13420.4s] applied memgas@0x7018d in 28.0s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.5)]
+[ 13437.9s] reachability check 16.2s at 0x70293 -> True
+[ 13472.4s] applied memgas@0x70720 in 26.7s: slow records [('memgas_exit_guard_excluded', 'unsat', 25.1)]
+[ 13490.8s] reachability check 17.2s at 0x70824 -> True
+[ 13526.6s] applied memgas@0x70e14 in 27.8s: slow records [('memgas_exit_guard_excluded', 'unsat', 26.1)]
+[ 13526.7s] progress: executed 2146 live 0 final/cut (0, 1) reach 986 checks 4297.3s pruned 252
+   top blocks: [('0x6efca', 24), ('0x6efb9', 15), ('0x6efbe', 15), ('0x6ee68', 13), ('0x6ee96', 12), ('0x6ef69', 12), ('0x6ef89', 12), ('0x6efa5', 12), ('0x6efc7', 12), ('0x6f071', 12), ('0x6f07a', 12), ('0x6f0b2', 12)]
+   top forks: [('0x6efca', 24), ('0x6ee96', 12), ('0x6ef69', 12), ('0x6ef89', 12), ('0x6efb9', 12), ('0x6efbe', 12), ('0x6f071', 12), ('0x6f2d1', 12), ('0x6f57d', 12), ('0x6ff84', 12), ('0x70231', 12), ('0x707c4', 12)]
+   summaries: {'seconds': 8239.451783774013, 'memgas@0x6992d': 1, 'memgas@0x69b4d': 1, 'memgas@0x6a075': 1, 'mul@0x6a2a1': 1, 'memgas@0x6a42d': 1, 'memgas@0x6a6c0': 1, 'memgas@0x6a9ed': 1, 'mul@0x6abf7': 1, 'memgas@0x6ade0': 1, 'copy_loop@0x6afd0': 1, 'memgas@0x6b134': 1, 'memgas@0x6b394': 1, 'memgas@0x6b5cd': 1, 'mul@0x6b756': 1, 'memgas@0x6b960': 1, 'memgas@0x6bbad': 1, 'memgas@0x6c080': 1, 'copy_loop@0x6c270': 1, 'memgas@0x6c3d4': 1, 'memgas@0x6c634': 1, 'memgas@0x6c86d': 1, 'mul@0x6c9f6': 1, 'memgas@0x6cc00': 1, 'memgas@0x6ce4d': 1, 'memgas@0x6d320': 1, 'copy_loop@0x6d510': 2, 'memgas@0x6d674': 2, 'memgas@0x6d8d4': 2, 'memgas@0x6de2d': 2, 'memgas@0x6e06d': 2, 'div@0x6e22d': 2, 'mul@0x6e383': 2, 'memgas@0x6e5f4': 2, 'memgas@0x6e834': 2, 'memgas@0x6ec74': 4, 'copy_loop@0x6ee68': 12, 'memgas@0x6efcd': 12, 'memgas@0x6f22d': 12, 'memgas@0x6f4d6': 12, 'div@0x6fc70': 12, 'memgas@0x6fee0': 12, 'memgas@0x7018d': 12, 'memgas@0x70720': 12, 'div@0x70b93': 12, 'memgas@0x70e14': 12}
+   complement: {'hit': 119, 'seconds': 116.75983265301329}
+[ 13543.8s] reachability check 16.0s at 0x70f1d -> True
+[ 13563.5s] reachability check 15.2s at 0x70f1d -> True
+[ 13580.2s] reachability check 16.7s at 0x70824 -> True
+[ 13595.0s] reachability check 14.8s at 0x70293 -> True
+[ 13612.8s] reachability check 17.8s at 0x6ffe4 -> True
+[ 13629.2s] reachability check 16.4s at 0x6f5dd -> True
+[ 13644.0s] reachability check 14.8s at 0x6f333 -> True
+[ 13660.8s] reachability check 16.8s at 0x6f0d3 -> True
+[ 13668.1s] reachability check 6.1s at 0x6efe5 -> False
+[ 13683.9s] reachability check 15.7s at 0x6edf2 -> True
+[ 13699.1s] reachability check 15.3s at 0x6e93d -> True
+[ 13715.8s] reachability check 15.7s at 0x6e8c5 -> True
+[ 13722.0s] reachability check 6.2s at 0x6e84c -> False
+[ 13731.2s] reachability check 9.2s at 0x6e8c5 -> False
+[ 13747.9s] reachability check 16.7s at 0x6e92c -> True
+[ 13763.2s] reachability check 15.2s at 0x6e92c -> True
+[ 13915.7s] applied copy_loop@0x6d510 in 151.9s: slow records [('copy_domain', 'unsat', 29.1), ('copy_param_entry', 'unsat', 7.8), ('copy_param_result', 'unsat', 27.0)]

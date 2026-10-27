@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|
 | PoolManager | 16670 sym7296 | `pair_4_84` unknown（26002s） | SDIV 符号分支树：x86 每个分支各有一个 `holiman_udiv`，参数只在本分支守卫下与 EVM 的 `holiman_udiv(|a|,|b|)` 相等，无条件的参数合并全部失败；另外节点内被提升的 unify 路线占去一半预算，守卫情形的快速查询受进程状态影响 | 9（守卫分情形）、10（排序键记忆化）、16（被提升路线的份额上限）、18（新 Context 中的快速情形查询 + 早期 `guardsq` 路线） | goal 2 生产 `_check` **36.2s proved**（修法 18 之后；之前 1326.6s）；m=768 的 `pair_2_74` goal 2 5.4–923.6s（N2 节点内 10664.8s unknown）；**整节点 proved（7346.7s，80b4086）** |
 | Aave | 6182 | `pair_63_2` unknown（792.9s，12h 预算末尾） | 对应关系提议在 30s 内 unknown → 多个 x86 行成为 "all"（每行 95 个 pair；`pair_63_2` 单独 2121–2883s 可证）；其后是义务数（49 行 × 150–200 个 `x86_maps`，每个 30–90s，`normalize_word_arith` 占大头），以及少数很难的 maps（`x86_maps_2_7` 单独 2854s，靠补跑的 potential 求解） | 11（对应关系 blast 回退）、12（补跑求解按类提前）、14（normalize 记忆化）、17（stuck group 阶段在有产出时延长） | pair 阶段**没有 "all" 行**（`pair_63_2` 不再出现）；每行剩余的单独 maps 202 → 19；整节点见 §6 |
-| Aave | 7200 | x86 分段 12h 超时 | 每个 DIV 命中把 8 个栈 limb 各自用新缓存对整条 x86 内存链做 `forward_selects`（占 x86 分段 53%）；其次每个命中的 `entry` SAT 约 40s | 13（limb 转发共享缓存）、15（entry 模型复用） | DIV 重复命中 570–630s → **41–47s**；`entry` 需要求解的命中 32/55 → 4/51；整节点受本机内存限制（§6） |
+| Aave | 7200 | x86 分段 12h 超时 | 每个 DIV 命中把 8 个栈 limb 各自用新缓存对整条 x86 内存链做 `forward_selects`（占 x86 分段 53%）；其次每个命中的 `entry` SAT 约 40s | 13（limb 转发共享缓存）、15（entry 模型复用） | DIV 重复命中 570–630s → **41–47s**；`entry` 需要求解的命中 32/55 → 4/51；同样时间内执行的基本块约 2.6 倍（13527s 时 2146 个，N2 10800s 时 816 个）。**x86 分段仍未跑完**：单独运行 13500s 时 RSS 14.0GB 被 OOM 杀掉，还没有任何路径到达终点（§6、§8） |
 | PoolManager | 4418 | 两个实例 12h 预算耗尽；sym 的 `x86_maps_1_0` 13894s unknown | x86 876 条路径：内存扩展费代码里 `words == 0` 的分支在后面汇合，执行器不合并；x86 分段 90% 是可达性检查 | 未修（方向见 §2.4） | 用新对应关系重建的 `x86_maps_1_0` **0.1s proved**；1h 分诊见 §2.4 |
 
 修法编号接任务 N / N2（1–8）。全部只改 Python 端，没有按合约或块号特化。没有出现任何 SAT（反例），也没有发现编译器问题。
@@ -92,7 +92,8 @@
 
 ## 5. 测试结果
 
-- **全量快测**（`poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider`，串行，与 2 个整节点并行，代码 90de4cd）：**1801 passed, 3 skipped, 0 failed**（1210s）。日志 `cloud-inputs/n3/results/fast-tests-90de4cd.log`。
+- **全量快测（最终代码）**（`poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider -n 4 --dist=loadscope`，机器空闲，代码 f5915cb，即 80b4086 的代码）：**1804 passed, 3 skipped, 0 failed**（550.8s）。日志 `cloud-inputs/n3/results/fast-tests-final.log`（其中的 `budgets must be positive` 是参数校验测试预期的 stderr）。
+- 中间一次（代码 90de4cd，串行，与 2 个整节点并行）：1801 passed, 3 skipped, 0 failed（1210s），`results/fast-tests-90de4cd.log`。
 - 之前一次（代码 6522a8d 之后、两处测试更新之前）：1795 passed, 3 failed。三条失败：
   - `test_block_route_order.py::test_promoted_route_gets_half_of_what_is_left`：断言的是修法 16 之前的规则（被提升的路线总拿一半）。改为预置一个长的历史证明（上限不起作用，仍是一半），另加一条 `test_promoted_route_with_cheap_wins_gets_its_cap`（廉价历史 → 4 个查询超时）。
   - `test_block_correspondence.py::test_empty_probe_only_for_unknown_rows_without_sibling_proposal`：测试把某些行的增量查询强制为 unknown，用来检验"空行探测只给没有兄弟提议的 unknown 行"；修法 11 的 blast 回退把这两行真的解出来了（行 3 → EVM 0、行 4 → EVM 2，都正确）。测试同时把 `_blasted_model` 强制为 unknown，本意不变；回退本身另有测试。
@@ -138,7 +139,7 @@
 | Aave | 6182 | 90de4cd（修法 9–17） | 停止 | ~15700s | pair 阶段 736.5s，无 "all" 行；90 个 stuck 组全部 unsat；`_unify_node` 49.3s；行 0、1 完成（各 19 个单独 maps，832s / 716s）；之后 `x86_maps_2_7` 在节点内 >10000s 未完成（单独 2854s proved，§2.2）。按每行约 800s × 47 行估计 12h 跑不完，为了让 7200 单独运行而停止。`results/aave-6182-90de4cd-stopped.log` |
 | Aave | 7200 | b8b429d（修法 9–13） | OOM | 7253s | RSS 7.7GB 时被 cgroup 杀掉（同机 6182 5.4GB、16670 1.7GB） |
 | Aave | 7200 | 4db8738（修法 9–15） | OOM | 5435s | RSS 7.4GB（同机 6182 3.6GB、16670 1.8GB）；entry 求解 4/51 |
-| Aave | 7200 | a9068f3（= 80b4086，修法 9–18） | 运行中（单独） | — | 见下 |
+| Aave | 7200 | a9068f3（= 80b4086 的代码，修法 9–18） | OOM（单独运行） | ~13500s | 同机没有其他运行；RSS 14.0GB 时被 cgroup 杀掉。13526.7s 时执行 2146 个基本块、可达性检查 986 次（4297s）、剪掉 252 个分支，终止路径 0 条。DIV 重复命中 88–98s（含首次 lemma），没有 summary 被拒。`results/aave-7200-a9068f3-alone-oom.log` |
 | PoolManager | 4418 sym 1h | 6522a8d | 预算耗尽 | 3605.6s | 548 个查询，EVM 63 / x86 877；x86 分段约 2900s，没有进入 pair 阶段，没有失败。`results/pm-4418-sym-1h.{json,log}` |
 
 
@@ -155,7 +156,7 @@
 ## 8. 未解决的问题
 
 1. **Aave 6182 整节点没有在本机跑完。** 对应关系问题（"all" 行、`pair_63_2`）已消除；剩下的是义务数与个别难义务：49 个映射行，每行在 stuck 组之后还剩约 19 个单独的 `x86_maps`（约 40s 一个，`normalize_word_arith` 仍占大头），合计约 37000s；另有 `x86_maps_2_7` 一类（按 `stack_12_z0` 查表的大合取项）单独 2854s，只靠补跑的 potential 求解证出，节点内超过 10000s。方向：(a) 节点内并行（`BLOCK_PAIR_WORKERS`，这些 maps 互相独立）；(b) 对一行的 maps 共享同一个 `normalize_word_arith(premise ∧ x_j)`（目前每个 map 都对整式重新规范化，前提与路径部分完全相同）；(c) 对 `x86_maps_2_7` 这一类，修法 12 已让同类在第一次补跑胜出后提前补跑，但第一次仍要付全部路线；需要服务器整节点运行确认。
-2. **Aave 7200**：x86 分段本身的瓶颈已经去掉（修法 13、15），但进程内存在 5000–7000s 时到 7.4–7.7GB，本机与其他运行并行时两次被 OOM 杀掉。单独运行的结果见 §6 最后一行（运行中时以提交时为准）。剩余开销：copy-loop 命中（约 365s/次）、证书文本（`_solve` 中对每个查询 `sexpr()`，约 6%）、可达性检查（约 30%）。
+2. **Aave 7200**：单次 summary 命中的代价已经降下来（修法 13、15；DIV 570–630s → 41–98s，`entry` 求解 32/55 → 4/51），x86 分段的推进速度约为 N2 的 2.6 倍，但**分段本身仍跑不完**：单独运行 13500s 时执行了 2146 个基本块、没有任何路径到达终点，RSS 增长到 14.0GB 被 OOM 杀掉（每个已执行基本块约 6.5MB，N2 约 9.6MB，所以内存增长来自探索的状态数，而不是修法 13 的缓存）。现在的瓶颈与 4418 同类：路径数 / 状态内存（分段有 556 个条件跳转、180 个 ret，命中组在每条路径上重复）。方向：(a) 服务器上更大的内存（本机 15GB 不够）；(b) 状态合并或在汇合点丢弃已不可观测的状态；(c) 剩余单项开销：copy-loop 命中（约 365s/次）、可达性检查（约 30%）、证书文本（`_solve` 中每个查询的 `sexpr()`，约 6%）。
 3. **PoolManager 4418**：路径数类（x86 876–877 条路径，分段约 2700–2900s 且 90% 是可达性检查）。没有实现修法；方向见 §2.4（扩大 memgas 模板覆盖 `words == 0` 菱形，或执行器合并短菱形）。服务器上的 `x86_maps_1_0` 在本次对应关系下 0.1s 证出。
 4. **`_unify_node` 的预算**：16670 三次整节点里 `_unify_node` 都用了约 5350s（剩余预算的 1/4，修法 6 的上限）只得到 2 条引理；6182 只要 49s。失败的参数对每个约 28s（`_prove_equal` 的情形树）。可以考虑：节点级合并的单对预算降到快速查询级别，或按成功率提前停止（与修法 17 同样的规则）。本次没有改，因为 1327 等节点的节点级引理需要多久没有数据。
 5. **守卫情形快速查询的波动**（§2.1）：同一个情形在新进程里 3s 内 unsat，在节点里可能 unknown。修法 18 用新 Context 重试一次，生产 `_check` 上 36.2s、整节点 42.8s；更一般的做法（例如对所有快速查询都在新 Context 中重试）没有评估。
