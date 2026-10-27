@@ -15,6 +15,9 @@
   premise and the executor takes it as its path witness (Aave 7200: ~40s per entry).
 - Promoted route share capped at 8x its longest refutation in the class (PoolManager 16670:
   unify won the easy rows in <12s, then held half the node on the hard row).
+- Stuck x86_maps groups: the phase continues past its 10-timeout cap (up to 1/4 of what is
+  left) while at least half of the groups tried are proved (Aave Pool 6182: 32 groups in
+  300s, then thousands of members at ~30s each).
 - Normalisation memo: _rewrite_candidate / _inequality_text (Aave Pool 6182 x86_maps_0_85:
   normalisation 74.6s -> 34.9s, a sibling 65.1s -> 16.2s; same formula and lemmas).
 - _correspondence: a row whose quick solve is unknown gets its proposal from the
@@ -397,3 +400,32 @@ def test_promoted_route_is_capped_by_its_longest_refutation(monkeypatch):
 def test_promoted_route_without_cheap_history_keeps_half(monkeypatch):
     share = _share_harness(monkeypatch, {("unify", False): (1, 200.0), ("unify", False, "longest"): 200.0})
     assert 250 < share <= 300.5                            # min(half of what is left, 8 x 200s)
+
+
+def _stuck_phase(monkeypatch, wins):
+    """_prove_stuck_groups over 20 groups on a fake clock (each trial 10s); wins(n): proved?"""
+    clock = [0.0]
+    monkeypatch.setattr(be, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(be, "_pair_pool", lambda: None)
+
+    def trials(self, obligations, until):
+        clock[0] += 10
+        name = obligations[0][0]
+        n = int(name.rsplit("_", 1)[1])
+        return {name: be.Obligation(name, "q", "unsat")} if wins(n) else {}
+    monkeypatch.setattr(be.BlockEquivalenceProver, "_proved_trials", trials)
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=1000)
+    stuck = [(BoolVal(True), [(n, k) for k in range(3)]) for n in range(20)]
+    done = {}
+    prover._prove_stuck_groups(stuck, done, until=30, per_group=60, extend_until=150)
+    return done, clock[0]
+
+
+def test_productive_stuck_groups_run_past_the_cap(monkeypatch):
+    done, spent = _stuck_phase(monkeypatch, lambda n: True)
+    assert spent == 150 and len(done) == 15 * 3           # 15 groups, not the 3 the cap allows
+
+
+def test_unproductive_stuck_groups_stop_at_the_cap(monkeypatch):
+    done, spent = _stuck_phase(monkeypatch, lambda n: False)
+    assert spent == 30 and not done

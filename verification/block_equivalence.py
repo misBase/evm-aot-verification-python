@@ -3562,25 +3562,33 @@ class BlockEquivalenceProver:
             self.deadline = deadline
         return proved
 
-    def _prove_stuck_groups(self, stuck, done, until, per_group):
+    def _prove_stuck_groups(self, stuck, done, until, per_group, extend_until=None):
         """Full routes once per prefix group discharge_maps_by_prefix left
         unknown. The group query weakens each member's x86_maps query, so its
         proved record, renamed, proves each member; anything else proves
         nothing and leaves the members to their own routes. Widest groups
         first, one pool-width at a time, each capped at `per_group` seconds;
-        the phase stops at `until`."""
+        the phase stops at `until`, or, while at least half of the groups tried
+        so far were proved, at `extend_until` (a group stands for >= 3 member
+        proofs: Aave Pool 6182 groups refute in 4-17s each, while 49 rows x
+        150-200 members at ~30s each overran the 12h node once the 300s phase
+        ended after 32 groups)."""
         stuck = sorted(stuck, key=lambda group: -len(group[1]))
         pool = _pair_pool()
         width = getattr(pool, "_max_workers", 1) if pool is not None else 1
+        tried = won = 0
         for first in range(0, len(stuck), width):
             now = monotonic()
-            if now >= until:
+            end = until if extend_until is None or 2 * won < tried else max(until, extend_until)
+            if now >= end:
                 break
             chunk = list(enumerate(stuck[first:first + width], first))
             proved = self._proved_trials([(f"x86_maps_group_{n}", q, "") for n, (q, _) in chunk],
-                                         min(until, now + per_group))
+                                         min(end, now + per_group))
+            tried += len(chunk)
             for n, (_, entries) in chunk:
                 if f"x86_maps_group_{n}" in proved:
+                    won += 1
                     record = proved[f"x86_maps_group_{n}"]
                     done.update({(j, k): replace(record, name=f"x86_maps_{j}_{k}") for j, k in entries})
 
@@ -4221,12 +4229,14 @@ class BlockEquivalenceProver:
             premise, {j: x86[j].condition for j in {j for _, es in jobs.values() for j, _ in es}},
             list(jobs.values()), min(_QUICK_EXACT_MS, self.timeout_ms), share, stuck)
         # ponytail: groups of >= _STUCK_MIN_MEMBERS maps, <= 2 query timeouts each, the phase
-        # min(1/4 of what is left, 10 query timeouts); uncovered members use their own routes.
+        # min(1/4 of what is left, 10 query timeouts), longer (up to that 1/4) while at least half
+        # of the groups tried are proved; uncovered members use their own routes.
         cap = 10 * self.timeout_ms / 1000
-        if self.deadline is not None:
-            cap = min(cap, (self.deadline - monotonic()) / 4)
+        quarter = None if self.deadline is None else monotonic() + (self.deadline - monotonic()) / 4
+        if quarter is not None:
+            cap = min(cap, quarter - monotonic())
         self._prove_stuck_groups([g for g in stuck if len(g[1]) >= _STUCK_MIN_MEMBERS], discharged,
-                                 monotonic() + cap, 2 * self.timeout_ms / 1000)
+                                 monotonic() + cap, 2 * self.timeout_ms / 1000, extend_until=quarter)
         ready = {f"x86_maps_{j}_{k}": r for (j, k), r in discharged.items()}
         start = len(records)
         failed = self._check_rows(evm, x86, premise, pair, correspondence, range(len(x86)), ready, records,
