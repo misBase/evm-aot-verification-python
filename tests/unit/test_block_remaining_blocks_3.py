@@ -11,6 +11,9 @@
 - Resumed potential solve credited per obligation class ("resume" stats): once it refuted
   a class, siblings resume it right after the potential route instead of after every
   other route (Aave Pool 6182 pair_63_2 goal 6: 2350s of failing routes first).
+- _correspondence: a row whose quick solve is unknown gets its proposal from the
+  blast_select_store form (Aave Pool 6182 rows 2/3/4: unknown at 30s directly, SAT in ~6s
+  blasted; unknown made them "all" rows).
 """
 from pathlib import Path
 
@@ -235,3 +238,30 @@ def test_resume_comes_first_once_it_refuted_the_class(monkeypatch):
     assert calls[first + 1] == "resume"
     assert "_retry_with_uf_unification" not in calls and "_retry_over_guard_cases" not in calls
     assert records[-1].proved and records[-1].formula == Bool("n3_pending_target").sexpr()
+
+
+def test_blasted_model_is_a_model_of_the_formula():
+    from z3 import Array, BitVecSort as S, BitVecVal, Select, Store, is_true, sat, unsat
+    mem, base = _memory_chain(16)
+    f = And(Select(mem, base + BitVecVal(3, 64)) == 9, a != 0)
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=5000)
+    answer, model = prover._blasted_model(f)
+    assert answer == sat and is_true(model.eval(f, model_completion=True))
+    answer, model = prover._blasted_model(And(f, Select(mem, base + BitVecVal(3, 64)) == 8))
+    assert answer == unsat and model is None
+
+
+def test_correspondence_falls_back_to_the_blasted_model(monkeypatch):
+    from types import SimpleNamespace
+    from z3 import BitVecVal, Select, unknown
+    from x86_64.cfg_state import PrefixSolver
+    monkeypatch.setattr(PrefixSolver, "check", lambda self, *args, **kw: unknown)
+    mem, base = _memory_chain(8)
+    word = Select(mem, base + BitVecVal(2, 64))
+    evm = [SimpleNamespace(condition=c, witness=None) for c in (word == 1, word == 2, word == 3, word == 4)]
+    x86 = [SimpleNamespace(condition=c, witness=None) for c in (
+        And(a == 1, word == 3), And(a == 255, word == 1), And(word == 2, word == 5))]
+    x86 += [SimpleNamespace(condition=word == k, witness=None) for k in (1, 2, 3, 4) for _ in range(4)]
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=5000)
+    found = prover._correspondence(evm, x86, BoolVal(True), [])
+    assert found[:3] == (2, 0, None)

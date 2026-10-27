@@ -3732,6 +3732,14 @@ class BlockEquivalenceProver:
             # Wall clock = the budget, as the fresh per-row solver had (not the
             # reachability 10x safety net): a row must not overrun the node deadline.
             answer = prefix.check([premise, *_ordered_conjuncts(x.condition)], budget, "correspondence", budget)
+            model = prefix.solver.model() if answer == sat else None
+            if answer not in (sat, unsat):
+                # Reads through store chains blasted into ites (an exact rewrite, as in
+                # X86Constraints.is_possible): Aave Pool 6182 rows 2/3/4 are unknown even at
+                # 30s directly and SAT in ~6s blasted, each model hitting exactly one EVM
+                # path; unknown made them "all" rows (95 pairs each; pair_63_2 then ran the
+                # 12h node out). Its answer is the row's: SAT gives the model, UNSAT "empty".
+                answer, model = self._blasted_model(And(premise, x.condition))
             if answer not in (sat, unsat):
                 unknown.append(j)
             if answer == unsat:
@@ -3739,7 +3747,6 @@ class BlockEquivalenceProver:
                 continue
             target = "all"
             if answer == sat:
-                model = prefix.solver.model()
                 hits = [i for i, e in enumerate(evm)
                         if is_true(model.eval(e.condition, model_completion=True))]
                 if len(hits) == 1:
@@ -3752,6 +3759,22 @@ class BlockEquivalenceProver:
             if proposed[j] == "all" and self._empty_by_bvabs(premise, x86[j]):
                 correspondence[j] = None
         return tuple(correspondence)
+
+    def _blasted_model(self, formula):
+        """(answer, model or None) of simplify(formula, blast_select_store=True),
+        one per-query budget. An equivalent formula over the same constants, so
+        its model is one of `formula` and UNSAT is formula's; _correspondence
+        only reads a proposal from it (never a proof)."""
+        budget = self.timeout_ms
+        if self.deadline is not None:
+            budget = min(budget, int((self.deadline - monotonic()) * 1000))
+        if budget <= 0:
+            return "unknown", None
+        query = simplify(formula, blast_select_store=True)
+        solver = _solver(budget, query)
+        solver.add(query)
+        answer = solver.check()
+        return answer, solver.model() if answer == sat else None
 
     def _empty_by_bvabs(self, premise, x):
         """Propose "empty" (Safe 4524 x86 path 2: a word-gas carry only the
