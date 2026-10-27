@@ -3741,7 +3741,7 @@ class BlockEquivalenceProver:
                 # 12h node out). Its answer is the row's: SAT gives the model, UNSAT "empty".
                 answer, model = self._blasted_model(And(premise, x.condition))
                 if answer not in (sat, unsat):
-                    # ponytail: one retry at 4x (row 2 there: 6.1s in one run, >30s in another
+                    # ponytail: one retry at 4x (Aave Pool 6182 row 2: 6.1s in one run, >30s in another
                     # under load; it has no mapped sibling to propose from).
                     answer, model = self._blasted_model(And(premise, x.condition), 4 * self.timeout_ms)
             if answer not in (sat, unsat):
