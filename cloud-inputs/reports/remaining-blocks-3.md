@@ -26,7 +26,7 @@
   - 第一版每个情形走 `_unify_and_split`（乘法抽象 + 合并探针 + sweep）：m=768 510.6s proved；sym7296 情形 0 用完它的一半份额（834s）仍 unknown，嵌套拆分只剩 10s。
   - 定稿：每个情形走 `_unify_case`（直接合并 + 一次直接查询 + `_after_unification` 的 opaque/blasted 尝试），守卫路线在适用时拿剩余预算的一半（同 `alias`）。**sym7296 goal 2 1326.6s proved**（守卫路线 702.7s），m=768 923.6s proved（守卫路线 761.3s）。
   - 节点内（4a30af6 之前）：16670 的前 15 个 SDIV 行（69–83）goal 2 都很快（0.1–12s，部分由 unify 证出），于是 `_winners_first` 把 unify 提升到最前，**提升的路线拿剩余预算的一半**（约 7300s），守卫路线排在后面。修法 16：被提升的路线最多拿它在本类中最长一次证明的 8 倍（至少 4 个查询超时）。
-  - 补充观察：在**新进程**里直接对 m=768 goal 2（原式、skolemize 之后、`pin_split` 之后都一样）调用 `_retry_over_guard_cases`，两个情形都被 3s 的快速精确查询 unsat，整条路线 3.0–4.6s。生产 `_check` 中同一路线却在情形 0 走到合并（761s）。差别不在公式，而在此前各路线留下的进程状态（AST 创建顺序影响 simplify 的结果形状与求解器的运气）。所以守卫路线的耗时有很大的波动：快则几秒，慢则数百秒；本节的耗时数字都应按此理解。在 90de4cd 上用生产 `_check` 再跑一次 m=768 goal 2：前面各路线 129.5s 都 unknown，守卫路线 **5.4s** unsat（上次 761.3s）。4a30af6 的整节点中，`pair_4_84` goal 2 在守卫路线里走到合并并失败（快速查询没中），随后进了 unify 路线。
+  - 补充观察：在**新进程**里直接对 m=768 goal 2（原式、skolemize 之后、`pin_split` 之后都一样）调用 `_retry_over_guard_cases`，两个情形都被 3s 的快速精确查询 unsat，整条路线 3.0–4.6s。生产 `_check` 中同一路线却在情形 0 走到合并（761s）。差别不在公式，而在此前各路线留下的进程状态（AST 创建顺序影响 simplify 的结果形状与求解器的运气）。所以守卫路线的耗时有很大的波动：快则几秒，慢则数百秒；本节的耗时数字都应按此理解。（新进程也不总是快：同一条 `slow` 单元测试一次 4.37s、另一次 583.5s，后者走到了情形内的合并。）在 90de4cd 上用生产 `_check` 再跑一次 m=768 goal 2：前面各路线 129.5s 都 unknown，守卫路线 **5.4s** unsat（上次 761.3s）。4a30af6 的整节点中，`pair_4_84` goal 2 在守卫路线里走到合并并失败（快速查询没中），随后进了 unify 路线。
   - 修法 18：情形的快速查询没中时，把公式 `translate` 到一个**新的 z3 Context**（精确拷贝）再分情形、再查一次（`_fresh_context_unsat`）；并在 `quick` 之后加一条只做这些快速查询的 `guardsq` 路线。生产 `_check` 上 sym7296 goal 2：**36.2s proved**（`lia` 23.8s 后 `guardsq` 3.4s）。
 
 ### 2.2 Aave 6182（`pair_63_2`）
@@ -47,7 +47,7 @@
 - 之后每条路径一轮 summary 约 900s（之前约 2600s）：`copy_loop@0x6ee68` 每次约 365s（`entry` 35s、`copy_domain` 59s、前提蕴含 ~50s、归纳 ~66s），7 个 memgas 每个约 55s（`entry` ~40s + exit guard ~20s），2 个 div 每个约 45s。
 - 修法 15（entry 模型复用）：命中的 `entry` 解出的模型（在原前提上求值为字面 true）保存在运行时；下一个命中先用它（以及执行器的见证）求值自己的前提；执行器在命中之后，若当前见证已不满足路径条件，就采用这个模型作为路径见证（可达性检查用之前仍会求值确认）。
 - 修法 15 生效：b8b429d 的运行中 55 次命中有 32 次要解 `entry`；4db8738 的运行中 51 次命中只有 4 次。同一时刻的进度：3958s 执行 715 个基本块（之前 3645s 执行 599 个）。
-- 两次整节点运行都在 7.4–7.7GB RSS 时被 cgroup OOM 杀掉（7253s、5435s），当时同机还有 6182（3.6–5.4GB）与 16670（1.7GB）。N2 的运行也到 7–8GB。x86 分段的内存随执行的状态增长，本机要单独跑才有可能跑完 12h（§6、§8）。
+- 两次整节点运行都在 7.4–7.7GB RSS 时被 cgroup OOM 杀掉（7253s、5435s），当时同机还有 6182（3.6–5.4GB）与 16670（1.7GB）。N2 的运行也到 7–8GB。第三次（修法 9–18）单独运行，13500s 时 RSS 14.0GB 仍被 OOM 杀掉，x86 分段没有跑完（§6、§8）。
 
 ### 2.4 PoolManager 4418（1h 分诊）
 
@@ -98,7 +98,7 @@
   - `test_block_route_order.py::test_promoted_route_gets_half_of_what_is_left`：断言的是修法 16 之前的规则（被提升的路线总拿一半）。改为预置一个长的历史证明（上限不起作用，仍是一半），另加一条 `test_promoted_route_with_cheap_wins_gets_its_cap`（廉价历史 → 4 个查询超时）。
   - `test_block_correspondence.py::test_empty_probe_only_for_unknown_rows_without_sibling_proposal`：测试把某些行的增量查询强制为 unknown，用来检验"空行探测只给没有兄弟提议的 unknown 行"；修法 11 的 blast 回退把这两行真的解出来了（行 3 → EVM 0、行 4 → EVM 2，都正确）。测试同时把 `_blasted_model` 强制为 unknown，本意不变；回退本身另有测试。
   - `test_block_uf_unification.py::test_alias_split_keeps_satisfiable_pairs_open`：负载敏感（N2 §9.1 已记录），单独运行通过；在最终全量中通过。
-- `tests/unit/test_block_remaining_blocks_3.py`：25 条快测（另有 1 条 `slow`：16670 goal 2 的守卫路线），函数名互不相同；逐个按节点 ID 单独运行的结果见下。另在 `test_block_route_order.py` 新增 1 条。
+- `tests/unit/test_block_remaining_blocks_3.py`：28 条快测 + 1 条 `slow`（16670 m=768 goal 2 的守卫路线），函数名互不相同；另在 `test_block_route_order.py` 新增 1 条。**30 条逐个按节点 ID 单独运行，全部 1 passed**（`results/node-id-runs.log`）；其中 `slow` 那条这次用了 583.5s（之前一次 4.37s，见 §2.1 的波动）。
 - 相关已有测试（`-k "summar or executor or cfg or copy or memgas or div or remaining"`）：453 passed, 2 skipped（872.9s）；normalize 相关（`-k "normali or word or offset_view or remaining or identity"`）：119 passed。
 
 ### 5.1 SMT2 回归（`cloud-inputs/n/tools/regress.py`，生产 `_check`，每文件新 prover，上限 1800s，与 2–3 个整节点并行；代码 389fdc7，即修法 9–13）
@@ -159,5 +159,5 @@
 2. **Aave 7200**：单次 summary 命中的代价已经降下来（修法 13、15；DIV 570–630s → 41–98s，`entry` 求解 32/55 → 4/51），x86 分段的推进速度约为 N2 的 2.6 倍，但**分段本身仍跑不完**：单独运行 13500s 时执行了 2146 个基本块、没有任何路径到达终点，RSS 增长到 14.0GB 被 OOM 杀掉（每个已执行基本块约 6.5MB，N2 约 9.6MB，所以内存增长来自探索的状态数，而不是修法 13 的缓存）。现在的瓶颈与 4418 同类：路径数 / 状态内存（分段有 556 个条件跳转、180 个 ret，命中组在每条路径上重复）。方向：(a) 服务器上更大的内存（本机 15GB 不够）；(b) 状态合并或在汇合点丢弃已不可观测的状态；(c) 剩余单项开销：copy-loop 命中（约 365s/次）、可达性检查（约 30%）、证书文本（`_solve` 中每个查询的 `sexpr()`，约 6%）。
 3. **PoolManager 4418**：路径数类（x86 876–877 条路径，分段约 2700–2900s 且 90% 是可达性检查）。没有实现修法；方向见 §2.4（扩大 memgas 模板覆盖 `words == 0` 菱形，或执行器合并短菱形）。服务器上的 `x86_maps_1_0` 在本次对应关系下 0.1s 证出。
 4. **`_unify_node` 的预算**：16670 三次整节点里 `_unify_node` 都用了约 5350s（剩余预算的 1/4，修法 6 的上限）只得到 2 条引理；6182 只要 49s。失败的参数对每个约 28s（`_prove_equal` 的情形树）。可以考虑：节点级合并的单对预算降到快速查询级别，或按成功率提前停止（与修法 17 同样的规则）。本次没有改，因为 1327 等节点的节点级引理需要多久没有数据。
-5. **守卫情形快速查询的波动**（§2.1）：同一个情形在新进程里 3s 内 unsat，在节点里可能 unknown。修法 18 用新 Context 重试一次，生产 `_check` 上 36.2s、整节点 42.8s；更一般的做法（例如对所有快速查询都在新 Context 中重试）没有评估。
+5. **守卫情形快速查询的波动**（§2.1）：同一个情形可能 3s 内 unsat，也可能要走到合并（数百秒），在节点里和新进程里都出现过。修法 18 用新 Context 重试一次，生产 `_check` 上 36.2s、整节点 42.8s，但不保证每次都快；更一般的做法（多个随机种子、对所有快速查询都在新 Context 中重试）没有评估。
 6. 负载敏感测试 `test_block_uf_unification.py::test_alias_split_keeps_satisfiable_pairs_open`（N2 已记录）仍在重负载下偶发失败，单独运行通过。
