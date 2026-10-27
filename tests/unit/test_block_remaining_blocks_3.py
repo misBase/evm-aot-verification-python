@@ -8,11 +8,14 @@
 - _text_size: the merge loops' pair order by sexpr length, memoized (same values).
 - forward_selects_shared: the DIV summary's limb forwarding through one process-level
   cache (Aave Pool 7200: each hit re-forwarded the whole x86 memory chain per limb).
+- Resumed potential solve credited per obligation class ("resume" stats): once it refuted
+  a class, siblings resume it right after the potential route instead of after every
+  other route (Aave Pool 6182 pair_63_2 goal 6: 2350s of failing routes first).
 """
 from pathlib import Path
 
 import pytest
-from z3 import (And, BitVec, BitVecSort, BoolVal, Function, If, Not, Or, Solver, Extract, parse_smt2_file,
+from z3 import (And, BitVec, BitVecSort, Bool, BoolVal, Function, If, Not, Or, Solver, Extract, parse_smt2_file,
                 simplify, unsat)
 
 import verification.block_equivalence as be
@@ -173,3 +176,62 @@ def test_forwarded_limb_is_unchanged_by_the_shared_cache():
     load = Concat(*[Select(mem, base + BitVecVal(7 - i, 64)) for i in range(8)])
     assert _forwarded_limb(load).eq(limb)
     assert _forwarded_limb(load).eq(limb)  # cached
+
+
+def _resume_harness(monkeypatch, stats_win):
+    """A prover whose routes all fail except the resumed potential solve; returns
+    (prover, call log). The potential route leaves PENDING pending, as a capped
+    solve that ran out does; solve_query refutes only PENDING."""
+    from time import monotonic
+    from z3 import Bool
+    pending_target = Bool("n3_pending_target")
+    calls = []
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=1000)
+    prover.deadline = monotonic() + 600
+
+    def potential(self, formula):
+        calls.append("potential")
+        if self._potential_pending is None:
+            self._potential_pending = (formula, pending_target, ())
+        return formula, "unknown", ()
+
+    def fail(tag):
+        def route(self, formula, *a, **k):
+            calls.append(tag)
+            return formula, "unknown", ()
+        return route
+
+    def solve(query, ms, trust_unknown=True):
+        if query.eq(pending_target):
+            calls.append("resume")
+            return "unsat"
+        return "unknown"
+
+    P = be.BlockEquivalenceProver
+    monkeypatch.setattr(P, "_retry_over_potential", potential)
+    for name in ("_retry_over_lia", "_retry_over_nonlinear_mul", "_retry_with_uf_unification",
+                 "_retry_over_guard_cases"):
+        monkeypatch.setattr(P, name, fail(name))
+    monkeypatch.setattr(be, "solve_query", solve)
+    if stats_win:
+        prover._route_stats[be._route_class("pair_1_2_goal_6_of_7")] = {("resume", False): (1, 90.0)}
+    return prover, calls
+
+
+def test_resume_waits_for_every_route_without_history(monkeypatch):
+    prover, calls = _resume_harness(monkeypatch, stats_win=False)
+    records = []
+    assert prover._check("pair_1_2_goal_6_of_7", And(udiv(a, b) == 1, udiv(b, a) == 2), records, split=False)
+    assert calls[-1] == "resume" and "_retry_with_uf_unification" in calls
+    stats = prover._route_stats[be._route_class("pair_1_2_goal_6_of_7")]
+    assert stats[("resume", False)][0] == 1  # the win is credited to the class
+
+
+def test_resume_comes_first_once_it_refuted_the_class(monkeypatch):
+    prover, calls = _resume_harness(monkeypatch, stats_win=True)
+    records = []
+    assert prover._check("pair_1_2_goal_6_of_7", And(udiv(a, b) == 1, udiv(b, a) == 2), records, split=False)
+    first = calls.index("potential")
+    assert calls[first + 1] == "resume"
+    assert "_retry_with_uf_unification" not in calls and "_retry_over_guard_cases" not in calls
+    assert records[-1].proved and records[-1].formula == Bool("n3_pending_target").sexpr()

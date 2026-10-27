@@ -49,5 +49,5 @@ for path in paths:
     except be.ProofBudgetExceeded:
         answer, lemmas, names = "budget", 0, []
     for part in (records[-1].lemmas if records else ()):
-        print(f"   part {part.name} {part.answer} {part.elapsed_seconds or 0:.1f}s lemmas={[r.name for r in part.lemmas][:8]}", flush=True)
+        print(f"   part {part.name} {part.answer} {part.elapsed_seconds or 0:.1f}s lemmas={sorted(set(r.name.rstrip("0123456789_") for r in part.lemmas))}", flush=True)
     print(f"{name} expected={expected} {answer} {monotonic() - started:.1f}s lemmas={lemmas} {names}", flush=True)

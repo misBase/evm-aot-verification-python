@@ -3452,6 +3452,16 @@ class BlockEquivalenceProver:
                 ours = self._potential_pending
                 if pending is None and ours is not None and ours[0].eq(target):
                     pending = (ours[1], ours[2], rewrites)
+                    if (answer != "unsat" and node_deadline is not None
+                            and stats.get(("resume", False), (0, 0.0))[0]):
+                        # The resumed solve refuted this class before ("resume" stats below):
+                        # resume it now with half of what is left, not after every other route
+                        # (Aave Pool 6182 pair_63_2 goal 6: 2350s of failing routes, then the
+                        # resumed solve refuted it in ~90s; its 94 sibling pairs paid that again).
+                        answer = self._resume_potential(pending, stats, (node_deadline - monotonic()) / 2)
+                        if answer == "unsat":
+                            proved, lemmas = pending[0], pending[2] + pending[1]
+                            break
                 if answer == "unsat":
                     lemmas = rewrites + lemmas
                     break
@@ -3460,8 +3470,8 @@ class BlockEquivalenceProver:
             if answer != "unsat" and pending is not None and node_deadline is not None:
                 # Every route failed: resume the capped potential solve with what they left,
                 # keeping one per-query share for the direct query below.
-                budget = int((node_deadline - monotonic()) * 1000) - self.timeout_ms
-                if budget > 4 * self.timeout_ms and solve_query(pending[0], budget) == "unsat":
+                budget = (node_deadline - monotonic()) - self.timeout_ms / 1000
+                if budget > 4 * self.timeout_ms / 1000 and self._resume_potential(pending, stats, budget) == "unsat":
                     proved, answer, lemmas = pending[0], "unsat", pending[2] + pending[1]
             if answer != "unsat":
                 proved, lemmas = formula, ()
@@ -3483,6 +3493,17 @@ class BlockEquivalenceProver:
                             witnesses + pinned + lemmas)
         records.append(record)
         return record.proved
+
+    def _resume_potential(self, pending, stats, seconds):
+        """Resume a capped potential solve (pending: (target, lemmas, rewrites) as
+        _retry_over_potential left it) for `seconds`; the same query, so an UNSAT
+        is that route's refutation. Credits the class's ("resume", False) entry
+        in `stats` (never a route in the table: it only orders the resume)."""
+        started = monotonic()
+        answer = solve_query(pending[0], int(seconds * 1000)) if seconds > 0 else "unknown"
+        wins, spent = stats.get(("resume", False), (0, 0.0))
+        stats[("resume", False)] = (wins + (answer == "unsat"), spent + monotonic() - started)
+        return answer
 
     def _refute_further(self, query):
         """(refuted formula, lemmas) from the unification / split abstraction
