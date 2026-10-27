@@ -297,7 +297,7 @@ def _forwarded_limb(load):
     div_semantics no longer matches the EVM operand syntactically."""
     from z3 import is_app_of, Z3_OP_CONCAT, Z3_OP_EXTRACT
 
-    from common.store_forwarding import forward_selects
+    from common.store_forwarding import forward_selects_shared
 
     def bytes_of(term):  # the 64-bit L with term == Concat(L[63:56], ..., L[7:0]), else None
         parts, work = [], [term]
@@ -315,7 +315,7 @@ def _forwarded_limb(load):
             return None
         return source
 
-    term, source = forward_selects(load), None
+    term, source = forward_selects_shared(load), None
     while (inner := bytes_of(term)) is not None:  # a reload of a spilled reload, ...
         term = source = inner
     return load if source is None else source

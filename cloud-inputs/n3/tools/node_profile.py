@@ -1,0 +1,219 @@
+"""Whole-node prove() with the x86 segment profile of cloud-inputs/n/tools/x86_profile.py (same log lines),
+continuing past the segment to the end of prove(); writes the probe-style node result as JSON.
+
+Usage (repo root, PYTHONPATH=.): node_profile.py STEM NODES.json INDEX OUT.json [--seconds N] [--every S]
+
+Runs prove() up to and including run_x86_segment with a node budget of --seconds, then stops.
+Every --every seconds (and at the end) prints: executed blocks, live work list, finished paths,
+the blocks executed most often, the jcc blocks that forked most often (both branches kept),
+summary hits / precondition failures, and reachability-check time.
+Diagnostics only: nothing here is a proof.
+"""
+import collections
+import json
+import sys
+import threading
+import time
+from pathlib import Path
+
+import verification.block_equivalence as be
+import x86_64.cfg_executor as cx
+from tools.probe_block_obligations import build_prover, parse_nodes
+
+argv = sys.argv[1:]
+stem, node_json, index = argv[0], argv[1], int(argv[2])
+seconds = float(argv[argv.index("--seconds") + 1]) if "--seconds" in argv else 1200
+every = float(argv[argv.index("--every") + 1]) if "--every" in argv else 60
+T0 = time.monotonic()
+executed, forks, reach = collections.Counter(), collections.Counter(), [0, 0.0, 0]
+summaries = collections.Counter()  # also "seconds": time inside summary application
+last = [T0]
+ex_ref = []
+
+
+def report(tag):
+    ex = ex_ref[-1] if ex_ref else None
+    live = len(ex.work_list) if ex is not None else -1
+    done = (len(ex.final_states), len(ex.cut_states)) if ex is not None else (-1, -1)
+    print(f"[{time.monotonic() - T0:8.1f}s] {tag}: executed {sum(executed.values())} live {live} "
+          f"final/cut {done} reach {reach[0]} checks {reach[1]:.1f}s pruned {reach[2]}", flush=True)
+    print("   top blocks:", [(hex(a), n) for a, n in executed.most_common(12)], flush=True)
+    print("   top forks:", [(hex(a), n) for a, n in forks.most_common(12)], flush=True)
+    print("   summaries:", dict(summaries), flush=True)
+    print("   complement:", dict(globals().get("complement", {})), flush=True)
+
+
+orig_execute = cx.X86SymbolicExecutor.execute
+orig_state = cx.X86SymbolicExecutor.execute_state
+orig_reach = cx.X86SymbolicExecutor._is_state_reachable
+
+
+def execute(self, *a, **k):
+    ex_ref.append(self)
+    return orig_execute(self, *a, **k)
+
+
+def execute_state(self, gs, *a, **k):
+    addr = gs.node.address if gs.node else None
+    executed[addr] += 1
+    out = orig_state(self, gs, *a, **k)
+    if out and len(out) > 1:
+        forks[addr] += 1
+    if time.monotonic() - last[0] > every:
+        last[0] = time.monotonic()
+        report("progress")
+    return out
+
+
+SLOW = float(argv[argv.index("--dump-slow") + 1]) if "--dump-slow" in argv else None
+
+
+def reachable(self, state):
+    t = time.monotonic()
+    timer = None
+    if SLOW is not None:
+        # A check still running after SLOW seconds: write its path condition (diagnostics).
+        text = be._to_smt2(state.get_constraints().as_bool())
+        addr = state.node.address if state.node else 0
+
+        def dump():
+            path = Path(f"slow_reach_{addr:x}_{reach[0]}.smt2")
+            path.write_text(text)
+            print(f"[{time.monotonic() - T0:8.1f}s] slow reachability check at {addr:#x} -> {path}", flush=True)
+        timer = threading.Timer(SLOW, dump)
+        timer.start()
+    ok = orig_reach(self, state)
+    if timer is not None:
+        timer.cancel()
+    reach[0] += 1
+    reach[1] += time.monotonic() - t
+    reach[2] += not ok
+    if time.monotonic() - t > 5:
+        print(f"[{time.monotonic() - T0:8.1f}s] reachability check {time.monotonic() - t:.1f}s "
+              f"at {state.node.address if state.node else 0:#x} -> {ok}", flush=True)
+    return ok
+
+
+cx.X86SymbolicExecutor.execute = execute
+cx.X86SymbolicExecutor.execute_state = execute_state
+cx.X86SymbolicExecutor._is_state_reachable = reachable
+
+
+class Stop(Exception):
+    pass
+
+
+orig_segment = be.run_x86_segment
+
+
+def segment(*a, **k):
+    runtime = k.get("summary_runtime")
+    if runtime is not None:
+        orig_apply = runtime.apply
+
+        def apply(summary, *aa, **kk):
+            started = time.monotonic()
+            try:
+                result = orig_apply(summary, *aa, **kk)
+                summaries["seconds"] += time.monotonic() - started
+                if time.monotonic() - started > 5:
+                    slow = [(r.name, r.answer, round(r.elapsed_seconds or 0, 1))
+                            for r in getattr(runtime, "last_records", []) if (r.elapsed_seconds or 0) > 1]
+                    print(f"[{time.monotonic() - T0:8.1f}s] applied {summary.kind}@{summary.entry_addr:#x} in "
+                          f"{time.monotonic() - started:.1f}s: slow records {slow}", flush=True)
+                summaries[f"{summary.kind}@{hex(summary.entry_addr)}"] += 1
+                return result
+            except Exception as exc:
+                summaries["seconds"] += time.monotonic() - started
+                summaries[f"REJECT {summary.kind}@{hex(summary.entry_addr)}: {type(exc).__name__}"] += 1
+                failed = [(r.name, r.answer, round(r.elapsed_seconds or 0, 1))
+                          for r in getattr(runtime, "last_records", []) if not r.proved]
+                print(f"[{time.monotonic() - T0:8.1f}s] rejected {summary.kind}@{summary.entry_addr:#x} after "
+                      f"{time.monotonic() - started:.1f}s: {str(exc)[:200]} failed={failed}", flush=True)
+                premise = getattr(exc, "premise", None)
+                if premise is not None and any(r.name == "entry" and not r.proved
+                                               for r in getattr(runtime, "last_records", [])):
+                    path = Path(f"rejected_entry_{summary.entry_addr:x}_{summaries['seconds']:.0f}.smt2")
+                    path.write_text(be._to_smt2(premise))
+                    print("   entry premise ->", path, flush=True)
+                raise
+        runtime.apply = apply
+    try:
+        paths, defects, notes = orig_segment(*a, **k)
+    finally:
+        report("x86 segment end")
+    print("paths", len(paths), collections.Counter(f"{p.kind}@{p.location}" for p in paths), defects, flush=True)
+    return paths, defects, notes
+
+
+be.run_x86_segment = segment
+
+import verification.block_summaries as bs  # noqa: E402
+_orig_solve = bs.VerifiedSummaryRuntime._solve
+last_formula = {}
+
+
+def solve(self, name, formula, expected="unsat"):
+    """Keep each summary query's formula; a failed one is written as SMT2 (diagnostics)."""
+    record = _orig_solve(self, name, formula, expected)
+    last_formula[name] = formula
+    if not record.proved and name != "entry":
+        path = Path(f"failed_{name}_{int(time.monotonic() - T0)}.smt2")
+        path.write_text(be._to_smt2(formula))
+        print(f"[{time.monotonic() - T0:8.1f}s] summary query {name} {record.answer} "
+              f"{record.elapsed_seconds:.1f}s -> {path}", flush=True)
+    return record
+
+
+bs.VerifiedSummaryRuntime._solve = solve
+_orig_complement = bs.refuted_by_complement
+complement = collections.Counter()
+
+
+def refuted(premise, goal):
+    """Count refuted_by_complement hits/misses; on a miss dump the goal and the window."""
+    started = time.monotonic()
+    hit = _orig_complement(premise, goal)
+    caller = sys._getframe(1).f_locals.get("name", "?")
+    if caller != "memgas_exit_guard_excluded":
+        return hit
+    complement["hit" if hit else "miss"] += 1
+    complement["seconds"] += time.monotonic() - started
+    if not hit and complement["miss"] <= 3:
+        from z3 import is_and, simplify, Not
+        work, conjuncts = [premise], []
+        while work:
+            t = work.pop()
+            if is_and(t):
+                work.extend(reversed(t.children()))
+            else:
+                conjuncts.append(t)
+        path = Path(f"complement_miss_{complement['miss']}.txt")
+        path.write_text("TARGET " + simplify(goal).sexpr() + "\n" + "\n".join(
+            "WINDOW " + simplify(Not(c)).sexpr()[:20000] for c in conjuncts[-16:]) + "\n")
+        print(f"[{time.monotonic() - T0:8.1f}s] complement miss -> {path}", flush=True)
+    return hit
+
+
+bs.refuted_by_complement = refuted
+_orig_check = be.BlockEquivalenceProver._check
+
+
+def traced_check(self, name, formula, records, **kw):
+    started = time.monotonic()
+    ok = _orig_check(self, name, formula, records, **kw)
+    if time.monotonic() - started > 1 or not ok:
+        print(f"[{time.monotonic() - T0:8.1f}s] {name} {records[-1].answer if records else '-'} "
+              f"{time.monotonic() - started:.1f}s", flush=True)
+    return ok
+
+
+be.BlockEquivalenceProver._check = traced_check
+spec = parse_nodes(json.loads(Path(node_json).read_text()))[index]
+print("spec", spec, flush=True)
+prover = build_prover(stem, base_addr=0x1000, timeout_ms=30000, node_seconds=seconds, max_depth=400,
+                      summaries=True)
+from tools.probe_block_obligations import probe_node  # noqa: E402
+node = probe_node(prover, spec)
+Path(argv[3]).write_text(json.dumps(node, indent=1, default=str) + "\n")
+print("result", {k: v for k, v in node.items() if k != "failed_obligations"}, node["failed_obligations"], flush=True)

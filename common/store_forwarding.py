@@ -93,6 +93,13 @@ def clear_memo():
     """Drop every memoized term. Pure caches, so only speed changes; long-lived
     worker processes call this between nodes, since entries keep their ASTs alive."""
     _MEMO.clear()
+    _SHARED_FORWARD.clear()
+
+
+# One forward_selects cache for the whole process (see forward_selects_shared).
+# ponytail: cleared wholesale at _SHARED_FORWARD_LIMIT nodes; an LRU if that ever thrashes.
+_SHARED_FORWARD: Dict[int, object] = {}
+_SHARED_FORWARD_LIMIT = 2_000_000
 
 
 def linearize_address(addr) -> Optional[Tuple[_AddrKey, int]]:
@@ -216,6 +223,21 @@ def forward_selects(expr, _cache: Optional[Dict[int, object]] = None):
         else:
             _put(_cache, node, _cache[resolved.get_id()])
     return _cache[expr.get_id()]
+
+
+def forward_selects_shared(expr):
+    """forward_selects(expr) through one process-level cache.
+
+    forward_selects is a pure function of each node (the cache keeps every
+    keyed node alive, so an id is never another term's), so the result is
+    the same as with a fresh cache. Callers that forward many terms over one
+    growing memory get the shared store chain forwarded once: the DIV summary
+    forwards 8 stack limbs per hit, each a read through the whole x86 memory
+    (Aave Pool 7200: ~500s per hit, 53% of the x86 segment, re-forwarding the
+    same chain per limb and again on every path)."""
+    if len(_SHARED_FORWARD) >= _SHARED_FORWARD_LIMIT:
+        _SHARED_FORWARD.clear()
+    return forward_selects(expr, _SHARED_FORWARD)
 
 
 def join_extracts(expr, _cache: Optional[Dict[int, object]] = None):

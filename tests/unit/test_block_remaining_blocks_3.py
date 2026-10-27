@@ -6,6 +6,8 @@
   unification route never merges them (PoolManager 16670 pair_2_74 / pair_4_84 goal 2).
   Splitting on the guard first lets each case unify.
 - _text_size: the merge loops' pair order by sexpr length, memoized (same values).
+- forward_selects_shared: the DIV summary's limb forwarding through one process-level
+  cache (Aave Pool 7200: each hit re-forwarded the whole x86 memory chain per limb).
 """
 from pathlib import Path
 
@@ -137,3 +139,37 @@ def test_pm16670_goal_2_is_refuted_by_guard_cases():
     prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=30000)
     _, answer, lemmas = prover._retry_over_guard_cases(And(*parse_smt2_file(str(path))))
     assert answer == "unsat" and all(r.proved for r in lemmas)
+
+
+def _memory_chain(n):
+    from z3 import Array, BitVecSort as S, Store, BitVecVal
+    mem = Array("n3_mem", S(64), S(8))
+    base = BitVec("n3_base", 64)
+    for k in range(n):
+        mem = Store(mem, base + BitVecVal(k, 64), Extract(7, 0, a + k))
+    return mem, base
+
+
+def test_shared_forwarding_equals_fresh_forwarding():
+    from z3 import BitVecVal, Concat, Select
+    from common.store_forwarding import _SHARED_FORWARD, forward_selects, forward_selects_shared
+    mem, base = _memory_chain(40)
+    loads = [Concat(*[Select(mem, base + BitVecVal(8 * w + 7 - i, 64)) for i in range(8)]) for w in range(4)]
+    for load in loads + loads:  # second round: every node from the cache
+        assert forward_selects_shared(load).eq(forward_selects(load))
+    assert _SHARED_FORWARD
+    clear_memo()
+    assert not _SHARED_FORWARD
+
+
+def test_forwarded_limb_is_unchanged_by_the_shared_cache():
+    from z3 import BitVecVal, Concat, Select, Store, Array, BitVecSort as S
+    from x86_64.summaries.div import _forwarded_limb
+    limb = a * b + 3
+    mem = Array("n3_stack", S(64), S(8))
+    base = BitVec("n3_r14", 64)
+    for i in range(8):
+        mem = Store(mem, base + BitVecVal(i, 64), Extract(8 * i + 7, 8 * i, limb))
+    load = Concat(*[Select(mem, base + BitVecVal(7 - i, 64)) for i in range(8)])
+    assert _forwarded_limb(load).eq(limb)
+    assert _forwarded_limb(load).eq(limb)  # cached
