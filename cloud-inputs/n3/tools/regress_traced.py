@@ -48,4 +48,6 @@ for path in paths:
         names = sorted({r.name.split("_case")[0][:24] for r in records[-1].lemmas})[:12]
     except be.ProofBudgetExceeded:
         answer, lemmas, names = "budget", 0, []
+    for part in (records[-1].lemmas if records else ()):
+        print(f"   part {part.name} {part.answer} {part.elapsed_seconds or 0:.1f}s lemmas={[r.name for r in part.lemmas][:8]}", flush=True)
     print(f"{name} expected={expected} {answer} {monotonic() - started:.1f}s lemmas={lemmas} {names}", flush=True)
