@@ -19,13 +19,25 @@ seconds = float(argv[argv.index("--seconds") + 1]) if "--seconds" in argv else 7
 meta = json.loads((d / "meta.json").read_text())
 
 
-def path(name):
-    return SimpleNamespace(condition=And(*parse_smt2_file(str(d / f"{name}.smt2"))), witness=None)
+def path(name, info):
+    return SimpleNamespace(condition=And(*parse_smt2_file(str(d / f"{name}.smt2"))), witness=None,
+                           kind=info["kind"], location=info["location"])
 
 
 premise = And(*parse_smt2_file(str(d / "premise.smt2")))
-evm = [path(f"evm_{i}") for i in range(len(meta["evm"]))]
-x86 = [path(f"x86_{j}") for j in range(len(meta["x86"]))]
+evm = [path(f"evm_{i}", e) for i, e in enumerate(meta["evm"])]
+x86 = [path(f"x86_{j}", x) for j, x in enumerate(meta["x86"])]
+orig = be.BlockEquivalenceProver._blasted_model
+
+
+def blasted(self, formula):
+    t = time.monotonic()
+    out = orig(self, formula)
+    print(f"  blasted proposal: {out[0]} {time.monotonic() - t:.1f}s", flush=True)
+    return out
+
+
+be.BlockEquivalenceProver._blasted_model = blasted
 prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=30000)
 prover.deadline = time.monotonic() + seconds
 started = time.monotonic()
