@@ -980,7 +980,7 @@ def _join_and_decide(formula, lemmas):
         proof = _identity_proof(old, new) if lemma is None else ((lemma,) if lemma.proved else None)
         if proof is None:  # never expected (a bit-vector identity); fail closed
             return formula, False
-        lemmas.append(Obligation(f"normalize_{len(lemmas)}", Not(old == new).sexpr(), "unsat",
+        lemmas.append(Obligation(f"normalize_{len(lemmas)}", _inequality_text(old, new), "unsat",
                                  elapsed_seconds=monotonic() - started, lemmas=proof))
     if joins:
         top = _conjuncts(simplify(And(substitute(And(*top), *pairs) if pairs else And(*top), *added),
@@ -1048,6 +1048,26 @@ def _normalize_lambdas(formula, lemmas, deadline=None):
     return simplify(canon_binders(substitute(formula, *pairs)), bv_sort_ac=True)
 
 
+def _rewrite_candidate(t):
+    """simplify(_word_rewrite(t), bv_sort_ac=True), or None; memoized per term.
+
+    Both are pure functions of t (_memoized keeps t alive). Every round of
+    normalize_word_arith walks the whole formula again, and sibling obligations
+    share their path terms: on Aave Pool 6182 x86_maps_0_85, 7571 calls of
+    _offset_view_select (each walking a memory Store chain to its root) cost 79s
+    of the 184s normalisation, which the route then refuted in 0.5s."""
+    def compute():
+        new = _word_rewrite(t)
+        return None if new is None else simplify(new, bv_sort_ac=True)
+    return _memoized("rewrite_candidate", (t,), compute)
+
+
+def _inequality_text(old, new):
+    """Not(old == new).sexpr(), memoized per (old, new): a normalisation lemma's text,
+    the same in every sibling obligation that makes this rewrite (~29s of the 184s above)."""
+    return _memoized("inequality_text", (old, new), lambda: Not(old == new).sexpr())
+
+
 def normalize_word_arith(formula, rounds=32, deadline=None):
     """Rewrite F into an equivalent F' whose word counts / gas sums are syntactic.
 
@@ -1077,10 +1097,9 @@ def normalize_word_arith(formula, rounds=32, deadline=None):
                 continue
             seen.add(t.get_id())
             work.extend(t.children())
-            new = _word_rewrite(t)
+            new = _rewrite_candidate(t)
             if new is None or (deadline is not None and monotonic() > deadline):
                 continue
-            new = simplify(new, bv_sort_ac=True)
             started = monotonic()
             key = (t.get_id(), new.get_id())
             proof = None if new.eq(t) or key in unproved else _identity_proof(t, new)
@@ -1089,7 +1108,7 @@ def normalize_word_arith(formula, rounds=32, deadline=None):
             if proof is not None:
                 # proof: the refuted lemmas this rewrite rests on (offset-view step lemma), else ().
                 pairs.append((t, new))
-                lemmas.append(Obligation(f"normalize_{len(lemmas)}", Not(t == new).sexpr(), "unsat",
+                lemmas.append(Obligation(f"normalize_{len(lemmas)}", _inequality_text(t, new), "unsat",
                                          elapsed_seconds=monotonic() - started, lemmas=proof))
         if not pairs:
             break

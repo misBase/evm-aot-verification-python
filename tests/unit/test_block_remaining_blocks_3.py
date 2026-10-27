@@ -13,6 +13,8 @@
   other route (Aave Pool 6182 pair_63_2 goal 6: 2350s of failing routes first).
 - Entry model reuse: a summary hit keeps its entry model; the next hit tries it on its
   premise and the executor takes it as its path witness (Aave 7200: ~40s per entry).
+- Normalisation memo: _rewrite_candidate / _inequality_text (Aave Pool 6182 x86_maps_0_85:
+  normalisation 74.6s -> 34.9s, a sibling 65.1s -> 16.2s; same formula and lemmas).
 - _correspondence: a row whose quick solve is unknown gets its proposal from the
   blast_select_store form (Aave Pool 6182 rows 2/3/4: unknown at 30s directly, SAT in ~6s
   blasted; unknown made them "all" rows).
@@ -20,7 +22,7 @@
 from pathlib import Path
 
 import pytest
-from z3 import (And, BitVec, BitVecSort, Bool, BoolVal, Function, If, Not, Or, Solver, Extract, ULT, parse_smt2_file,
+from z3 import (And, BitVec, BitVecSort, BitVecVal, Bool, BoolVal, Function, If, Not, Or, Solver, Extract, ULT, parse_smt2_file,
                 simplify, unsat)
 
 import verification.block_equivalence as be
@@ -339,3 +341,25 @@ def test_executor_adopts_the_entry_model_only_over_a_stale_witness():
         path._witness = current
         X86SymbolicExecutor._adopt_entry_model(executor, SimpleNamespace(get_constraints=lambda: path))
         assert path._witness is expected
+
+
+def test_rewrite_candidate_matches_the_uncached_rewrite():
+    from z3 import Concat, Extract as Ex
+    terms = [Ex(255, 5, Concat(BitVecVal(0, 192), a) + 31 + 64 * Concat(BitVecVal(0, 192), b)),
+             Concat(Ex(63, 8, a), Ex(7, 0, a)), a + b]
+    for t in terms:
+        raw = be._word_rewrite(t)
+        expected = None if raw is None else simplify(raw, bv_sort_ac=True)
+        for _ in range(2):
+            got = be._rewrite_candidate(t)
+            assert (got is None) == (expected is None) and (got is None or got.eq(expected))
+    assert be._inequality_text(a, b) == Not(a == b).sexpr()
+
+
+def test_normalisation_is_unchanged_by_the_memo():
+    from z3 import Concat, Extract as Ex
+    f = And(Ex(255, 5, Concat(BitVecVal(0, 192), a) + 31) == Ex(255, 5, Concat(BitVecVal(0, 192), a) + 63) - 1,
+            Concat(Ex(63, 8, b), Ex(7, 0, b)) != b)
+    first, lemmas = be.normalize_word_arith(f)
+    again, lemmas_again = be.normalize_word_arith(f)
+    assert first.eq(again) and [r.formula for r in lemmas] == [r.formula for r in lemmas_again]
