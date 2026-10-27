@@ -3432,6 +3432,11 @@ class BlockEquivalenceProver:
                     elif route == "mul":
                         proved, answer, lemmas = self._retry_over_nonlinear_mul(target, "unknown", split=norm)
                     elif route == "guards":
+                        # Half of what is left when it applies, as "alias": every case already runs
+                        # the unification route, and one share cut PoolManager 16670 pair_4_84 goal 2
+                        # off mid-case (833s per case of a 1666s share). No guard: returns at once.
+                        if node_deadline is not None:
+                            self.deadline = monotonic() + (node_deadline - monotonic()) / 2
                         proved, answer, lemmas = self._retry_over_guard_cases(target)
                     else:
                         proved, answer, lemmas = self._retry_with_uf_unification(target, "unknown")
