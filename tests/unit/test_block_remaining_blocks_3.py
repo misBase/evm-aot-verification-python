@@ -11,6 +11,8 @@
 - Resumed potential solve credited per obligation class ("resume" stats): once it refuted
   a class, siblings resume it right after the potential route instead of after every
   other route (Aave Pool 6182 pair_63_2 goal 6: 2350s of failing routes first).
+- Entry model reuse: a summary hit keeps its entry model; the next hit tries it on its
+  premise and the executor takes it as its path witness (Aave 7200: ~40s per entry).
 - _correspondence: a row whose quick solve is unknown gets its proposal from the
   blast_select_store form (Aave Pool 6182 rows 2/3/4: unknown at 30s directly, SAT in ~6s
   blasted; unknown made them "all" rows).
@@ -18,7 +20,7 @@
 from pathlib import Path
 
 import pytest
-from z3 import (And, BitVec, BitVecSort, Bool, BoolVal, Function, If, Not, Or, Solver, Extract, parse_smt2_file,
+from z3 import (And, BitVec, BitVecSort, Bool, BoolVal, Function, If, Not, Or, Solver, Extract, ULT, parse_smt2_file,
                 simplify, unsat)
 
 import verification.block_equivalence as be
@@ -265,3 +267,75 @@ def test_correspondence_falls_back_to_the_blasted_model(monkeypatch):
     prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=5000)
     found = prover._correspondence(evm, x86, BoolVal(True), [])
     assert found[:3] == (2, 0, None)
+
+
+# --- entry model reuse ------------------------------------------------------------
+
+
+def _memgas_hit():
+    from tests.unit.test_memgas_summary import RENAMED_HEX, _blocks
+    from verification.block_summaries import VerifiedSummaryRuntime
+    from x86_64.summaries import X86SummaryConfig
+    from x86_64.summaries.memgas import exit_guard
+    from x86_64.summaries.memgas_proof import clear_proof_cache, generic_memgas_state
+    clear_proof_cache()
+    runtime = VerifiedSummaryRuntime(_blocks(RENAMED_HEX), X86SummaryConfig.enabled(memgas="strict"), timeout_ms=30000)
+    [summary] = runtime.summaries
+    state = generic_memgas_state()
+    return runtime, summary, state, exit_guard(summary.payload, state)
+
+
+def test_entry_model_is_reused_on_the_next_hit(monkeypatch):
+    runtime, summary, state, guard = _memgas_hit()
+    names, real = [], runtime._solve
+    monkeypatch.setattr(runtime, "_solve", lambda name, f, expected="unsat": names.append(name) or real(name, f, expected))
+    runtime.apply(summary, state, path_condition=Not(guard))
+    assert names.count("entry") == 1 and runtime.entry_model is not None
+    runtime.apply(summary, state, path_condition=Not(guard))
+    assert names.count("entry") == 1                  # the second hit's entry came from the model
+    for certificate in runtime.certificates:
+        entry = next(o for o in certificate.obligations if o.name == "entry")
+        assert (entry.answer, entry.expected) == ("sat", "sat") and certificate.complete
+
+
+def test_an_entry_model_counts_only_if_it_satisfies_the_premise(monkeypatch):
+    from z3 import Solver, sat
+    runtime, summary, state, guard = _memgas_hit()
+    s = Solver()
+    s.add(guard)                                       # a model of the exit guard: violates Not(guard)
+    assert s.check() == sat
+    runtime.entry_model = s.model()
+    names, real = [], runtime._solve
+    monkeypatch.setattr(runtime, "_solve", lambda name, f, expected="unsat": names.append(name) or real(name, f, expected))
+    runtime.apply(summary, state, path_condition=Not(guard))
+    assert names.count("entry") == 1                  # not trusted: solved
+
+
+def test_sat_model_is_a_model_of_the_formula():
+    from z3 import is_true
+    runtime, *_ = _memgas_hit()
+    f = And(a + b == 5, ULT(a, 3))
+    record = runtime._solve("entry", f, "sat")
+    assert record.answer == "sat" and is_true(runtime.sat_model.eval(f, model_completion=True))
+    runtime.sat_model = None
+    assert runtime._solve("copy_domain", And(f, a == 7), "unsat").proved and runtime.sat_model is None
+
+
+def test_executor_adopts_the_entry_model_only_over_a_stale_witness():
+    from types import SimpleNamespace
+    from z3 import Solver
+    from x86_64.cfg_executor import X86SymbolicExecutor
+    from x86_64.cfg_state import X86Constraints
+    path = X86Constraints()
+    path.add(ULT(a, 3))
+    def model(value):
+        s = Solver()
+        s.add(a == value)
+        s.check()
+        return s.model()
+    entry, stale, valid = model(1), model(9), model(2)
+    executor = SimpleNamespace(summary_runtime=SimpleNamespace(entry_model=entry))
+    for current, expected in ((None, entry), (stale, entry), (valid, valid)):  # a valid witness stays
+        path._witness = current
+        X86SymbolicExecutor._adopt_entry_model(executor, SimpleNamespace(get_constraints=lambda: path))
+        assert path._witness is expected

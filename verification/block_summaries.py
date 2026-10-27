@@ -546,6 +546,23 @@ _LEMMA_SECONDS = 1200  # ponytail: fixed; first CALLDATALOAD lemma measured ~333
 _LEMMA_SPENT = [0.0]  # seconds this process spent in fresh shared-lemma proofs
 
 
+def _sat_model(query, timeout_ms):
+    """(answer, model or None) of one solver call on the query, as solve_query
+    answers it (same solver choice and incomplete-array retry; no proof cache)."""
+    from z3 import sat as SAT
+    from verification.block_equivalence import _solver
+    end = monotonic() + timeout_ms / 1000
+    solver = _solver(timeout_ms, query)
+    solver.add(query)
+    answer = solver.check()
+    remaining = int((end - monotonic()) * 1000)
+    if str(answer) == "unknown" and remaining > 0 and "incomplete" in solver.reason_unknown():
+        solver = _solver(remaining)
+        solver.add(query)
+        answer = solver.check()
+    return str(answer), solver.model() if answer == SAT else None
+
+
 def lemma_seconds():
     return _LEMMA_SPENT[0]
 
@@ -581,6 +598,11 @@ class VerifiedSummaryRuntime:
         self._generic_mode = False
         self._joined = set()
         self._statement = None  # lemma statement items while _generic_mode
+        # The last model an expected-SAT query found (_solve), checked to make that query's
+        # formula literally true; entry_model: the last hit entry's, tried on the next hit
+        # (apply) and handed to the executor as its path witness (both re-check it).
+        self.sat_model = None
+        self.entry_model = None
 
     def __getattr__(self, name):
         return getattr(self.runtime, name)
@@ -855,7 +877,10 @@ class VerifiedSummaryRuntime:
                 and refuted_by_complement(And(*formula.children()[:-1]), formula.arg(formula.num_args() - 1))):
             return Obligation(name, formula.sexpr(), "unsat", expected, monotonic() - started)
         query = simplify(formula, expand_select_store=True)
-        answer = solve_query(query, timeout)
+        # Expected SAT: keep the model (_sat_model) for the next hit's entry and the
+        # executor's witness (see apply); the answer is the same query's.
+        solve = _sat_model if expected == "sat" else (lambda q, ms: (solve_query(q, ms), None))
+        answer, model = solve(query, timeout)
         if answer == "unknown":
             # Reads through store chains over lambda arrays (x86 copy results) defeat the
             # solver; blasted into ites (an exact rewrite, so its answer is the formula's)
@@ -864,8 +889,12 @@ class VerifiedSummaryRuntime:
             budget = self.timeout_ms
             if self.deadline is not None:
                 budget = min(budget, int((self.deadline - monotonic()) * 1000))
-            if budget > 0 and solve_query(simplify(formula, blast_select_store=True), budget) == expected:
-                answer = expected
+            if budget > 0:
+                blasted, model = solve(simplify(formula, blast_select_store=True), budget)
+                if blasted == expected:
+                    answer = expected
+        if model is not None and answer == "sat" and is_true(model.eval(formula, model_completion=True)):
+            self.sat_model = model
         if answer == "unknown" and expected == "unsat":
             relaxed, changed = abstract_nonlinear_mul(formula)
             budget = self.timeout_ms
@@ -939,12 +968,18 @@ class VerifiedSummaryRuntime:
                 # assignment, and only a result that is literally true counts
                 # (a quantifier it cannot reduce stays symbolic, so it is a miss).
                 # Otherwise (or for a generic-mode statement) solve as before.
-                if (witness is not None and not self._generic_mode
-                        and is_true(witness.eval(premise, model_completion=True))):
+                # The last hit's entry model is tried the same way: hits along one path
+                # share most of the premise, and the executor's witness is often older
+                # than the last hit (Aave 7200: ~40s per memgas/div entry, every hit).
+                models = () if self._generic_mode else [m for m in (witness, self.entry_model) if m is not None]
+                if any(is_true(m.eval(premise, model_completion=True)) for m in models):
                     self.proof_queries += 1
                     records.append(Obligation("entry", premise.sexpr(), "sat", "sat"))
                 else:
+                    self.sat_model = None
                     check("entry", premise, "sat")
+                    if not self._generic_mode and self.sat_model is not None:
+                        self.entry_model = self.sat_model
                 required = ["entry"]
             except ValueError:
                 from verification.mcopy_induction import dead_hit

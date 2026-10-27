@@ -240,12 +240,13 @@ def test_summary_entry_falls_back_to_the_blasted_query(monkeypatch):
     from tests.unit.test_memgas_summary import RENAMED_HEX, _blocks
     from x86_64.summaries import X86SummaryConfig
     runtime = bs.VerifiedSummaryRuntime(_blocks(RENAMED_HEX), X86SummaryConfig.enabled(memgas="strict"), timeout_ms=30000)
-    real, queries = bs.solve_query, []
+    # Expected-SAT queries go through _sat_model (N3: it keeps the model for the next entry).
+    real, queries = bs._sat_model, []
 
     def solve(query, timeout_ms, *a, **k):
         queries.append(query)
-        return "unknown" if len(queries) == 1 else real(query, timeout_ms, *a, **k)
-    monkeypatch.setattr(bs, "solve_query", solve)
+        return ("unknown", None) if len(queries) == 1 else real(query, timeout_ms, *a, **k)
+    monkeypatch.setattr(bs, "_sat_model", solve)
     record = runtime._solve("entry", And(*_store_chain_path("se")), "sat")
     assert record.answer == "sat" and len(queries) == 2
 

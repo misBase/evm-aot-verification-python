@@ -7,7 +7,7 @@ x86-64 符号执行引擎（参考 evm_ir）。
 import logging
 from time import monotonic
 from typing import List, Dict, Optional, Tuple, Set, TYPE_CHECKING
-from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat, is_false
+from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat, is_false, is_true
 
 logger = logging.getLogger(__name__)
 
@@ -755,6 +755,7 @@ class X86SymbolicExecutor:
                         path_condition=global_state.get_constraints().as_bool(),
                         witness=global_state.get_constraints()._witness,
                     )
+                    self._adopt_entry_model(global_state)
                 except SummaryPreconditionError as error:
                     self.summary_runtime.record_precondition_failure(error)
                     if not self.summary_runtime.should_fallback_on_precondition(
@@ -846,6 +847,7 @@ class X86SymbolicExecutor:
                 applied = self.summary_runtime.apply(
                     summary, new_mstate, path_condition=fast.get_constraints().as_bool(),
                     witness=fast.get_constraints()._witness)
+                self._adopt_entry_model(fast)
             except SummaryPreconditionError as error:
                 self.summary_runtime.record_precondition_failure(error)
                 if not self.summary_runtime.should_fallback_on_precondition(summary.kind):
@@ -853,6 +855,20 @@ class X86SymbolicExecutor:
                 return out + run_raw(fast)
             out.extend(self._continue_after_cross_block_summary(fast, summary, applied))
         return out
+
+    def _adopt_entry_model(self, global_state: X86GlobalState) -> None:
+        """After a summary hit, the runtime's last entry model (a model of the hit
+        premise, which conjoins this path condition) becomes the path's witness
+        when the current one no longer satisfies the path condition. A hint only:
+        is_possible uses a witness only if it makes the whole path condition
+        literally true, and otherwise solves as before."""
+        model = getattr(self.summary_runtime, "entry_model", None)
+        constraints = global_state.get_constraints()
+        if model is None or model is constraints._witness:
+            return
+        current = constraints._witness
+        if current is None or not is_true(current.eval(constraints.as_bool(), model_completion=True)):
+            constraints._witness = model
 
     def _continue_after_cross_block_summary(
         self,
