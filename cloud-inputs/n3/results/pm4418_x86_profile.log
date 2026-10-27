@@ -1,0 +1,292 @@
+spec BlockSpecialization(pc=4418, stack_depth=15, memory_size=None, free_memory_pointer=None, stack_constants=())
+[    73.4s] reachability check 6.3s at 0x2dda8 -> True
+[    79.0s] reachability check 5.6s at 0x2dda8 -> True
+[    84.6s] reachability check 5.5s at 0x2dda8 -> True
+[    94.8s] reachability check 7.8s at 0x2dff3 -> True
+[   102.4s] reachability check 7.5s at 0x2e25e -> True
+[   109.5s] reachability check 7.1s at 0x2dff3 -> False
+[   116.8s] reachability check 7.3s at 0x2dda8 -> True
+[   122.4s] reachability check 5.6s at 0x2dda8 -> True
+[   130.0s] reachability check 7.6s at 0x2dda8 -> True
+[   140.3s] reachability check 6.2s at 0x2dda8 -> True
+[   148.2s] reachability check 7.9s at 0x2dda8 -> True
+[   154.6s] reachability check 6.3s at 0x2dda8 -> True
+[   164.0s] reachability check 7.7s at 0x2dff3 -> True
+[   171.0s] reachability check 6.9s at 0x2e8e2 -> True
+[   178.7s] reachability check 7.7s at 0x2dff3 -> True
+[   186.9s] reachability check 8.1s at 0x2dda8 -> True
+[   193.8s] reachability check 6.9s at 0x2dda8 -> True
+[   201.8s] reachability check 8.1s at 0x2dda8 -> True
+[   218.3s] reachability check 5.4s at 0x2d7dd -> True
+[   227.2s] reachability check 6.3s at 0x2db93 -> True
+[   237.9s] reachability check 8.5s at 0x2dda8 -> True
+[   244.6s] reachability check 6.6s at 0x2dda8 -> True
+[   253.0s] reachability check 8.2s at 0x2dda8 -> True
+[   260.9s] reachability check 6.4s at 0x2dff3 -> False
+[   268.6s] reachability check 7.6s at 0x2e8e2 -> True
+[   277.8s] reachability check 9.1s at 0x2dda8 -> True
+[   283.4s] reachability check 5.6s at 0x2dda8 -> True
+[   291.4s] reachability check 8.0s at 0x2dda8 -> True
+[   298.0s] reachability check 5.2s at 0x2db93 -> True
+[   309.3s] reachability check 8.0s at 0x2dda8 -> True
+[   315.1s] reachability check 5.7s at 0x2dda8 -> True
+[   322.3s] reachability check 7.1s at 0x2dda8 -> True
+[   328.2s] reachability check 5.9s at 0x2de1c -> True
+[   336.6s] reachability check 7.3s at 0x2dff3 -> False
+[   344.1s] reachability check 7.5s at 0x2e8e2 -> True
+[   351.3s] reachability check 7.2s at 0x2de1c -> True
+[   357.7s] reachability check 6.3s at 0x2dda8 -> True
+[   364.6s] reachability check 6.9s at 0x2dda8 -> True
+[   370.3s] reachability check 5.7s at 0x2dda8 -> True
+[   377.1s] reachability check 6.8s at 0x2db93 -> True
+[   383.3s] reachability check 6.1s at 0x2d7dd -> True
+[   416.5s] reachability check 7.1s at 0x2de1c -> True
+[   425.5s] reachability check 8.0s at 0x2dff3 -> False
+[   433.7s] reachability check 8.1s at 0x2e8e2 -> True
+[   452.8s] reachability check 7.8s at 0x2dff3 -> False
+[   461.2s] reachability check 8.3s at 0x2e8e2 -> True
+[   492.1s] reachability check 6.9s at 0x2db93 -> True
+[   499.8s] reachability check 5.5s at 0x2dda8 -> False
+[   506.4s] reachability check 6.5s at 0x2dda8 -> False
+[   514.3s] reachability check 7.8s at 0x2de1c -> True
+[   524.6s] reachability check 8.8s at 0x2dff3 -> True
+[   532.3s] reachability check 7.5s at 0x2e8e2 -> True
+[   540.1s] reachability check 7.8s at 0x2dff3 -> False
+[   547.4s] reachability check 7.4s at 0x2de1c -> True
+[   557.5s] reachability check 6.8s at 0x2db93 -> True
+[   570.8s] reachability check 8.0s at 0x2de1c -> True
+[   580.0s] reachability check 8.1s at 0x2dff3 -> False
+[   587.5s] reachability check 7.4s at 0x2e8e2 -> True
+[   595.3s] reachability check 7.8s at 0x2de1c -> True
+[   600.2s] progress: executed 1151 live 0 final/cut (0, 3) reach 1367 checks 502.0s pruned 370
+   top blocks: [('0x2da8a', 16), ('0x2dc9d', 12), ('0x2dda8', 12), ('0x2d3a2', 12), ('0x2d193', 12), ('0x2cd2c', 12), ('0x2cc21', 8), ('0x2cc26', 8), ('0x2cc32', 8), ('0x2d08c', 8), ('0x2d091', 8), ('0x2d09d', 8)]
+   top forks: [('0x2da8a', 16), ('0x2cc32', 8), ('0x2d09d', 8), ('0x2d2aa', 8), ('0x2d4aa', 8), ('0x2d6d1', 8), ('0x2d987', 8), ('0x2da36', 8), ('0x2da4d', 8), ('0x2da79', 8), ('0x2da7e', 8), ('0x2db31', 8)]
+   summaries: {'seconds': 25.99586937099889, 'memgas@0x2c22d': 3, 'memgas@0x2c44d': 3, 'memgas@0x2c674': 3, 'memgas@0x2c8ad': 3, 'memgas@0x2cc35': 4, 'memgas@0x2ce6d': 4, 'memgas@0x2d0a0': 4, 'memgas@0x2d2ad': 4, 'memgas@0x2d4ad': 4, 'memgas@0x2d6d4': 4, 'memgas@0x2da8d': 8, 'memgas@0x2dca0': 8, 'memgas@0x2deed': 8}
+   complement: {'hit': 60, 'seconds': 1.558834974001229}
+[   617.1s] reachability check 7.3s at 0x2d5b3 -> True
+[   628.4s] reachability check 6.8s at 0x2db93 -> True
+[   642.1s] reachability check 7.3s at 0x2dff3 -> False
+[   650.8s] reachability check 8.5s at 0x2e8e2 -> True
+[   666.5s] reachability check 7.4s at 0x2de1c -> True
+[   675.0s] reachability check 7.5s at 0x2dff3 -> False
+[   682.5s] reachability check 7.4s at 0x2e25e -> True
+[   689.0s] reachability check 6.5s at 0x2de1c -> True
+[   714.5s] reachability check 6.4s at 0x2d5b3 -> True
+[   723.6s] reachability check 7.1s at 0x2da8a -> True
+[   735.9s] reachability check 6.9s at 0x2de1c -> True
+[   744.5s] reachability check 7.7s at 0x2dff3 -> False
+[   752.3s] reachability check 7.7s at 0x2e8e2 -> True
+[   768.3s] reachability check 7.6s at 0x2de1c -> True
+[   777.0s] reachability check 7.5s at 0x2dff3 -> False
+[   784.8s] reachability check 7.6s at 0x2e8e2 -> True
+[   792.5s] reachability check 7.6s at 0x2de1c -> True
+[   798.7s] reachability check 6.1s at 0x2d5b3 -> True
+[   811.2s] reachability check 5.3s at 0x2d3b3 -> True
+[   829.1s] reachability check 7.0s at 0x2dff3 -> False
+[   837.1s] reachability check 7.9s at 0x2e25e -> True
+[   848.2s] reachability check 7.1s at 0x2dff3 -> False
+[   855.7s] reachability check 7.4s at 0x2e25e -> True
+[   873.3s] reachability check 8.1s at 0x2d7dd -> True
+[   883.6s] reachability check 7.5s at 0x2de1c -> True
+[   891.7s] reachability check 7.0s at 0x2dff3 -> False
+[   899.0s] reachability check 7.2s at 0x2e8e2 -> True
+[   912.1s] reachability check 7.0s at 0x2dff3 -> False
+[   920.6s] reachability check 8.4s at 0x2e8e2 -> True
+[   951.8s] reachability check 8.5s at 0x2dff3 -> False
+[   960.7s] reachability check 8.9s at 0x2e8e2 -> True
+[   977.1s] reachability check 7.8s at 0x2dff3 -> False
+[   985.2s] reachability check 8.0s at 0x2e25e -> True
+[  1000.0s] reachability check 6.1s at 0x2d3a2 -> True
+[  1016.5s] reachability check 7.1s at 0x2d7dd -> True
+[  1022.4s] reachability check 5.8s at 0x2d947 -> True
+[  1031.4s] reachability check 6.8s at 0x2db93 -> True
+[  1043.2s] reachability check 7.5s at 0x2de1c -> True
+[  1052.6s] reachability check 8.2s at 0x2dff3 -> False
+[  1061.0s] reachability check 8.3s at 0x2e8e2 -> True
+[  1071.8s] reachability check 10.8s at 0x2de1c -> True
+[  1090.8s] reachability check 7.8s at 0x2dff3 -> False
+[  1099.2s] reachability check 8.3s at 0x2e8e2 -> True
+[  1120.0s] reachability check 6.5s at 0x2da8a -> True
+[  1129.9s] reachability check 7.0s at 0x2db93 -> True
+[  1142.1s] reachability check 7.7s at 0x2de1c -> True
+[  1151.3s] reachability check 8.1s at 0x2dff3 -> False
+[  1159.3s] reachability check 7.9s at 0x2e8e2 -> True
+[  1167.1s] reachability check 7.8s at 0x2de1c -> True
+[  1174.3s] reachability check 7.2s at 0x2db93 -> True
+[  1192.0s] reachability check 7.9s at 0x2dff3 -> False
+[  1199.1s] reachability check 7.0s at 0x2e8e2 -> True
+[  1200.4s] progress: executed 2910 live 0 final/cut (0, 3) reach 3433 checks 1026.4s pruned 976
+   top blocks: [('0x2da8a', 44), ('0x2d3a2', 33), ('0x2d193', 33), ('0x2cd2c', 33), ('0x2dc9d', 26), ('0x2cc21', 22), ('0x2cc26', 22), ('0x2cc32', 22), ('0x2d08c', 22), ('0x2d091', 22), ('0x2d09d', 22), ('0x2d299', 22)]
+   top forks: [('0x2da8a', 44), ('0x2cc32', 22), ('0x2d09d', 22), ('0x2d2aa', 22), ('0x2d4aa', 22), ('0x2d6d1', 22), ('0x2d987', 22), ('0x2da36', 22), ('0x2da4d', 22), ('0x2da79', 22), ('0x2da7e', 22), ('0x2db31', 22)]
+   summaries: {'seconds': 68.00675275800018, 'memgas@0x2c22d': 6, 'memgas@0x2c44d': 6, 'memgas@0x2c674': 6, 'memgas@0x2c8ad': 6, 'memgas@0x2cc35': 11, 'memgas@0x2ce6d': 11, 'memgas@0x2d0a0': 11, 'memgas@0x2d2ad': 11, 'memgas@0x2d4ad': 11, 'memgas@0x2d6d4': 11, 'memgas@0x2da8d': 22, 'memgas@0x2dca0': 22, 'memgas@0x2deed': 22}
+   complement: {'hit': 156, 'seconds': 4.30603070800521}
+[  1206.0s] reachability check 5.0s at 0x2cd3d -> True
+[  1228.4s] reachability check 6.9s at 0x2d6d1 -> True
+[  1249.9s] reachability check 8.4s at 0x2dff3 -> False
+[  1258.3s] reachability check 8.4s at 0x2e8e2 -> True
+[  1268.1s] reachability check 7.9s at 0x2db93 -> True
+[  1277.9s] reachability check 5.9s at 0x2dda8 -> False
+[  1286.8s] reachability check 7.5s at 0x2de1c -> True
+[  1296.2s] reachability check 8.2s at 0x2dff3 -> False
+[  1304.1s] reachability check 7.8s at 0x2e8e2 -> True
+[  1312.3s] reachability check 8.3s at 0x2de1c -> True
+[  1319.6s] reachability check 7.2s at 0x2db93 -> True
+[  1342.9s] reachability check 6.9s at 0x2d786 -> True
+[  1349.8s] reachability check 6.9s at 0x2d977 -> True
+[  1357.4s] reachability check 7.6s at 0x2d947 -> True
+[  1371.1s] reachability check 8.4s at 0x2dda8 -> True
+[  1380.6s] reachability check 9.6s at 0x2dda8 -> True
+[  1389.5s] reachability check 8.6s at 0x2dda8 -> True
+[  1399.2s] reachability check 8.4s at 0x2dff3 -> True
+[  1407.4s] reachability check 8.1s at 0x2e8e2 -> True
+[  1417.1s] reachability check 9.7s at 0x2dff3 -> True
+[  1425.3s] reachability check 8.1s at 0x2dda8 -> True
+[  1432.7s] reachability check 7.4s at 0x2dda8 -> True
+[  1441.3s] reachability check 8.5s at 0x2dda8 -> True
+[  1456.0s] reachability check 8.0s at 0x2dda8 -> True
+[  1464.1s] reachability check 8.0s at 0x2dda8 -> True
+[  1471.7s] reachability check 7.5s at 0x2dda8 -> True
+[  1481.9s] reachability check 8.6s at 0x2dff3 -> True
+[  1490.6s] reachability check 8.6s at 0x2e8e2 -> True
+[  1499.7s] reachability check 9.1s at 0x2dff3 -> True
+[  1507.6s] reachability check 7.8s at 0x2dda8 -> True
+[  1515.2s] reachability check 7.6s at 0x2dda8 -> True
+[  1523.2s] reachability check 8.0s at 0x2dda8 -> True
+[  1560.6s] reachability check 9.7s at 0x2dda8 -> True
+[  1568.0s] reachability check 7.4s at 0x2dda8 -> True
+[  1579.5s] reachability check 11.3s at 0x2dda8 -> True
+[  1587.6s] reachability check 8.1s at 0x2de1c -> True
+[  1597.2s] reachability check 8.4s at 0x2dff3 -> True
+[  1604.6s] reachability check 7.3s at 0x2e8e2 -> True
+[  1612.1s] reachability check 7.5s at 0x2dff3 -> True
+[  1621.8s] reachability check 9.6s at 0x2de1c -> True
+[  1629.3s] reachability check 7.5s at 0x2dda8 -> True
+[  1636.6s] reachability check 7.4s at 0x2dda8 -> True
+[  1643.9s] reachability check 7.2s at 0x2dda8 -> True
+[  1657.8s] reachability check 7.2s at 0x2dda8 -> True
+[  1665.3s] reachability check 7.5s at 0x2dda8 -> True
+[  1672.7s] reachability check 7.3s at 0x2dda8 -> True
+[  1683.0s] reachability check 8.2s at 0x2dff3 -> True
+[  1691.3s] reachability check 8.2s at 0x2e8e2 -> True
+[  1699.7s] reachability check 8.4s at 0x2dff3 -> True
+[  1707.6s] reachability check 7.9s at 0x2dda8 -> True
+[  1715.5s] reachability check 7.9s at 0x2dda8 -> True
+[  1723.0s] reachability check 7.5s at 0x2dda8 -> True
+[  1744.4s] reachability check 6.9s at 0x2d5b3 -> True
+[  1763.8s] reachability check 7.7s at 0x2dda8 -> True
+[  1772.0s] reachability check 8.2s at 0x2dda8 -> True
+[  1780.7s] reachability check 8.6s at 0x2dda8 -> True
+[  1790.4s] reachability check 9.7s at 0x2de1c -> True
+[  1800.7s] reachability check 9.2s at 0x2dff3 -> True
+[  1800.8s] progress: executed 3881 live 0 final/cut (0, 3) reach 4587 checks 1584.0s pruned 1286
+   top blocks: [('0x2da8a', 58), ('0x2d3a2', 42), ('0x2d193', 42), ('0x2cd2c', 42), ('0x2dc9d', 38), ('0x2cc32', 30), ('0x2d09d', 30), ('0x2d2aa', 30), ('0x2d4aa', 30), ('0x2d6d1', 30), ('0x2cc21', 29), ('0x2cc26', 29)]
+   top forks: [('0x2da8a', 58), ('0x2cc32', 30), ('0x2d09d', 30), ('0x2d2aa', 30), ('0x2d4aa', 30), ('0x2d6d1', 30), ('0x2d987', 29), ('0x2da36', 29), ('0x2da4d', 29), ('0x2da79', 29), ('0x2da7e', 29), ('0x2db31', 29)]
+   summaries: {'seconds': 91.76972468499912, 'memgas@0x2c22d': 8, 'memgas@0x2c44d': 8, 'memgas@0x2c674': 8, 'memgas@0x2c8ad': 8, 'memgas@0x2cc35': 15, 'memgas@0x2ce6d': 15, 'memgas@0x2d0a0': 15, 'memgas@0x2d2ad': 15, 'memgas@0x2d4ad': 15, 'memgas@0x2d6d4': 15, 'memgas@0x2da8d': 29, 'memgas@0x2dca0': 29, 'memgas@0x2deed': 29}
+   complement: {'hit': 209, 'seconds': 5.933484018004265}
+[  1808.7s] reachability check 7.9s at 0x2e25e -> True
+[  1816.9s] reachability check 8.2s at 0x2dff3 -> True
+[  1824.2s] reachability check 7.3s at 0x2de1c -> True
+[  1833.9s] reachability check 9.7s at 0x2dda8 -> True
+[  1842.3s] reachability check 8.4s at 0x2dda8 -> True
+[  1851.7s] reachability check 9.4s at 0x2dda8 -> True
+[  1862.2s] reachability check 7.6s at 0x2db93 -> True
+[  1875.8s] reachability check 10.3s at 0x2dda8 -> True
+[  1883.5s] reachability check 7.7s at 0x2dda8 -> True
+[  1890.9s] reachability check 7.3s at 0x2dda8 -> True
+[  1897.6s] reachability check 6.6s at 0x2de1c -> True
+[  1906.9s] reachability check 8.3s at 0x2dff3 -> True
+[  1915.7s] reachability check 8.7s at 0x2e25e -> True
+[  1923.8s] reachability check 8.1s at 0x2dff3 -> False
+[  1930.8s] reachability check 6.9s at 0x2dda8 -> True
+[  1938.0s] reachability check 7.2s at 0x2dda8 -> True
+[  1945.2s] reachability check 7.2s at 0x2dda8 -> True
+[  1952.9s] reachability check 7.6s at 0x2db93 -> True
+[  1974.8s] reachability check 7.6s at 0x2d5b3 -> True
+[  1983.2s] reachability check 7.1s at 0x2d7dd -> True
+[  1997.1s] reachability check 8.1s at 0x2dda8 -> True
+[  2003.9s] reachability check 6.7s at 0x2dda8 -> True
+[  2011.7s] reachability check 7.7s at 0x2dda8 -> True
+[  2021.3s] reachability check 8.3s at 0x2dff3 -> False
+[  2028.8s] reachability check 7.4s at 0x2e8e2 -> True
+[  2036.5s] reachability check 7.7s at 0x2dda8 -> True
+[  2047.4s] reachability check 10.8s at 0x2dda8 -> True
+[  2054.9s] reachability check 7.6s at 0x2dda8 -> True
+[  2067.2s] reachability check 7.0s at 0x2dda8 -> True
+[  2074.8s] reachability check 7.6s at 0x2dda8 -> True
+[  2083.1s] reachability check 8.2s at 0x2dda8 -> True
+[  2093.2s] reachability check 8.3s at 0x2dff3 -> True
+[  2101.3s] reachability check 7.9s at 0x2e8e2 -> True
+[  2109.4s] reachability check 8.2s at 0x2dff3 -> True
+[  2117.1s] reachability check 7.7s at 0x2dda8 -> True
+[  2124.6s] reachability check 7.5s at 0x2dda8 -> True
+[  2132.4s] reachability check 7.7s at 0x2dda8 -> True
+[  2138.0s] reachability check 5.5s at 0x2d7dd -> True
+[  2145.2s] reachability check 7.1s at 0x2d5b3 -> True
+[  2166.6s] reachability check 6.9s at 0x2d7dd -> True
+[  2181.6s] reachability check 8.1s at 0x2dda8 -> True
+[  2188.9s] reachability check 7.3s at 0x2dda8 -> True
+[  2197.9s] reachability check 7.4s at 0x2dda8 -> True
+[  2209.6s] reachability check 8.9s at 0x2dff3 -> True
+[  2217.2s] reachability check 7.5s at 0x2e8e2 -> True
+[  2226.0s] reachability check 8.8s at 0x2dff3 -> True
+[  2233.4s] reachability check 7.4s at 0x2dda8 -> True
+[  2241.1s] reachability check 7.7s at 0x2dda8 -> True
+[  2248.9s] reachability check 7.7s at 0x2dda8 -> True
+[  2256.1s] reachability check 6.3s at 0x2da8a -> True
+[  2264.3s] reachability check 7.5s at 0x2db93 -> True
+[  2277.5s] reachability check 8.1s at 0x2dda8 -> True
+[  2285.1s] reachability check 7.6s at 0x2dda8 -> True
+[  2295.2s] reachability check 8.3s at 0x2dda8 -> True
+[  2303.0s] reachability check 7.8s at 0x2de1c -> True
+[  2312.6s] reachability check 8.6s at 0x2dff3 -> True
+[  2320.0s] reachability check 7.3s at 0x2e8e2 -> True
+[  2328.4s] reachability check 8.5s at 0x2dff3 -> True
+[  2336.4s] reachability check 7.9s at 0x2de1c -> True
+[  2343.9s] reachability check 7.5s at 0x2dda8 -> True
+[  2350.9s] reachability check 7.0s at 0x2dda8 -> True
+[  2358.4s] reachability check 7.5s at 0x2dda8 -> True
+[  2370.3s] reachability check 11.8s at 0x2db93 -> True
+[  2379.2s] reachability check 8.7s at 0x2d7dd -> True
+[  2389.5s] reachability check 6.0s at 0x2d1a4 -> True
+[  2401.0s] progress: executed 4628 live 0 final/cut (0, 3) reach 5469 checks 2154.3s pruned 1511
+   top blocks: [('0x2da8a', 70), ('0x2d3a2', 51), ('0x2d193', 51), ('0x2cd2c', 51), ('0x2dc9d', 48), ('0x2dda8', 42), ('0x2cc32', 36), ('0x2d09d', 36), ('0x2d2aa', 36), ('0x2d4aa', 36), ('0x2d6d1', 36), ('0x2dc64', 36)]
+   top forks: [('0x2da8a', 70), ('0x2cc32', 36), ('0x2d09d', 36), ('0x2d2aa', 36), ('0x2d4aa', 36), ('0x2d6d1', 36), ('0x2d987', 35), ('0x2da36', 35), ('0x2da4d', 35), ('0x2da79', 35), ('0x2da7e', 35), ('0x2db31', 35)]
+   summaries: {'seconds': 108.08113406500138, 'memgas@0x2c22d': 9, 'memgas@0x2c44d': 9, 'memgas@0x2c674': 9, 'memgas@0x2c8ad': 9, 'memgas@0x2cc35': 18, 'memgas@0x2ce6d': 18, 'memgas@0x2d0a0': 18, 'memgas@0x2d2ad': 18, 'memgas@0x2d4ad': 18, 'memgas@0x2d6d4': 18, 'memgas@0x2da8d': 35, 'memgas@0x2dca0': 34, 'memgas@0x2deed': 34}
+   complement: {'hit': 247, 'seconds': 7.02073706200531}
+[  2410.8s] reachability check 9.6s at 0x2de0b -> True
+[  2419.7s] reachability check 7.2s at 0x2dda8 -> True
+[  2427.0s] reachability check 7.2s at 0x2dda8 -> True
+[  2434.6s] reachability check 7.0s at 0x2dda8 -> True
+[  2442.8s] reachability check 8.2s at 0x2de1c -> True
+[  2452.2s] reachability check 8.5s at 0x2dff3 -> True
+[  2460.1s] reachability check 7.8s at 0x2e8e2 -> True
+[  2468.3s] reachability check 8.2s at 0x2dff3 -> True
+[  2476.5s] reachability check 8.2s at 0x2de1c -> True
+[  2484.0s] reachability check 7.5s at 0x2dda8 -> True
+[  2491.8s] reachability check 7.8s at 0x2dda8 -> True
+[  2499.2s] reachability check 7.5s at 0x2dda8 -> True
+[  2504.8s] reachability check 5.5s at 0x2de0b -> True
+[  2517.0s] reachability check 7.4s at 0x2dc5a -> True
+[  2528.2s] reachability check 7.9s at 0x2dda8 -> True
+[  2536.0s] reachability check 7.8s at 0x2dda8 -> True
+[  2542.4s] reachability check 6.3s at 0x2dda8 -> False
+[  2553.6s] reachability check 11.2s at 0x2dda8 -> True
+[  2561.5s] reachability check 7.8s at 0x2de1c -> True
+[  2570.8s] reachability check 8.3s at 0x2dff3 -> True
+[  2578.5s] reachability check 7.5s at 0x2e8e2 -> True
+[  2587.1s] reachability check 8.6s at 0x2dff3 -> True
+[  2595.1s] reachability check 8.1s at 0x2de1c -> True
+[  2602.4s] reachability check 7.3s at 0x2dda8 -> True
+[  2609.8s] reachability check 7.4s at 0x2dda8 -> True
+[  2617.5s] reachability check 7.7s at 0x2dda8 -> True
+[  2622.8s] reachability check 5.2s at 0x2de0b -> True
+[  2630.6s] reachability check 5.9s at 0x2d1a4 -> True
+[  2674.7s] reachability check 8.2s at 0x2db93 -> True
+[  2682.0s] reachability check 7.3s at 0x2db93 -> True
+[  2683.9s] x86 segment end: executed 5198 live 0 final/cut (0, 3) reach 6105 checks 2418.1s pruned 1660
+   top blocks: [('0x2da8a', 80), ('0x2d3a2', 60), ('0x2d193', 60), ('0x2cd2c', 60), ('0x2dc9d', 52), ('0x2dda8', 48), ('0x2cc21', 40), ('0x2cc26', 40), ('0x2cc32', 40), ('0x2d08c', 40), ('0x2d091', 40), ('0x2d09d', 40)]
+   top forks: [('0x2da8a', 80), ('0x2cc32', 40), ('0x2d09d', 40), ('0x2d2aa', 40), ('0x2d4aa', 40), ('0x2d6d1', 40), ('0x2d987', 40), ('0x2da36', 40), ('0x2da4d', 40), ('0x2da79', 40), ('0x2da7e', 40), ('0x2db31', 40)]
+   summaries: {'seconds': 117.97470629800205, 'memgas@0x2c22d': 10, 'memgas@0x2c44d': 10, 'memgas@0x2c674': 10, 'memgas@0x2c8ad': 10, 'memgas@0x2cc35': 20, 'memgas@0x2ce6d': 20, 'memgas@0x2d0a0': 20, 'memgas@0x2d2ad': 20, 'memgas@0x2d4ad': 20, 'memgas@0x2d6d4': 20, 'memgas@0x2da8d': 40, 'memgas@0x2dca0': 36, 'memgas@0x2deed': 36}
+   complement: {'hit': 272, 'seconds': 7.6566482600035215}
+paths 876 Counter({'terminal@185250': 60, 'terminal@184723': 60, 'terminal@183596': 60, 'terminal@187816': 48, 'terminal@187283': 40, 'terminal@187161': 40, 'exit@189022': 36, 'exit@190690': 36, 'terminal@187932': 36, 'terminal@182690': 30, 'terminal@182124': 30, 'terminal@181570': 30, 'terminal@181026': 30, 'terminal@186333': 20, 'terminal@186213': 20, 'terminal@185779': 20, 'terminal@185657': 20, 'terminal@185267': 20, 'terminal@185145': 20, 'terminal@184740': 20, 'terminal@184620': 20, 'terminal@184179': 20, 'terminal@183613': 20, 'terminal@183493': 20, 'terminal@187692': 16, 'terminal@187915': 12, 'terminal@188403': 11, 'terminal@182707': 10, 'terminal@182585': 10, 'terminal@182141': 10, 'terminal@182021': 10, 'terminal@181587': 10, 'terminal@181465': 10, 'terminal@181043': 10, 'terminal@180921': 10, 'terminal@179025': 1}) []
+result ('Stop: ',)

@@ -1,0 +1,7 @@
+[     3.6s]   _retry_over_lia -> unknown 0.1s
+[    86.0s]   _retry_over_potential -> unknown 0.2s
+[    86.4s]   _retry_over_potential -> unknown 0.2s
+[   161.8s]   _retry_over_nonlinear_mul -> unknown 0.2s
+[   162.0s]   _retry_over_nonlinear_mul -> unknown 0.2s
+[   923.3s]   _retry_over_guard_cases -> unsat 761.3s
+pair_2_74_goal_2_of_7 expected=unsat proved 923.6s lemmas=68 ['extensionality_0', 'guard_0_0_blasted', 'guard_0_0_unify_0', 'guard_0_0_unify_1', 'guard_0_0_unify_10', 'guard_0_0_unify_11', 'guard_0_0_unify_12', 'guard_0_0_unify_13', 'guard_0_0_unify_14', 'guard_0_0_unify_15', 'guard_0_0_unify_16', 'guard_0_0_unify_17']

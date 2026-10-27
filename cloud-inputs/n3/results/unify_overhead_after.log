@@ -1,0 +1,82 @@
+24 lemmas in 241.4s
+         147739108 function calls (147717622 primitive calls) in 241.442 seconds
+
+   Ordered by: cumulative time
+   List reduced from 195 to 40 due to restriction <40>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.452    0.452  241.437  241.437 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2595(unify_uf_arguments)
+       23    0.003    0.000  201.775    8.773 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2431(_prove_equal)
+       91    0.001    0.000  187.883    2.065 /home/user/evm-aot-verification-python/verification/block_equivalence.py:81(solve_query)
+       91    0.002    0.000  187.711    2.063 /home/user/evm-aot-verification-python/verification/block_equivalence.py:101(_solve_query)
+       91    0.003    0.000  178.588    1.963 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:7283(check)
+       91  178.582    1.962  178.583    1.962 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:4330(Z3_solver_check_assumptions)
+       21    0.004    0.000  160.985    7.666 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2324(_refute_by_cases)
+   463318    0.806    0.000   37.870    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1142(children)
+       23    0.004    0.000   37.460    1.629 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2401(_refute_over_light_premise)
+  1038690    2.455    0.000   31.183    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1121(arg)
+    64836    0.065    0.000   16.238    0.000 /home/user/evm-aot-verification-python/common/store_forwarding.py:78(_memoized)
+  3674179    1.993    0.000   15.386    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1327(is_app)
+    53056    0.557    0.000   15.242    0.000 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2578(_uf_nesting)
+  3674179    3.585    0.000   12.982    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:505(_ast_kind)
+  1513366    2.408    0.000   12.791    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1105(num_args)
+  1040576    2.061    0.000   12.257    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1180(_to_expr_ref)
+ 14097446    8.429    0.000    9.621    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:1580(Check)
+  4714755    5.416    0.000    9.481    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3152(Z3_get_ast_kind)
+       91    0.003    0.000    8.971    0.099 /home/user/evm-aot-verification-python/verification/block_equivalence.py:73(_solver)
+       91    0.330    0.004    8.957    0.098 /home/user/evm-aot-verification-python/verification/block_equivalence.py:55(_bv_array_formula)
+     3864    0.002    0.000    8.955    0.002 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2374(_heavy)
+      262    0.001    0.000    8.930    0.034 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2379(<lambda>)
+      262    0.008    0.000    8.929    0.034 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2382(_heavy_uncached)
+      262    0.313    0.001    8.789    0.034 /home/user/evm-aot-verification-python/verification/block_equivalence.py:391(_nonlinear_mul_terms)
+  1416315    1.635    0.000    6.125    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:355(__init__)
+     6888    0.004    0.000    5.959    0.001 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2270(_no_binder)
+     3042    0.002    0.000    5.935    0.002 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2617(<genexpr>)
+      262    0.002    0.000    5.913    0.023 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2274(<lambda>)
+      262    0.187    0.001    5.911    0.023 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2277(_no_binder_uncached)
+       18    0.204    0.011    5.867    0.326 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2199(_uf_applications)
+  1588666    1.235    0.000    5.259    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1015(get_id)
+  1415637    1.656    0.000    4.765    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:360(__del__)
+   259271    0.543    0.000    4.083    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1083(decl)
+  1589931    1.820    0.000    3.202    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3127(Z3_get_ast_id)
+  1513366    1.686    0.000    2.994    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3112(Z3_get_app_num_args)
+       23    0.103    0.004    2.900    0.126 /home/user/evm-aot-verification-python/verification/block_equivalence.py:2290(_uf_app_constants)
+  1416315    1.660    0.000    2.882    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:1650(Z3_inc_ref)
+ 29610869    2.574    0.000    2.574    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3types.py:24(from_param)
+  1038690    1.613    0.000    2.527    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3117(Z3_get_app_arg)
+  5743627    1.765    0.000    2.316    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:410(ctx_ref)
+
+
+         147739108 function calls (147717622 primitive calls) in 241.442 seconds
+
+   Ordered by: internal time
+   List reduced from 195 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       91  178.582    1.962  178.583    1.962 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:4330(Z3_solver_check_assumptions)
+ 14097446    8.429    0.000    9.621    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:1580(Check)
+  4714755    5.416    0.000    9.481    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3152(Z3_get_ast_kind)
+  3674179    3.585    0.000   12.982    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:505(_ast_kind)
+ 29610869    2.574    0.000    2.574    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3types.py:24(from_param)
+  1038690    2.455    0.000   31.183    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1121(arg)
+  1513366    2.408    0.000   12.791    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1105(num_args)
+  1040576    2.061    0.000   12.257    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1180(_to_expr_ref)
+  3674179    1.993    0.000   15.386    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1327(is_app)
+  1589931    1.820    0.000    3.202    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3127(Z3_get_ast_id)
+  5743627    1.765    0.000    2.316    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:410(ctx_ref)
+  1513366    1.686    0.000    2.994    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3112(Z3_get_app_num_args)
+  1416315    1.660    0.000    2.882    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:1650(Z3_inc_ref)
+  1415637    1.656    0.000    4.765    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:360(__del__)
+  1416315    1.635    0.000    6.125    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:355(__init__)
+      177    1.616    0.009    1.620    0.009 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3582(Z3_ast_to_string)
+  1038690    1.613    0.000    2.527    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3117(Z3_get_app_arg)
+ 14848179    1.422    0.000    1.422    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:228(ref)
+  1415637    1.331    0.000    1.594    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:1654(Z3_dec_ref)
+  1135223    1.304    0.000    2.266    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:3137(Z3_get_sort)
+  1170659    1.302    0.000    2.292    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py:2892(Z3_get_sort_kind)
+ 13445793    1.238    0.000    1.238    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3types.py:64(from_param)
+  1588666    1.235    0.000    5.259    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1015(get_id)
+ 10478821    1.148    0.000    1.148    0.000 /home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py:1012(as_ast)
+8822944/8822762    1.088    0.000    1.089    0.000 {built-in method builtins.isinstance}
+
+

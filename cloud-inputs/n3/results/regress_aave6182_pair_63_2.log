@@ -1,0 +1,19 @@
+[    66.6s]   _retry_over_lia -> unknown 58.7s
+[   170.3s]   _retry_over_lia -> unknown 56.8s
+[   218.7s]   _retry_over_potential -> unknown 0.2s
+[   546.2s]   _retry_over_potential -> unknown 327.3s
+[   790.9s]   _retry_over_nonlinear_mul -> unknown 30.6s
+[   821.5s]   _retry_over_nonlinear_mul -> unknown 30.6s
+[   821.6s]   _retry_over_guard_cases -> unknown 0.2s
+[  1752.0s]   _unify_and_split -> unknown 930.3s
+[  1752.0s]   _retry_with_uf_unification -> unknown 930.4s
+[  2681.3s]   _unify_and_split -> unknown 929.0s
+[  2681.3s]   _retry_with_uf_unification -> unknown 929.2s
+   part pair_63_2_goal_0_of_7 unsat 0.1s lemmas=[]
+   part pair_63_2_goal_1_of_7 unsat 0.3s lemmas=[]
+   part pair_63_2_goal_2_of_7 unsat 105.4s lemmas=['extensionality_0', 'normalize_0_lambda', 'normalize_1', 'normalize_2', 'normalize_3', 'normalize_4', 'normalize_5', 'normalize_6']
+   part pair_63_2_goal_3_of_7 unsat 0.1s lemmas=['extensionality_0']
+   part pair_63_2_goal_4_of_7 unsat 0.1s lemmas=['extensionality_0']
+   part pair_63_2_goal_5_of_7 unsat 0.1s lemmas=[]
+   part pair_63_2_goal_6_of_7 unsat 2773.0s lemmas=['normalize_0_lambda', 'normalize_1', 'normalize_2', 'normalize_3', 'normalize_4', 'normalize_5', 'normalize_6', 'normalize_7']
+pair_63_2 expected=unsat proved 2883.3s lemmas=7 ['pair_63_2_goal_0_of_7', 'pair_63_2_goal_1_of_7', 'pair_63_2_goal_2_of_7', 'pair_63_2_goal_3_of_7', 'pair_63_2_goal_4_of_7', 'pair_63_2_goal_5_of_7', 'pair_63_2_goal_6_of_7']

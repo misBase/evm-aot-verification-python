@@ -25,6 +25,7 @@
 - 生产 `_check`（`cloud-inputs/n3/tools/regress_traced.py`）：
   - 第一版每个情形走 `_unify_and_split`（乘法抽象 + 合并探针 + sweep）：m=768 510.6s proved；sym7296 情形 0 用完它的一半份额（834s）仍 unknown，嵌套拆分只剩 10s。
   - 定稿：每个情形走 `_unify_case`（直接合并 + 一次直接查询 + `_after_unification` 的 opaque/blasted 尝试），守卫路线在适用时拿剩余预算的一半（同 `alias`）。**sym7296 goal 2 1326.6s proved**（守卫路线 702.7s），m=768 923.6s proved（守卫路线 761.3s）。
+  - 补充观察：在**新进程**里直接对 m=768 goal 2（原式、skolemize 之后、`pin_split` 之后都一样）调用 `_retry_over_guard_cases`，两个情形都被 3s 的快速精确查询 unsat，整条路线 3.0–4.6s。生产 `_check` 中同一路线却在情形 0 走到合并（761s）。差别不在公式，而在此前各路线留下的进程状态（AST 创建顺序影响 simplify 的结果形状与求解器的运气）。所以守卫路线的耗时有很大的波动：快则几秒，慢则数百秒；本节的耗时数字都应按此理解。
 
 ### 2.2 Aave 6182（`pair_63_2`）
 
@@ -77,9 +78,12 @@
 
 ## 5. 测试结果
 
-（待补：全量快测）
-
-- `tests/unit/test_block_remaining_blocks_3.py`：21 条（另有 1 条 `slow`：16670 goal 2 的守卫路线）。
+- **全量快测**（`poetry run pytest tests/unit -q -m "not slow" -p no:cacheprovider`，串行，与 2 个整节点并行，代码 90de4cd）：**1801 passed, 3 skipped, 0 failed**（1210s）。日志 `cloud-inputs/n3/results/fast-tests-90de4cd.log`。
+- 之前一次（代码 6522a8d 之后、两处测试更新之前）：1795 passed, 3 failed。三条失败：
+  - `test_block_route_order.py::test_promoted_route_gets_half_of_what_is_left`：断言的是修法 16 之前的规则（被提升的路线总拿一半）。改为预置一个长的历史证明（上限不起作用，仍是一半），另加一条 `test_promoted_route_with_cheap_wins_gets_its_cap`（廉价历史 → 4 个查询超时）。
+  - `test_block_correspondence.py::test_empty_probe_only_for_unknown_rows_without_sibling_proposal`：测试把某些行的增量查询强制为 unknown，用来检验"空行探测只给没有兄弟提议的 unknown 行"；修法 11 的 blast 回退把这两行真的解出来了（行 3 → EVM 0、行 4 → EVM 2，都正确）。测试同时把 `_blasted_model` 强制为 unknown，本意不变；回退本身另有测试。
+  - `test_block_uf_unification.py::test_alias_split_keeps_satisfiable_pairs_open`：负载敏感（N2 §9.1 已记录），单独运行通过；在最终全量中通过。
+- `tests/unit/test_block_remaining_blocks_3.py`：25 条快测（另有 1 条 `slow`：16670 goal 2 的守卫路线），函数名互不相同；逐个按节点 ID 单独运行的结果见下。另在 `test_block_route_order.py` 新增 1 条。
 - 相关已有测试（`-k "summar or executor or cfg or copy or memgas or div or remaining"`）：453 passed, 2 skipped（872.9s）；normalize 相关（`-k "normali or word or offset_view or remaining or identity"`）：119 passed。
 
 ### 5.1 SMT2 回归（`cloud-inputs/n/tools/regress.py`，生产 `_check`，每文件新 prover，上限 1800s，与 2–3 个整节点并行；代码 389fdc7，即修法 9–13）
