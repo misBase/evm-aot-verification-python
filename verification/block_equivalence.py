@@ -3740,6 +3740,10 @@ class BlockEquivalenceProver:
                 # path; unknown made them "all" rows (95 pairs each; pair_63_2 then ran the
                 # 12h node out). Its answer is the row's: SAT gives the model, UNSAT "empty".
                 answer, model = self._blasted_model(And(premise, x.condition))
+                if answer not in (sat, unsat):
+                    # ponytail: one retry at 4x (row 2 there: 6.1s in one run, >30s in another
+                    # under load; it has no mapped sibling to propose from).
+                    answer, model = self._blasted_model(And(premise, x.condition), 4 * self.timeout_ms)
             if answer not in (sat, unsat):
                 unknown.append(j)
             if answer == unsat:
@@ -3760,12 +3764,12 @@ class BlockEquivalenceProver:
                 correspondence[j] = None
         return tuple(correspondence)
 
-    def _blasted_model(self, formula):
-        """(answer, model or None) of simplify(formula, blast_select_store=True),
-        one per-query budget. An equivalent formula over the same constants, so
-        its model is one of `formula` and UNSAT is formula's; _correspondence
-        only reads a proposal from it (never a proof)."""
-        budget = self.timeout_ms
+    def _blasted_model(self, formula, budget=None):
+        """(answer, model or None) of simplify(formula, blast_select_store=True)
+        within `budget` ms (default: one per-query budget). An equivalent formula
+        over the same constants, so its model is one of `formula` and UNSAT is
+        formula's; _correspondence only reads a proposal from it (never a proof)."""
+        budget = self.timeout_ms if budget is None else budget
         if self.deadline is not None:
             budget = min(budget, int((self.deadline - monotonic()) * 1000))
         if budget <= 0:
