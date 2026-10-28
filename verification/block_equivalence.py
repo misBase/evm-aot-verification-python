@@ -2235,7 +2235,7 @@ def _uf_applications(formula):
     return [list(g.values()) for g in groups.values() if len(g) > 1]
 
 
-def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64):
+def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64, stall_seconds=None):
     """unify_uf_arguments over a node's pair formulas, one lemma per term pair.
 
     Sibling pairs share the host-call argument terms, so each (x, y) is proved
@@ -2243,8 +2243,11 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
     both applications, then rewritten (big := small) only in formulas whose
     own conjuncts include Q: each such F ⊨ Q ⊨ x = y, so F[big := small] is
     UNSAT only if F is. Returns (formulas, lemmas); nothing is ever assumed.
+    With `stall_seconds`, it also stops once that long has passed without a
+    merge (each failed candidate costs up to a query budget).
     """
     formulas, lemmas, failed = list(formulas), [], set()
+    last_merge = monotonic()
     while len(lemmas) < max_lemmas:
         conj = [{c.get_id(): c for c in _conjuncts(f)} for f in formulas]
         occurs, pairs = {}, {}
@@ -2260,7 +2263,7 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
         merged = False
         for key, (x, y) in sorted(pairs.items(), key=lambda kv: _text_size(kv[1][0]) + _text_size(kv[1][1])):
             budget = timeout_ms if deadline is None else min(timeout_ms, int((deadline - monotonic()) * 1000))
-            if budget <= 0:
+            if budget <= 0 or (stall_seconds is not None and monotonic() - last_merge > stall_seconds):
                 return formulas, tuple(lemmas)
             common = set.intersection(*(set(conj[k]) for k in occurs[key]))
             parts = [conj[next(iter(occurs[key]))][i] for i in common]
@@ -2275,7 +2278,7 @@ def unify_across(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64)
             small, big = sorted((x, y), key=_text_size)
             formulas = [substitute(f, (big, small)) if used <= set(conj[k]) else f
                         for k, f in enumerate(formulas)]
-            merged = True
+            merged, last_merge = True, monotonic()
             break
         if not merged:
             break
@@ -3742,7 +3745,10 @@ class BlockEquivalenceProver:
         # over 50 of its 90 minutes here before checking any obligation; an unmerged pair only
         # goes to its own routes (its unify route included), so the cap costs no proof.
         until = None if self.deadline is None else monotonic() + (self.deadline - monotonic()) / 4
-        unified, lemmas = unify_across(abstract, self.timeout_ms, until, cache=self._lemma_cache)
+        # ponytail: also stop after 10 query timeouts without a merge (PoolManager 16670 on the
+        # server: 10816s / 10818s of the 1/4 share for 2 lemmas, 55-85% of the node).
+        unified, lemmas = unify_across(abstract, self.timeout_ms, until, cache=self._lemma_cache,
+                                       stall_seconds=10 * self.timeout_ms / 1000)
         if not lemmas and not identities:
             return pairs, (), set()
         out, rewritten = list(pairs), set()

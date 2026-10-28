@@ -7,9 +7,18 @@ x86-64 符号执行引擎（参考 evm_ir）。
 import logging
 from time import monotonic
 from typing import List, Dict, Optional, Tuple, Set, TYPE_CHECKING
-from z3 import BitVecVal, Not, And, Or, If, Solver, simplify, unsat, is_false, is_true
+import copy as _copy
+from enum import Enum
+
+from z3 import (AstRef, BitVec, BitVecVal, Context, Not, And, Or, If, Solver, simplify, unsat, is_false, is_not,
+                is_true)
 
 logger = logging.getLogger(__name__)
+
+# Diamond merge (X86SymbolicExecutor._merge_diamond). ponytail: the join within 4 static blocks of
+# each side, at most 8 states executed per side.
+_DIAMOND_BLOCKS = 4
+_DIAMOND_STEPS = 8
 
 from .aot_profile import GO_HPC_EVM_PROFILE, X86AOTProfile
 from .models import Register, X86Block, X86Instruction
@@ -56,7 +65,8 @@ class X86SymbolicExecutor:
                  aot_profile: Optional[X86AOTProfile] = None,
                  summary_runtime: Optional[X86SummaryRuntime] = None,
                  stop_addrs: Optional[set] = None,
-                 deadline: Optional[float] = None):
+                 deadline: Optional[float] = None,
+                 merge_diamonds: bool = False):
         """初始化符号执行引擎。
 
         Args:
@@ -70,6 +80,8 @@ class X86SymbolicExecutor:
             reachability_timeout_ms: 单次可达性 SMT 检查预算；超时按可能可达处理
             summary_runtime: 预构建的 x86 summary runtime；None 表示不启用任何
                 summary，调用方负责注册插件（见 build_x86_summary_runtime）
+            merge_diamonds: 两侧只改寄存器/标志、很快汇合的条件分支在汇合点合并成一个
+                状态（_merge_diamond，精确合并）
         """
         self.blocks = blocks
         self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
@@ -79,6 +91,8 @@ class X86SymbolicExecutor:
         self.use_reachability_check = use_reachability_check
         self.enable_go_bridge = enable_go_bridge
         self.enable_merge = enable_merge
+        self.merge_diamonds = merge_diamonds
+        self.merged_diamonds = 0
         self.reachability_timeout_ms = reachability_timeout_ms
         self.call_site_mapping = call_site_mapping
         self.aot_profile = aot_profile or GO_HPC_EVM_PROFILE
@@ -578,45 +592,123 @@ class X86SymbolicExecutor:
                     global_state = self._merge_at_confluence(addr, buf)
                     del self.merge_buffers[addr]
 
-            # 循环检测调用点（TODO: 实现检测逻辑）
-            self._detect_and_handle_loops(global_state)
-
-            # 执行单个状态
-            new_states = self.execute_state(global_state)
-
-            if new_states:
-                # 可达性检查和剪枝
-                if self.use_reachability_check and len(new_states) > 1:
-                    old_count = len(new_states)
-                    new_states = [
-                        state for state in new_states
-                        if self._is_state_reachable(state)
-                    ]
-                    pruned = old_count - len(new_states)
-                    self.pruned_states += pruned
-
-                # 更新 CFG；summary entry 已经把整个 slice 折叠成
-                # entry -> exit 的压缩边，不能再按原 entry 末尾 JNE 建普通条件边。
-                if (not global_state.summary_control_flow_managed
-                        and global_state.node
-                        and global_state.node.block.instructions):
-                    last_insn = global_state.node.block.instructions[-1]
-                    from_addr = global_state.node.address
-                    self.manage_cfg(last_insn, new_states, from_addr)
-
-                # 添加新状态到 work_list
-                self.work_list.extend(new_states)
-                self.total_states += len(new_states)
-
-            # 如果是终止状态，保存
-            if self._is_terminal_state(global_state):
-                self.final_states.append(global_state)
+            new_states = self._advance(global_state)
+            if self.merge_diamonds and len(new_states) == 2:
+                new_states = self._merge_diamond(new_states)
+            # 添加新状态到 work_list
+            self.work_list.extend(new_states)
 
         # flush 残余 merge buffer（某些路径被剪枝导致入边不齐）
         if self.enable_merge:
             self._flush_merge_buffers()
 
         return self.final_states
+
+    def _advance(self, global_state: X86GlobalState) -> List[X86GlobalState]:
+        """Execute one state as the main loop does: its successors after the
+        reachability pruning of a fork, with the CFG edges added; a terminal
+        state is recorded in final_states."""
+        # 循环检测调用点（TODO: 实现检测逻辑）
+        self._detect_and_handle_loops(global_state)
+
+        # 执行单个状态
+        new_states = self.execute_state(global_state)
+
+        if new_states:
+            # 可达性检查和剪枝
+            if self.use_reachability_check and len(new_states) > 1:
+                old_count = len(new_states)
+                new_states = [
+                    state for state in new_states
+                    if self._is_state_reachable(state)
+                ]
+                pruned = old_count - len(new_states)
+                self.pruned_states += pruned
+
+            # 更新 CFG；summary entry 已经把整个 slice 折叠成
+            # entry -> exit 的压缩边，不能再按原 entry 末尾 JNE 建普通条件边。
+            if (not global_state.summary_control_flow_managed
+                    and global_state.node
+                    and global_state.node.block.instructions):
+                last_insn = global_state.node.block.instructions[-1]
+                from_addr = global_state.node.address
+                self.manage_cfg(last_insn, new_states, from_addr)
+
+            self.total_states += len(new_states)
+
+        # 如果是终止状态，保存
+        if self._is_terminal_state(global_state):
+            self.final_states.append(global_state)
+        return new_states
+
+    def _diamond_join(self, a: int, b: int):
+        """(join address, region) of the two successors of a fork: the address
+        both reach first along static successors (within _DIAMOND_BLOCKS
+        blocks each; least total distance), and every address either side
+        passes before it. None when they do not meet that soon."""
+        def reach(start):
+            dist, frontier = {start: 0}, [start]
+            for d in range(1, _DIAMOND_BLOCKS + 1):
+                nxt = []
+                for addr in frontier:
+                    block = self.blocks_by_addr.get(addr)
+                    if block is None:
+                        continue
+                    for succ in self._get_static_successors(self.block_index[addr], block):
+                        if succ not in dist:
+                            dist[succ] = d
+                            nxt.append(succ)
+                frontier = nxt
+            return dist
+        da, db = reach(a), reach(b)
+        common = [addr for addr in da if addr in db]
+        if not common:
+            return None
+        join = min(common, key=lambda addr: (da[addr] + db[addr], addr))
+        region = {addr for addr, d in da.items() if d < da[join]} | {addr for addr, d in db.items() if d < db[join]}
+        return join, region - {join}
+
+    def _merge_diamond(self, forks: List[X86GlobalState]) -> List[X86GlobalState]:
+        """Run both sides of a fork ahead to their join (_diamond_join) and
+        return one merged state there when nothing but registers and flags
+        differ (_merged); otherwise every state reached, unchanged.
+
+        Each side is executed exactly as the main loop would (_advance: forks
+        pruned, CFG edges, terminals recorded); a state that leaves the region,
+        reaches a cutpoint or the depth limit, or exceeds _DIAMOND_STEPS is
+        handed back unexecuted. Only the bookkeeping of which states continue
+        changes: the go-hpc-evm memory-expansion prologue forks twice per
+        access into short register-only diamonds (toWordSize's overflow clamp,
+        the words == 0 skip of SafeMul) that the executor kept apart, so live
+        paths doubled per access (PoolManager 4418: 876 x86 paths, 90% of the
+        segment in reachability checks)."""
+        a, b = forks
+        if a.node is None or b.node is None:
+            return forks
+        found = self._diamond_join(a.node.address, b.node.address)
+        if found is None:
+            return forks
+        join, region = found
+        arrived, out = ([], []), []
+        for side, start in enumerate(forks):
+            queue, steps = [start], 0
+            while queue:
+                state = queue.pop()
+                addr = state.node.address if state.node else None
+                if addr == join:
+                    arrived[side].append(state)
+                elif (addr not in region or addr in self.stop_addrs or state.depth >= self.max_depth
+                      or steps >= _DIAMOND_STEPS):
+                    out.append(state)
+                else:
+                    steps += 1
+                    queue.extend(self._advance(state))
+        if len(arrived[0]) == len(arrived[1]) == 1:
+            merged = _merged(arrived[0][0], arrived[1][0])
+            if merged is not None:
+                self.merged_diamonds += 1
+                return out + [merged]
+        return out + arrived[0] + arrived[1]
 
     def _flush_merge_buffers(self) -> None:
         """处理残余的合流 buffer（某些路径被可达性剪枝导致入边不齐）。"""
@@ -1649,3 +1741,98 @@ def build_x86_dynamic_cfg(blocks: List[X86Block],
     )
     final_states = executor.execute(initial_state)
     return final_states, executor.cfg
+
+
+def _state_leaves(obj, prefix="", out=None):
+    """{attribute path: leaf} of a machine state; Z3 terms by AST id."""
+    out = {} if out is None else out
+    if isinstance(obj, AstRef):
+        out[prefix] = ("ast", obj.get_id())
+    elif obj is None or isinstance(obj, (str, int, float, bool, bytes, Enum)):
+        out[prefix] = obj
+    elif isinstance(obj, Context):
+        out[prefix] = "ctx"
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            _state_leaves(v, f"{prefix}[{k!r}]", out)
+        out[prefix + "#keys"] = tuple(sorted(map(repr, obj)))
+    elif isinstance(obj, (list, tuple)):
+        for k, v in enumerate(obj):
+            _state_leaves(v, f"{prefix}[{k}]", out)
+        out[prefix + "#len"] = len(obj)
+    elif isinstance(obj, (set, frozenset)):
+        out[prefix] = tuple(sorted(map(repr, obj)))
+    elif hasattr(obj, "__dict__") or hasattr(type(obj), "__slots__"):
+        items = vars(obj).items() if hasattr(obj, "__dict__") else (
+            (k, getattr(obj, k)) for k in type(obj).__slots__ if hasattr(obj, k))
+        out[prefix + "#type"] = type(obj).__qualname__
+        for k, v in items:
+            _state_leaves(v, f"{prefix}.{k}", out)
+    else:
+        out[prefix] = ("opaque", id(obj))  # equal only to itself
+    return out
+
+
+_REGISTER_LEAVES = (".x86_registers._registers", ".x86_registers._flags", ".x86_registers._pointer_tags")
+
+
+def _exclusive(x, y):
+    """x ∧ y is unsatisfiable: syntactic complements, or refuted (200 ms)."""
+    if (is_not(x) and x.arg(0).eq(y)) or (is_not(y) and y.arg(0).eq(x)) or is_false(simplify(And(x, y))):
+        return True
+    solver = Solver()
+    solver.set(timeout=200)
+    solver.add(x, y)
+    return solver.check() == unsat
+
+
+def _merged(a: X86GlobalState, b: X86GlobalState) -> Optional[X86GlobalState]:
+    """One state for two states at the same address, or None.
+
+    Merged only when everything but registers and flags is identical (every
+    other leaf of the machine state, the flag constraints, the pointer tags)
+    and the path conditions are P ∧ T_a and P ∧ T_b for a common prefix P
+    with T_a ∧ T_b unsatisfiable (their first constraints are the two sides
+    of one branch). The merged state has path condition P ∧ (T_a ∨ T_b) and
+    each differing register / flag ite(T_a, value_a, value_b): under T_a it
+    is state a, under T_b state b, so its executions are exactly those of a
+    and of b (an exact merge: no execution added or lost)."""
+    if a.node is not b.node or a.summary_control_flow_managed != b.summary_control_flow_managed:
+        return None
+    ca, cb = a.get_constraints(), b.get_constraints()
+    if (a.world_state.annotations or b.world_state.annotations
+            or ca.flag_constraints.keys() != cb.flag_constraints.keys()
+            or any(not v.eq(cb.flag_constraints[k]) for k, v in ca.flag_constraints.items())):
+        return None
+    la, lb = list(ca._constraints), list(cb._constraints)
+    common = 0
+    while common < min(len(la), len(lb)) and la[common].eq(lb[common]):
+        common += 1
+    ta, tb = la[common:], lb[common:]
+    if not ta or not tb or not _exclusive(ta[0], tb[0]):
+        return None
+    ra, rb = a.mstate.x86_registers, b.mstate.x86_registers
+    regs = set(ra._registers) | set(rb._registers) | set(ra._pointer_tags) | set(rb._pointer_tags)
+    if any(ra.get_pointer_tag(k) != rb.get_pointer_tag(k) for k in regs):
+        return None
+    leaves_a, leaves_b = _state_leaves(a.mstate), _state_leaves(b.mstate)
+    if ({k: v for k, v in leaves_a.items() if not k.startswith(_REGISTER_LEAVES)}
+            != {k: v for k, v in leaves_b.items() if not k.startswith(_REGISTER_LEAVES)}):
+        return None
+    guard = And(*ta) if len(ta) > 1 else ta[0]
+    mstate = a.mstate.copy()
+    out = mstate.x86_registers
+    for k in set(ra._registers) | set(rb._registers):
+        va = ra._registers.get(k, BitVec(f"{k}_init", 64))
+        vb = rb._registers.get(k, BitVec(f"{k}_init", 64))
+        out._registers[k] = va if va.eq(vb) else If(guard, va, vb)
+    for k in set(ra._flags) | set(rb._flags):
+        va, vb = ra._flags.get(k, BitVecVal(0, 1)), rb._flags.get(k, BitVecVal(0, 1))
+        out._flags[k] = va if va.eq(vb) else If(guard, va, vb)
+    world = _copy.copy(a.world_state)
+    world.constraints._constraints = la[:common] + [Or(guard, And(*tb) if len(tb) > 1 else tb[0])]
+    world.constraints._witness = ca._witness if ca._witness is not None else cb._witness
+    merged = X86GlobalState(mstate=mstate, world_state=world, node=a.node)
+    merged.depth = max(a.depth, b.depth)
+    merged.summary_control_flow_managed = a.summary_control_flow_managed
+    return merged

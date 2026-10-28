@@ -31,6 +31,7 @@
   桥接不成立（SAT/unknown/解析失败）时也一样回到全量枚举。
 """
 
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
@@ -510,6 +511,9 @@ def run_x86_segment(
         deadline=deadline,
         call_site_mapping=call_site_mapping,
         reachability_timeout_ms=reachability_timeout_ms,
+        # Exact merge of short register-only diamonds (X86SymbolicExecutor._merge_diamond);
+        # BLOCK_MERGE_DIAMONDS=0 keeps every path apart (A/B diagnostics).
+        merge_diamonds=os.environ.get("BLOCK_MERGE_DIAMONDS", "1") != "0",
     )
     final_states = executor.execute(cut_state, entry_addr=entry_addr)
 

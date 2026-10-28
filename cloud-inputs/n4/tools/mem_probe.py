@@ -128,6 +128,8 @@ def attributed(kind, fn):
     return run
 
 
+if "--forward-limit" in argv:  # experiment: a smaller process-level forwarding cache
+    sf._SHARED_FORWARD_LIMIT = opt("--forward-limit", 0, int)
 RESET = opt("--reset-prefix", 0, int)  # experiment: drop the incremental reachability solver every N checks
 if RESET:
     import x86_64.cfg_state as cs
@@ -163,7 +165,14 @@ def segment(*a, **k):
         k["summary_runtime"].apply = attributed("apply", k["summary_runtime"].apply)
     started = time.monotonic()
     try:
-        return orig_segment(*a, **k)
+        out = orig_segment(*a, **k)
+        ex = seen["executor"]
+        print(f"[{time.monotonic() - T0:8.1f}s] x86 paths {len(out[0])} "
+              f"{collections.Counter(p.kind for p in out[0])} merged diamonds {getattr(ex, 'merged_diamonds', None)} "
+              f"reachability checks {getattr(ex, 'reachability_call_count', None)} "
+              f"({getattr(ex, 'reachability_total_wall', 0):.1f}s, pruned {getattr(ex, 'pruned_states', None)})",
+              flush=True)
+        return out
     finally:
         seen["phase"] = "pairs"
         print(f"[{time.monotonic() - T0:8.1f}s] x86 segment end after {time.monotonic() - started:.1f}s", flush=True)

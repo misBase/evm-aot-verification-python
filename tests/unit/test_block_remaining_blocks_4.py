@@ -79,3 +79,63 @@ def test_row_groups_skip_unmapped_rows_and_small_remainders():
     be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)._prove_row_groups(
         BoolVal(True), evm, x86, (0, "all"), done, monotonic() + 60)
     assert done == {}  # row 0: 3 conjuncts < _ROW_GROUP_MIN; row 1 is not a kept row
+
+
+# --- fix 18: short register-only diamonds merged at their join (executor) --------------
+
+# cmp rax, rbx; jb L; add rbx, 0x1f; jmp J; L: movabs rbx, 2^59; J: mov rcx, rbx; ret
+_DIAMOND = "4839d8" "7206" "4883c31f" "eb0a" "48bb0000000000000008" "4889d9" "c3"
+# The same, but the jb side also stores rbx to [r15] (memory differs: never merged).
+_DIAMOND_STORE = "4839d8" "7206" "4883c31f" "eb0d" "48bb0000000000000008" "49891f" "4889d9" "c3"
+
+
+def _run_diamond(hex_code, merge):
+    from z3 import BitVecVal
+    from state.smt_state import PointerTag, SMTState
+    from x86_64.cfg import identify_basic_blocks
+    from x86_64.cfg_executor import X86SymbolicExecutor
+    from x86_64.disassembler import disassemble_hex
+    from x86_64.models import Register
+    blocks = identify_basic_blocks(disassemble_hex(hex_code, base_addr=0x1000))
+    state = SMTState()
+    state.x86_registers.set_register(Register.R15, BitVecVal(0x2000, 64))
+    state.x86_registers.set_pointer_tag(Register.R15, PointerTag.EVM_PTR)
+    executor = X86SymbolicExecutor(blocks, max_depth=20, enable_merge=False, merge_diamonds=merge)
+    return executor, executor.execute(state)
+
+
+def test_register_only_diamond_merges_into_one_exact_state():
+    from z3 import BitVec, BitVecVal, If, Solver, ULT, unsat
+    from x86_64.models import Register
+    executor, finals = _run_diamond(_DIAMOND, merge=True)
+    _, apart = _run_diamond(_DIAMOND, merge=False)
+    assert len(apart) == 2 and len(finals) == 1 and executor.merged_diamonds == 1
+    (final,) = finals
+    rax, rbx = BitVec("rax_init", 64), BitVec("rbx_init", 64)
+    expected = If(ULT(rax, rbx), BitVecVal(1 << 59, 64), rbx + 0x1f)
+    solver = Solver()  # the merged rcx is the program's on every input, and the path is all inputs
+    solver.add(final.mstate.x86_registers.get_register(Register.RCX) != expected)
+    solver.add(final.get_constraints().as_bool())
+    assert solver.check() == unsat
+    covers = Solver()
+    covers.add(final.get_constraints().as_bool() == False)  # noqa: E712
+    assert covers.check() == unsat
+
+
+def test_diamond_whose_sides_differ_in_memory_stays_apart():
+    executor, finals = _run_diamond(_DIAMOND_STORE, merge=True)
+    assert len(finals) == 2 and executor.merged_diamonds == 0
+
+
+# --- fix 19: unify_across stops after a stall without merges ---------------------------
+
+def test_unify_across_stops_after_a_stall_and_never_merges_unproved():
+    from z3 import BitVecSort, Function, Solver, unsat
+    g = Function("n4_stall_g", BitVecSort(8), BitVecSort(8))
+    a, b, d = BitVec("n4_stall_a", 8), BitVec("n4_stall_b", 8), BitVec("n4_stall_d", 8)
+    f1 = And(a == b, g(a) != g(b))
+    f2 = And(a == b, d == 1, g(a) != g(b))
+    out, lemmas = be.unify_across([f1, f2], 3000, stall_seconds=0)  # stalled before any candidate
+    assert not lemmas and out[0].eq(f1) and out[1].eq(f2)
+    out, lemmas = be.unify_across([f1, f2], 3000, stall_seconds=60)  # a merge in time: unchanged behaviour
+    assert lemmas and all(Solver().check(f) == unsat for f in out)
