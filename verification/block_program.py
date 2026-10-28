@@ -144,6 +144,7 @@ class BlockProgramResult:
     timings: dict = field(default_factory=dict)
     diagnostics: dict = field(default_factory=dict)
     closure_checks: list = field(default_factory=list)
+    running: list = field(default_factory=list)  # worker status of the nodes in flight (block_parallel)
     _prover: object = field(default=None, repr=False)
     _initial: object = field(default=None, repr=False)
     _issued_scope: str = field(default="", repr=False)

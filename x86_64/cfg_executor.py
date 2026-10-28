@@ -22,6 +22,7 @@ from .summaries.base import (
     X86Summary,
     X86SummaryRuntime,
 )
+from common.node_monitor import check_abort
 from common.path_observation import PathCoverageCertificate
 from state.smt_state import SMTState, PointerTag
 
@@ -719,6 +720,7 @@ class X86SymbolicExecutor:
         node = global_state.node
         if self.deadline is not None and monotonic() >= self.deadline:
             raise TimeoutError("x86 segment execution deadline exhausted")
+        check_abort()
         if node is None:
             self._mark_coverage_incomplete("encountered state without CFG node")
             return []

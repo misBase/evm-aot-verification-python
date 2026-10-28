@@ -498,7 +498,7 @@ def refute_goal(pre, goal, timeout_ms, deadline=None):
             relaxed, changed = abstract_nonlinear_mul(query)  # only adds models
             if changed and solve_query(relaxed, budget) == "unsat":
                 query, answer = relaxed, "unsat"
-        return answer, Obligation("split", query.sexpr(), answer, "unsat", monotonic() - started)
+        return answer, Obligation("split", summary_text(query), answer, "unsat", monotonic() - started)
 
     # ponytail: 3s whole-goal probe; the split below is exact and usually faster than a long wait here.
     answer, _ = solve(And(pre, Not(goal)), cap=3000)
@@ -540,6 +540,21 @@ def refute_goal(pre, goal, timeout_ms, deadline=None):
                 return answer, ()
             lemmas.append(record)
     return "unsat", tuple(lemmas)
+
+
+def summary_text(formula):
+    """The formula field of a summary-hit obligation: the sha256 fingerprint of
+    its SMT text, as block_parallel.slim records it (BLOCK_KEEP_SUMMARY_TEXT=1:
+    the text itself, for diagnostics).
+
+    No consumer reads the text (certificates are judged by names, answers and
+    lemmas), and a hit's query carries the whole x86 memory of its path: kept
+    whole, the texts of one node grew without bound (Aave Pool 7200: 1.3G
+    characters after 45 hits in 32 minutes, ~30 MB per hit and growing)."""
+    text = formula.sexpr()
+    if os.environ.get("BLOCK_KEEP_SUMMARY_TEXT") == "1":
+        return text
+    return "sha256:" + sha256(text.encode()).hexdigest()
 
 
 _LEMMA_SECONDS = 1200  # ponytail: fixed; first CALLDATALOAD lemma measured ~333s
@@ -875,7 +890,7 @@ class VerifiedSummaryRuntime:
         # refuted_by_complement; a miss runs the unchanged query below.
         if (expected == "unsat" and is_and(formula) and formula.num_args() >= 2
                 and refuted_by_complement(And(*formula.children()[:-1]), formula.arg(formula.num_args() - 1))):
-            return Obligation(name, formula.sexpr(), "unsat", expected, monotonic() - started)
+            return Obligation(name, summary_text(formula), "unsat", expected, monotonic() - started)
         query = simplify(formula, expand_select_store=True)
         # Expected SAT: keep the model (_sat_model) for the next hit's entry and the
         # executor's witness (see apply); the answer is the same query's.
@@ -903,7 +918,7 @@ class VerifiedSummaryRuntime:
             if changed and budget > 0:
                 if solve_query(relaxed, budget) == "unsat":
                     formula, answer = relaxed, "unsat"
-        return Obligation(name, formula.sexpr(), answer, expected, monotonic() - started)
+        return Obligation(name, summary_text(formula), answer, expected, monotonic() - started)
 
     def _discharge(self, certificate):
         """Solve the lemma statement collected by a generic-mode apply, or
@@ -940,7 +955,7 @@ class VerifiedSummaryRuntime:
         def check(name, formula, expected="unsat"):
             if self._generic_mode:  # lemma statement: built here, solved by _discharge
                 self._statement.append((name, expected, formula, None))
-                records.append(Obligation(name, formula.sexpr(), expected, expected))
+                records.append(Obligation(name, summary_text(formula), expected, expected))
                 return
             record = self._solve(name, formula, expected)
             records.append(record)
@@ -974,7 +989,7 @@ class VerifiedSummaryRuntime:
                 models = () if self._generic_mode else [m for m in (witness, self.entry_model) if m is not None]
                 if any(is_true(m.eval(premise, model_completion=True)) for m in models):
                     self.proof_queries += 1
-                    records.append(Obligation("entry", premise.sexpr(), "sat", "sat"))
+                    records.append(Obligation("entry", summary_text(premise), "sat", "sat"))
                 else:
                     self.sat_model = None
                     check("entry", premise, "sat")
@@ -1118,7 +1133,7 @@ class VerifiedSummaryRuntime:
                 else:
                     answer, split = refute_goal(And(premise, path.condition), goal, self.timeout_ms, self.deadline)
                     self.proof_queries += 1 + len(split)
-                record = Obligation(required[-1], And(premise, path.condition, Not(goal)).sexpr(), answer,
+                record = Obligation(required[-1], summary_text(And(premise, path.condition, Not(goal))), answer,
                                     "unsat", monotonic() - started, split)
                 records.append(record)
                 if not record.proved:

@@ -25,6 +25,7 @@ def _progress_report(result):
                  for instance in block["instances"]]
     return dict(kind="progress", status="inconclusive",
         diagnostics=result.diagnostics, closure_checks=result.closure_checks, timings=result.timings,
+        running=list(getattr(result, "running", ())),
         reasons=list(result.reasons), attempted_instances=len(instances),
         recorded_local_theorems=sum(n["status"] == "proved" for n in instances),
         local_statistics_basis=_BASIS)
@@ -145,6 +146,11 @@ def main():
     p.add_argument("--node-workers", type=int, default=4, help="--discover-first: node proofs in parallel")
     p.add_argument("--pair-workers-per-node", type=int, default=1, help="--discover-first: BLOCK_PAIR_WORKERS inside each node worker")
     p.add_argument("--results-dir", type=Path, help="--discover-first: persist finished nodes here and resume from them")
+    p.add_argument("--node-memory-mb", type=float, default=None,
+                   help="--discover-first: per-node RSS budget of a worker; a node over it is stopped and reported "
+                        "inconclusive alone (common/node_monitor). Default: no budget")
+    p.add_argument("--status-dir", type=Path, default=None,
+                   help="--discover-first: worker status files (node, pid, start, RSS); default: a temporary directory")
     p.add_argument("--constant-insensitive", action="store_true",
                    help="--discover-first only: prove each block once per proof instance that drops the stack constants it never consumes (docs/块级实例常量去敏化方案.md)")
     p.add_argument("--pushed-code-return-tags", action="store_true",
@@ -157,8 +163,9 @@ def main():
     if args.context_constant_projection and not args.pushed_code_return_tags:
         p.error("--context-constant-projection needs --pushed-code-return-tags")
     options = {k: v for k, v in vars(args).items() if k not in ("stem", "output")}
-    if options["results_dir"] is not None:
-        options["results_dir"] = str(options["results_dir"])  # report metadata is JSON
+    for key in ("results_dir", "status_dir"):
+        if options[key] is not None:
+            options[key] = str(options[key])  # report metadata is JSON
     if args.constant_insensitive and not args.discover_first:
         p.error("--constant-insensitive needs --discover-first (the worklist discovers from proved exits)")
     if args.hard_wall_seconds <= 0:

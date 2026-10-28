@@ -89,9 +89,22 @@ def build_prover(stem, *, base_addr, timeout_ms, node_seconds, max_depth, summar
         keep_going=keep_going)
 
 
-def probe_node(prover, spec, formula_dir=None):
+def probe_node(prover, spec, formula_dir=None, memory_budget=None):
+    """One node's report. Under a NodeMonitor (common/node_monitor): pid, start / end
+    time and RSS are recorded; over `memory_budget` bytes the node stops at its next
+    solver call and is reported inconclusive (the remaining nodes still run)."""
+    from common.node_monitor import NodeMemoryExceeded, NodeMonitor, release_memory
+    from verification.block_parallel import forget_summary_failures, reset_node_caches
     started = time.monotonic()
-    result = prover.prove(spec)
+    with NodeMonitor(repr(spec), memory_budget) as monitor:
+        try:
+            result = prover.prove(spec)
+        except NodeMemoryExceeded as exc:
+            return dict(spec=asdict(spec), scope="block-local", status="inconclusive",
+                        seconds=time.monotonic() - started, wall_seconds=time.monotonic() - started,
+                        reasons=[str(exc)], failed_obligations=[], keep_going_failures=[], summary_hits=0,
+                        **monitor_info(monitor, forget_summary_failures, reset_node_caches, release_memory,
+                                       prover))
     failed = []
     for obligation in result.obligations:
         if obligation.proved:
@@ -112,7 +125,16 @@ def probe_node(prover, spec, formula_dir=None):
                 keep_going_failures=[dict(name=f["name"], answer=f["answer"], seconds=f["seconds"],
                                           where=f["where"])
                                      for f in getattr(result, "kept_failures", ())],
-                summary_hits=len(result.theorem.summary_hits) if result.theorem else 0)
+                summary_hits=len(result.theorem.summary_hits) if result.theorem else 0,
+                **{k: v for k, v in monitor.info().items() if k not in ("finished_at", "end_rss_mb")})
+
+
+def monitor_info(monitor, forget_summary_failures, reset_node_caches, release_memory, prover):
+    # An over-budget node: drop what it left behind before the next one.
+    forget_summary_failures()
+    reset_node_caches(prover)
+    release_memory()
+    return {k: v for k, v in monitor.info().items() if k not in ("finished_at", "end_rss_mb")}
 
 
 def main(argv=None):
@@ -126,6 +148,8 @@ def main(argv=None):
     p.add_argument("--base-addr", type=lambda v: int(v, 0), default=0x1000)
     p.add_argument("--no-summaries", dest="summaries", action="store_false")
     p.add_argument("--formula-dir", type=Path, help="Dump each failed obligation's formula here")
+    p.add_argument("--node-memory-mb", type=float, default=None,
+                   help="Per-node RSS budget: a node over it is stopped and reported inconclusive (common/node_monitor)")
     p.add_argument("--keep-going", action="store_true",
                    default=os.environ.get("BLOCK_KEEP_GOING", "") not in ("", "0"),
                    help="Diagnostics: try every pair-phase row after a failure (default: BLOCK_KEEP_GOING)")
@@ -151,7 +175,8 @@ def main(argv=None):
                           node_seconds=args.node_seconds, max_depth=args.max_depth,
                           summaries=args.summaries, keep_going=args.keep_going)
     for spec in specs:
-        report["nodes"].append(probe_node(prover, spec, args.formula_dir))
+        report["nodes"].append(probe_node(prover, spec, args.formula_dir,
+                                          None if args.node_memory_mb is None else int(args.node_memory_mb * 2**20)))
         report["locally_proved"] = sum(n["status"] == "proved" for n in report["nodes"])
         report["ended_at_utc"] = datetime.now(timezone.utc).isoformat()
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")

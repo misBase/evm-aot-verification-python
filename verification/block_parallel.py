@@ -39,9 +39,9 @@ from __future__ import annotations
 import gc
 import os
 import pickle
+import tempfile
 import zlib  # obligation texts compress ~15x: R30 wrote 15GB for 1188 nodes uncompressed
 import time
-from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import dataclass, replace
 from hashlib import sha256
 from pathlib import Path
@@ -49,6 +49,8 @@ from time import monotonic
 
 from z3 import Z3_OP_CONCAT, Z3_OP_UNINTERPRETED, And, Not, Or, is_app, is_eq, is_false, is_quantifier, simplify
 
+from common.node_monitor import (MEMORY_EXIT_CODE, NodeMemoryExceeded, NodeMonitor, read_status, release_memory,
+                                 rss_bytes)
 from verification.block_equivalence import ProofBudgetExceeded, digest, paths_digest, state_digest
 from verification.block_program import (BlockProgramResult, BlockProgramVerifier, EdgeCertificate,
                                         EntryCertificate)
@@ -162,8 +164,11 @@ def load_worker(stem, options, ordered):
     targets = {}
     for spec in ordered:
         targets.setdefault(spec.pc, []).append(spec)
+    memory = options.get("node_memory_mb")
     _WORKER.update(setup=setup, targets={pc: tuple(v) for pc, v in targets.items()},
-                   identity=setup.prover.portable_identity)
+                   identity=setup.prover.portable_identity,
+                   memory_budget=None if memory is None else int(memory * 2**20),
+                   status_dir=options.get("status_dir"))
 
 
 def slim(obligation):
@@ -439,11 +444,51 @@ def reset_node_caches(prover):
     gc.collect()
 
 
+def forget_summary_failures():
+    """Drop the per-process caches of failed summary-slice proofs. Pure
+    caches (a slice is simply proved again), but a failure recorded while
+    an over-budget node was being interrupted is not the slice's own."""
+    from x86_64.summaries import div_proof, memgas_proof, mul_proof
+    div_proof._FAILURE.clear()
+    memgas_proof._FAILURE.clear()
+    mul_proof._PROOF_FAILURE_CACHE.clear()
+
+
 def prove_instance(spec, node_seconds, deadline_epoch, contexts=None):
     """Worker task: the proof of `spec` (a proof instance k), then for every
     context c of k (default: k itself) its H2 edges into the frozen set, on
-    k's exits under premise_k ∧ E_c."""
+    k's exits under premise_k ∧ E_c.
+
+    Runs under a NodeMonitor (common/node_monitor): the result records the
+    worker pid, start / end time and RSS (start, peak, end), and the
+    worker's status file names the node while it runs. Over the worker's
+    memory budget the node stops at its next solver call and only it is
+    reported inconclusive (reason: the budget); a worker still holding most
+    of the budget after its caches are dropped asks to be replaced
+    ("recycle", NodePool). Stopping concludes nothing, so only proofs are lost."""
     contexts = (spec,) if contexts is None else tuple(contexts)
+    budget, status = _WORKER.get("memory_budget"), _WORKER.get("status_dir")
+    started = monotonic()
+    monitor = NodeMonitor(repr(spec), budget,
+                          status_path=None if status is None else Path(status) / f"worker-{os.getpid()}.json")
+    with monitor:
+        try:
+            node = _prove_instance(spec, node_seconds, deadline_epoch, contexts)
+        except NodeMemoryExceeded as exc:
+            node = dict(spec=spec, contexts=contexts, identity=_WORKER["identity"], proved=False,
+                        status="inconclusive", theorem=None, expected=(), edges=(), reasons=(str(exc),),
+                        seconds=monotonic() - started, queries=0, failed=[])
+        if monitor.exceeded is not None:
+            forget_summary_failures()
+        reset_node_caches(_WORKER["setup"].prover)
+        release_memory()
+    node.update(monitor.info())
+    # ponytail: replace the worker when 3/4 of its budget stays resident after the node.
+    node["recycle"] = budget is not None and (monitor.exceeded is not None or rss_bytes() > 0.75 * budget)
+    return node
+
+
+def _prove_instance(spec, node_seconds, deadline_epoch, contexts):
     setup = _WORKER["setup"]
     prover, identity = setup.prover, _WORKER["identity"]
     reset_node_caches(prover)
@@ -661,6 +706,130 @@ def verify_parallel(stem, options, *, workers=4, pair_workers=1, results_dir=Non
     return result
 
 
+class WorkerDied(RuntimeError):
+    """A NodePool worker exited while running a task (signal, OOM kill, os._exit)."""
+
+    def __init__(self, pid, exitcode, status=None):
+        self.pid, self.exitcode, self.status = pid, exitcode, status
+        how = f"signal {-exitcode}" if exitcode is not None and exitcode < 0 else f"exit code {exitcode}"
+        last = "" if status is None else (f" (node {status.get('node')}, state {status.get('state')}, "
+                                          f"peak RSS {status.get('peak_rss_mb')} MB)")
+        super().__init__(f"worker pid {pid} died with {how}{last}")
+
+    @property
+    def memory(self):
+        """Killed for memory: our own hard ceiling, or a SIGKILL (the kernel OOM killer)."""
+        return self.exitcode in (MEMORY_EXIT_CODE, -9) or (self.status or {}).get("state") == "killed"
+
+
+def _pool_worker(conn, initializer, initargs):
+    try:
+        if initializer is not None:
+            initializer(*initargs)
+    except BaseException as exc:
+        conn.send(("init_error", f"{type(exc).__name__}: {exc}"))
+        return
+    while True:
+        try:
+            task = conn.recv()
+        except (EOFError, OSError):
+            return
+        if task is None:
+            return
+        fn, args = task
+        try:
+            out = ("ok", fn(*args))
+        except BaseException as exc:
+            out = ("error", f"{type(exc).__name__}: {exc}")
+        conn.send(out)
+        if out[0] == "ok" and isinstance(out[1], dict) and out[1].get("recycle"):
+            return
+
+
+class NodePool:
+    """Worker processes with one pipe each, so a worker is watched and
+    replaced on its own: one that dies (segfault, OOM kill, the node
+    monitor's hard ceiling) fails only the task it was running (WorkerDied),
+    and a worker whose result asks to be recycled is restarted after it.
+    concurrent.futures' pool marks itself broken instead and fails every
+    running task (and the run with it). The caller keeps at most `workers`
+    tasks in flight."""
+
+    def __init__(self, workers, initializer=None, initargs=(), context=None, status_dir=None):
+        import multiprocessing
+        self._context = context or multiprocessing.get_context("spawn")
+        self._init = (initializer, initargs)
+        self.status_dir = status_dir
+        self._slots = [self._spawn() for _ in range(workers)]
+
+    def _spawn(self):
+        parent, child = self._context.Pipe()
+        process = self._context.Process(target=_pool_worker, args=(child, *self._init), daemon=True)
+        process.start()
+        child.close()
+        return dict(process=process, conn=parent, future=None)
+
+    def submit(self, fn, *args):
+        from concurrent.futures import Future
+        slot = next(s for s in self._slots if s["future"] is None)
+        future = Future()
+        future.set_running_or_notify_cancel()
+        slot["conn"].send((fn, args))
+        slot["future"] = future
+        future.pid = slot["process"].pid
+        return future
+
+    def _status(self, pid):
+        return None if self.status_dir is None else read_status(Path(self.status_dir) / f"worker-{pid}.json")
+
+    def running(self):
+        """Status (common/node_monitor) of every worker with a task in flight."""
+        return [dict(self._status(s["process"].pid) or {}, pid=s["process"].pid)
+                for s in self._slots if s["future"] is not None]
+
+    def wait(self, timeout):
+        """Futures finished within `timeout` seconds (results, errors, dead workers)."""
+        from multiprocessing.connection import wait as ready_of
+        busy = [s for s in self._slots if s["future"] is not None]
+        if not busy:
+            return set()
+        ready = set(ready_of([s["conn"] for s in busy] + [s["process"].sentinel for s in busy], timeout))
+        done = set()
+        for n, slot in enumerate(self._slots):
+            future, process = slot["future"], slot["process"]
+            if future is None or (slot["conn"] not in ready and process.sentinel not in ready):
+                continue
+            message = None
+            try:
+                if slot["conn"].poll():
+                    message = slot["conn"].recv()
+            except (EOFError, OSError):
+                pass
+            if message is not None and message[0] == "init_error":
+                raise RuntimeError(f"worker initializer failed: {message[1]}")
+            if message is None:  # exited without an answer
+                process.join(5)
+                future.set_exception(WorkerDied(process.pid, process.exitcode, self._status(process.pid)))
+            elif message[0] == "ok":
+                future.set_result(message[1])
+            else:
+                future.set_exception(RuntimeError(message[1]))
+            done.add(future)
+            slot["future"] = None
+            if message is None or (message[0] == "ok" and isinstance(message[1], dict) and message[1].get("recycle")):
+                process.join(30)
+                if process.is_alive():
+                    process.kill()
+                slot["conn"].close()
+                self._slots[n] = self._spawn()
+        return done
+
+    def shutdown(self):
+        for slot in self._slots:
+            slot["process"].kill()
+            slot["conn"].close()
+
+
 class LeaderFirstSchedule:
     """Submission order only; which instances get proved never depends on it.
 
@@ -780,9 +949,11 @@ def _prove_all(stem, options, ordered, groups, identity, deadline_epoch, workers
     first = options.get("first_pass_node_seconds") or options["node_seconds"]
     full = options["node_seconds"]
     schedule = LeaderFirstSchedule([s for s in groups if s not in done], min(first, full), full)
-    pool = ProcessPoolExecutor(workers, mp_context=multiprocessing.get_context("spawn"),
-                               initializer=_init_worker,
-                               initargs=(str(stem), options, ordered, os.getpid(), pair_workers))
+    # Worker status files (common/node_monitor): which node each worker runs, since when, how big.
+    status_dir = options.get("status_dir") or tempfile.mkdtemp(prefix="block-workers-")
+    options = dict(options, status_dir=status_dir)
+    pool = NodePool(workers, _init_worker, (str(stem), options, ordered, os.getpid(), pair_workers),
+                    multiprocessing.get_context("spawn"), status_dir)
     try:
         running = {}
 
@@ -799,7 +970,7 @@ def _prove_all(stem, options, ordered, groups, identity, deadline_epoch, workers
             left = deadline_epoch + 60 - time.time()
             if left <= 0:
                 break
-            finished, _ = wait(running, timeout=min(left, 60), return_when=FIRST_COMPLETED)
+            finished = pool.wait(min(left, 60))
             for future in finished:
                 spec = running.pop(future)
                 try:
@@ -807,15 +978,24 @@ def _prove_all(stem, options, ordered, groups, identity, deadline_epoch, workers
                 except Exception as exc:
                     node = dict(spec=spec, contexts=groups[spec], identity=identity, proved=False, status="error",
                                 theorem=None, expected=(), edges=(),
-                                reasons=(f"worker: {type(exc).__name__}: {exc}",), seconds=0.0, queries=0, failed=[])
+                                reasons=(f"worker: {type(exc).__name__}: {exc}",), seconds=0.0, queries=0, failed=[],
+                                pid=getattr(exc, "pid", getattr(future, "pid", None)))
+                    if isinstance(exc, WorkerDied):
+                        node.update({k: exc.status[k] for k in ("started_at", "peak_rss_mb", "memory_budget_mb")
+                                     if exc.status and k in exc.status})
+                        if exc.memory:
+                            # Killed for memory: final for this node (a retry grows the same way).
+                            node.update(status="inconclusive", memory_exceeded=str(exc))
                 out_of_wall = time.time() >= deadline_epoch
                 if out_of_wall and not node["proved"]:
                     # Queued behind the program wall: never attempted, not a failed proof.
                     _record(result, node, "not attempted")
                     continue
                 # An open H2 edge also earns the full-budget retry (it reproves the node too).
+                # Not after a memory stop either: a longer budget only grows further.
                 retry = (final_status(node) != "proved" and spec not in schedule.full_start
-                         and not any("solver=sat" in r for r in node["reasons"]))
+                         and not any("solver=sat" in r for r in node["reasons"])
+                         and not node.get("memory_exceeded"))
                 if retry:
                     schedule.retry(spec)
                     _record(result, node, "deferred")
@@ -836,17 +1016,22 @@ def _prove_all(stem, options, ordered, groups, identity, deadline_epoch, workers
                     schedule.finish(spec)
                     _record(result, node, final_status(node))
                     keep(spec, groups[spec], node)
-                if progress_callback is not None:
-                    progress_callback(result)
             fill()
+            result.running = pool.running()
+            if progress_callback is not None:
+                progress_callback(result)
         # Never submitted before the wall (queued, or blocked behind an unfinished leader).
         for spec in schedule.pending():
             _record(result, dict(spec=spec, reasons=(), seconds=0.0, queries=0, failed=[]), "not attempted")
     finally:
-        for process in list(getattr(pool, "_processes", {}).values()):
-            process.kill()
-        pool.shutdown(wait=False, cancel_futures=True)
+        pool.shutdown()
+        result.running = []
     return done
+
+
+# Worker observations kept per instance (prove_instance / NodeMonitor.info, WorkerDied).
+_OBSERVED = ("pid", "started_at", "finished_at", "start_rss_mb", "peak_rss_mb", "end_rss_mb", "memory_budget_mb",
+             "memory_exceeded")
 
 
 def _record(result, node, status):
@@ -855,7 +1040,8 @@ def _record(result, node, status):
     diagnostic["instances"].append(dict(spec=repr(node["spec"]), status=status, reasons=list(node["reasons"]),
                                         contexts=len(node.get("contexts", ())) or 1,
                                         seconds=node["seconds"], queries=node["queries"],
-                                        failed_obligations=node["failed"]))
+                                        failed_obligations=node["failed"],
+                                        **{k: node[k] for k in _OBSERVED if node.get(k) is not None}))
     # A split proof instance is superseded by its contexts' own entries.
     diagnostic["status"] = ("inconclusive" if any(n["status"] not in ("proved", "split")
                                                   for n in diagnostic["instances"]) else "proved")

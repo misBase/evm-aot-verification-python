@@ -32,6 +32,7 @@ from verification import proof_cache
 from verification.block_specialization import BlockSpecialization
 from verification.block_relation import BlockRelationSchema
 from verification.linear_encoding import lia_query, split_limb_joins
+from common.node_monitor import check_abort
 from common.store_forwarding import _memoized, _subtract_base_term, forward_selects, linearize_address, unshift_store_chain
 from verification.alpha_canon import binder_capture_risk, canon_binders
 from verification.loop_induction import run_evm_segment, run_x86_segment, terminal_observable_conditions
@@ -71,6 +72,7 @@ def _bv_array_formula(formula):
 
 
 def _solver(timeout_ms, formula=None):
+    check_abort()  # a node over its memory budget stops at its next solver call (common/node_monitor)
     # Concrete SP eliminates Int from most block queries. Keep the general
     # solver for mixed sorts and quantifiers; neither route changes assertions.
     solver = SolverFor("QF_AUFBV") if formula is not None and _bv_array_formula(formula) else Solver()
@@ -87,12 +89,14 @@ def solve_query(formula, timeout_ms, trust_unknown=True):
     for checks expected SAT (entry_nonempty), where one timeout under load
     would otherwise fail every later node of that shape at once.
     """
+    check_abort()
     key = proof_cache.query_key("check", formula) if proof_cache.enabled() else None
     if key is not None:
         cached = proof_cache.cached_answer(key, timeout_ms)
         if cached is not None and (trust_unknown or cached != "unknown"):
             return cached
     answer = _solve_query(formula, timeout_ms)
+    check_abort()  # an interrupted check's unknown is not the query's answer: never cached
     if key is not None:
         proof_cache.record_answer(key, answer, timeout_ms)
     return answer
@@ -2206,10 +2210,12 @@ def solve_pure_bv(query, timeout_ms):
     cached = proof_cache.cached_answer(key, timeout_ms) if key is not None else None
     if cached is not None:
         return cached
+    check_abort()
     solver = Then("simplify", "ackermannize_bv", "bit-blast", "sat").solver()
     solver.set("timeout", timeout_ms)
     solver.add(query)
     answer = str(solver.check())
+    check_abort()  # as in solve_query
     if key is not None:
         proof_cache.record_answer(key, answer, timeout_ms)
     return answer
@@ -2804,6 +2810,12 @@ _QUICK_EXACT_MS = 3000
 _LAST_RESORT_MS = 300_000
 # A stuck prefix group pays for itself only if it replaces several member proofs.
 _STUCK_MIN_MEMBERS = 3
+# Row groups (_prove_row_groups): halved down to this many members; smaller remainders keep
+# their own obligations. ponytail: a try is capped at _ROW_GROUP_TRY query timeouts, halving
+# stops _ROW_GROUP_DEPTH levels below a row's whole group.
+_ROW_GROUP_MIN = 4
+_ROW_GROUP_TRY = 4
+_ROW_GROUP_DEPTH = 3
 # ponytail: fixed 10s cap for the LIA route (runs before the SAT routes on every hard pair); raise if LIA wins start timing out.
 _LIA_MS = 10_000
 # ponytail: two guard levels (<= 4 cases); PoolManager 16670 needs one, 4 guards (16 cases) cost 100-500s each.
@@ -3573,6 +3585,59 @@ class BlockEquivalenceProver:
                     record = proved[f"x86_maps_group_{n}"]
                     done.update({(j, k): replace(record, name=f"x86_maps_{j}_{k}") for j, k in entries})
 
+    def _prove_row_groups(self, premise, evm, x86, correspondence, done, until):
+        """x86_maps_j_k of a kept row j (correspondence[j] an EVM index s) that
+        `done` lacks, proved together and added to `done`.
+
+        x86_maps_j_k is premise ∧ x_j ∧ ¬c_k for conjunct c_k of e_s. For a
+        group K of them, premise ∧ x_j ∧ ¬(∧_{k∈K} c_k) holds in every model of
+        each member (¬c_k implies the negated conjunction): a weakening, so
+        its UNSAT, renamed, proves every member, as _prove_stuck_groups does
+        for prefix groups. Its record is the group query with the lemmas that
+        refuted it, so each member's certificate is checkable on its own.
+        Anything else (sat, unknown, budget) proves nothing: the group is
+        halved (at most _ROW_GROUP_DEPTH levels, down to _ROW_GROUP_MIN
+        members) and what stays unproved keeps its own obligation. One try
+        refutes the row's shared premise ∧ x_j once instead of once per
+        conjunct (Aave Pool 6182: ~3400 maps of 15-22s each, the node ran out
+        of its 12h after 558). The phase stops at `until`.
+        """
+        forwarded, canon = {}, {}
+        for j, target in enumerate(correspondence):
+            if type(target) is not int:
+                continue
+            conjuncts = _conjuncts(evm[target].condition)
+            left = [k for k in range(len(conjuncts)) if (j, k) not in done]
+            stack = [(left, 0)] if len(left) >= _ROW_GROUP_MIN else []
+            while stack:
+                if until is not None and monotonic() >= until:
+                    return
+                group, depth = stack.pop()
+                goal = And(*(conjuncts[k] for k in group))
+                query = canon_binders(forward_selects(And(premise, x86[j].condition, Not(goal)), forwarded), canon)
+                record = self._group_trial(f"x86_maps_{j}_group", query, until)
+                if record is not None:
+                    done.update({(j, k): replace(record, name=f"x86_maps_{j}_{k}") for k in group})
+                elif depth < _ROW_GROUP_DEPTH and len(group) >= 2 * _ROW_GROUP_MIN:
+                    half = len(group) // 2
+                    stack += [(group[half:], depth + 1), (group[:half], depth + 1)]
+
+    def _group_trial(self, name, query, until):
+        """The proved record of _check(query) (no goal split: the group is the
+        point) within _ROW_GROUP_TRY query timeouts and `until`, or None."""
+        deadline = self.deadline
+        end = monotonic() + _ROW_GROUP_TRY * self.timeout_ms / 1000
+        for bound in (deadline, until):
+            if bound is not None:
+                end = min(end, bound)
+        self.deadline, trial = end, []
+        try:
+            return trial[-1] if self._check(name, query, trial, split=False) else None
+        except ProofBudgetExceeded:
+            return None
+        finally:
+            self.deadline = deadline
+
     def _discharge_all_rows(self, premise, evm, x86, rows, until):
         """{(i, j): record} proving pair_i_j of the "all" rows j, one proof
         per shared x86 path prefix.
@@ -4216,6 +4281,10 @@ class BlockEquivalenceProver:
             cap = min(cap, (self.deadline - monotonic()) / 4)
         self._prove_stuck_groups([g for g in stuck if len(g[1]) >= _STUCK_MIN_MEMBERS], discharged,
                                  monotonic() + cap, 2 * self.timeout_ms / 1000)
+        # What the prefix passes left of each kept row, one implication per row (halved on
+        # failure); ponytail: the phase gets 1/3 of what is left, leftovers use their own routes.
+        until = None if self.deadline is None else monotonic() + (self.deadline - monotonic()) / 3
+        self._prove_row_groups(premise, evm, x86, correspondence, discharged, until)
         ready = {f"x86_maps_{j}_{k}": r for (j, k), r in discharged.items()}
         start = len(records)
         failed = self._check_rows(evm, x86, premise, pair, correspondence, range(len(x86)), ready, records,
