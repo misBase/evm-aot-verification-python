@@ -31,7 +31,6 @@
   桥接不成立（SAT/unknown/解析失败）时也一样回到全量枚举。
 """
 
-import os
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
@@ -480,6 +479,9 @@ def run_x86_segment(
     # 250ms kept 81 paths/107s, 1000ms 61 paths/68s; 3000ms no further gain).
     # Witness reuse means only non-model branches pay this budget.
     reachability_timeout_ms: int = 1000,
+    # Exact merge of short register-only diamonds (X86SymbolicExecutor._merge_diamond). Only the
+    # block proof's own segment asks for it; summary / induction replays keep one path per raw path.
+    merge_diamonds: bool = False,
 ) -> Tuple[List[SegmentPath], List[str], List[str]]:
     """从 cutpoint 执行一轮 x86 段。
 
@@ -511,9 +513,7 @@ def run_x86_segment(
         deadline=deadline,
         call_site_mapping=call_site_mapping,
         reachability_timeout_ms=reachability_timeout_ms,
-        # Exact merge of short register-only diamonds (X86SymbolicExecutor._merge_diamond);
-        # BLOCK_MERGE_DIAMONDS=0 keeps every path apart (A/B diagnostics).
-        merge_diamonds=os.environ.get("BLOCK_MERGE_DIAMONDS", "1") != "0",
+        merge_diamonds=merge_diamonds,
     )
     final_states = executor.execute(cut_state, entry_addr=entry_addr)
 

@@ -2813,6 +2813,9 @@ _QUICK_EXACT_MS = 3000
 _LAST_RESORT_MS = 300_000
 # A stuck prefix group pays for itself only if it replaces several member proofs.
 _STUCK_MIN_MEMBERS = 3
+# Exact merge of short register-only diamonds in the node's own x86 segment (fix 18,
+# X86SymbolicExecutor._merge_diamond); BLOCK_MERGE_DIAMONDS=0 keeps every path apart.
+_MERGE_DIAMONDS = __import__("os").environ.get("BLOCK_MERGE_DIAMONDS", "1") != "0"
 # Row groups (_prove_row_groups): halved down to this many members; smaller remainders keep
 # their own obligations. ponytail: a try is capped at _ROW_GROUP_TRY query timeouts, halving
 # stops _ROW_GROUP_DEPTH levels below a row's whole group.
@@ -4431,7 +4434,8 @@ class BlockEquivalenceProver:
                 self.x86_blocks, state.copy(), self.pc_to_addr[spec.pc],
                 set(self.pc_to_addr.values()), max_depth=self.max_depth,
                 aot_profile=self.aot_profile, use_reachability_check=True, summary_runtime=runtime,
-                deadline=self.deadline, call_site_mapping=self.call_site_mapping)
+                deadline=self.deadline, call_site_mapping=self.call_site_mapping,
+                merge_diamonds=_MERGE_DIAMONDS)
             result.evm_outcomes, result.x86_outcomes = tuple(evm), tuple(x86)
             result.evm_paths, result.x86_paths = len(evm), len(x86)
             if len(evm) * len(x86) > self.max_path_pairs:
