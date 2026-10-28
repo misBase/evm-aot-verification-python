@@ -8,7 +8,8 @@ For each x86 row j (its EVM target from meta.json `proposed`), builds
 over the row's conjuncts (all, or the first --size), forwarded and canonicalised as
 _check_rows does, and runs production _check(split=False) on it with --seconds (default 600).
 --prefix first runs discharge_maps_by_prefix on the row (3s per group, as _pair_phase) and groups
-only what it leaves. --split: also time each left conjunct alone (cap --seconds each).
+only what it leaves. --split: also time each left conjunct alone (cap --seconds each). --save DIR: write the group query
+as DIR/x86_maps_<j>_group.smt2 (after forwarding and canonicalisation, as _check receives it).
 """
 import json
 import sys
@@ -27,7 +28,7 @@ def opt(flag, default=None):
 
 
 d = Path(argv[0])
-rows = [int(a) for a in argv[1:] if not a.startswith("--") and argv[argv.index(a) - 1] not in ("--seconds", "--size")]
+rows = [int(a) for a in argv[1:] if not a.startswith("--") and argv[argv.index(a) - 1] not in ("--seconds", "--size", "--save")]
 seconds, size = float(opt("--seconds", 600)), opt("--size")
 meta = json.loads((d / "meta.json").read_text())
 premise = And(*parse_smt2_file(str(d / "premise.smt2")))
@@ -53,6 +54,9 @@ for j in rows:
     forwarded, canon = {}, {}
     query = be.canon_binders(be.forward_selects(And(premise, x, Not(And(*(conj[k] for k in left)))), forwarded),
                              canon)
+    if opt("--save"):
+        Path(opt("--save")).mkdir(parents=True, exist_ok=True)
+        (Path(opt("--save")) / f"x86_maps_{j}_group.smt2").write_text(be._to_smt2(query))
     prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=30000)
     prover.deadline = time.monotonic() + seconds
     records, started = [], time.monotonic()
