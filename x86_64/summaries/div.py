@@ -336,6 +336,9 @@ def apply_div_summary(
     r14 = state.x86_registers.get_register(Register.R14)
     mem = state.x86_memory
 
+    from common.store_forwarding import shared_forward_scope
+    shared_forward_scope()  # the 8 limb loads below share the forwarding cache (bounded between hits)
+
     def limbs(offsets):
         return Uint256(*(_forwarded_limb(mem.load_limb(r14 + BitVecVal(o, 64), domain=MemoryDomain.STACK))
                          for o in offsets))

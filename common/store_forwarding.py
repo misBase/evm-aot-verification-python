@@ -96,10 +96,11 @@ def clear_memo():
     _SHARED_FORWARD.clear()
 
 
-# One forward_selects cache for the whole process (see forward_selects_shared).
-# ponytail: cleared wholesale at _SHARED_FORWARD_LIMIT nodes; an LRU if that ever thrashes.
+# One forward_selects cache for the whole process (see forward_selects_shared), cleared
+# wholesale at a scope boundary (shared_forward_scope) once it holds _SHARED_FORWARD_LIMIT
+# entries. ponytail: one Aave Pool 7200 DIV hit adds ~22k; an LRU if that ever thrashes.
 _SHARED_FORWARD: Dict[int, object] = {}
-_SHARED_FORWARD_LIMIT = 2_000_000
+_SHARED_FORWARD_LIMIT = 25_000
 
 
 def linearize_address(addr) -> Optional[Tuple[_AddrKey, int]]:
@@ -234,10 +235,25 @@ def forward_selects_shared(expr):
     growing memory get the shared store chain forwarded once: the DIV summary
     forwards 8 stack limbs per hit, each a read through the whole x86 memory
     (Aave Pool 7200: ~500s per hit, 53% of the x86 segment, re-forwarding the
-    same chain per limb and again on every path)."""
+    same chain per limb and again on every path).
+
+    Never cleared here: within a scope (shared_forward_scope) every call
+    shares it, whatever its size."""
+    return forward_selects(expr, _SHARED_FORWARD)
+
+
+def shared_forward_scope():
+    """Start a scope of forward_selects_shared calls (one summary hit): the
+    cache is dropped first if it holds _SHARED_FORWARD_LIMIT entries.
+
+    Entries keep their nodes alive, and on a long x86 segment they are the
+    store chains of every path forwarded so far: with a 2M-entry limit that
+    was never reached the cache held most of Z3's memory (Aave Pool 7200:
+    ~2.4 GB/h of growth). Dropping it only between hits keeps the sharing
+    across one hit's 8 limb loads (most of the gain) and between the hits
+    that follow, until the bound. A pure cache: only speed and memory change."""
     if len(_SHARED_FORWARD) >= _SHARED_FORWARD_LIMIT:
         _SHARED_FORWARD.clear()
-    return forward_selects(expr, _SHARED_FORWARD)
 
 
 def join_extracts(expr, _cache: Optional[Dict[int, object]] = None):

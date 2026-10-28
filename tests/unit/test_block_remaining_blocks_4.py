@@ -139,3 +139,26 @@ def test_unify_across_stops_after_a_stall_and_never_merges_unproved():
     assert not lemmas and out[0].eq(f1) and out[1].eq(f2)
     out, lemmas = be.unify_across([f1, f2], 3000, stall_seconds=60)  # a merge in time: unchanged behaviour
     assert lemmas and all(Solver().check(f) == unsat for f in out)
+
+
+# --- fix 20: the shared forwarding cache is bounded at hit boundaries ------------------
+
+def test_shared_forward_cache_is_kept_within_a_scope_and_dropped_between_scopes(monkeypatch):
+    from z3 import Array, BitVecSort, BitVecVal, Select, Store
+    import common.store_forwarding as sf
+    monkeypatch.setattr(sf, "_SHARED_FORWARD_LIMIT", 10)
+    sf._SHARED_FORWARD.clear()
+    a, k = Array("n4_fw_a", BitVecSort(64), BitVecSort(8)), BitVec("n4_fw_k", 64)
+    chain = a
+    for i in range(8):
+        chain = Store(chain, k + i, BitVecVal(i, 8))
+    sf.shared_forward_scope()
+    loads = [Select(chain, k + i) for i in range(8)]
+    for load in loads:  # one scope: never dropped, however large it grows
+        assert sf.forward_selects_shared(load).eq(sf.forward_selects(load))
+    size = len(sf._SHARED_FORWARD)
+    assert size >= 10
+    sf.shared_forward_scope()  # next hit: over the bound, so dropped
+    assert not sf._SHARED_FORWARD
+    assert sf.forward_selects_shared(loads[3]).eq(BitVecVal(3, 8))
+    sf._SHARED_FORWARD.clear()

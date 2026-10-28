@@ -147,6 +147,7 @@ orig_execute = cx.X86SymbolicExecutor.execute
 
 
 def execute(self, *a, **k):
+    seen.setdefault("executors", []).append(self)
     seen["executor"] = self
     return orig_execute(self, *a, **k)
 
@@ -161,12 +162,13 @@ class Stop(BaseException):  # past prove()'s `except Exception`
 
 def segment(*a, **k):
     seen["runtime"], seen["phase"] = k.get("summary_runtime"), "x86"
+    seen["executors"] = []
     if k.get("summary_runtime") is not None:
         k["summary_runtime"].apply = attributed("apply", k["summary_runtime"].apply)
     started = time.monotonic()
     try:
         out = orig_segment(*a, **k)
-        ex = seen["executor"]
+        ex = max(seen.get("executors", [None]), key=lambda e: getattr(e, "total_states", -1))  # the segment's
         print(f"[{time.monotonic() - T0:8.1f}s] x86 paths {len(out[0])} "
               f"{collections.Counter(p.kind for p in out[0])} merged diamonds {getattr(ex, 'merged_diamonds', None)} "
               f"reachability checks {getattr(ex, 'reachability_call_count', None)} "
