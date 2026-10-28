@@ -56,7 +56,9 @@
 ### 2.5 PoolManager 4418
 
 - 分叉（N3 §2.4）：每个符号长度的内存访问在 memgas summary 之前有两段只改寄存器的短菱形——`toWordSize` 的溢出钳位（`cmp rsi,rbx; jb BU64`，两边汇合于 memgas 入口前）和 `SafeMul(words, 32)` 的 `test rbx,rbx; je L`（跳过乘法；另一边 `mul rbx; jb ERR; mov rbx,rax`），执行器不合并，活路径数按访问点翻倍。
-- **修法 18**（方向 (b)，`X86SymbolicExecutor._merge_diamond`）：一次条件分支产生两个可达后继时，先静态找两边沿静态后继各 4 个块以内最早共同到达的地址 J，再把两边按主循环完全相同的方式（`_advance`：执行、分叉时的可达性剪枝、CFG 边、终止状态记录）向前执行到 J（每边至多 8 个状态）；离开这片区域、到达 cutpoint、深度上限的状态原样交回工作表。若两边各恰好一个状态到达 J，且除寄存器/标志外状态的每个叶子都相同（`_state_leaves`：Z3 项按 AST id，含 assumptions、内存、gas、指针标签、标志约束），路径条件是 P ∧ T_a 与 P ∧ T_b 且 T_a ∧ T_b 不可满足，就合并为一个状态：路径条件 P ∧ (T_a ∨ T_b)，不同的寄存器/标志为 ite(T_a, a, b)。只在节点证明自己的 x86 分段（`BlockEquivalenceProver.prove` 调 `run_x86_segment(merge_diamonds=True)`）启用，`BLOCK_MERGE_DIAMONDS=0` 关闭；summary 与归纳的原始代码重放（div / memgas 引理、复制循环归纳等）保持一条原始路径一条记录，因为它们的证书和检查按原始路径构造（第一版对所有 `run_x86_segment` 都开启，快测里 4 个引理路径数断言和 1 个复制归纳变异测试随之变化，于是收窄到节点分段）。
+- **修法 18**（方向 (b)，`X86SymbolicExecutor._merge_diamond`）：一次条件分支产生两个可达后继时，先静态找两边沿静态后继各 4 个块以内最早共同到达的地址 J，再把两边按主循环完全相同的方式（`_advance`：执行、分叉时的可达性剪枝、CFG 边、终止状态记录）向前执行到 J（每边至多 8 个状态）；离开这片区域、到达 cutpoint、深度上限的状态原样交回工作表。若两边各恰好一个状态到达 J，且除寄存器/标志外状态的每个叶子都相同（`_state_leaves`：Z3 项按 AST id，含 assumptions、内存、gas、指针标签、标志约束），路径条件是 P ∧ T_a 与 P ∧ T_b 且 T_a ∧ T_b 不可满足，就合并为一个状态：路径条件 P ∧ (T_a ∨ T_b)，不同的寄存器/标志为 ite(T_a, a, b)。- **适用范围（两次收窄）**：
+  1. 只在节点证明自己的 x86 分段（`BlockEquivalenceProver.prove` → `run_x86_segment(merge_diamonds=…)`）启用；summary 与归纳的原始代码重放（div / memgas 引理、复制循环归纳等）保持一条原始路径一条记录，因为它们的证书和检查按原始路径构造（第一版对所有 `run_x86_segment` 都开启，快测里 4 个引理路径数断言和 1 个复制归纳变异测试随之变化）。
+  2. **自适应**：一次执行已有 200 条路径（终止 + 截断 + 待执行）之后才开始合并（`X86SymbolicExecutor._merging`；`BLOCK_MERGE_DIAMONDS=<N>` / `off`）。始终合并时，PoolManager 16670 m=768 的 x86 从 83 条变 73 条，每行都带合并点，SDIV 内存目标的 pair 明显变慢（`pair_2_65` 1.5h 仍未完成，服务器上同类 pair 140–520s；单独跑它的 goal 2，守卫路线因为 UF 参数里变成了 `ite(T, −a, a)` 而选不到守卫），6182 的复跑在前缀阶段之后 40 分钟没有进展（`cloud-inputs/n4/runs/*-mergeall-stopped.log`）：合并改变了状态的形状（寄存器是 ite、路径条件里有 Or），而各条路线是在原来的形状上调好的。200 高于那些不合并就能证出的分段（16670：83 / 109，6182：49），远低于 4418 的 878，所以这些节点与修法前完全相同，只有路径爆炸的分段改变形状。
 - x86 分段（`mem_probe.py --x86-only`，sym 实例）：开启合并 **360 条路径**（342 终止 + 18 出口），合并 150 次，可达性检查 2563 次（1400s），分段 1606s（负载 6 个进程）；同一份代码、相近负载下关闭合并（`BLOCK_MERGE_DIAMONDS=0`）：878 条路径（806 终止 + 72 出口），可达性检查 6080 次（3394s，剪掉 1596 个），分段 3733s（N3 当时是 876 条、6105 次、2684s）。即路径 −59%（出口路径 72 → 18），可达性检查 −58%，分段 −57%。剩下的 342 条终止路径是各访问点的错误出口（溢出 / OOG 桩），它们彼此内存不同，不能合并。
 - 整节点（`n4-4418-sym`）：（待补）
 
@@ -73,8 +75,8 @@
 - `verification/block_program.py`：`BlockProgramResult.running`。
 - `tools/verify_block_lockstep.py`：`--node-memory-mb`、`--status-dir`，progress 带 `running`。`tools/probe_block_obligations.py`：`probe_node` 的监控与 `--node-memory-mb`。
 - `verification/block_equivalence.py`：`check_abort` 接入 `_solver`、`solve_query`（求解后再查一次，被中断的 unknown 不进 proof cache）、`solve_pure_bv`；修法 17 `_ROW_GROUP_*`、`_pair_phase` 中调用、`_prove_row_groups`、`_group_trial`；修法 19 `unify_across(stall_seconds=)` 与 `_unify_node` 的调用。
-- `x86_64/cfg_executor.py`：`check_abort` 接入 `execute_state`；修法 18 `merge_diamonds` 参数、`_advance`（主循环的单步，提出来复用）、`_diamond_join`、`_merge_diamond`、模块级 `_state_leaves`、`_exclusive`、`_merged`、`_DIAMOND_BLOCKS` / `_DIAMOND_STEPS`。
-- `verification/loop_induction.py`：`run_x86_segment(merge_diamonds=False)` 参数；`verification/block_equivalence.py` 的 `prove` 以 `_MERGE_DIAMONDS`（`BLOCK_MERGE_DIAMONDS`，默认开）传入。
+- `x86_64/cfg_executor.py`：`check_abort` 接入 `execute_state`；修法 18 `merge_diamonds` 参数、`_merging`、`_advance`（主循环的单步，提出来复用）、`_diamond_join`、`_merge_diamond`、模块级 `_state_leaves`、`_exclusive`、`_merged`、`_DIAMOND_BLOCKS` / `_DIAMOND_STEPS`。
+- `verification/loop_induction.py`：`run_x86_segment(merge_diamonds=None)` 参数；`verification/block_equivalence.py` 的 `prove` 以 `_MERGE_DIAMONDS`（`BLOCK_MERGE_DIAMONDS`，默认 200）传入。
 - `verification/block_equivalence.py`：修法 21 `_correspondence` 开头的规模估计（先算 `disjoint_groups`）。
 - `verification/block_summaries.py`：修法 16 `summary_text`，用于所有 summary 命中义务的记录。
 - `common/store_forwarding.py`：修法 20 `_SHARED_FORWARD_LIMIT = 25_000`、`forward_selects_shared` 不再自清、`shared_forward_scope`；`x86_64/summaries/div.py`：`apply_div_summary` 开头开一个作用域。
