@@ -1,0 +1,76 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "/home/heqi/evm-verif/bl-runs/r5/fixtures/Pool",
+  "started_at_utc": "2026-10-27T06:18:01.754215+00:00",
+  "configuration": {
+    "nodes": "/home/heqi/evm-verif/bl-runs/n3runs/aave6182-node.json",
+    "output": "/home/heqi/evm-verif/bl-runs/n3runs/aave6182.json",
+    "timeout_ms": "30000",
+    "node_seconds": "43200.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "None",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "8b7ff12132610ce147c70ccc257dca54555b72993d506c7f73e62588c867a5d2",
+    ".hex": "04aa03ffcc5a70f0d297184b602c948c945534c5edef918747a3e045ef86195c"
+  },
+  "model_sources_sha256": "b13252279c1ac34247048ce304233146568a8eb43d86d736baff69f0bb3a654f",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 6182,
+        "stack_depth": 14,
+        "memory_size": null,
+        "free_memory_pointer": null,
+        "stack_constants": [
+          [
+            0,
+            128
+          ],
+          [
+            3,
+            54
+          ],
+          [
+            4,
+            52
+          ],
+          [
+            5,
+            1778129887
+          ],
+          [
+            6,
+            91343852333181432387730302044767688728495783942
+          ],
+          [
+            12,
+            663
+          ]
+        ]
+      },
+      "scope": "block-local",
+      "status": "inconclusive",
+      "seconds": 43209.02592892805,
+      "wall_seconds": 43209.4117542319,
+      "queries": 5043,
+      "evm_paths": 95,
+      "x86_paths": 49,
+      "paired_transitions": 2,
+      "terminals_proved": 47,
+      "reasons": [
+        "ProofBudgetExceeded: proof wall budget exhausted"
+      ],
+      "failed_obligations": [],
+      "keep_going_failures": [],
+      "summary_hits": 0
+    }
+  ],
+  "locally_proved": 0,
+  "ended_at_utc": "2026-10-27T18:18:14.695944+00:00"
+}

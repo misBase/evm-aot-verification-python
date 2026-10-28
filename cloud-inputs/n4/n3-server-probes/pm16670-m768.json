@@ -1,0 +1,54 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "started_at_utc": "2026-10-27T06:18:01.754325+00:00",
+  "configuration": {
+    "nodes": "/home/heqi/evm-verif/bl-runs/n3runs/pm16670-m768-node.json",
+    "output": "/home/heqi/evm-verif/bl-runs/n3runs/pm16670-m768.json",
+    "timeout_ms": "30000",
+    "node_seconds": "43200.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "None",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "1d40b9d12b04c2984c95621b8093f59dd0687892a8aa4d1baa13616a94d15a03",
+    ".hex": "1ae33a365dabbdb8a22451bd57d029cbb04074a87d3e1b6a3de6722492e33c1a"
+  },
+  "model_sources_sha256": "b13252279c1ac34247048ce304233146568a8eb43d86d736baff69f0bb3a654f",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 16670,
+        "stack_depth": 16,
+        "memory_size": 768,
+        "free_memory_pointer": 768,
+        "stack_constants": [
+          [
+            3,
+            7296
+          ]
+        ]
+      },
+      "scope": "block-local",
+      "status": "proved",
+      "seconds": 12741.548424822278,
+      "wall_seconds": 12969.692743309308,
+      "queries": 1239,
+      "evm_paths": 3,
+      "x86_paths": 83,
+      "paired_transitions": 69,
+      "terminals_proved": 14,
+      "reasons": [],
+      "failed_obligations": [],
+      "keep_going_failures": [],
+      "summary_hits": 48
+    }
+  ],
+  "locally_proved": 1,
+  "ended_at_utc": "2026-10-27T09:54:14.431591+00:00"
+}

@@ -1,0 +1,5 @@
+10-27 14:18 launch pm16670-sym pid=19312
+10-27 14:18 launch pm16670-m768 pid=19315
+10-27 14:18 launch aave6182 pid=19318
+10-27 14:18 launch aave7200 pid=19321
+10-27 23:21 killed aave7200 probe: rss 16.8G + swap 29.9G after 9h, x86 segment unfinished; machine swap exhausted
