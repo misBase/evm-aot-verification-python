@@ -99,6 +99,8 @@ def test_empty_probe_only_for_unknown_rows_without_sibling_proposal(monkeypatch)
     real, probed = be.PrefixSolver.check, []
     monkeypatch.setattr(be.PrefixSolver, "check", lambda self, conjuncts, *a: z3.unknown
                         if any(c.get_id() in hard for c in conjuncts) else real(self, conjuncts, *a))
+    # Unknown blasted too (N3 fix 11 falls back to the blasted query before calling a row unknown).
+    monkeypatch.setattr(be.BlockEquivalenceProver, "_blasted_model", lambda self, f, budget=None: (z3.unknown, None))
     monkeypatch.setattr(be.BlockEquivalenceProver, "_empty_by_bvabs", lambda self, p, x: probed.append(x.location) or True)
     corr = be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)._correspondence(evm, x86, BoolVal(True), [])
     # Row 3's siblings at A agree on EVM 0 (prove() proposes it); only row 4 is probed for emptiness.

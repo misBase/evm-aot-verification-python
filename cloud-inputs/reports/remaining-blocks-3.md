@@ -77,7 +77,9 @@
 
 ## 5. 测试结果
 
-（待补：全量快测）
+（N3 会话中断后由任务 N4 补写，N4 分支见 `remaining-blocks-4.md` 第一行。）
+
+- **全量快测（N3 最终代码 4db8738，`-m "not slow" -n 3 --dist=loadscope`）**：1795 passed，**1 failed**，3 skipped（634s）。失败的是 `tests/unit/test_block_correspondence.py::test_empty_probe_only_for_unknown_rows_without_sibling_proposal`：该测试把两行的增量查询 mock 成 unknown，但修法 11 之后 `_correspondence` 对 unknown 行先走 blast 回退，这两行（玩具约束 `x == 7`、`x == 200`）blast 后直接 SAT，于是被映射为 EVM 0 / EVM 2，不再是 "all" / None。代码行为正确（修法 11 的本意），是测试没有跟上：N4 中把 `_blasted_model` 一并 mock 成 unknown（保持"只对无兄弟提议的 unknown 行做 empty 探测"的测试原意），该文件 10/10 通过；N4 改动后的全量快测见 `remaining-blocks-4.md` §5。
 
 - `tests/unit/test_block_remaining_blocks_3.py`：21 条（另有 1 条 `slow`：16670 goal 2 的守卫路线）。
 - 相关已有测试（`-k "summar or executor or cfg or copy or memgas or div or remaining"`）：453 passed, 2 skipped（872.9s）；normalize 相关（`-k "normali or word or offset_view or remaining or identity"`）：119 passed。
@@ -108,7 +110,17 @@
 
 ## 6. 整节点
 
-（待补）
+本机整节点在会话中断前没有跑完（第一次在 7253s 被 cgroup OOM 杀掉，见 §2.3）。以下是服务器上用 N3 代码（4db8738）做的整节点探针（N4 任务输入 `cloud-inputs/n4/n3-server-probes/`；`probe_traced.py`，每查询 30s，节点预算 43200s，每节点一个进程，四个节点同时启动）：
+
+| 节点 | 结果 | 节点时间 | 查询数 | 路径（EVM / x86） | 说明 |
+|---|---|---|---|---|---|
+| PoolManager 16670 m=768 | **proved** | 12741.5s（墙钟 12969.7s） | 1239，0 失败 | 3 / 83 | 69 个配对转移、14 个终止配对、48 个 summary 命中。r4 的 `pair_2_74` goal 2（10664.8s unknown）现在 133.3s；最慢的 pair 是 `pair_2_79` 517.0s。**`_unify_node` 用了 10816.1s（85%），只产出 2 条引理** |
+| PoolManager 16670 sym7296 | **proved** | 19678.1s（墙钟 19941.2s） | 1735，0 失败 | 5 / 109 | 69 个配对转移、40 个终止配对、48 个 summary 命中。r5 卡住的 `pair_4_84`（26002s unknown）现在 1086.8s（goal 2 1082.8s）；其余 goal 2 每个 360–720s。**`_unify_node` 10818.4s（55%），2 条引理** |
+| Aave 6182 | inconclusive（预算耗尽） | 43209.0s | 5043，0 失败 | 95 / 49 | pair 阶段 358s 开始，**没有 "all" 行**（修法 11 生效；行 2 → EVM 93）；32 个卡住的前缀组全部由完整路线证出（每组 3–18s）；`_unify_node` 32.5s。12h 内只证完 558 个 `x86_maps`（行 0–6 各 66–77 个，行 7 的 25 个）和 `pair_0_0`、`pair_1_1`、`pair_93_2`（170.3s）。**`x86_maps_2_7` 一条 23857.4s**（最终 unsat）；行 0/1 每条中位数 22s，行 2–6 中位数 15–17s，但每行第 7、16、32、48…（间隔 16）个合取项要 110–500s |
+| Aave 7200 | 手动停止 | 约 9h | — | — | x86 分段 9h 仍未完成，进程 RSS 16.8GB + swap 29.9GB，整机 swap 将耗尽 |
+| PoolManager 4418 | 未跑 | | | | 没有修法（§2.4） |
+
+结论：修法 9–10 解决了 16670 的两个实例（都在 6h 内证出）；修法 11 消除了 6182 的 "all" 行，但逐合取项证明的总量（约 3400 条）和个别合取项的长尾（`x86_maps_2_7`）让它在 12h 内跑不完；修法 13/15 让 7200 的 x86 分段变快，但内存一直增长。这三个问题连同 4418 转为任务 N4。另：同一批服务器运行中 PoolManager 全量（3G r5）出现过一次 `libz3.so` 段错误（10-28 02:29），进程池报废导致整个运行退出（N4 §2 的进程池隔离处理了这一类问题）。
 
 ## 7. 诊断工具（`cloud-inputs/n3/tools/`，仅用于诊断）
 
@@ -121,4 +133,9 @@
 
 ## 8. 未解决的问题
 
-（待补）
+- **Aave 6182**：节点预算类。12h 内只证完约 1/6 的 `x86_maps`；`x86_maps_2_7` 单条 6.6h；每行间隔 16 的合取项 110–500s。→ N4 第 4 项。
+- **Aave 7200**：x86 分段内存无界增长（服务器 9h 46.7GB），本机 15GB 跑不完。→ N4 第 3 项。
+- **PoolManager 4418**：未修，方向见 §2.4。→ N4 第 5 项。
+- **16670 的 `_unify_node`**：两个实例都把节点预算的 1/4（约 10800s）花在 `unify_across` 上，只得到 2 条引理（不影响结论，但占了 55–85% 的时间）。
+- 节点内存暴涨时无法从日志看出是哪个节点、哪个 worker，一个 worker 死掉会让整个进程池报废。→ N4 第 2 项。
+- 本节的整节点结果都来自服务器；本机没能在中断前完成任何一个整节点。
