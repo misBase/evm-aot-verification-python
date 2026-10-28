@@ -56,9 +56,11 @@
 ### 2.5 PoolManager 4418
 
 - 分叉（N3 §2.4）：每个符号长度的内存访问在 memgas summary 之前有两段只改寄存器的短菱形——`toWordSize` 的溢出钳位（`cmp rsi,rbx; jb BU64`，两边汇合于 memgas 入口前）和 `SafeMul(words, 32)` 的 `test rbx,rbx; je L`（跳过乘法；另一边 `mul rbx; jb ERR; mov rbx,rax`），执行器不合并，活路径数按访问点翻倍。
-- **修法 18**（方向 (b)，`X86SymbolicExecutor._merge_diamond`）：一次条件分支产生两个可达后继时，先静态找两边沿静态后继各 4 个块以内最早共同到达的地址 J，再把两边按主循环完全相同的方式（`_advance`：执行、分叉时的可达性剪枝、CFG 边、终止状态记录）向前执行到 J（每边至多 8 个状态）；离开这片区域、到达 cutpoint、深度上限的状态原样交回工作表。若两边各恰好一个状态到达 J，且除寄存器/标志外状态的每个叶子都相同（`_state_leaves`：Z3 项按 AST id，含 assumptions、内存、gas、指针标签、标志约束），路径条件是 P ∧ T_a 与 P ∧ T_b 且 T_a ∧ T_b 不可满足，就合并为一个状态：路径条件 P ∧ (T_a ∨ T_b)，不同的寄存器/标志为 ite(T_a, a, b)。只在块段执行（`run_x86_segment`）启用，`BLOCK_MERGE_DIAMONDS=0` 关闭。
+- **修法 18**（方向 (b)，`X86SymbolicExecutor._merge_diamond`）：一次条件分支产生两个可达后继时，先静态找两边沿静态后继各 4 个块以内最早共同到达的地址 J，再把两边按主循环完全相同的方式（`_advance`：执行、分叉时的可达性剪枝、CFG 边、终止状态记录）向前执行到 J（每边至多 8 个状态）；离开这片区域、到达 cutpoint、深度上限的状态原样交回工作表。若两边各恰好一个状态到达 J，且除寄存器/标志外状态的每个叶子都相同（`_state_leaves`：Z3 项按 AST id，含 assumptions、内存、gas、指针标签、标志约束），路径条件是 P ∧ T_a 与 P ∧ T_b 且 T_a ∧ T_b 不可满足，就合并为一个状态：路径条件 P ∧ (T_a ∨ T_b)，不同的寄存器/标志为 ite(T_a, a, b)。只在节点证明自己的 x86 分段（`BlockEquivalenceProver.prove` 调 `run_x86_segment(merge_diamonds=True)`）启用，`BLOCK_MERGE_DIAMONDS=0` 关闭；summary 与归纳的原始代码重放（div / memgas 引理、复制循环归纳等）保持一条原始路径一条记录，因为它们的证书和检查按原始路径构造（第一版对所有 `run_x86_segment` 都开启，快测里 4 个引理路径数断言和 1 个复制归纳变异测试随之变化，于是收窄到节点分段）。
 - x86 分段（`mem_probe.py --x86-only`，sym 实例）：开启合并 **360 条路径**（342 终止 + 18 出口），合并 150 次，可达性检查 2563 次（1400s），分段 1606s（负载 6 个进程）；同一份代码、相近负载下关闭合并（`BLOCK_MERGE_DIAMONDS=0`）：878 条路径（806 终止 + 72 出口），可达性检查 6080 次（3394s，剪掉 1596 个），分段 3733s（N3 当时是 876 条、6105 次、2684s）。即路径 −59%（出口路径 72 → 18），可达性检查 −58%，分段 −57%。剩下的 342 条终止路径是各访问点的错误出口（溢出 / OOG 桩），它们彼此内存不同，不能合并。
 - 整节点（`n4-4418-sym`）：（待补）
+
+- **修法 21（与修法 18 的交互）**：合并后 6182 的 x86 路径从 49 条变成 46 条，`_correspondence` 的规模估计 `n·m ≤ n(n−1)/2 + 2m`（95·46 = 4370 ≤ 4557）于是退回全积，又会带回 `pair_63_2` 这类错配 pair（N3：单独 2121–2883s）。这个估计把 EVM 两两不交按每对一个查询计，但 `disjoint_groups` 是按分歧组反驳的（约 n 个），而修法 17 之后每个映射行约两个查询（行组 + pair）。修法 21 改为 `n·m ≤ 分歧组数 + 2m`。只决定走对应关系还是全积，两者的证书判定不变。
 
 ### 2.6 修法 19：`unify_across` 的停滞上限
 
@@ -72,7 +74,8 @@
 - `tools/verify_block_lockstep.py`：`--node-memory-mb`、`--status-dir`，progress 带 `running`。`tools/probe_block_obligations.py`：`probe_node` 的监控与 `--node-memory-mb`。
 - `verification/block_equivalence.py`：`check_abort` 接入 `_solver`、`solve_query`（求解后再查一次，被中断的 unknown 不进 proof cache）、`solve_pure_bv`；修法 17 `_ROW_GROUP_*`、`_pair_phase` 中调用、`_prove_row_groups`、`_group_trial`；修法 19 `unify_across(stall_seconds=)` 与 `_unify_node` 的调用。
 - `x86_64/cfg_executor.py`：`check_abort` 接入 `execute_state`；修法 18 `merge_diamonds` 参数、`_advance`（主循环的单步，提出来复用）、`_diamond_join`、`_merge_diamond`、模块级 `_state_leaves`、`_exclusive`、`_merged`、`_DIAMOND_BLOCKS` / `_DIAMOND_STEPS`。
-- `verification/loop_induction.py`：`run_x86_segment` 开启 `merge_diamonds`（`BLOCK_MERGE_DIAMONDS`）。
+- `verification/loop_induction.py`：`run_x86_segment(merge_diamonds=False)` 参数；`verification/block_equivalence.py` 的 `prove` 以 `_MERGE_DIAMONDS`（`BLOCK_MERGE_DIAMONDS`，默认开）传入。
+- `verification/block_equivalence.py`：修法 21 `_correspondence` 开头的规模估计（先算 `disjoint_groups`）。
 - `verification/block_summaries.py`：修法 16 `summary_text`，用于所有 summary 命中义务的记录。
 - `common/store_forwarding.py`：修法 20 `_SHARED_FORWARD_LIMIT = 25_000`、`forward_selects_shared` 不再自清、`shared_forward_scope`；`x86_64/summaries/div.py`：`apply_div_summary` 开头开一个作用域。
 - 测试：`tests/unit/test_block_node_isolation.py`（新，8 条）、`tests/unit/test_block_remaining_blocks_4.py`（新，修法 16–20）、`tests/unit/test_block_correspondence.py`（§2.1）。
@@ -84,6 +87,7 @@
 - **修法 16**：只改义务记录里的文本字段，换成的指纹与 `slim()` 交给父进程的完全一样（测试 `test_hit_certificate_keeps_names_and_answers_and_slim_keeps_the_fingerprint`）；名字、答案、预期、引理都不变，证书完整性判定（`SummaryHitCertificate.complete`、`Obligation.proved`）不读文本。
 - **修法 17**：成员义务 `premise ∧ x_j ∧ ¬c_k` 的每个模型都满足组查询 `premise ∧ x_j ∧ ¬(∧_{k∈K} c_k)`（¬c_k 蕴含合取的否定），所以组查询是每个成员的弱化：组 UNSAT ⟹ 每个成员 UNSAT，与修法前已有的 `_prove_stuck_groups`（前缀组）同一论证。组的记录（改名后）就是被反驳的组查询加上反驳它的引理，`_check` 对它的路线与任何义务相同；组 sat / unknown / 超时不产生任何记录，成员留给自己的义务。合取项的下标用的是 `_check_rows` 命名 `x86_maps_j_k` 时同一个 `_conjuncts` 顺序（测试中特意检查了反向顺序下真假成员的归属）。
 - **修法 18**：合并只在两个状态位于同一地址、除寄存器和标志外每个叶子都相同、路径条件为 P ∧ T_a 与 P ∧ T_b 且 T_a ∧ T_b 不可满足时进行（T_a、T_b 的第一个约束是同一分支的两边：语法上互补，或 simplify 为 false，或 200ms 内被求解器反驳；否则不合并）。合并后路径条件 P ∧ (T_a ∨ T_b)、寄存器 ite(T_a, a, b)：任一模型若满足 T_a，合并状态在这个模型下就是 a；若满足 T_b（此时 T_a 必假），就是 b——所以合并状态的执行集合恰好是 a 与 b 的并集，不增不减，覆盖和有限执行都不变。见证模型取某一边的（它满足那一边的路径条件，因而满足合并后的），使用前照常求值确认。两边状态是用主循环同样的单步函数执行的；没到 J 或不满足条件的状态原样交回。测试：合并后的 rcx 在全部输入上等于程序语义（求解器验证），路径条件覆盖全部输入；一边写内存的菱形不合并。
+- **修法 21**：对应关系只是提议（原有约定，见 `_correspondence` / `_pair_phase`）；走全积还是走对应关系由一个规模估计决定，两条路的定理都由 `BlockTheorem.complete` 按各自的清单判定，估计值只影响耗时。
 - **修法 19**：只是更早停止一个预处理；`unify_across` 返回的每条引理和改写与之前一样由被反驳的查询支持，没合并的 pair 原样留下（测试：停滞为 0 时不做任何改写）。
 - **修法 20**：`forward_selects` 对每个结点是纯函数，缓存保活所有键结点（id 不会复用），只在作用域边界整体清空——清空后结果与新缓存相同（测试：作用域内大小不受限，跨作用域超过上限即清空，清空后结果不变）。只影响耗时和内存。
 
