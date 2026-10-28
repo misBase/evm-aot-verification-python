@@ -66,7 +66,7 @@ class X86SymbolicExecutor:
                  summary_runtime: Optional[X86SummaryRuntime] = None,
                  stop_addrs: Optional[set] = None,
                  deadline: Optional[float] = None,
-                 merge_diamonds: bool = False):
+                 merge_diamonds: Optional[int] = None):
         """初始化符号执行引擎。
 
         Args:
@@ -80,8 +80,9 @@ class X86SymbolicExecutor:
             reachability_timeout_ms: 单次可达性 SMT 检查预算；超时按可能可达处理
             summary_runtime: 预构建的 x86 summary runtime；None 表示不启用任何
                 summary，调用方负责注册插件（见 build_x86_summary_runtime）
-            merge_diamonds: 两侧只改寄存器/标志、很快汇合的条件分支在汇合点合并成一个
-                状态（_merge_diamond，精确合并）
+            merge_diamonds: None 不合并；整数 N：本次执行已有 N 条路径（终止 + 截断 + 待执行）
+                之后，两侧只改寄存器/标志、很快汇合的条件分支在汇合点合并成一个
+                状态（_merge_diamond，精确合并）；0 即始终合并
         """
         self.blocks = blocks
         self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
@@ -593,7 +594,7 @@ class X86SymbolicExecutor:
                     del self.merge_buffers[addr]
 
             new_states = self._advance(global_state)
-            if self.merge_diamonds and len(new_states) == 2:
+            if len(new_states) == 2 and self._merging():
                 new_states = self._merge_diamond(new_states)
             # 添加新状态到 work_list
             self.work_list.extend(new_states)
@@ -603,6 +604,12 @@ class X86SymbolicExecutor:
             self._flush_merge_buffers()
 
         return self.final_states
+
+    def _merging(self) -> bool:
+        """Diamonds are merged once this run has merge_diamonds paths (finished,
+        cut or pending): only exploding segments change shape."""
+        return (self.merge_diamonds is not None
+                and len(self.final_states) + len(self.cut_states) + len(self.work_list) >= self.merge_diamonds)
 
     def _advance(self, global_state: X86GlobalState) -> List[X86GlobalState]:
         """Execute one state as the main loop does: its successors after the

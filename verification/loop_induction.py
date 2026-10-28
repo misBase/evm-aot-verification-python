@@ -479,9 +479,10 @@ def run_x86_segment(
     # 250ms kept 81 paths/107s, 1000ms 61 paths/68s; 3000ms no further gain).
     # Witness reuse means only non-model branches pay this budget.
     reachability_timeout_ms: int = 1000,
-    # Exact merge of short register-only diamonds (X86SymbolicExecutor._merge_diamond). Only the
-    # block proof's own segment asks for it; summary / induction replays keep one path per raw path.
-    merge_diamonds: bool = False,
+    # Exact merge of short register-only diamonds once the run has this many paths
+    # (X86SymbolicExecutor._merge_diamond; None: never). Only the block proof's own segment asks for
+    # it; summary / induction replays keep one path per raw path.
+    merge_diamonds: Optional[int] = None,
 ) -> Tuple[List[SegmentPath], List[str], List[str]]:
     """从 cutpoint 执行一轮 x86 段。
 

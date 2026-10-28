@@ -107,8 +107,8 @@ def _run_diamond(hex_code, merge):
 def test_register_only_diamond_merges_into_one_exact_state():
     from z3 import BitVec, BitVecVal, If, Solver, ULT, unsat
     from x86_64.models import Register
-    executor, finals = _run_diamond(_DIAMOND, merge=True)
-    _, apart = _run_diamond(_DIAMOND, merge=False)
+    executor, finals = _run_diamond(_DIAMOND, merge=0)
+    _, apart = _run_diamond(_DIAMOND, merge=None)
     assert len(apart) == 2 and len(finals) == 1 and executor.merged_diamonds == 1
     (final,) = finals
     rax, rbx = BitVec("rax_init", 64), BitVec("rbx_init", 64)
@@ -122,8 +122,14 @@ def test_register_only_diamond_merges_into_one_exact_state():
     assert covers.check() == unsat
 
 
+def test_diamonds_merge_only_once_the_run_has_more_paths_than_the_threshold():
+    # One fork, no earlier paths: a threshold of 1 is not reached, so the run stays as unmerged.
+    executor, finals = _run_diamond(_DIAMOND, merge=1)
+    assert len(finals) == 2 and executor.merged_diamonds == 0
+
+
 def test_diamond_whose_sides_differ_in_memory_stays_apart():
-    executor, finals = _run_diamond(_DIAMOND_STORE, merge=True)
+    executor, finals = _run_diamond(_DIAMOND_STORE, merge=0)
     assert len(finals) == 2 and executor.merged_diamonds == 0
 
 

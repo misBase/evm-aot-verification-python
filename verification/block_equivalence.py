@@ -2813,9 +2813,13 @@ _QUICK_EXACT_MS = 3000
 _LAST_RESORT_MS = 300_000
 # A stuck prefix group pays for itself only if it replaces several member proofs.
 _STUCK_MIN_MEMBERS = 3
-# Exact merge of short register-only diamonds in the node's own x86 segment (fix 18,
-# X86SymbolicExecutor._merge_diamond); BLOCK_MERGE_DIAMONDS=0 keeps every path apart.
-_MERGE_DIAMONDS = __import__("os").environ.get("BLOCK_MERGE_DIAMONDS", "1") != "0"
+# Exact merge of short register-only diamonds in the node's own x86 segment once it has this
+# many paths (fix 18, X86SymbolicExecutor._merge_diamond). ponytail: 200, above the
+# segments that proved unmerged (PoolManager 16670: 83 / 109, Aave 6182: 49) and far below the
+# 878 of PoolManager 4418; merged state shapes (ite registers, Or path conjuncts) made 16670's
+# SDIV goals much slower. BLOCK_MERGE_DIAMONDS=<N> sets it, =off disables.
+_MERGE_DIAMONDS = __import__("os").environ.get("BLOCK_MERGE_DIAMONDS", "200")
+_MERGE_DIAMONDS = None if _MERGE_DIAMONDS in ("off", "none", "") else int(_MERGE_DIAMONDS)
 # Row groups (_prove_row_groups): halved down to this many members; smaller remainders keep
 # their own obligations. ponytail: a try is capped at _ROW_GROUP_TRY query timeouts, halving
 # stops _ROW_GROUP_DEPTH levels below a row's whole group.
