@@ -3769,15 +3769,22 @@ class BlockEquivalenceProver:
         here, before the mapping is used; see BlockTheorem._pairs_covered.
         """
         n, m = len(evm), len(x86)
-        if n < 2 or n * m <= n * (n - 1) // 2 + 2 * m:
+        if n < 2:
             return ()
-        def full(i, k):
-            return And(premise, evm[i].condition, evm[k].condition)
         # One proof per divergence group (disjoint_groups), recorded under
         # every pair name it covers. A group refuted only with more of the
         # path (edges that do not exclude each other on their own) falls back
         # to its pairs' full queries; any failure there is an overlap.
         groups, proofs, trial = disjoint_groups(premise, [e.condition for e in evm]), {}, []
+        # Size estimate in queries: the full product has n·m pairs; a correspondence one
+        # disjointness query per divergence group (not per EVM pair) and about two per x86
+        # row (its row group of maps, _prove_row_groups, and its pair). Counted per EVM pair,
+        # Aave Pool 6182 (95 EVM / 46 x86 paths) fell back to the full product, whose
+        # mismatched pairs include pair_63_2 (2121-2883s alone).
+        if n * m <= len(groups) + 2 * m:
+            return ()
+        def full(i, k):
+            return And(premise, evm[i].condition, evm[k].condition)
         checks = self._check_all([("evm_disjoint_%d_%d" % pairs[0], formula, "") for pairs, formula in groups], trial)
         try:
             for (pairs, formula), proved in zip(groups, checks):

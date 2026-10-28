@@ -162,3 +162,19 @@ def test_shared_forward_cache_is_kept_within_a_scope_and_dropped_between_scopes(
     assert not sf._SHARED_FORWARD
     assert sf.forward_selects_shared(loads[3]).eq(BitVecVal(3, 8))
     sf._SHARED_FORWARD.clear()
+
+
+# --- fix 21: correspondence size estimate counts divergence groups, not EVM pairs -------
+
+def test_correspondence_is_kept_when_disjointness_needs_few_group_queries():
+    x = BitVec("n4_corr_x", 8)
+    # Executor-shaped: And(constraints in execution order), so path i diverges from all later ones at once.
+    evm = [_row(And(*(x != k for k in range(i)), x == i)) for i in range(9)]
+    evm.append(_row(And(*(x != k for k in range(9)), UGE(x, 9))))  # 10 paths, 45 EVM pairs
+    x86 = [_row(x == i) for i in (0, 3, 5, 7)] + [_row(UGE(x, 20))]  # 5 rows: 50 product pairs
+    assert len(be.disjoint_groups(BoolVal(True), [e.condition for e in evm])) < 45
+    records = []
+    corr = be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)._correspondence(evm, x86, BoolVal(True), records)
+    # Counted per EVM pair (45 + 2·5 >= 50) this was the full product.
+    assert corr == (0, 3, 5, 7, 9)
+    assert {r.name for r in records} == {f"evm_disjoint_{i}_{k}" for i in range(10) for k in range(i + 1, 10)}
