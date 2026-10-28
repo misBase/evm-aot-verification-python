@@ -374,12 +374,13 @@ def test_node_unification_gets_a_quarter_of_what_is_left(monkeypatch):
     prover.deadline = monotonic() + 400
     seen = []
 
-    def unify(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64):
-        seen.append(deadline)
+    def unify(formulas, timeout_ms, deadline=None, cache=None, max_lemmas=64, stall_seconds=None):
+        seen.append((deadline, stall_seconds))
         return formulas, ()
     monkeypatch.setattr(be, "unify_across", unify)
     prover._unify_node(pairs)
-    assert len(seen) == 1 and seen[0] is not None and seen[0] <= monotonic() + 100 + 1
+    assert len(seen) == 1 and seen[0][0] is not None and seen[0][0] <= monotonic() + 100 + 1
+    assert seen[0][1] == 10.0  # N4 fix 19: also stops after 10 query timeouts without a merge
 
 
 @pytest.mark.parametrize("row", [6, 7])
