@@ -128,6 +128,17 @@ def attributed(kind, fn):
     return run
 
 
+RESET = opt("--reset-prefix", 0, int)  # experiment: drop the incremental reachability solver every N checks
+if RESET:
+    import x86_64.cfg_state as cs
+    orig_prefix_check = cs.PrefixSolver.check
+
+    def prefix_check(self, *a, **k):
+        self.calls = getattr(self, "calls", 0) + 1
+        if self.calls % RESET == 0:
+            self.reset()
+        return orig_prefix_check(self, *a, **k)
+    cs.PrefixSolver.check = prefix_check
 cx.X86SymbolicExecutor._is_state_reachable = attributed("reach", cx.X86SymbolicExecutor._is_state_reachable)
 cx.X86SymbolicExecutor.execute_state = attributed("step", cx.X86SymbolicExecutor.execute_state)
 orig_execute = cx.X86SymbolicExecutor.execute

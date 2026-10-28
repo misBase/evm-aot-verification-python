@@ -2814,7 +2814,7 @@ _STUCK_MIN_MEMBERS = 3
 # their own obligations. ponytail: a try is capped at _ROW_GROUP_TRY query timeouts, halving
 # stops _ROW_GROUP_DEPTH levels below a row's whole group.
 _ROW_GROUP_MIN = 4
-_ROW_GROUP_TRY = 4
+_ROW_GROUP_TRY = 8
 _ROW_GROUP_DEPTH = 3
 # ponytail: fixed 10s cap for the LIA route (runs before the SAT routes on every hard pair); raise if LIA wins start timing out.
 _LIA_MS = 10_000
