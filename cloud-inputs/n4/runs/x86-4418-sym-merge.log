@@ -1,0 +1,13 @@
+[   305.0s] MEM x86 rss 1.64G peak 2.38G z3 0.26G memo 1 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 44 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 2, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': -0.04, 'apply#': 44, 'reach': 0.22, 'reach#': 985, 'step': -0.04, 'step#': 833}
+[   605.1s] MEM x86 rss 1.75G peak 2.38G z3 0.47G memo 1 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 78 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 2, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': -0.04, 'apply#': 78, 'reach': 0.32, 'reach#': 1687, 'step': 0.01, 'step#': 1421}
+[   891.2s] x86 paths 360 Counter({'terminal': 342, 'exit': 18}) merged diamonds 1 reachability checks 8 (0.0s, pruned 2)
+[   891.2s] x86 segment end after 843.1s
+[   891.2s] MEM pairs rss 1.64G peak 2.38G z3 0.19G memo 1 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 117 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 2, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': -0.04, 'apply#': 117, 'reach': 0.33, 'reach#': 2588, 'step': 0.05, 'step#': 2180}
+   types: [('dict', 578268), ('list', 470828), ('_cs_detail', 350490), ('X86Op', 243534), ('X86Instruction', 211901), ('CsInsn', 211901), ('_cs_insn', 211901), ('CsX86Encoding', 138589), ('CsX86', 138589), ('_cs_arch', 138589), ('LP__cs_detail', 138589), ('X86Block', 40656)]
+[   892.0s] MEM pairs rss 1.64G peak 2.38G z3 0.19G memo 1 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 117 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 2, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': -0.04, 'apply#': 117, 'reach': 0.33, 'reach#': 2588, 'step': 0.05, 'step#': 2180}
+   types: [('dict', 577852), ('list', 470573), ('_cs_detail', 350490), ('X86Op', 243534), ('X86Instruction', 211901), ('CsInsn', 211901), ('_cs_insn', 211901), ('CsX86Encoding', 138589), ('CsX86', 138589), ('_cs_arch', 138589), ('LP__cs_detail', 138589), ('X86Block', 40656)]
+{'status': 'x86-only', 'seconds': 891.9955193739997}

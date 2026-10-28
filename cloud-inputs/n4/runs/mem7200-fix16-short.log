@@ -1,0 +1,11 @@
+[   125.9s] MEM x86 rss 1.70G peak 1.80G z3 0.31G memo 34 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 21 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 3, 0)
+[   245.9s] MEM x86 rss 1.84G peak 2.04G z3 0.45G memo 34 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 25 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+[   365.9s] MEM x86 rss 1.98G peak 2.15G z3 0.48G memo 1189 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 25 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 3, 0)
+[   485.9s] MEM x86 rss 2.02G peak 2.24G z3 0.61G memo 1253 (0M chars str, 0M chars obl) shared_fwd 213 alive 212 lemma_cache 0 certs 30 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+[   605.9s] MEM x86 rss 2.02G peak 2.24G z3 0.56G memo 1382 (0M chars str, 0M chars obl) shared_fwd 22636 alive 22635 lemma_cache 0 certs 31 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+[   725.9s] MEM x86 rss 2.37G peak 2.38G z3 0.90G memo 1382 (0M chars str, 0M chars obl) shared_fwd 22636 alive 22635 lemma_cache 0 certs 33 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+[   845.9s] MEM x86 rss 2.44G peak 2.55G z3 0.97G memo 1382 (0M chars str, 0M chars obl) shared_fwd 22636 alive 22635 lemma_cache 0 certs 34 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+[   965.9s] MEM x86 rss 2.53G peak 2.55G z3 1.01G memo 1382 (0M chars str, 0M chars obl) shared_fwd 22636 alive 22635 lemma_cache 0 certs 34 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+[  1085.9s] MEM x86 rss 2.58G peak 2.65G z3 1.18G memo 1382 (0M chars str, 0M chars obl) shared_fwd 22636 alive 22635 lemma_cache 0 certs 35 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+[  1205.9s] MEM x86 rss 3.09G peak 3.25G z3 1.51G memo 1439 (0M chars str, 0M chars obl) shared_fwd 22636 alive 22635 lemma_cache 0 certs 35 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   types: [('list', 915008), ('dict', 631931), ('_cs_detail', 392391), ('X86Op', 279142), ('X86Instruction', 233314), ('CsInsn', 233314), ('_cs_insn', 233314), ('CsX86Encoding', 159077), ('CsX86', 159077), ('_cs_arch', 159077), ('LP__cs_detail', 159077), ('X86Block', 144349)]
