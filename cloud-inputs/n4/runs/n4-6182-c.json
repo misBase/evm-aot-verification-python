@@ -1,0 +1,81 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "cloud-inputs/n2/fixtures/Pool",
+  "started_at_utc": "2026-10-28T07:07:44.222339+00:00",
+  "configuration": {
+    "nodes": "cloud-inputs/n4/n3-server-probes/aave6182-node.json",
+    "output": "cloud-inputs/n4/runs/n4-6182-c.json",
+    "timeout_ms": "30000",
+    "node_seconds": "43200.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "None",
+    "node_memory_mb": "5000.0",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "8b7ff12132610ce147c70ccc257dca54555b72993d506c7f73e62588c867a5d2",
+    ".hex": "04aa03ffcc5a70f0d297184b602c948c945534c5edef918747a3e045ef86195c"
+  },
+  "model_sources_sha256": "b72eafdab58834eb04d329a1210d51cc76f8c9717440eeac12de22d12d4eb58e",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 6182,
+        "stack_depth": 14,
+        "memory_size": null,
+        "free_memory_pointer": null,
+        "stack_constants": [
+          [
+            0,
+            128
+          ],
+          [
+            3,
+            54
+          ],
+          [
+            4,
+            52
+          ],
+          [
+            5,
+            1778129887
+          ],
+          [
+            6,
+            91343852333181432387730302044767688728495783942
+          ],
+          [
+            12,
+            663
+          ]
+        ]
+      },
+      "scope": "block-local",
+      "status": "proved",
+      "seconds": 5398.971897896998,
+      "wall_seconds": 5650.187367030998,
+      "queries": 10087,
+      "evm_paths": 95,
+      "x86_paths": 49,
+      "paired_transitions": 2,
+      "terminals_proved": 47,
+      "reasons": [],
+      "failed_obligations": [],
+      "keep_going_failures": [],
+      "summary_hits": 20,
+      "pid": 10862,
+      "started_at": 1793171273.9759455,
+      "start_rss_mb": 1263.2,
+      "peak_rss_mb": 2897.6,
+      "memory_budget_mb": 5000.0,
+      "memory_exceeded": null
+    }
+  ],
+  "locally_proved": 1,
+  "ended_at_utc": "2026-10-28T08:42:04.178719+00:00"
+}
