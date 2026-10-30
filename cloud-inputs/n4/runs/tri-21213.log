@@ -3,3 +3,7 @@
 [    58.8s] TRACE solve_query unknown 3.1s z3 148->148 MB
 [    62.1s] TRACE solve_query unknown 3.1s z3 148->148 MB
 [    71.8s] TRACE solve_query unsat 3.2s z3 148->148 MB
+[    76.0s] TRACE solve_query unsat 2.3s z3 148->148 MB
+[    78.9s] TRACE solve_query unsat 2.9s z3 148->148 MB
+[    87.2s] TRACE solve_query unsat 8.2s z3 148->149 MB
+[    92.3s] TRACE solve_query unsat 2.7s z3 149->149 MB
