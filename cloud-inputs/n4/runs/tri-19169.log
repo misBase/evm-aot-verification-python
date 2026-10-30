@@ -355,3 +355,5 @@
 [  3308.4s] H2_c0_0_2_t0_stack_constant_predicate_4 unsat 0.5s
 [  3402.4s] H2_c0_0_4_t0_live_stack_prefix_30 unsat 7.0s
 [  6500.4s] H2_c0_0_4_t0_live_stack_prefix_31 unknown 3098.0s
+[  6623.4s] result {'proved': True, 'status': 'proved', 'reasons': ('H2 c0_budget exhausted (solver=unknown)',), 'seconds': 5593.730780594997, 'queries': 2659, 'failed': [], 'pid': 23279, 'peak_rss_mb': 3004.6, 'memory_exceeded': None, 'spec': 'BlockSpecialization(pc=19169, stack_depth=25, memory_size=None, free_memory_pointer=None, stack_constants=())', 'contexts': ['BlockSpecialization(pc=19169, stack_depth=25, memory_size=None, free_memory_pointer=None, stack_constants=((1, 1755), (19, 1935), (21, 1954)))'], 'edges': 2, 'open_edges': []}
+tri-19169 exit 0
