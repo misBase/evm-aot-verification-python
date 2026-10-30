@@ -10,3 +10,7 @@ spec BlockSpecialization(pc=18089, stack_depth=18, memory_size=None, free_memory
 [   184.8s] reachability check 10.9s at 0xb9a32 -> True
 [   204.0s] reachability check 13.3s at 0xba3f2 -> True
 [   211.9s] reachability check 7.9s at 0xba3bc -> False
+terminate called after throwing an instance of 'out_of_memory_error'
+  what():  out of memory
+Aborted
+exit 134
