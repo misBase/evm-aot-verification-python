@@ -1,0 +1,36 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.17, pytest-9.0.2, pluggy-1.6.0
+rootdir: /home/user/evm-aot-verification-python
+configfile: pyproject.toml
+plugins: xdist-3.8.0
+created: 2/2 workers
+2 workers [1818 items]
+
+..........................................................................................................................................................................................................................................................................................................................................s........................s.........................................................................................................................................................................................usage: main.py [-h] [--base-addr ADDR] [--timeout MS] [--verbose]
+               [--gas-check {off,fixed-budget,full}] [--gas-budget GAS_BUDGET]
+               [--proof-mode {paths,block-lockstep}] [--num-inputs NUM_INPUTS]
+               [--block-fallback {none,full-program}]
+               ir_json_path x86_hex
+main.py: error: argument --gas-check: invalid choice: 'bogus' (choose from 'off', 'fixed-budget', 'full')
+.......................................................................................................................................................usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          [--node-memory-mb NODE_MEMORY_MB] [--keep-going]
+          stem nodes
+-c: error: budgets must be positive
+.usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          [--node-memory-mb NODE_MEMORY_MB] [--keep-going]
+          stem nodes
+-c: error: budgets must be positive
+.usage: -c [-h] --output OUTPUT [--timeout-ms TIMEOUT_MS]
+          [--node-seconds NODE_SECONDS] [--max-depth MAX_DEPTH]
+          [--base-addr BASE_ADDR] [--no-summaries] [--formula-dir FORMULA_DIR]
+          [--node-memory-mb NODE_MEMORY_MB] [--keep-going]
+          stem nodes
+-c: error: budgets must be positive
+...........................................................................................................................................................................................................................................................................................................................................................................................................................s........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+================= 1815 passed, 3 skipped in 631.42s (0:10:31) ==================
+EXIT 0
+revision 24e375d
