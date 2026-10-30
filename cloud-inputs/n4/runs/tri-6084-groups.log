@@ -1,0 +1,4 @@
+[   199.5s] row 10 -> evm 46: prefix pass 46 of 103 in 199.5s
+[   285.9s] row 10 -> evm 46: group of 57 conjuncts proved 85.9s routes {'lia': (0, 39.6), 'quick+n': (0, 3.1), 'shift': (0, 0.1), 'blast+n': (1, 33.3)}
+[   593.6s] row 2 -> evm 0: prefix pass 52 of 140 in 307.7s
+[   678.4s] row 2 -> evm 0: group of 88 conjuncts proved 84.2s routes {'lia': (0, 39.0), 'quick+n': (0, 3.2), 'shift': (0, 0.1), 'blast+n': (1, 33.2)}
