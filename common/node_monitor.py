@@ -1,7 +1,7 @@
 """Per-node observability and memory budget for proof workers.
 
 A worker process proves one node after another. NodeMonitor runs beside one
-node: a sampler thread records the process RSS (start, peak, end) and,
+node: a sampler thread records the process memory (RSS plus swap; start, peak, end) and,
 every few seconds, writes a small JSON status file (pid, node, start time,
 current / peak RSS) that the parent reads to say which node a worker is on
 and how big it is (block_parallel). With a memory budget, the first sample
@@ -42,10 +42,17 @@ def check_abort():
 
 
 def rss_bytes():
-    """Resident set size of this process (Linux /proc; 0 where unavailable)."""
+    """Memory of this process: resident set plus swapped-out pages (Linux /proc;
+    0 where unavailable). Swap counts: on the servers a growing node is pushed
+    to swap (Aave 7200: 16.8 GB resident + 29.9 GB swap), and a resident-only
+    budget would never see it."""
     try:
-        with open("/proc/self/statm") as f:
-            return int(f.read().split()[1]) * os.sysconf("SC_PAGE_SIZE")
+        total = 0
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith(("VmRSS:", "VmSwap:")):
+                    total += int(line.split()[1]) * 1024
+        return total
     except (OSError, ValueError, IndexError):
         return 0
 
