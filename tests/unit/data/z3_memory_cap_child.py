@@ -21,6 +21,10 @@ except z3.Z3Exception as exc:
 prefix = cs.PrefixSolver()  # incremental: one push per conjunct
 out.append(str(prefix.check(hard, 60000, "test")))
 out.append(str(prefix.check([z3.And(hard)], 60000, "test")))
+# As is_possible: the check trips, then PrefixSolver resets the solver inside the enclosing cap
+# (memory_max_size: SIGABRT in Z3_solver_reset, PoolManager 18089 locally after 2084s).
+with cs.z3_memory_cap():
+    out.append(str(prefix.check([z3.And(hard)], 60000, "test")))
 out.append(be.solve_query(z3.And(hard), 60000))
 out.append(be.solve_pure_bv(z3.And(hard), 60000))
 try:

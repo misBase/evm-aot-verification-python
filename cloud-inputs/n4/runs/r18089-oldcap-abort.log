@@ -1,0 +1,73 @@
+spec BlockSpecialization(pc=18089, stack_depth=18, memory_size=None, free_memory_pointer=320, stack_constants=((3, 4418),))
+[    69.8s] reachability check 9.8s at 0xb4f7f -> True
+[    83.2s] reachability check 11.2s at 0xb577f -> True
+[   101.4s] reachability check 15.3s at 0xb6032 -> True
+[   120.9s] reachability check 14.6s at 0xb699f -> True
+[   136.8s] reachability check 11.6s at 0xb7352 -> True
+[   158.3s] reachability check 16.5s at 0xb7d12 -> True
+[   183.5s] reachability check 17.8s at 0xb86d2 -> True
+[   210.2s] reachability check 16.3s at 0xb9092 -> True
+[   217.6s] reachability check 5.8s at 0xb905c -> False
+[   240.8s] reachability check 19.8s at 0xb9a32 -> True
+[   249.3s] reachability check 6.4s at 0xb99fc -> False
+[   272.6s] reachability check 19.8s at 0xba3f2 -> True
+[   284.0s] reachability check 8.1s at 0xba3bc -> False
+[   310.8s] reachability check 23.0s at 0xbadff -> True
+[   312.3s] progress: executed 277 live 0 final/cut (0, 1) reach 52 checks 223.9s pruned 12
+   top blocks: [('0xb3aa2', 1), ('0xb3aae', 1), ('0xb3ac6', 1), ('0xb3ace', 1), ('0xb3b0a', 1), ('0xb3b25', 1), ('0xb3c54', 1), ('0xb3c6d', 1), ('0xb3cbf', 1), ('0xb3cd6', 1), ('0xb3cdf', 1), ('0xb3d31', 1)]
+   top forks: [('0xb3aa2', 1), ('0xb408d', 1), ('0xb4096', 1), ('0xb47cd', 1), ('0xb47d6', 1), ('0xb4f2d', 1), ('0xb4f36', 1), ('0xb571d', 1), ('0xb5726', 1), ('0xb5fcd', 1), ('0xb5fd6', 1), ('0xb693d', 1)]
+   summaries: {'seconds': 35.16464947899999, 'mul@0xb3b25': 1, 'mul@0xb426a': 1, 'mul@0xb49b1': 1, 'mul@0xb5111': 1, 'mul@0xb591a': 1, 'mul@0xb6254': 1, 'mul@0xb6bbb': 1, 'mul@0xb7590': 1, 'mul@0xb7f4d': 1, 'mul@0xb890d': 1, 'mul@0xb92cd': 1, 'mul@0xb9c6d': 1, 'mul@0xba62d': 1}
+   complement: {}
+[   324.3s] reachability check 10.1s at 0xbadca -> False
+[   354.4s] reachability check 19.7s at 0xbdfb9 -> True
+[   408.4s] reachability check 53.9s at 0xbe5b6 -> True
+[   527.8s] reachability check 119.3s at 0xbe586 -> True
+[   708.7s] reachability check 180.8s at 0xbe81a -> True
+[   951.6s] reachability check 242.8s at 0xbe629 -> True
+[   951.6s] progress: executed 388 live 0 final/cut (0, 1) reach 60 checks 854.1s pruned 13
+   top blocks: [('0xb3aa2', 1), ('0xb3aae', 1), ('0xb3ac6', 1), ('0xb3ace', 1), ('0xb3b0a', 1), ('0xb3b25', 1), ('0xb3c54', 1), ('0xb3c6d', 1), ('0xb3cbf', 1), ('0xb3cd6', 1), ('0xb3cdf', 1), ('0xb3d31', 1)]
+   top forks: [('0xb3aa2', 1), ('0xb408d', 1), ('0xb4096', 1), ('0xb47cd', 1), ('0xb47d6', 1), ('0xb4f2d', 1), ('0xb4f36', 1), ('0xb571d', 1), ('0xb5726', 1), ('0xb5fcd', 1), ('0xb5fd6', 1), ('0xb693d', 1)]
+   summaries: {'seconds': 43.32312152700001, 'mul@0xb3b25': 1, 'mul@0xb426a': 1, 'mul@0xb49b1': 1, 'mul@0xb5111': 1, 'mul@0xb591a': 1, 'mul@0xb6254': 1, 'mul@0xb6bbb': 1, 'mul@0xb7590': 1, 'mul@0xb7f4d': 1, 'mul@0xb890d': 1, 'mul@0xb92cd': 1, 'mul@0xb9c6d': 1, 'mul@0xba62d': 1, 'mul@0xbb01b': 1, 'mul@0xbde9f': 1}
+   complement: {}
+[  1254.4s] reachability check 302.7s at 0xbec16 -> True
+[  1637.9s] reachability check 383.6s at 0xbebe6 -> True
+[  1638.0s] progress: executed 401 live 0 final/cut (0, 1) reach 62 checks 1540.4s pruned 13
+   top blocks: [('0xb3aa2', 1), ('0xb3aae', 1), ('0xb3ac6', 1), ('0xb3ace', 1), ('0xb3b0a', 1), ('0xb3b25', 1), ('0xb3c54', 1), ('0xb3c6d', 1), ('0xb3cbf', 1), ('0xb3cd6', 1), ('0xb3cdf', 1), ('0xb3d31', 1)]
+   top forks: [('0xb3aa2', 1), ('0xb408d', 1), ('0xb4096', 1), ('0xb47cd', 1), ('0xb47d6', 1), ('0xb4f2d', 1), ('0xb4f36', 1), ('0xb571d', 1), ('0xb5726', 1), ('0xb5fcd', 1), ('0xb5fd6', 1), ('0xb693d', 1)]
+   summaries: {'seconds': 43.32312152700001, 'mul@0xb3b25': 1, 'mul@0xb426a': 1, 'mul@0xb49b1': 1, 'mul@0xb5111': 1, 'mul@0xb591a': 1, 'mul@0xb6254': 1, 'mul@0xb6bbb': 1, 'mul@0xb7590': 1, 'mul@0xb7f4d': 1, 'mul@0xb890d': 1, 'mul@0xb92cd': 1, 'mul@0xb9c6d': 1, 'mul@0xba62d': 1, 'mul@0xbb01b': 1, 'mul@0xbde9f': 1}
+   complement: {}
+[  2083.9s] reachability check 445.8s at 0xbec97 -> True
+terminate called without an active exception
+Fatal Python error: Aborted
+
+Thread 0x00007fbcd08f96c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 136 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Current thread 0x00007fbceaa39080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4195 in Z3_solver_reset
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7195 in reset
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 145 in reset
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 165 in check
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 289 in _is_possible
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 260 in is_possible
+  File "/tmp/claude-0/-home-user-evm-aot-verification-python/9c59c61d-99a5-5484-9900-ae220e9b96d1/scratchpad/savereach.py", line 14 in saving
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_executor.py", line 195 in _is_state_reachable
+  File "cloud-inputs/n3/tools/node_profile.py", line 85 in reachable
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_executor.py", line 630 in _advance
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_executor.py", line 596 in execute
+  File "cloud-inputs/n3/tools/node_profile.py", line 53 in execute
+  File "/home/user/evm-aot-verification-python/verification/loop_induction.py", line 519 in run_x86_segment
+  File "cloud-inputs/n3/tools/node_profile.py", line 142 in segment
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4547 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "cloud-inputs/n3/tools/node_profile.py", line 217 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/tmp/claude-0/-home-user-evm-aot-verification-python/9c59c61d-99a5-5484-9900-ae220e9b96d1/scratchpad/savereach.py", line 17 in <module>
+exit 134

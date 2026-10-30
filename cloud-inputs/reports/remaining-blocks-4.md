@@ -76,6 +76,13 @@
 - **修法 25**（路径覆盖按前缀树证明，`coverage_by_prefix_tree`）：见 §2.8 21213。
 - **修法 26**（单个证明查询的 Z3 内存上限）：`solve_query` 与 `solve_pure_bv` 在 `z3_memory_cap(QUERY_MEMORY_MB)` 下求解（`BLOCK_QUERY_MEMORY_MB`，默认 4096）。触顶的查询是 unknown，并且**不写进 proof cache**（它不是"这个预算下超时"）；义务照常走其余路线。22747 的 pair 阶段在 `solve_query` 里几秒内涨了数 GB（栈采样 `tri-22747.stacks`）。
 
+### 2.9 修法 23/26 v2：内存上限触顶不得中止进程（补充说明 2，10-30b）
+
+- **原因**：修法 23/26 用 Z3 的进程级 `memory_max_size`。它由 Z3 的分配器自己检查，超出时在**任意一次分配**处抛 C++ `out_of_memory_error`。大多数 API 调用会把它转成 `Z3Exception`，但分配也可能发生在不能传出异常的地方（析构函数、noexcept 路径），这时直接 `std::terminate` → SIGABRT。服务器上 18089 d18/d29 在 `Z3_solver_check_assumptions`（`_bounded_check`）里稳定复现；本机 6810c73 上 18089 的 x86 剖析也在 212s 被同样中止过（`cloud-inputs/n4/runs/tri-18089.log`）。我的单元测试只覆盖了能正常转成异常的路径。
+- **修法**：改用 `memory_high_watermark_mb`。它不在分配器里检查，只在 Z3 的协作检查点读取：SAT/SMT 内核与 tactic 的 checkpoint，也就是超时和 `interrupt()` 让求解器停下来的同一批位置。所以触顶的结束方式和超时一样，要么是 unknown（原因 "max. memory exceeded" 或 "canceled"），要么是可捕获的 `Z3Exception`，Z3 之后照常可用。`out_of_memory()` 把这三种说法都算作"在上限处停下"：可达性检查保留路径并 reset 增量求解器，证明查询为 unknown 且不写 proof cache。"canceled" 的另一个来源是节点预算的 `interrupt()`，那种 unknown 本来也不是答案，`solve_query` 在返回前先 `check_abort()`。
+- **取舍**：水位线只在检查点生效，所以没有检查点的单个大步骤停不下来（本机测量：512 位除法 bit-blast 一步约 500MB）。`memory_max_size` 虽然能在分配时立刻拦住，但会让进程中止，所以不能用。不能被上限拦住的增长由节点内存预算兜底：软预算超出 → 中断并记为 inconclusive，1.5 倍硬上限 → worker 以 86 退出，`NodePool` 只丢这一个节点。另外，在节点预算下每个受限调用最多再用"剩余余量的一半"（`memory_headroom_mb()`；上限按 Z3 自己的分配量计，本机 RSS 的增长约是它的 1.6 倍），让一个调用里的逐步增长先让这个调用 unknown，而不是整个节点超预算。
+- **回归测试**（`tests/unit/test_block_remaining_blocks_4.py`）：`test_tiny_memory_caps_give_unknown_and_never_abort_the_process` 在子进程（`tests/unit/data/z3_memory_cap_child.py`）里把上限设成 1MB，依次跑 `check(assumptions)`、增量 `PrefixSolver`（逐合取项 push 和单个合取项两种形状）、`solve_query`、`solve_pure_bv`、`simplify(blast_select_store)`，要求子进程正常退出、各项为 unknown 或被识别的内存异常、之后 Z3 仍能解出一个小查询。`test_the_memory_cap_is_at_most_half_the_node_headroom` 检查节点预算下设出的水位线。说明：这个合成子进程在旧的 `memory_max_size` 上**也不会**中止（中止取决于在哪一次分配上触顶），所以真正的确认是 18089 整节点复跑（下面）。
+
 ## 3. 改动位置
 
 - `common/node_monitor.py`（新）：`NodeMemoryExceeded`、`check_abort`、`rss_bytes`、`release_memory`、`NodeMonitor`、`read_status`。

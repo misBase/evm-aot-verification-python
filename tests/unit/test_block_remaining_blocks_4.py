@@ -323,9 +323,10 @@ def test_tiny_memory_caps_give_unknown_and_never_abort_the_process():
     env = dict(os.environ, PYTHONPATH=str(root))
     run = subprocess.run([sys.executable, str(child)], capture_output=True, text=True, timeout=900, cwd=root, env=env)
     assert run.returncode == 0, run.stderr[-2000:]  # memory_max_size: SIGABRT (-6) on the servers
-    # check(assumptions), PrefixSolver (two shapes), solve_query, solve_pure_bv, simplify; Z3 usable after.
+    # check(assumptions), PrefixSolver (two shapes, then a reset inside an enclosing cap), solve_query,
+    # solve_pure_bv, simplify; Z3 usable after.
     words = run.stdout.split()
-    assert words[0] == "memory" and words[1:5] == ["unknown"] * 4 and words[-1] == "sat", run.stdout
+    assert words[0] == "memory" and words[1:6] == ["unknown"] * 5 and words[-1] == "sat", run.stdout
 
 
 def test_the_memory_cap_is_at_most_half_the_node_headroom():
