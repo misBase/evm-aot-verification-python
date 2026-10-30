@@ -78,13 +78,13 @@ def test_symbolic_successor_still_checks_memory_equality(monkeypatch):
 
 def test_obligation_manifest_does_not_follow_deleted_query_records(monkeypatch):
     import verification.block_equivalence as be
-    original = be.BlockEquivalenceProver._check
-    def omit(self, name, formula, records, **kwargs):
-        ok = original(self, name, formula, records, **kwargs)
-        if name == "x86_coverage":
-            records.pop()
-        return ok
-    monkeypatch.setattr(be.BlockEquivalenceProver, "_check", omit)
+    original = be.BlockEquivalenceProver.check_paths
+    def omit(self, evm, x86, premise, initial, records):
+        # Whichever route proved it (_check, the quick exact query, the prefix tree), drop the record.
+        out = original(self, evm, x86, premise, initial, records)
+        records[:] = [r for r in records if r.name != "x86_coverage"]
+        return out
+    monkeypatch.setattr(be.BlockEquivalenceProver, "check_paths", omit)
     r = BlockProgramVerifier(timeout_ms=3000).verify_program_pair(*load("lockstep_counter_loop"))
     assert not r.verified
 

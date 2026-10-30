@@ -6,4 +6,31 @@ plugins: xdist-3.8.0
 created: 2/2 workers
 2 workers [5 items]
 
-FF.F
+FF.F.
+=================================== FAILURES ===================================
+________________ test_alias_split_keeps_satisfiable_pairs_open _________________
+[gw1] linux -- Python 3.13.17 /home/user/evm-aot-verification-python/.venv/bin/python
+tests/unit/test_block_uf_unification.py:453: in test_alias_split_keeps_satisfiable_pairs_open
+    assert answer(formula) == sat
+E   assert unknown == sat
+E    +  where unknown = answer(And(Not(And(Store(Store(Store(Store(Store(Store(Store(Store(Store(Store(Store(Store(Store(Store(Store(Store(...,\n     ...,\n                              29 + al_pos,\n                              0),\n                        30 + al_pos,\n...)
+________ test_obligation_manifest_does_not_follow_deleted_query_records ________
+[gw0] linux -- Python 3.13.17 /home/user/evm-aot-verification-python/.venv/bin/python
+tests/integration/test_block_symbolic_loops.py:89: in test_obligation_manifest_does_not_follow_deleted_query_records
+    assert not r.verified
+E   AssertionError: assert not True
+E    +  where True = BlockProgramResult(status='verified', reasons=(), certificate=ProgramCertificate(identity='09384914febe37377a2574d3a3e...y_size=0, free_memory_pointer=0, stack_constants=())', 'pair': (0, 0), 'target_pc': 2, 'answer': 'unsat'}], running=[]).verified
+__________________ test_single_instruction_equivalence[BYTE] ___________________
+[gw0] linux -- Python 3.13.17 /home/user/evm-aot-verification-python/.venv/bin/python
+tests/integration/test_single_ins_equivalence.py:1355: in test_single_instruction_equivalence
+    assert_instruction_equivalent(case)
+tests/support/instruction_equivalence.py:201: in assert_instruction_equivalent
+    assert result == unsat, (
+           ^^^^^^^^^^^^^^^
+E   AssertionError: BYTE micro-equivalence failed: opcode=BYTE, base_addr=0x0, execution_mode=cfg, compare_terminal_paths=False, x86_core_hex=48c7c000000000490b46e8490b46f0490b46f8904885c0756c498b46e04883f820736248c1e8034883f80374134883f8027413904883f80174124883f8007412498b46c0eb10498b46c8eb0a498b46d0eb04498b46d8498b56e04883e20748c1e20348c7c3ff00000048c1e3384889d148d3eb4821c348c7c1380000004829d148d3ebeb0748c7c30000000049895ec049c746c80000000049c746d00000000049c746d80000000041c685e00000000249c74528fcffffffc3, solver_result=unknown
+=========================== short test summary info ============================
+FAILED tests/unit/test_block_uf_unification.py::test_alias_split_keeps_satisfiable_pairs_open
+FAILED tests/integration/test_block_symbolic_loops.py::test_obligation_manifest_does_not_follow_deleted_query_records
+FAILED tests/integration/test_single_ins_equivalence.py::test_single_instruction_equivalence[BYTE]
+=================== 3 failed, 2 passed in 1157.91s (0:19:17) ===================
+EXIT 1
