@@ -407,3 +407,32 @@ Thread 0x00007f07c517b080 (most recent call first):
   File "<frozen runpy>", line 98 in _run_module_code
   File "<frozen runpy>", line 294 in run_path
   File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:30:00)!
+Thread 0x00007f07a490f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 146 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007f07c517b080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 127 in _check
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 114 in _bounded_check
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 188 in check
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 310 in _is_possible
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_state.py", line 281 in is_possible
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_executor.py", line 195 in _is_state_reachable
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_executor.py", line 630 in _advance
+  File "/home/user/evm-aot-verification-python/x86_64/cfg_executor.py", line 596 in execute
+  File "/home/user/evm-aot-verification-python/verification/loop_induction.py", line 519 in run_x86_segment
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4547 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
