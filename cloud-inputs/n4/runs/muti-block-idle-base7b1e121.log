@@ -1,0 +1,19 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.17, pytest-9.0.2, pluggy-1.6.0
+rootdir: /tmp/claude-0/-home-user-evm-aot-verification-python/9c59c61d-99a5-5484-9900-ae220e9b96d1/scratchpad/wt-base
+configfile: pyproject.toml
+plugins: xdist-3.8.0
+collected 1 item
+
+tests/integration/test_block_constant_insensitive.py F
+
+=================================== FAILURES ===================================
+__________________ test_muti_block_verifies_with_fewer_proofs __________________
+tests/integration/test_block_constant_insensitive.py:225: in test_muti_block_verifies_with_fewer_proofs
+    assert r.verified, r.message
+E   AssertionError: INCONCLUSIVE: local pc=385 BlockSpecialization(pc=385, stack_depth=1, memory_size=96, free_memory_pointer=96, stack_constants=()): H2 budget exhausted (solver=unknown); ValueError: certificate withheld: unresolved local or closure obligations. model=GO_HPC_EVM_PROFILE, exact calldata, full jump-destination domain, summaries=off; gas=full, symbolic initial gas; terminal status, return metadata/bytes, storage, transient storage, remaining gas; finite segment matching and termination correspondence within the model; host calls use bounded-cost atomic UFs where declared, and host-internal exhaustion/termination is outside the claim; platform premise: memory base (R15) < 2^47 and calldata/code lengths < 2^47 (canonical user space; the input and code are Go byte slices in it).
+E   assert False
+E    +  where False = BlockProgramResult(status='inconclusive', reasons=('local pc=385 BlockSpecialization(pc=385, stack_depth=1, memory_siz...closure_checks=[{'phase': 'proof_instances', 'contexts': 47, 'proof_instances': 46, 'projection': 'pi-v1-value-used'}]).verified
+=========================== short test summary info ============================
+FAILED tests/integration/test_block_constant_insensitive.py::test_muti_block_verifies_with_fewer_proofs
+======================== 1 failed in 790.80s (0:13:10) =========================
