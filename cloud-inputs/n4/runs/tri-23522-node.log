@@ -1,2 +1,4 @@
 [     7.8s] entry_nonempty sat 0.0s
 [     8.6s] havoc_relation unsat 0.6s
+[   113.1s] model_domain_nonempty sat 0.1s
+[   115.0s] pair phase: evm 2 x86 304 found []
