@@ -272,3 +272,19 @@ def test_prefix_tree_coverage_reproves_pruned_branches_and_rejects_missing_ones(
     assert be.coverage_by_prefix_tree(ULT(x, 3), [And(ULT(x, 3), implied)], 10000, {implied.get_id()}) == 0
     # Not(x < 5) ∧ ¬(x == 7) has models: the tree does not cover it, the caller keeps the full query.
     assert be.coverage_by_prefix_tree(BoolVal(True), [ULT(x, 5), And(Not(ULT(x, 5)), x == 7)], 10000) is None
+
+
+# --- fix 26: one proof query may add at most QUERY_MEMORY_MB to Z3's memory ------------------
+
+def test_proof_query_out_of_memory_is_unknown_and_not_cached(monkeypatch, tmp_path):
+    import z3
+    from verification import proof_cache
+    monkeypatch.setenv("BLOCK_PROOF_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setattr(be, "QUERY_MEMORY_MB", 50)
+    x, y, q = z3.BitVec("n4_qm_x", 512), z3.BitVec("n4_qm_y", 512), z3.BitVec("n4_qm_q", 512)
+    query = z3.And(y != 0, z3.UDiv(x, y) * y + z3.URem(x, y) != x, z3.UDiv(x * q, y + 1) == q * x)
+    started = monotonic()
+    assert be.solve_query(query, 60000) == "unknown" and monotonic() - started < 10
+    assert proof_cache.cached_answer(proof_cache.query_key("check", query), 1) is None  # not a timeout
+    assert be.solve_pure_bv(query, 60000) == "unknown"
+    assert be.solve_query(ULT(BitVec("n4_qm_small", 8), 3), 1000) == "sat"  # Z3 still usable

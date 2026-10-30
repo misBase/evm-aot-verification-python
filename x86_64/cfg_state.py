@@ -44,10 +44,11 @@ _CAPS = []  # active caps in MB, innermost last
 
 
 @contextmanager
-def z3_memory_cap():
-    """Z3 may allocate at most REACHABILITY_MEMORY_MB more inside the block (and
-    never more than an enclosing cap); beyond it Z3 raises "out of memory"."""
-    limit = Z3_get_estimated_alloc_size() // 2**20 + REACHABILITY_MEMORY_MB
+def z3_memory_cap(mb=None):
+    """Z3 may allocate at most `mb` (default REACHABILITY_MEMORY_MB) more inside
+    the block (and never more than an enclosing cap); beyond it Z3 raises
+    "out of memory"."""
+    limit = Z3_get_estimated_alloc_size() // 2**20 + (REACHABILITY_MEMORY_MB if mb is None else mb)
     _CAPS.append(min(limit, _CAPS[-1]) if _CAPS else limit)
     set_param("memory_max_size", _CAPS[-1])
     try:
@@ -58,7 +59,8 @@ def z3_memory_cap():
 
 
 def out_of_memory(exc):
-    """Whether a Z3Exception is a z3_memory_cap() trip (recorded for memory_tripped())."""
+    """Whether a Z3Exception (or a solver's reason_unknown) is a z3_memory_cap()
+    trip (recorded for memory_tripped())."""
     if "out of memory" not in str(exc):
         return False
     _WATCH["tripped"] = True

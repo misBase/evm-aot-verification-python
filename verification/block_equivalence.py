@@ -5,6 +5,7 @@ SAT from a havoc state is an unclosed obligation, not a concrete-program refutat
 """
 from __future__ import annotations
 
+import os
 import re
 from collections import Counter
 from itertools import count
@@ -22,7 +23,7 @@ from z3 import (And, Not, Or, is_expr, Solver, SolverFor, sat, unsat, simplify, 
                 Implies, ULT, Var, substitute_funs, Extract, If, Z3_OP_EXTRACT, Z3_OP_BADD, Z3_OP_CONCAT, Z3_OP_EQ, Z3_OP_SELECT, is_true,
                 is_store, is_select, substitute_vars, Concat, Z3_OP_BUDIV, Z3_OP_BUDIV_I, Z3_OP_BOR, Store,
                 is_not, is_eq, is_distinct, ForAll, Z3_get_array_arity, Then, Lambda, ArraySort, Const, FuncDeclRef,
-                UGT, Z3_OP_BSHL, Z3_OP_BLSHR, Z3_OP_BASHR, BoolSort)
+                UGT, Z3_OP_BSHL, Z3_OP_BLSHR, Z3_OP_BASHR, BoolSort, Z3Exception)
 from concurrent.futures import TimeoutError as FutureTimeout
 from concurrent.futures import BrokenExecutor
 from random import Random
@@ -37,7 +38,7 @@ from common.store_forwarding import _memoized, _subtract_base_term, forward_sele
 from verification.alpha_canon import binder_capture_risk, canon_binders
 from verification.loop_induction import run_evm_segment, run_x86_segment, terminal_observable_conditions
 from x86_64.aot_profile import GO_HPC_EVM_PROFILE
-from x86_64.cfg_state import PrefixSolver
+from x86_64.cfg_state import PrefixSolver, out_of_memory, z3_memory_cap
 
 
 def _semantic_sources_digest():
@@ -80,6 +81,12 @@ def _solver(timeout_ms, formula=None):
     return solver
 
 
+# One proof query may add at most this much to Z3's memory (z3_memory_cap); beyond it the query is
+# unknown, so the obligation goes on to its other routes. ponytail: 4 GB; PoolManager 22747's pair
+# queries grew the process by GBs within seconds (the servers' 15-24 GB spikes and OOM kills).
+QUERY_MEMORY_MB = int(os.environ.get("BLOCK_QUERY_MEMORY_MB", "4096"))
+
+
 def solve_query(formula, timeout_ms, trust_unknown=True):
     """Retry incomplete array tactics with the same query and remaining budget.
 
@@ -95,7 +102,15 @@ def solve_query(formula, timeout_ms, trust_unknown=True):
         cached = proof_cache.cached_answer(key, timeout_ms)
         if cached is not None and (trust_unknown or cached != "unknown"):
             return cached
-    answer = _solve_query(formula, timeout_ms)
+    try:
+        with z3_memory_cap(QUERY_MEMORY_MB):
+            answer = _solve_query(formula, timeout_ms)
+        if answer == "memory":
+            return "unknown"  # as below
+    except Z3Exception as exc:
+        if not out_of_memory(exc):
+            raise
+        return "unknown"  # out of memory: not the query's answer at this budget, never cached
     check_abort()  # an interrupted check's unknown is not the query's answer: never cached
     if key is not None:
         proof_cache.record_answer(key, answer, timeout_ms)
@@ -107,6 +122,8 @@ def _solve_query(formula, timeout_ms):
     solver = _solver(timeout_ms, formula)
     solver.add(formula)
     answer = str(solver.check())
+    if answer == "unknown" and out_of_memory(solver.reason_unknown()):
+        return "memory"  # a stop at z3_memory_cap: solve_query's unknown, never cached
     # Lambda arrays passed to UFs can be incomplete in QF_AUFBV even though
     # all sorts pass the guard. A general solver can discharge those queries.
     remaining = int((end - monotonic()) * 1000)
@@ -115,6 +132,8 @@ def _solve_query(formula, timeout_ms):
         solver = _solver(remaining)
         solver.add(formula)
         answer = str(solver.check())
+        if answer == "unknown" and out_of_memory(solver.reason_unknown()):
+            return "memory"
     return answer
 
 
@@ -2213,8 +2232,16 @@ def solve_pure_bv(query, timeout_ms):
     check_abort()
     solver = Then("simplify", "ackermannize_bv", "bit-blast", "sat").solver()
     solver.set("timeout", timeout_ms)
-    solver.add(query)
-    answer = str(solver.check())
+    try:
+        with z3_memory_cap(QUERY_MEMORY_MB):
+            solver.add(query)
+            answer = str(solver.check())
+        if answer == "unknown" and out_of_memory(solver.reason_unknown()):
+            return "unknown"  # as in solve_query
+    except Z3Exception as exc:
+        if not out_of_memory(exc):
+            raise
+        return "unknown"  # as in solve_query
     check_abort()  # as in solve_query
     if key is not None:
         proof_cache.record_answer(key, answer, timeout_ms)
