@@ -251,3 +251,4 @@
 [ 16272.4s] x86_maps_1_group unsat 0.6s
 [ 18045.0s] x86_maps_2_group unsat 12.6s
 [ 19543.1s] x86_maps_2_group unsat 0.7s
+[ 22487.3s] _unify_node over 9087 obligations: 986.9s, 10 lemmas
