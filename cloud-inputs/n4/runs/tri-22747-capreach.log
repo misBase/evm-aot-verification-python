@@ -1,0 +1,5 @@
+[     7.0s] entry_nonempty sat 0.0s
+[     7.8s] havoc_relation unsat 0.7s
+{'spec': {'pc': 22747, 'stack_depth': 40, 'memory_size': None, 'free_memory_pointer': None, 'stack_constants': ((4, 20572),)}, 'scope': 'block-local', 'status': 'inconclusive', 'seconds': 161.59074830600002, 'wall_seconds': 161.59074981999947, 'reasons': ['node memory budget exceeded: RSS 3542.4 MB > budget 3500.0 MB (pid 6722)'], 'keep_going_failures': [], 'summary_hits': 0, 'pid': 6722, 'started_at': 1793334777.9505346, 'start_rss_mb': 1150.1, 'peak_rss_mb': 4842.4, 'memory_budget_mb': 3500.0, 'memory_exceeded': 'node memory budget exceeded: RSS 3542.4 MB > budget 3500.0 MB (pid 6722)'}
+LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.
+tri-22747 exit 1

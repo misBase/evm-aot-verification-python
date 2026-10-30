@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import os
 import time
+from contextlib import contextmanager
 from typing import List, Optional, Dict, TYPE_CHECKING
-from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, unknown, is_true, And, simplify, Z3_get_estimated_alloc_size
+from z3 import (BoolRef, BoolVal, Solver, SolverFor, unsat, sat, unknown, is_true, And, simplify,
+                Z3_get_estimated_alloc_size, Z3Exception, set_param)
 
 from state.smt_state import SMTState
 
@@ -30,25 +32,62 @@ DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS = 1000
 # The wall clock is only a safety net for pathological tactics.
 REACHABILITY_RLIMIT_PER_MS = 10000
 REACHABILITY_WALL_SAFETY_FACTOR = 10
-# A check may add at most this much to Z3's memory (its "max_memory" is process-wide, so the cap is
-# set per check above what Z3 holds already). Above it the answer is unknown: the path is kept.
-# ponytail: 1 GB; PoolManager 22747 grew +1.5 GB in 5s inside one reachability check after a DIV
-# summary (the servers' 15-24 GB spikes, killing whole process pools).
+# A check may add at most this much to Z3's memory; above it Z3 stops with "out of memory", the
+# answer is unknown and the path is kept. ponytail: 1 GB; PoolManager 22747 grew +1.5 GB in one
+# reachability check after a DIV summary and +2.3 GB in the next 10s (the servers' 15-24 GB spikes
+# that killed whole process pools). The solver parameter max_memory is ignored by incremental
+# solvers (PrefixSolver), and an interrupt is honoured only tens of seconds later, so the cap is
+# Z3's process-wide memory_max_size, set around the check only (Z3 stays usable after it trips).
 REACHABILITY_MEMORY_MB = 1024
+_WATCH = {"tripped": False}
+_CAPS = []  # active caps in MB, innermost last
+
+
+@contextmanager
+def z3_memory_cap():
+    """Z3 may allocate at most REACHABILITY_MEMORY_MB more inside the block (and
+    never more than an enclosing cap); beyond it Z3 raises "out of memory"."""
+    limit = Z3_get_estimated_alloc_size() // 2**20 + REACHABILITY_MEMORY_MB
+    _CAPS.append(min(limit, _CAPS[-1]) if _CAPS else limit)
+    set_param("memory_max_size", _CAPS[-1])
+    try:
+        yield
+    finally:
+        _CAPS.pop()
+        set_param("memory_max_size", _CAPS[-1] if _CAPS else 0)  # 0: unlimited
+
+
+def out_of_memory(exc):
+    """Whether a Z3Exception is a z3_memory_cap() trip (recorded for memory_tripped())."""
+    if "out of memory" not in str(exc):
+        return False
+    _WATCH["tripped"] = True
+    return True
 
 
 def _bounded_check(solver, timeout_ms, tag, wall_ms=None):
     """solver.check() under the reachability budget; any non-UNSAT keeps the path.
 
     `wall_ms` replaces the wall-clock safety net (timeout_ms x the factor) for
-    callers whose budget is a wall-clock budget against a deadline."""
+    callers whose budget is a wall-clock budget against a deadline. The check
+    may add at most REACHABILITY_MEMORY_MB to Z3's memory, else it is unknown;
+    memory_tripped() says whether the last one was stopped for that."""
     if timeout_ms is not None and timeout_ms > 0:
         cap = 2**32 - 1  # both are unsigned-int Z3 params
         wall = timeout_ms * REACHABILITY_WALL_SAFETY_FACTOR if wall_ms is None else max(wall_ms, 1)
         solver.set("rlimit", min(timeout_ms * REACHABILITY_RLIMIT_PER_MS, cap))
         solver.set("timeout", min(wall, cap))
-    held = Z3_get_estimated_alloc_size() // 2**20
-    solver.set("max_memory", min(held + REACHABILITY_MEMORY_MB, 2**32 - 1))
+    _WATCH["tripped"] = False
+    try:
+        with z3_memory_cap():
+            return _check(solver, tag)
+    except Z3Exception as exc:
+        if not out_of_memory(exc):
+            raise
+        return unknown
+
+
+def _check(solver, tag):
     stats = os.environ.get("REACH_STATS_FILE")
     if not stats:
         return solver.check()
@@ -61,6 +100,11 @@ def _bounded_check(solver, timeout_ms, tag, wall_ms=None):
     with open(stats, "a") as log:
         log.write(f"{tag} {result} {time.monotonic() - started:.4f} {spent}\n")
     return result
+
+
+def memory_tripped():
+    """Whether the last _bounded_check was interrupted for memory."""
+    return _WATCH["tripped"]
 
 
 class PrefixSolver:
@@ -107,7 +151,10 @@ class PrefixSolver:
         except BaseException:
             self.reset()
             raise
-        return _bounded_check(self.solver, timeout_ms, tag, wall_ms)
+        result = _bounded_check(self.solver, timeout_ms, tag, wall_ms)
+        if memory_tripped():
+            self.reset()  # drop what the interrupted check built (an unknown keeps the path)
+        return result
 
 
 class X86Constraints:
@@ -190,7 +237,23 @@ class X86Constraints:
 
         Returns:
             如果约束可满足则返回 True
+
+        The whole check (witness evaluation, solver calls, the blasted fallback)
+        may add at most REACHABILITY_MEMORY_MB to Z3's memory: pruning only, so
+        out of memory keeps the path (and resets the incremental solver).
         """
+        try:
+            with z3_memory_cap():
+                return self._is_possible(solver_timeout, prefix_solver)
+        except Z3Exception as exc:
+            if not out_of_memory(exc):
+                raise
+            if prefix_solver is not None:
+                prefix_solver.reset()
+            self._witness = None
+            return True
+
+    def _is_possible(self, solver_timeout, prefix_solver):
         # A model under which the whole path condition evaluates to true is a
         # sat witness: the solver could only answer sat (or time out -> keep).
         # Pruning below still requires an explicit UNSAT, so this only skips
@@ -220,23 +283,31 @@ class X86Constraints:
             # entry pays a full solve. Blasted into ites (an exact rewrite) the same
             # query is SAT in ~4s. Its UNSAT is exact; a model counts as the path's
             # witness only if it makes the path condition literally true.
+            # Building the blasted term counts against the check's memory cap too (PoolManager
+            # 22747: +2 GB in one fallback); out of memory keeps the path.
             path = self.as_bool()
-            blasted = SolverFor("QF_AUFBV")
-            blasted.add(simplify(path, blast_select_store=True))
-            result = _bounded_check(blasted, timeout_ms, "blast")
-            if result == unsat:
-                return False
-            if result == sat:
-                model = blasted.model()
-                if is_true(model.eval(path, model_completion=True)):
-                    self._witness = model
+            try:
+                with z3_memory_cap():
+                    blasted = SolverFor("QF_AUFBV")
+                    blasted.add(simplify(path, blast_select_store=True))
+                    result = _bounded_check(blasted, timeout_ms, "blast")
+                    if result == unsat:
+                        return False
+                    if result == sat:
+                        model = blasted.model()
+                        if is_true(model.eval(path, model_completion=True)):
+                            self._witness = model
+                        return True
+                    relaxed, changed = abstract_nonlinear_mul(path)
+                    if changed:
+                        probe = SolverFor("QF_AUFBV")
+                        probe.add(relaxed)
+                        return _bounded_check(probe, timeout_ms, "probe") != unsat
+                    return True
+            except Z3Exception as exc:
+                if not out_of_memory(exc):
+                    raise
                 return True
-            relaxed, changed = abstract_nonlinear_mul(path)
-            if changed:
-                probe = SolverFor("QF_AUFBV")
-                probe.add(relaxed)
-                return _bounded_check(probe, timeout_ms, "probe") != unsat
-            return True
         # 全符号场景下，calldata/storage 是 Z3 Array，约束含 Array Select。默认的
         # 通用 Solver() 会尝试组合多种理论，bit-blast 慢；QF_AUFBV 直接走 array
         # + bit-vector + uninterpreted-function tactic，对我们用到的形式更快。

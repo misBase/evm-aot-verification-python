@@ -1,0 +1,62 @@
+[    14.7s] MEM setup rss 1.28G peak 1.28G z3 0.13G memo 1 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 0 (0M chars) statement 0 states(live,final,cut,buffered) None
+   z3 net alloc by step kind (GB, calls): {}
+[    24.7s] MEM setup rss 1.28G peak 1.28G z3 0.13G memo 1 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 0 (0M chars) statement 0 states(live,final,cut,buffered) None
+   z3 net alloc by step kind (GB, calls): {}
+[    34.7s] MEM setup rss 1.28G peak 1.28G z3 0.14G memo 1 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 0 (0M chars) statement 0 states(live,final,cut,buffered) None
+   z3 net alloc by step kind (GB, calls): {}
+[    44.7s] MEM setup rss 1.31G peak 1.31G z3 0.13G memo 1 (0M chars str, 0M chars obl) shared_fwd 0 alive 0 lemma_cache 0 certs 0 (0M chars) statement 0 states(live,final,cut,buffered) None
+   z3 net alloc by step kind (GB, calls): {}
+[    54.7s] MEM x86 rss 1.32G peak 1.32G z3 0.19G memo 65 (0M chars str, 0M chars obl) shared_fwd 212 alive 211 lemma_cache 0 certs 0 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'reach': 0.02, 'reach#': 8, 'step': 0.0, 'step#': 13}
+[    64.7s] MEM x86 rss 1.32G peak 1.32G z3 0.19G memo 65 (0M chars str, 0M chars obl) shared_fwd 212 alive 211 lemma_cache 0 certs 0 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'reach': 0.02, 'reach#': 8, 'step': 0.0, 'step#': 13}
+[    74.7s] MEM x86 rss 1.32G peak 1.32G z3 0.19G memo 65 (0M chars str, 0M chars obl) shared_fwd 212 alive 211 lemma_cache 0 certs 0 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'reach': 0.02, 'reach#': 8, 'step': 0.0, 'step#': 13}
+[    84.7s] MEM x86 rss 1.32G peak 1.32G z3 0.16G memo 65 (0M chars str, 0M chars obl) shared_fwd 212 alive 211 lemma_cache 0 certs 0 (0M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'reach': 0.02, 'reach#': 8, 'step': 0.0, 'step#': 13}
+[    94.9s] MEM x86 rss 1.37G peak 1.37G z3 0.16G memo 281 (0M chars str, 0M chars obl) shared_fwd 8518 alive 8517 lemma_cache 0 certs 2 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.02, 'apply#': 2, 'reach': 0.02, 'reach#': 8, 'step': 0.02, 'step#': 15}
+[   105.0s] MEM x86 rss 1.47G peak 1.47G z3 0.16G memo 281 (0M chars str, 0M chars obl) shared_fwd 8518 alive 8517 lemma_cache 0 certs 6 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.02, 'apply#': 6, 'reach': 0.02, 'reach#': 8, 'step': 0.02, 'step#': 20}
+[   116.0s] MEM x86 rss 1.59G peak 1.59G z3 0.16G memo 281 (0M chars str, 0M chars obl) shared_fwd 8518 alive 8517 lemma_cache 0 certs 11 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.02, 'apply#': 11, 'reach': 0.02, 'reach#': 8, 'step': 0.02, 'step#': 24}
+[   126.0s] MEM x86 rss 1.70G peak 1.70G z3 0.21G memo 345 (0M chars str, 0M chars obl) shared_fwd 8718 alive 8717 lemma_cache 0 certs 14 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.02, 'apply#': 14, 'reach': 0.03, 'reach#': 14, 'step': 0.02, 'step#': 35}
+[   136.0s] MEM x86 rss 1.70G peak 1.70G z3 0.20G memo 345 (0M chars str, 0M chars obl) shared_fwd 8718 alive 8717 lemma_cache 0 certs 14 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.02, 'apply#': 14, 'reach': 0.03, 'reach#': 14, 'step': 0.02, 'step#': 35}
+[   146.0s] MEM x86 rss 1.70G peak 1.70G z3 0.20G memo 345 (0M chars str, 0M chars obl) shared_fwd 8718 alive 8717 lemma_cache 0 certs 14 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.02, 'apply#': 14, 'reach': 0.03, 'reach#': 14, 'step': 0.02, 'step#': 35}
+[   156.0s] MEM x86 rss 1.70G peak 1.70G z3 0.21G memo 345 (0M chars str, 0M chars obl) shared_fwd 8718 alive 8717 lemma_cache 0 certs 14 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.02, 'apply#': 14, 'reach': 0.03, 'reach#': 14, 'step': 0.02, 'step#': 35}
+[   166.0s] MEM x86 rss 1.70G peak 1.70G z3 0.17G memo 433 (0M chars str, 0M chars obl) shared_fwd 16682 alive 16681 lemma_cache 0 certs 14 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.02, 'apply#': 14, 'reach': 0.03, 'reach#': 14, 'step': 0.02, 'step#': 35}
+[   176.0s] MEM x86 rss 2.23G peak 2.23G z3 0.73G memo 529 (0M chars str, 0M chars obl) shared_fwd 19117 alive 19116 lemma_cache 0 certs 15 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.03, 'apply#': 15, 'reach': 0.03, 'reach#': 15, 'step': 0.03, 'step#': 37}
+[   186.0s] MEM x86 rss 2.33G peak 2.33G z3 0.80G memo 593 (0M chars str, 0M chars obl) shared_fwd 19309 alive 19308 lemma_cache 0 certs 16 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.03, 'apply#': 16, 'reach': 0.6, 'reach#': 22, 'step': 0.03, 'step#': 47}
+[   196.0s] MEM x86 rss 2.33G peak 2.33G z3 0.80G memo 593 (0M chars str, 0M chars obl) shared_fwd 19309 alive 19308 lemma_cache 0 certs 16 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.03, 'apply#': 16, 'reach': 0.6, 'reach#': 22, 'step': 0.03, 'step#': 47}
+[   206.0s] MEM x86 rss 2.33G peak 2.33G z3 0.80G memo 593 (0M chars str, 0M chars obl) shared_fwd 19309 alive 19308 lemma_cache 0 certs 16 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.03, 'apply#': 16, 'reach': 0.6, 'reach#': 22, 'step': 0.03, 'step#': 47}
+[   216.1s] MEM x86 rss 2.33G peak 2.33G z3 0.80G memo 593 (0M chars str, 0M chars obl) shared_fwd 19309 alive 19308 lemma_cache 0 certs 16 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.03, 'apply#': 16, 'reach': 0.6, 'reach#': 22, 'step': 0.03, 'step#': 47}
+[   226.1s] MEM x86 rss 2.33G peak 2.33G z3 0.81G memo 593 (0M chars str, 0M chars obl) shared_fwd 19309 alive 19308 lemma_cache 0 certs 16 (1M chars) statement 0 states(live,final,cut,buffered) (0, 0, 4, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.03, 'apply#': 16, 'reach': 0.6, 'reach#': 22, 'step': 0.03, 'step#': 47}
+[   236.1s] MEM x86 rss 2.36G peak 2.36G z3 0.77G memo 649 (0M chars str, 0M chars obl) shared_fwd 21183 alive 21182 lemma_cache 0 certs 17 (2M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.06, 'apply#': 17, 'reach': 0.6, 'reach#': 22, 'step': 0.06, 'step#': 49}
+[   246.1s] MEM x86 rss 2.39G peak 2.39G z3 0.76G memo 649 (0M chars str, 0M chars obl) shared_fwd 22175 alive 22174 lemma_cache 0 certs 19 (2M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.06, 'apply#': 19, 'reach': 0.6, 'reach#': 22, 'step': 0.06, 'step#': 53}
+[   251.0s] x86 paths 3 Counter({'exit': 2, 'terminal': 1}) merged diamonds 0 reachability checks 5 (6.1s, pruned 0)
+[   251.0s] x86 segment end after 203.1s
+[   251.0s] MEM pairs rss 2.42G peak 2.42G z3 0.76G memo 649 (0M chars str, 0M chars obl) shared_fwd 22217 alive 22216 lemma_cache 0 certs 21 (2M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.06, 'apply#': 21, 'reach': 0.6, 'reach#': 23, 'step': 0.06, 'step#': 58}
+   types: [('list', 3343322), ('X86CFGNode', 731549), ('X86Block', 731549), ('dict', 565914), ('_cs_detail', 349923), ('X86Op', 242589), ('X86Instruction', 211901), ('CsInsn', 211901), ('_cs_insn', 211901), ('LP__cs_detail', 138022), ('_cs_arch', 138022), ('CsX86', 138022)]
+[   256.1s] MEM pairs rss 2.46G peak 2.86G z3 0.77G memo 649 (0M chars str, 0M chars obl) shared_fwd 22217 alive 22216 lemma_cache 0 certs 21 (2M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.06, 'apply#': 21, 'reach': 0.6, 'reach#': 23, 'step': 0.06, 'step#': 58}
+[   266.1s] MEM pairs rss 2.72G peak 2.86G z3 1.06G memo 649 (0M chars str, 0M chars obl) shared_fwd 22217 alive 22216 lemma_cache 0 certs 21 (2M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.06, 'apply#': 21, 'reach': 0.6, 'reach#': 23, 'step': 0.06, 'step#': 58}
+[   276.1s] MEM pairs rss 3.79G peak 3.79G z3 2.18G memo 665 (0M chars str, 0M chars obl) shared_fwd 22217 alive 22216 lemma_cache 0 certs 21 (2M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.06, 'apply#': 21, 'reach': 0.6, 'reach#': 23, 'step': 0.06, 'step#': 58}
+[   286.1s] MEM pairs rss 4.53G peak 4.53G z3 3.17G memo 847 (0M chars str, 0M chars obl) shared_fwd 22217 alive 22216 lemma_cache 0 certs 21 (2M chars) statement 0 states(live,final,cut,buffered) (0, 0, 1, 0)
+   z3 net alloc by step kind (GB, calls): {'apply': 0.06, 'apply#': 21, 'reach': 0.6, 'reach#': 23, 'step': 0.06, 'step#': 58}
+[   286.1s] RSS 4.53G above cap 4.5G: exit 3

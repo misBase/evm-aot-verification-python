@@ -1,0 +1,569 @@
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 3368 in Z3_simplify
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 9087 in simplify
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 938 in _zero_test_joins
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 977 in _join_and_decide
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 1096 in normalize_word_arith
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2792 in unify_identities
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3747 in _unify_node
+  File "cloud-inputs/n2/tools/probe_traced.py", line 38 in unify_node
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4377 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 3153 in Z3_get_ast_kind
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 508 in _ast_kind
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 1349 in is_app
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 1152 in children
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 1103 in normalize_word_arith
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3397 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3971 in _retry_over_lia
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3411 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4022 in _retry_over_potential
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3446 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2377 in _refute_by_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2568 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2377 in _refute_by_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2568 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2377 in _refute_by_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2568 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 273 in _unsat_core
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 261 in unsat_core
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2555 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 273 in _unsat_core
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 261 in unsat_core
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2555 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2377 in _refute_by_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2568 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 273 in _unsat_core
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 261 in unsat_core
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2555 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 273 in _unsat_core
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 261 in unsat_core
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2555 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2377 in _refute_by_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2568 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2377 in _refute_by_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2568 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2377 in _refute_by_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2568 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2377 in _refute_by_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2568 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>
+Timeout (0:10:00)!
+Thread 0x00007fd25010f6c0 (most recent call first):
+  File "/usr/lib/python3.13/threading.py", line 363 in wait
+  File "/usr/lib/python3.13/threading.py", line 660 in wait
+  File "/home/user/evm-aot-verification-python/common/node_monitor.py", line 129 in _run
+  File "/usr/lib/python3.13/threading.py", line 995 in run
+  File "/usr/lib/python3.13/threading.py", line 1044 in _bootstrap_inner
+  File "/usr/lib/python3.13/threading.py", line 1015 in _bootstrap
+
+Thread 0x00007fd26e452080 (most recent call first):
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3core.py", line 4331 in Z3_solver_check_assumptions
+  File "/home/user/evm-aot-verification-python/.venv/lib/python3.13/site-packages/z3/z3.py", line 7309 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 109 in _solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 98 in solve_query
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2507 in _refute_over_light_premise
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2545 in _prove_equal
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 2726 in unify_uf_arguments
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4216 in _unify_case
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4254 in _retry_over_guard_cases
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3481 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3333 in _check
+  File "cloud-inputs/n2/tools/probe_traced.py", line 25 in check
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 3909 in _check_all
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4382 in _check_rows
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4314 in _pair_phase
+  File "cloud-inputs/n2/tools/probe_traced.py", line 33 in pair_phase
+  File "/home/user/evm-aot-verification-python/verification/block_equivalence.py", line 4480 in prove
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 101 in probe_node
+  File "/home/user/evm-aot-verification-python/tools/probe_block_obligations.py", line 178 in main
+  File "cloud-inputs/n2/tools/probe_traced.py", line 45 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 294 in run_path
+  File "/home/user/evm-aot-verification-python/cloud-inputs/n4/tools/probe_stacks.py", line 14 in <module>

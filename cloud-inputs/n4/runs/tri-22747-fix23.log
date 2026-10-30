@@ -1,0 +1,19 @@
+[     6.2s] entry_nonempty sat 0.0s
+[     6.9s] havoc_relation unsat 0.6s
+[   259.7s] model_domain_nonempty sat 0.4s
+[   261.2s] evm_assumption_7 unsat 0.6s
+[   262.4s] evm_assumption_8 unsat 0.6s
+[   263.6s] evm_assumption_9 unsat 0.6s
+[   265.4s] evm_assumption_10 unsat 0.6s
+[   266.4s] evm_assumption_11 unsat 0.5s
+[   268.2s] evm_assumption_12 unsat 0.6s
+[   268.2s] evm_coverage unsat 0.0s
+[   268.2s] x86_coverage unsat 0.0s
+[   268.2s] pair phase: evm 2 x86 3 found []
+[   270.0s] _unify_node over 6 obligations: 0.3s, 0 lemmas
+[   270.0s] pair_0_0 unsat 0.0s
+[   270.0s] pair_0_1 unsat 0.0s
+[   270.1s] pair_0_2 unsat 0.0s
+{'spec': {'pc': 22747, 'stack_depth': 40, 'memory_size': None, 'free_memory_pointer': None, 'stack_constants': ((4, 20572),)}, 'scope': 'block-local', 'status': 'inconclusive', 'seconds': 282.1673945530001, 'wall_seconds': 282.16739563600004, 'reasons': ['node memory budget exceeded: RSS 4191.2 MB > budget 4000.0 MB (pid 4951)'], 'keep_going_failures': [], 'summary_hits': 0, 'pid': 4951, 'started_at': 1793333008.30093, 'start_rss_mb': 1149.8, 'peak_rss_mb': 4418.4, 'memory_budget_mb': 4000.0, 'memory_exceeded': 'node memory budget exceeded: RSS 4191.2 MB > budget 4000.0 MB (pid 4951)'}
+LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.
+tri-22747 exit 1

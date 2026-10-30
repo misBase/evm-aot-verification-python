@@ -563,7 +563,24 @@ _LEMMA_SPENT = [0.0]  # seconds this process spent in fresh shared-lemma proofs
 
 def _sat_model(query, timeout_ms):
     """(answer, model or None) of one solver call on the query, as solve_query
-    answers it (same solver choice and incomplete-array retry; no proof cache)."""
+    answers it (same solver choice and incomplete-array retry; no proof cache).
+
+    Expected-SAT queries only (a hit's entry): like a reachability check it may
+    add at most REACHABILITY_MEMORY_MB to Z3's memory (z3_memory_cap), and out
+    of memory is "unknown", which apply() already treats as undecided
+    (PoolManager 22747: one entry check grew Z3 by GBs within seconds)."""
+    from z3 import Z3Exception
+    from x86_64.cfg_state import out_of_memory, z3_memory_cap
+    try:
+        with z3_memory_cap():
+            return _sat_model_uncapped(query, timeout_ms)
+    except Z3Exception as exc:
+        if not out_of_memory(exc):
+            raise
+        return "unknown", None
+
+
+def _sat_model_uncapped(query, timeout_ms):
     from z3 import sat as SAT
     from verification.block_equivalence import _solver
     end = monotonic() + timeout_ms / 1000
@@ -905,7 +922,10 @@ class VerifiedSummaryRuntime:
             if self.deadline is not None:
                 budget = min(budget, int((self.deadline - monotonic()) * 1000))
             if budget > 0:
-                blasted, model = solve(simplify(formula, blast_select_store=True), budget)
+                if expected == "sat":
+                    blasted, model = self._blasted_sat(formula, budget)
+                else:
+                    blasted, model = solve(simplify(formula, blast_select_store=True), budget)
                 if blasted == expected:
                     answer = expected
         if model is not None and answer == "sat" and is_true(model.eval(formula, model_completion=True)):
@@ -919,6 +939,19 @@ class VerifiedSummaryRuntime:
                 if solve_query(relaxed, budget) == "unsat":
                     formula, answer = relaxed, "unsat"
         return Obligation(name, summary_text(formula), answer, expected, monotonic() - started)
+
+    @staticmethod
+    def _blasted_sat(formula, budget):
+        """_sat_model on the blasted formula, building it under the same memory cap."""
+        from z3 import Z3Exception
+        from x86_64.cfg_state import out_of_memory, z3_memory_cap
+        try:
+            with z3_memory_cap():
+                return _sat_model(simplify(formula, blast_select_store=True), budget)
+        except Z3Exception as exc:
+            if not out_of_memory(exc):
+                raise
+            return "unknown", None
 
     def _discharge(self, certificate):
         """Solve the lemma statement collected by a generic-mode apply, or

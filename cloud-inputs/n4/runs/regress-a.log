@@ -1,0 +1,16 @@
+aave_8248_pair_0_1 expected=unsat proved 1153.7s lemmas=2
+permit2_1327_m192_f128_x86_maps_0_46 expected=unsat proved 85.0s lemmas=160
+permit2_1327_pair_0_6 expected=unsat proved 234.0s lemmas=184
+permit2_1327_x86_maps_0_46 expected=unsat proved 78.0s lemmas=158
+aave_11831_evm_assumption_7 expected=unsat unknown 1029.7s lemmas=0
+aave_7200_entry_71f8d expected=sat unknown 30.8s lemmas=0
+x86_empty_6 expected=unsat proved 132.8s lemmas=177
+x86_empty_7 expected=unsat proved 138.3s lemmas=176
+x86_empty_3 expected=unsat proved 152.9s lemmas=186
+pair_2_74_goal_2_of_7 expected=unsat unknown 1439.8s lemmas=1
+x86_maps_0_0 expected=unsat proved 1579.1s lemmas=224
+model_domain_nonempty_e765d561caaa expected=sat proved 0.6s lemmas=0
+x86_maps_0_0_29de495a80ca expected=unsat proved 66.0s lemmas=162
+x86_maps_0_1_fd3e98561987 expected=unsat proved 42.6s lemmas=160
+x86_maps_12_0_bb35805d9c63 expected=unsat proved 23.6s lemmas=68
+x86_maps_14_0_3cedcf6f0591 expected=unsat proved 16.2s lemmas=2

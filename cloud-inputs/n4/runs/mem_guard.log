@@ -1,0 +1,1 @@
+04:52:41 headroom 1557 MB: killed  7419 3256348 .venv/bin/python cloud-inputs/n4/tools/probe_stacks.py cloud-inputs/n2/fixtures/PoolManager cloud-inputs/n4b/nodes/22747-sym.json --output cloud-inputs/n4/runs/tri-22747.json --timeout-m
