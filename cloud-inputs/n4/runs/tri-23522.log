@@ -1,1 +1,4 @@
 [     6.9s] init_nonempty sat 0.0s
+[   996.0s] discovered 5052 instances, 0 defects
+[   996.1s] proof instance BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383),)) contexts 1
+[  1004.8s] init_nonempty sat 0.0s
