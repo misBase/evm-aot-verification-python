@@ -45,7 +45,8 @@ REACHABILITY_WALL_SAFETY_FACTOR = 10
 REACHABILITY_MEMORY_MB = 1024
 _WATCH = {"tripped": False}
 _CAPS = []  # active caps in MB, innermost last
-_MEMORY_STOPS = ("max. memory exceeded", "out of memory", "canceled")  # Z3's words for a stop at the cap
+_MEMORY_STOPS = ("max. memory exceeded", "out of memory")  # Z3's words for a stop at the cap
+_LAST_EXIT = {"over": False}  # whether Z3 held at least the cap when the last capped block ended
 
 
 @contextmanager
@@ -71,16 +72,25 @@ def z3_memory_cap(mb=None):
     try:
         yield
     finally:
+        _LAST_EXIT["over"] = _at_cap()
         _CAPS.pop()
         set_param("memory_high_watermark_mb", _CAPS[-1] if _CAPS else 0)  # 0: unlimited
 
 
+def _at_cap():
+    """Whether Z3 holds (nearly) the innermost active cap."""
+    return bool(_CAPS) and Z3_get_estimated_alloc_size() // 2**20 >= _CAPS[-1] - 16
+
+
 def out_of_memory(exc):
     """Whether a Z3Exception (or a solver's reason_unknown) is a stop at a
-    z3_memory_cap() (recorded for memory_tripped()). "canceled" counts too: a
-    checkpoint above the watermark may report it; the only other source is an
-    interrupt (node memory budget), whose unknown is no answer either."""
-    if not any(word in str(exc) for word in _MEMORY_STOPS):
+    z3_memory_cap() (recorded for memory_tripped()). Some checkpoints above the
+    watermark report "canceled", which a timeout or an interrupt reports too:
+    it counts only while Z3 holds the cap (inside the block), or held it when
+    the last capped block ended (an exception handled after it)."""
+    text = str(exc)
+    if not (any(word in text for word in _MEMORY_STOPS)
+            or "canceled" in text and (_at_cap() if _CAPS else _LAST_EXIT["over"])):
         return False
     _WATCH["tripped"] = True
     return True
@@ -102,12 +112,12 @@ def _bounded_check(solver, timeout_ms, tag, wall_ms=None):
     try:
         with z3_memory_cap():
             result = _check(solver, tag)
+            if result == unknown:
+                out_of_memory(solver.reason_unknown())  # records a stop at the cap
     except Z3Exception as exc:
         if not out_of_memory(exc):
             raise
         return unknown
-    if result == unknown:
-        out_of_memory(solver.reason_unknown())  # records a stop at the cap
     return result
 
 

@@ -345,3 +345,14 @@ def test_the_memory_cap_is_at_most_half_the_node_headroom():
         with cs.z3_memory_cap(4096):
             assert 250 <= cap() <= 301  # half the headroom: the cap counts Z3's allocations, RSS grows more
     assert memory_headroom_mb() is None and z3.get_param("memory_high_watermark_mb") == "0"
+
+
+def test_a_timeout_is_not_a_memory_stop_and_keeps_the_incremental_solver():
+    import z3
+    import x86_64.cfg_state as cs
+    x, y, q = z3.BitVec("n4_to_x", 128), z3.BitVec("n4_to_y", 128), z3.BitVec("n4_to_q", 128)
+    hard = [y != 0, z3.UDiv(x, y) * y + z3.URem(x, y) != x, z3.UDiv(x * q, y + 1) == q * x]
+    prefix = cs.PrefixSolver()
+    assert prefix.check(hard, 50, "test", 200) == z3.unknown  # budget, not memory ("canceled" / "timeout")
+    assert not cs.memory_tripped() and len(prefix.stack) == 3  # the prefix stays pushed
+    assert not cs.out_of_memory("canceled")  # outside any cap and Z3 nowhere near one
