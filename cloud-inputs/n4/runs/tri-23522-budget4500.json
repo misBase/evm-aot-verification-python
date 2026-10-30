@@ -1,0 +1,19 @@
+{
+  "proved": false,
+  "status": "inconclusive",
+  "reasons": [
+    "node memory budget exceeded: RSS 4501.6 MB > budget 4500.0 MB (pid 31159)"
+  ],
+  "seconds": 3486.3697245280055,
+  "queries": 0,
+  "failed": [],
+  "pid": 31159,
+  "peak_rss_mb": 4501.6,
+  "memory_exceeded": "node memory budget exceeded: RSS 4501.6 MB > budget 4500.0 MB (pid 31159)",
+  "spec": "BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383),))",
+  "contexts": [
+    "BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383), (17, 1755), (35, 1935), (37, 1954)))"
+  ],
+  "edges": 0,
+  "open_edges": []
+}
