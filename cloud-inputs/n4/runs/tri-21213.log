@@ -10,3 +10,10 @@
 [    97.4s] TRACE solve_query unsat 3.9s z3 148->148 MB
 [   107.9s] TRACE solve_query unsat 10.4s z3 148->149 MB
 [   115.1s] TRACE solve_query unsat 3.4s z3 149->149 MB
+[  2305.5s] TRACE solve_query sat 5.8s z3 276->517 MB
+[  2305.5s] model_domain_nonempty sat 5.9s
+[  2306.2s] evm_assumption_7 unsat 0.2s
+[  2307.8s] evm_assumption_8 unsat 0.8s
+[  2312.0s] TRACE solve_query unknown 4.0s z3 296->813 MB
+[  2568.8s] TRACE prefix tree 274 paths -> 51 256.8s z3 448 MB
+[  2568.8s] pair phase: evm 2 x86 274 found []
