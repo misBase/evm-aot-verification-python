@@ -1,0 +1,74 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "cloud-inputs/n2/fixtures/PoolManager",
+  "started_at_utc": "2026-10-30T02:16:42.827677+00:00",
+  "configuration": {
+    "nodes": "cloud-inputs/n4b/nodes/6084-f768.json",
+    "output": "cloud-inputs/n4/runs/tri-6084.json",
+    "timeout_ms": "30000",
+    "node_seconds": "3600.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "None",
+    "node_memory_mb": "4000.0",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "1d40b9d12b04c2984c95621b8093f59dd0687892a8aa4d1baa13616a94d15a03",
+    ".hex": "1ae33a365dabbdb8a22451bd57d029cbb04074a87d3e1b6a3de6722492e33c1a"
+  },
+  "model_sources_sha256": "1299c30d19b8e0d91205eab3b8bfa81faff53346df5ef99eef3f5b2e5d9de85c",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 6084,
+        "stack_depth": 13,
+        "memory_size": null,
+        "free_memory_pointer": 768,
+        "stack_constants": [
+          [
+            7,
+            6222
+          ],
+          [
+            8,
+            6240
+          ]
+        ]
+      },
+      "scope": "block-local",
+      "status": "inconclusive",
+      "seconds": 3505.325049446,
+      "wall_seconds": 3505.3312358229996,
+      "queries": 1641,
+      "evm_paths": 56,
+      "x86_paths": 114,
+      "paired_transitions": 4,
+      "terminals_proved": 110,
+      "reasons": [
+        "ValueError: outcome mismatch x86_maps_10_7: x86 path 10 implies conjunct 7 of evm path 46 (solver=unknown)"
+      ],
+      "failed_obligations": [
+        {
+          "name": "x86_maps_10_7",
+          "answer": "unknown",
+          "expected": "unsat",
+          "seconds": 679.6715224100003
+        }
+      ],
+      "keep_going_failures": [],
+      "summary_hits": 0,
+      "pid": 939,
+      "started_at": 1793326608.1817,
+      "start_rss_mb": 1150.0,
+      "peak_rss_mb": 2007.8,
+      "memory_budget_mb": 4000.0,
+      "memory_exceeded": null
+    }
+  ],
+  "locally_proved": 0,
+  "ended_at_utc": "2026-10-30T03:15:13.525721+00:00"
+}
