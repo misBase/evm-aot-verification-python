@@ -2992,6 +2992,64 @@ def _ordered_conjuncts(condition):
     return list(condition.children()) if is_and(condition) else [condition]
 
 
+_TREE_QUERIES = 20  # ponytail: coverage_by_prefix_tree's total budget, in query timeouts
+
+
+def coverage_by_prefix_tree(premise, conditions, timeout_ms, implied=(), deadline=None):
+    """Prove premise ⇒ ∨ conditions over the paths' shared prefixes: the
+    number of local queries, or None (the caller keeps the monolithic query).
+
+    Path conditions are And(conjuncts in execution order); put them in a trie.
+    A trie node with prefix P is covered if a path ends there (its condition
+    is P), or premise ∧ P ∧ ¬(c_1 ∨ … ∨ c_k) is UNSAT for its children's
+    conjuncts c_i. If every node is, any model of the premise descends from
+    the root (P = true) through children it satisfies to a path's end: the
+    coverage formula is UNSAT. A local query needs no solver when two
+    children are x and Not(x), a child is in `implied` (ids of conjuncts the
+    premise implies: justified execution assumptions), or ¬(∨ c_i) alone is
+    UNSAT (a tautology, e.g. a carry bit = 0 / = 1). Executor branches are
+    exactly such pairs; a single child is a pruned branch whose UNSAT is
+    re-proved here with its prefix (PoolManager 21213 x86: 274 paths, 51
+    local queries, 145s; the monolithic query unknown after 27000s on the
+    server). Each local query gets `timeout_ms`; gives up on the first one
+    that is not UNSAT, or after _TREE_QUERIES x timeout_ms in all.
+    """
+    started = monotonic()
+    end = started + _TREE_QUERIES * timeout_ms / 1000
+    if deadline is not None:
+        end = min(end, deadline)
+    trie = {}
+    for condition in conditions:
+        node = trie
+        for c in _ordered_conjuncts(condition):
+            node = node.setdefault(c.get_id(), (c, {}))[1]
+        node[None] = None
+    implied = set(implied) | {c.get_id() for c in _conjuncts(premise)}
+    queries, work, solver = 0, [((), trie)], PrefixSolver()
+    while work:
+        prefix, node = work.pop()
+        edges = [edge for key, edge in node.items() if key is not None]
+        work.extend(((*prefix, c), child) for c, child in edges)
+        kids = [c for c, _ in edges]
+        if None in node or any(c.get_id() in implied for c in kids) or any(
+                is_not(a) and a.arg(0).eq(b) for a in kids for b in kids):
+            continue
+        left = int((end - monotonic()) * 1000)
+        if left <= 0 or not kids:
+            return None
+        missing = Not(Or(*kids))
+        if is_false(simplify(missing)) or solve_query(missing, min(left, 1000)) == "unsat":
+            continue
+        queries += 1
+        left = int((end - monotonic()) * 1000)
+        # Depth-first, so one incremental solver shares each prefix like the executor's
+        # reachability checks that pruned these branches (a fresh solve per node: 5s+ each).
+        local = min(left, timeout_ms)
+        if left <= 0 or solver.check([premise, *prefix, missing], local, "coverage", local) != unsat:
+            return None
+    return queries
+
+
 def disjoint_groups(premise, conditions):
     """[(pairs, formula)]: every (i, k), i < k, in exactly one group.
 
@@ -4576,6 +4634,20 @@ class BlockEquivalenceProver:
             # the exact coverage query slow (Safe 5377 x86: 251s -> 11s). A miss
             # costs at most one query budget and falls through unchanged.
             started = monotonic()
+            # After a quick exact attempt, over the paths' prefix tree (coverage_by_prefix_tree):
+            # branch pairs are complementary, so it is mostly syntactic plus one incremental query
+            # per pruned branch; a miss stops at its first local query that is not UNSAT.
+            quick = solve_query(coverage, _QUICK_EXACT_MS) == "unsat"
+            tree = (coverage_by_prefix_tree(premise, [p.condition for p in paths], self.timeout_ms,
+                                            justified - allowed, self.deadline)
+                    if len(paths) > 1 and not quick else None)
+            if quick:
+                records.append(Obligation(name, coverage.sexpr(), "unsat", "unsat", monotonic() - started))
+                continue
+            if tree is not None:
+                records.append(Obligation(name, f"(prefix-tree coverage, {tree} local queries)",
+                                          "unsat", "unsat", monotonic() - started))
+                continue
             proved, answer, _ = self._retry_over_nonlinear_mul(coverage, "unknown")
             if answer == "unsat":
                 records.append(Obligation(name, proved.sexpr(), "unsat", "unsat", monotonic() - started))

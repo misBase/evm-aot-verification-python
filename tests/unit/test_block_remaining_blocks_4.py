@@ -249,3 +249,26 @@ def test_unknown_rows_with_a_mapped_sibling_skip_the_blast_fallback(monkeypatch)
     # Row 3 has none at C: the blasted query maps it (EVM 2).
     assert corr == (0, "all", "all", 2, 1) and len(blasted) == 1
     assert be.propose_from_siblings(list(corr), x86)[:3] == [0, 0, 0]
+
+
+# --- fix 25: x86/evm coverage over the paths' prefix tree -------------------------------------
+
+def test_prefix_tree_coverage_discharges_branch_pairs_without_queries():
+    from z3 import Extract, Not
+    x, y = BitVec("n4_tree_x", 64), BitVec("n4_tree_y", 64)
+    a, carry = ULT(x, 5), Extract(63, 63, x + y)
+    paths = [And(a, carry == 1), And(a, carry == 0), And(Not(a), y == 0), And(Not(a), y != 0, ULT(y, 9)),
+             And(Not(a), y != 0, Not(ULT(y, 9)))]
+    assert be.coverage_by_prefix_tree(BoolVal(True), paths, 10000) == 0  # x / Not(x) and a tautology
+
+
+def test_prefix_tree_coverage_reproves_pruned_branches_and_rejects_missing_ones():
+    from z3 import Not
+    x = BitVec("n4_tree_p", 64)
+    # Under x < 5 the branch x >= 10 was pruned: one local query (x < 5 ∧ ¬(x < 10)) is UNSAT.
+    assert be.coverage_by_prefix_tree(BoolVal(True), [And(ULT(x, 5), ULT(x, 10)), Not(ULT(x, 5))], 10000) == 1
+    # A premise conjunct, or an id in `implied`, needs no query.
+    implied = x != 7
+    assert be.coverage_by_prefix_tree(ULT(x, 3), [And(ULT(x, 3), implied)], 10000, {implied.get_id()}) == 0
+    # Not(x < 5) ∧ ¬(x == 7) has models: the tree does not cover it, the caller keeps the full query.
+    assert be.coverage_by_prefix_tree(BoolVal(True), [ULT(x, 5), And(Not(ULT(x, 5)), x == 7)], 10000) is None
