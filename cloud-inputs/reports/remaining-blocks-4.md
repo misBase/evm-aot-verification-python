@@ -76,12 +76,53 @@
 - **修法 25**（路径覆盖按前缀树证明，`coverage_by_prefix_tree`）：见 §2.8 21213。
 - **修法 26**（单个证明查询的 Z3 内存上限）：`solve_query` 与 `solve_pure_bv` 在 `z3_memory_cap(QUERY_MEMORY_MB)` 下求解（`BLOCK_QUERY_MEMORY_MB`，默认 4096）。触顶的查询是 unknown，并且**不写进 proof cache**（它不是"这个预算下超时"）；义务照常走其余路线。22747 的 pair 阶段在 `solve_query` 里几秒内涨了数 GB（栈采样 `tri-22747.stacks`）。
 
+### 2.8 PoolManager 3G 新暴露的难块分诊（补充说明 §2）
+
+在最终代码上逐个分诊（本机，4 核同时 4–6 个进程，所以耗时偏保守）。修法 9–15 是 N3 的，16–27 是本任务的。
+
+| 块 | 3G 上的结果 | 本机结果（最终代码） | 是否已被覆盖 |
+|---|---|---|---|
+| 22747 sym | 进程池 OOM，无结论 | **proved，679s**，76 个查询，峰值 4.9 GB（`tri-22747c`） | 是：修法 23（可达性/入口 SAT 内存上限）、26（单查询上限）、27（DIV 引理重试）；见下 |
+| 21213 d29 | `x86_coverage` unknown（27200s） | `x86_coverage` 离线按前缀树 **145s 证出**（51 个局部查询）；整节点：（待补） | 修法 25（新） |
+| 6084 f768 | 预算耗尽，`x86_maps_2_8` unknown | 行 0–9、10、2 作为行组证出（每组 84–128s），1h 分诊只剩 `x86_maps_10_7` 单独 unknown，随后行 10 的组 86s 证出 | 修法 17 |
+| 18089 d18 | x86 分段 12h 超时 | 未证；见下 | 未覆盖（根因与建议见下） |
+| 22918 d22 / d39 | OOM / x86 超时后 deferred | （待补） | 与 22747 同形 |
+| 19169、23522 | H2 出边预算耗尽 | （待补） | |
+
+- **22747**：修法前 x86 分段在一个 DIV summary 之后的可达性检查里几秒内 +2 GB（栈：`_bounded_check` → `Z3_solver_check_assumptions`），随后 summary 命中入口的 SAT 检查、pair 阶段的 `solve_query` 也各自暴涨，这就是服务器上进程池在几分钟内涨到 15–24 GB 的来源之一（`tri-22747*.rss`）。修法 23/26 之后 x86 分段 ≤1.85 GB。中间有一次因 DIV 切片 0xe5f62 的引理 `effect_1` 在负载下 unknown 而整个节点失败（单独跑需要约 38s，查询预算 30s），由修法 27 解决。最后 proved，679s。
+- **21213**：x86 有 274 条路径，覆盖查询是 274 个路径条件的析取。路径条件按执行顺序构成一棵二叉前缀树（273 个分叉点）：191 个分叉的两边语法上互补，82 个是同义反复（进位位 = 0 / = 1），其余是剪掉的分支。修法 25 逐节点证明 premise ∧ 前缀 ∧ ¬(子节点析取)，用一个增量求解器沿深度优先共享前缀：51 个局部查询，145s，而单个整体查询在服务器上 27200s 后仍是 unknown。4418 的 `x86_coverage` 也从 1298s 降到 708s。
+- **18089**：EVM 块 18089 是一个 240 条指令的直线块，即 `TickMath` 的 log2 循环展开：14 次 `r := mul(r,r); f := shr(127,r); r := shr(f,r)`。移位量 `f` 是符号值，编译后的 256 位 SHR 按移位量分派（≥256、按 64 对齐的 0/64/128/192、非对齐），每次都分叉，而且两边可能都可达（f = 0 或 1）。所以 EVM 侧 1 条路径，x86 侧按移位次数指数增长。每次可达性检查都落在 r 的平方链上（单次 10–28s），增量求解器在 push 新合取项时还会把整条链内部化，这一步不受检查的超时约束：栈采样显示时间耗在 `Z3_solver_push`；合成实验中每次 push 0.2→1.5s、约 +60 MB。修法 18 的菱形合并只合并"只改寄存器/标志"的两边，而这里两边写的是不同的栈槽，所以不适用。服务器上的 SIGABRT 由修法 23/26 v2 修好（§2.9）；之后 d18 整节点不再中止，而是被节点内存预算停下（inconclusive）。**建议的通用修法**：(1) 像 DIV/MUL 那样加一个 SHR/SHL/SAR summary：匹配编译出的 256 位移位分派代码，按 EVM 语义一步给出结果，并按切片做一次重放证明（与 `div_proof` 同样的结构：原始路径覆盖 + 每条原始路径的效果等于 summary）。这样 x86 侧也只剩 1 条路径。(2) `PrefixSolver` 的 push/add 加墙钟上限（实验：`interrupt()` 能让 push 以 "push canceled" 结束，reset 后 Z3 正常），超时则 reset、记为 unknown、保留路径。它只限制单次检查的耗时和内存，不解决路径数，所以 (1) 是主要的。两者本任务都未实现。
+
 ### 2.9 修法 23/26 v2：内存上限触顶不得中止进程（补充说明 2，10-30b）
 
 - **原因**：修法 23/26 用 Z3 的进程级 `memory_max_size`。它由 Z3 的分配器自己检查，超出时在**任意一次分配**处抛 C++ `out_of_memory_error`。大多数 API 调用会把它转成 `Z3Exception`，但分配也可能发生在不能传出异常的地方（析构函数、noexcept 路径），这时直接 `std::terminate` → SIGABRT。服务器上 18089 d18/d29 在 `Z3_solver_check_assumptions`（`_bounded_check`）里稳定复现；本机 6810c73 上 18089 的 x86 剖析也在 212s 被同样中止过（`cloud-inputs/n4/runs/tri-18089.log`）。我的单元测试只覆盖了能正常转成异常的路径。
 - **修法**：改用 `memory_high_watermark_mb`。它不在分配器里检查，只在 Z3 的协作检查点读取：SAT/SMT 内核与 tactic 的 checkpoint，也就是超时和 `interrupt()` 让求解器停下来的同一批位置。所以触顶的结束方式和超时一样，要么是 unknown（原因 "max. memory exceeded" 或 "canceled"），要么是可捕获的 `Z3Exception`，Z3 之后照常可用。`out_of_memory()` 把这三种说法都算作"在上限处停下"：可达性检查保留路径并 reset 增量求解器，证明查询为 unknown 且不写 proof cache。"canceled" 的另一个来源是节点预算的 `interrupt()`，那种 unknown 本来也不是答案，`solve_query` 在返回前先 `check_abort()`。
 - **取舍**：水位线只在检查点生效，所以没有检查点的单个大步骤停不下来（本机测量：512 位除法 bit-blast 一步约 500MB）。`memory_max_size` 虽然能在分配时立刻拦住，但会让进程中止，所以不能用。不能被上限拦住的增长由节点内存预算兜底：软预算超出 → 中断并记为 inconclusive，1.5 倍硬上限 → worker 以 86 退出，`NodePool` 只丢这一个节点。另外，在节点预算下每个受限调用最多再用"剩余余量的一半"（`memory_headroom_mb()`；上限按 Z3 自己的分配量计，本机 RSS 的增长约是它的 1.6 倍），让一个调用里的逐步增长先让这个调用 unknown，而不是整个节点超预算。
 - **回归测试**（`tests/unit/test_block_remaining_blocks_4.py`）：`test_tiny_memory_caps_give_unknown_and_never_abort_the_process` 在子进程（`tests/unit/data/z3_memory_cap_child.py`）里把上限设成 1MB，依次跑 `check(assumptions)`、增量 `PrefixSolver`（逐合取项 push 和单个合取项两种形状）、`solve_query`、`solve_pure_bv`、`simplify(blast_select_store)`，要求子进程正常退出、各项为 unknown 或被识别的内存异常、之后 Z3 仍能解出一个小查询。`test_the_memory_cap_is_at_most_half_the_node_headroom` 检查节点预算下设出的水位线。说明：这个合成子进程在旧的 `memory_max_size` 上**也不会**中止（中止取决于在哪一次分配上触顶），所以真正的确认是 18089 整节点复跑（下面）。
+
+### 2.10 `--node-memory-mb` 与 worker 数的建议（补充说明 §3）
+
+本机测得的单节点内存（RSS+swap，即节点预算计量的口径）：
+
+| 节点 | 峰值 | 说明 |
+|---|---|---|
+| worker 刚载入 PoolManager / Pool | 1.1–1.2 GB | IR + x86 程序 + summary 发现，每个 worker 都有 |
+| Aave 6182 | 2.9 GB | 整节点证出 |
+| PoolManager 16670 m=768 / 4418 sym | 2.5–2.6 GB | |
+| Aave 7200（修法 16+20） | 3.4–4.0 GB | 之前在服务器上 9h 涨到 46.7 GB |
+| PoolManager 22747 sym（修法 23–27） | 4.9 GB | 证出，679s；修法前几秒内 +2 GB，服务器上即 15–24 GB 的暴涨 |
+| PoolManager 21213 d29 | >3.0 GB | 3000 MB 的分诊预算在覆盖检查前停下 |
+| PoolManager 18089 d18 | >4.5 GB | x86 分段持续增长，1200s 时一分钟内 2.5 → 5.3 GB，被 4500 MB 预算停下（见 §2.8） |
+
+建议：
+
+- **`--node-memory-mb 6000`**。它覆盖所有能证出的节点（≤4.9 GB），同时把失控节点限制在软预算 6 GB（中断 Z3、记为 inconclusive）和硬上限 9 GB（1.5 倍，worker 以 86 退出，`NodePool` 补一个 worker，只丢这一个节点）。预算按 RSS+swap 计，所以 swap 不会让单个节点超过预算，只是多个节点同时到峰值时的缓冲。
+- **worker 数按"最坏情况 = worker 数 × 9 GB 硬上限 + 父进程约 2 GB"来定，而不是按核数**：
+  - 16 核 / 32 GB + 32 GB swap：**`--node-workers 4`**。典型占用 4 × 3–4 GB ≈ 16 GB；最坏 4 × 9 + 2 = 38 GB，超出内存的部分落在 swap 里（慢但不会被 OOM）。5 个 worker 的最坏情况 47 GB 也还在 64 GB 之内，但同时有两三个节点到硬上限时 swap 会很重，所以不建议更多。核数不是瓶颈：节点证明是单线程的，多出来的核可以给 `--pair-workers-per-node`，但 pair 子进程**不在节点预算之内**，所以保持默认 1。
+  - 8 核 / 16 GB + 40 GB swap：**`--node-workers 2`**。最坏 2 × 9 + 2 = 20 GB，略进 swap；3 个 worker 的最坏情况 29 GB 会长时间重度换页，不建议。
+  - 如果更想多跑节点、少等：`--node-memory-mb 4500` 时最坏 6.75 GB/worker，32 GB 机器可以 5 个、16 GB 机器 3 个。代价是 22747 这类 4.9 GB 的节点会被判 inconclusive。
+- 其余环境变量保持默认：`BLOCK_QUERY_MEMORY_MB=4096`（单个查询上限；在节点预算下实际取剩余余量的一半）、`REACHABILITY_MEMORY_MB=1024`。
+- 哪个节点在暴涨：本机可复现的是 **22747**（修法前 x86 分段 DIV summary 之后的可达性检查和入口 SAT 检查几秒内 +2 GB、pair 阶段 `solve_query` 再涨，`tri-22747*.log/.rss/.stacks`），以及 **18089**（x86 分段持续增长）；22918 与 22747 是同一形状的块（77 条指令，DIV/OR/MUL），大概率是同一个原因（§2.8）。
 
 ## 3. 改动位置
 
