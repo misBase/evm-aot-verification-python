@@ -105,13 +105,13 @@ def solve_query(formula, timeout_ms, trust_unknown=True):
     try:
         with z3_memory_cap(QUERY_MEMORY_MB):
             answer = _solve_query(formula, timeout_ms)
-        if answer == "memory":
-            return "unknown"  # as below
     except Z3Exception as exc:
         if not out_of_memory(exc):
             raise
-        return "unknown"  # out of memory: not the query's answer at this budget, never cached
+        answer = "memory"
     check_abort()  # an interrupted check's unknown is not the query's answer: never cached
+    if answer == "memory":
+        return "unknown"  # stopped at the memory cap: not the query's answer at this budget, never cached
     if key is not None:
         proof_cache.record_answer(key, answer, timeout_ms)
     return answer

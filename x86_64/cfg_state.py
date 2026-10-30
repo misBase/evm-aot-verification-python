@@ -32,36 +32,44 @@ DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS = 1000
 # The wall clock is only a safety net for pathological tactics.
 REACHABILITY_RLIMIT_PER_MS = 10000
 REACHABILITY_WALL_SAFETY_FACTOR = 10
-# A check may add at most this much to Z3's memory; above it Z3 stops with "out of memory", the
-# answer is unknown and the path is kept. ponytail: 1 GB; PoolManager 22747 grew +1.5 GB in one
+# A check may add at most this much to Z3's memory; above it Z3 stops with "max. memory exceeded",
+# the answer is unknown and the path is kept. ponytail: 1 GB; PoolManager 22747 grew +1.5 GB in one
 # reachability check after a DIV summary and +2.3 GB in the next 10s (the servers' 15-24 GB spikes
 # that killed whole process pools). The solver parameter max_memory is ignored by incremental
 # solvers (PrefixSolver), and an interrupt is honoured only tens of seconds later, so the cap is
-# Z3's process-wide memory_max_size, set around the check only (Z3 stays usable after it trips).
+# Z3's process-wide memory_high_watermark_mb, set around the check only. Not memory_max_size: that
+# one throws out_of_memory_error from the allocator itself, also where nothing can catch it, and
+# the process aborts (servers, PoolManager 18089: SIGABRT inside Z3_solver_check_assumptions). The
+# high watermark is only read at Z3's cooperative checkpoints, the points where a timeout or an
+# interrupt stops a solver, so it ends like them: unknown, or a Z3Exception, and Z3 stays usable.
 REACHABILITY_MEMORY_MB = 1024
 _WATCH = {"tripped": False}
 _CAPS = []  # active caps in MB, innermost last
+_MEMORY_STOPS = ("max. memory exceeded", "out of memory", "canceled")  # Z3's words for a stop at the cap
 
 
 @contextmanager
 def z3_memory_cap(mb=None):
     """Z3 may allocate at most `mb` (default REACHABILITY_MEMORY_MB) more inside
-    the block (and never more than an enclosing cap); beyond it Z3 raises
-    "out of memory"."""
+    the block (and never more than an enclosing cap); beyond it Z3 stops at its
+    next checkpoint: the call answers unknown or raises a Z3Exception (see
+    out_of_memory), it never aborts the process."""
     limit = Z3_get_estimated_alloc_size() // 2**20 + (REACHABILITY_MEMORY_MB if mb is None else mb)
     _CAPS.append(min(limit, _CAPS[-1]) if _CAPS else limit)
-    set_param("memory_max_size", _CAPS[-1])
+    set_param("memory_high_watermark_mb", _CAPS[-1])
     try:
         yield
     finally:
         _CAPS.pop()
-        set_param("memory_max_size", _CAPS[-1] if _CAPS else 0)  # 0: unlimited
+        set_param("memory_high_watermark_mb", _CAPS[-1] if _CAPS else 0)  # 0: unlimited
 
 
 def out_of_memory(exc):
-    """Whether a Z3Exception (or a solver's reason_unknown) is a z3_memory_cap()
-    trip (recorded for memory_tripped())."""
-    if "out of memory" not in str(exc):
+    """Whether a Z3Exception (or a solver's reason_unknown) is a stop at a
+    z3_memory_cap() (recorded for memory_tripped()). "canceled" counts too: a
+    checkpoint above the watermark may report it; the only other source is an
+    interrupt (node memory budget), whose unknown is no answer either."""
+    if not any(word in str(exc) for word in _MEMORY_STOPS):
         return False
     _WATCH["tripped"] = True
     return True
@@ -82,11 +90,14 @@ def _bounded_check(solver, timeout_ms, tag, wall_ms=None):
     _WATCH["tripped"] = False
     try:
         with z3_memory_cap():
-            return _check(solver, tag)
+            result = _check(solver, tag)
     except Z3Exception as exc:
         if not out_of_memory(exc):
             raise
         return unknown
+    if result == unknown:
+        out_of_memory(solver.reason_unknown())  # records a stop at the cap
+    return result
 
 
 def _check(solver, tag):

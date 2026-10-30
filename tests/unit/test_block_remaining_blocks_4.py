@@ -309,3 +309,20 @@ def test_div_lemma_retries_an_unknown_effect_with_a_larger_budget(monkeypatch):
     monkeypatch.setattr(bs, "refute_goal", flaky)
     lemma = dp.prove_div_slice(summary, blocks, timeout_ms=30000)
     assert lemma.complete and budgets == [30000, 120000] * lemma.path_count
+
+
+# --- fix 23/26 v2: a capped Z3 call that hits the cap is unknown, never an abort --------------
+
+def test_tiny_memory_caps_give_unknown_and_never_abort_the_process():
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    child = root / "tests" / "unit" / "data" / "z3_memory_cap_child.py"
+    env = dict(os.environ, PYTHONPATH=str(root))
+    run = subprocess.run([sys.executable, str(child)], capture_output=True, text=True, timeout=900, cwd=root, env=env)
+    assert run.returncode == 0, run.stderr[-2000:]  # memory_max_size: SIGABRT (-6) on the servers
+    # check(assumptions), PrefixSolver (two shapes), solve_query, solve_pure_bv, simplify; Z3 usable after.
+    words = run.stdout.split()
+    assert words[0] == "memory" and words[1:5] == ["unknown"] * 4 and words[-1] == "sat", run.stdout
