@@ -330,3 +330,5 @@
 [  2380.9s] pair_2_60 unsat 0.1s
 [  2902.3s] context_nonempty_c0_ sat 2.7s
 [  2982.6s] H2_c0_0_0_t0_memory_size_0_shared unsat 4.8s
+[  3042.1s] H2_c0_0_0_t0_memory_gas_0_shared unsat 59.3s
+[  3047.5s] H2_c0_0_0_t0_memory_gas_1_shared unsat 5.2s
