@@ -1411,3 +1411,1317 @@ tests/unit/test_block_report_progress.py::test_independent_rerun_keeps_its_own_w
 tests/unit/test_block_report_progress.py::test_interrupted_report_keeps_local_failures_and_claims_nothing 
 [gw1] PASSED tests/unit/test_block_report_progress.py::test_interrupted_report_keeps_local_failures_and_claims_nothing 
 tests/unit/test_block_review_3b.py::test_light_premise_proofs_are_sound_on_random_conjunctions 
+[gw1] PASSED tests/unit/test_block_review_3b.py::test_light_premise_proofs_are_sound_on_random_conjunctions 
+tests/unit/test_block_review_3b.py::test_prefix_solver_never_wrong_unsat_with_budgets_that_cancel_checks 
+[gw1] PASSED tests/unit/test_block_review_3b.py::test_prefix_solver_never_wrong_unsat_with_budgets_that_cancel_checks 
+tests/unit/test_block_review_3b.py::test_prefix_solver_rlimit_is_per_check_and_witness_outlives_pops 
+[gw1] PASSED tests/unit/test_block_review_3b.py::test_prefix_solver_rlimit_is_per_check_and_witness_outlives_pops 
+tests/unit/test_block_review_3b.py::test_model_eval_is_never_literally_true_for_unsat_premises 
+[gw1] PASSED tests/unit/test_block_review_3b.py::test_model_eval_is_never_literally_true_for_unsat_premises 
+tests/unit/test_block_review_3b.py::test_disjoint_groups_formulas_are_sub_conjunctions_on_random_trees 
+[gw1] PASSED tests/unit/test_block_review_3b.py::test_disjoint_groups_formulas_are_sub_conjunctions_on_random_trees 
+tests/unit/test_block_review_3b.py::test_complement_refutation_agrees_with_the_solver_on_random_terms 
+[gw1] PASSED tests/unit/test_block_review_3b.py::test_complement_refutation_agrees_with_the_solver_on_random_terms 
+tests/unit/test_block_route_order.py::test_route_class_drops_path_indices_and_keeps_goal_parts 
+[gw1] PASSED tests/unit/test_block_route_order.py::test_route_class_drops_path_indices_and_keeps_goal_parts 
+tests/unit/test_block_route_order.py::test_winners_first_keeps_the_table_without_wins 
+[gw1] PASSED tests/unit/test_block_route_order.py::test_winners_first_keeps_the_table_without_wins 
+tests/unit/test_block_route_order.py::test_winners_first_orders_by_refutations_per_second 
+[gw1] PASSED tests/unit/test_block_route_order.py::test_winners_first_orders_by_refutations_per_second 
+tests/unit/test_block_route_order.py::test_route_that_refuted_a_class_goes_first_for_its_siblings 
+[gw1] PASSED tests/unit/test_block_route_order.py::test_route_that_refuted_a_class_goes_first_for_its_siblings 
+tests/unit/test_block_route_order.py::test_static_switch_keeps_the_table 
+[gw1] PASSED tests/unit/test_block_route_order.py::test_static_switch_keeps_the_table 
+tests/unit/test_block_route_order.py::test_promoted_route_failing_falls_back_to_every_other_route 
+[gw1] PASSED tests/unit/test_block_route_order.py::test_promoted_route_failing_falls_back_to_every_other_route 
+tests/unit/test_block_route_order.py::test_nothing_refutes_nothing_is_proved 
+[gw1] PASSED tests/unit/test_block_route_order.py::test_nothing_refutes_nothing_is_proved 
+tests/unit/test_block_route_order.py::test_promoted_route_gets_half_of_what_is_left 
+[gw1] PASSED tests/unit/test_block_route_order.py::test_promoted_route_gets_half_of_what_is_left 
+tests/unit/test_block_sat_witness.py::test_lambda_under_uf_is_unknown_to_the_direct_solver 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_lambda_under_uf_is_unknown_to_the_direct_solver 
+tests/unit/test_block_sat_witness.py::test_witness_proves_oracle_axiom_over_lambda 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_witness_proves_oracle_axiom_over_lambda 
+tests/unit/test_block_sat_witness.py::test_witness_value_is_chosen_by_the_solver 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_witness_value_is_chosen_by_the_solver 
+tests/unit/test_block_sat_witness.py::test_uf_under_lambda_binder_is_restricted 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_uf_under_lambda_binder_is_restricted 
+tests/unit/test_block_sat_witness.py::test_needs_nonconstant_function_is_unknown_not_unsat 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_needs_nonconstant_function_is_unknown_not_unsat 
+tests/unit/test_block_sat_witness.py::test_unsat_formula_is_never_sat 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_unsat_formula_is_never_sat 
+tests/unit/test_block_sat_witness.py::test_no_array_ufs_returns_at_once 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_no_array_ufs_returns_at_once 
+tests/unit/test_block_sat_witness.py::test_function_referenced_as_value_is_refused 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_function_referenced_as_value_is_refused 
+tests/unit/test_block_sat_witness.py::test_unsat_expected_checks_do_not_use_the_witness 
+[gw1] PASSED tests/unit/test_block_sat_witness.py::test_unsat_expected_checks_do_not_use_the_witness 
+tests/unit/test_block_sat_witness.py::test_permit2_1327_model_domain_nonempty 
+[gw1] SKIPPED tests/unit/test_block_sat_witness.py::test_permit2_1327_model_domain_nonempty 
+tests/unit/test_block_solver_logic.py::test_bv_arrays_and_lambda_keep_their_semantics 
+[gw1] PASSED tests/unit/test_block_solver_logic.py::test_bv_arrays_and_lambda_keep_their_semantics 
+tests/unit/test_block_solver_logic.py::test_ints_nested_array_sorts_and_quantifiers_use_general_solver 
+[gw1] PASSED tests/unit/test_block_solver_logic.py::test_ints_nested_array_sorts_and_quantifiers_use_general_solver 
+tests/unit/test_block_specialization.py::test_all_concrete_blocks_are_specializable 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_all_concrete_blocks_are_specializable 
+tests/unit/test_block_specialization.py::test_specialization_feeds_build_havoc 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_specialization_feeds_build_havoc 
+tests/unit/test_block_specialization.py::test_multiple_depth_classes_produce_one_instance_each 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_multiple_depth_classes_produce_one_instance_each 
+tests/unit/test_block_specialization.py::test_top_memory_size_becomes_symbolic_relation 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_top_memory_size_becomes_symbolic_relation 
+tests/unit/test_block_specialization.py::test_top_fmp_becomes_symbolic_relation 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_top_fmp_becomes_symbolic_relation 
+tests/unit/test_block_specialization.py::test_degraded_and_specializable_partition_the_reachable_set 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_degraded_and_specializable_partition_the_reachable_set 
+tests/unit/test_block_specialization.py::test_empty_depth_class_on_a_reachable_block_is_a_violation 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_empty_depth_class_on_a_reachable_block_is_a_violation 
+tests/unit/test_block_specialization.py::test_empty_value_set_is_a_violation_not_a_degrade 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_empty_value_set_is_a_violation_not_a_degrade 
+tests/unit/test_block_specialization.py::test_missing_analysis_defaults_to_symbolic_parameter 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_missing_analysis_defaults_to_symbolic_parameter 
+tests/unit/test_block_specialization.py::test_many_finite_candidates_do_not_prove_or_disprove_convergence 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_many_finite_candidates_do_not_prove_or_disprove_convergence 
+tests/unit/test_block_specialization.py::test_candidate_resource_budget_is_explicit 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_candidate_resource_budget_is_explicit 
+tests/unit/test_block_specialization.py::test_missing_successor_is_not_silently_degraded 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_missing_successor_is_not_silently_degraded 
+tests/unit/test_block_specialization.py::test_coverage_summary_mentions_both_sides 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_coverage_summary_mentions_both_sides 
+tests/unit/test_block_specialization.py::test_specialization_is_hashable_for_use_as_a_theorem_key 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_specialization_is_hashable_for_use_as_a_theorem_key 
+tests/unit/test_block_specialization.py::test_actual_abstract_interpreter_top_is_a_symbolic_candidate 
+[gw1] PASSED tests/unit/test_block_specialization.py::test_actual_abstract_interpreter_top_is_a_symbolic_candidate 
+tests/unit/test_block_speedups.py::test_prefix_solver_matches_fresh_solver_across_pops 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_prefix_solver_matches_fresh_solver_across_pops 
+tests/unit/test_block_speedups.py::test_is_possible_with_prefix_solver_agrees_and_keeps_witness 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_is_possible_with_prefix_solver_agrees_and_keeps_witness 
+tests/unit/test_block_speedups.py::test_prefix_unknown_keeps_path_unless_probe_refutes 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_prefix_unknown_keeps_path_unless_probe_refutes 
+tests/unit/test_block_speedups.py::test_prefix_unknown_pruned_only_by_probe_unsat 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_prefix_unknown_pruned_only_by_probe_unsat 
+tests/unit/test_block_speedups.py::test_prefix_solver_matches_fresh_solver_on_random_dfs 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_prefix_solver_matches_fresh_solver_on_random_dfs 
+tests/unit/test_block_speedups.py::test_prefix_solver_recovers_from_failure_mid_sync 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_prefix_solver_recovers_from_failure_mid_sync 
+tests/unit/test_block_speedups.py::test_summary_entry_answered_by_path_witness 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_summary_entry_answered_by_path_witness 
+tests/unit/test_block_speedups.py::test_summary_entry_solved_when_witness_misses 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_summary_entry_solved_when_witness_misses 
+tests/unit/test_block_speedups.py::test_disjoint_groups_cover_every_pair_once_and_weaken_it 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_disjoint_groups_cover_every_pair_once_and_weaken_it 
+tests/unit/test_block_speedups.py::test_correspondence_records_and_mapping 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_correspondence_records_and_mapping 
+tests/unit/test_block_speedups.py::test_disjoint_dedup_keeps_names_and_coverage 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_disjoint_dedup_keeps_names_and_coverage 
+tests/unit/test_block_speedups.py::test_disjoint_group_failure_falls_back_to_full_pair_queries 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_disjoint_group_failure_falls_back_to_full_pair_queries 
+tests/unit/test_block_speedups.py::test_disjoint_overlap_gives_full_product 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_disjoint_overlap_gives_full_product 
+tests/unit/test_block_speedups.py::test_coverage_refuted_over_mul_abstraction_first 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_coverage_refuted_over_mul_abstraction_first 
+tests/unit/test_block_speedups.py::test_complement_refutation_hit_and_miss 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_complement_refutation_hit_and_miss 
+tests/unit/test_block_speedups.py::test_summary_solve_skips_solver_on_complement 
+[gw1] PASSED tests/unit/test_block_speedups.py::test_summary_solve_skips_solver_on_complement 
+tests/unit/test_block_store_forwarding_join.py::test_join_extracts_rejoins_byte_splits_exactly 
+[gw1] PASSED tests/unit/test_block_store_forwarding_join.py::test_join_extracts_rejoins_byte_splits_exactly 
+tests/unit/test_block_store_forwarding_join.py::test_join_extracts_soundness_never_joins_across_sources_or_gaps 
+[gw1] PASSED tests/unit/test_block_store_forwarding_join.py::test_join_extracts_soundness_never_joins_across_sources_or_gaps 
+tests/unit/test_block_store_forwarding_join.py::test_forward_then_join_makes_the_mirror_goal_trivial 
+[gw1] PASSED tests/unit/test_block_store_forwarding_join.py::test_forward_then_join_makes_the_mirror_goal_trivial 
+tests/unit/test_block_store_forwarding_join.py::test_forward_then_join_soundness_overwritten_byte_is_not_trivial 
+[gw1] PASSED tests/unit/test_block_store_forwarding_join.py::test_forward_then_join_soundness_overwritten_byte_is_not_trivial 
+tests/unit/test_block_store_forwarding_join.py::test_subtract_base_term_memoized_equals_unmemoized 
+[gw1] PASSED tests/unit/test_block_store_forwarding_join.py::test_subtract_base_term_memoized_equals_unmemoized 
+tests/unit/test_block_store_forwarding_join.py::test_subtract_base_term_memo_soundness_keys_on_both_terms 
+[gw1] PASSED tests/unit/test_block_store_forwarding_join.py::test_subtract_base_term_memo_soundness_keys_on_both_terms 
+tests/unit/test_block_store_forwarding_join.py::test_join_extracts_shared_cache_survives_id_recycling 
+[gw1] PASSED tests/unit/test_block_store_forwarding_join.py::test_join_extracts_shared_cache_survives_id_recycling 
+tests/unit/test_block_store_forwarding_join.py::test_forward_selects_shared_cache_survives_id_recycling 
+[gw1] PASSED tests/unit/test_block_store_forwarding_join.py::test_forward_selects_shared_cache_survives_id_recycling 
+tests/unit/test_block_store_peel.py::test_matching_stores_peel_down_to_the_bases 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_matching_stores_peel_down_to_the_bases 
+tests/unit/test_block_store_peel.py::test_distinct_and_flipped_offset_forms_peel_too 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_distinct_and_flipped_offset_forms_peel_too 
+tests/unit/test_block_store_peel.py::test_peeling_stops_at_the_first_mismatch 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeling_stops_at_the_first_mismatch 
+tests/unit/test_block_store_peel.py::test_peeled_formula_is_only_a_weakening 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_formula_is_only_a_weakening 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[0] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[0] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[1] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[1] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[2] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[2] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[3] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[3] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[4] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[4] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[5] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[5] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[6] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[6] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[7] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[7] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[8] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[8] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[9] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[9] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[10] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[10] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[11] 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[11] 
+tests/unit/test_block_store_peel.py::test_unification_route_refutes_the_peeled_memory_goal 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_unification_route_refutes_the_peeled_memory_goal 
+tests/unit/test_block_store_peel.py::test_unpeeled_query_still_runs_when_the_peeled_one_is_not_refuted 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_unpeeled_query_still_runs_when_the_peeled_one_is_not_refuted 
+tests/unit/test_block_store_peel.py::test_timed_out_light_probe_is_retried_with_the_callers_budget 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_timed_out_light_probe_is_retried_with_the_callers_budget 
+tests/unit/test_block_store_peel.py::test_sat_light_probe_is_not_retried 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_sat_light_probe_is_not_retried 
+tests/unit/test_block_store_peel.py::test_prove_equal_retries_with_its_budget_bounded_by_the_deadline 
+[gw1] PASSED tests/unit/test_block_store_peel.py::test_prove_equal_retries_with_its_budget_bounded_by_the_deadline 
+tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[0] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[0] 
+tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[7] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[7] 
+tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[8] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[8] 
+tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[9] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[9] 
+tests/unit/test_block_summary_certificates.py::test_summary_wrong_memory_effect_rejected 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_summary_wrong_memory_effect_rejected 
+tests/unit/test_block_summary_certificates.py::test_summary_missing_progress_is_rejected 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_summary_missing_progress_is_rejected 
+tests/unit/test_block_summary_certificates.py::test_summary_cannot_cross_a_block_cutpoint 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_summary_cannot_cross_a_block_cutpoint 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[0] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[0] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[7] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[7] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[8] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[8] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[9] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[9] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[31] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[31] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[32] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[32] 
+tests/unit/test_block_summary_certificates.py::test_symbolic_calldata_offset_is_proved_under_current_guard 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_symbolic_calldata_offset_is_proved_under_current_guard 
+tests/unit/test_block_summary_certificates.py::test_calldata_wrap_boundary_never_gets_an_assumed_no_overflow 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_wrap_boundary_never_gets_an_assumed_no_overflow 
+tests/unit/test_block_summary_certificates.py::test_actual_mcopy_overlap_and_direction[mcopy-low-word-4096-4098] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_actual_mcopy_overlap_and_direction[mcopy-low-word-4096-4098] 
+tests/unit/test_block_summary_certificates.py::test_actual_mcopy_overlap_and_direction[mcopy-high-word-4098-4096] 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_actual_mcopy_overlap_and_direction[mcopy-high-word-4098-4096] 
+tests/unit/test_block_summary_certificates.py::test_summary_deadline_expiry_is_not_converted_to_raw_fallback 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_summary_deadline_expiry_is_not_converted_to_raw_fallback 
+tests/unit/test_block_summary_certificates.py::test_raw_replay_timeout_is_not_converted_to_fallback 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_raw_replay_timeout_is_not_converted_to_fallback 
+tests/unit/test_block_summary_certificates.py::test_calldata_uint64_wrap_counterexample_cannot_be_summarized_away 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_uint64_wrap_counterexample_cannot_be_summarized_away 
+tests/unit/test_block_summary_certificates.py::test_summary_hit_certificate_requires_manifest_match 
+[gw1] PASSED tests/unit/test_block_summary_certificates.py::test_summary_hit_certificate_requires_manifest_match 
+tests/unit/test_block_uf_unification.py::test_entailed_argument_equality_is_merged 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_entailed_argument_equality_is_merged 
+tests/unit/test_block_uf_unification.py::test_argument_containing_its_partner_terminates 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_argument_containing_its_partner_terminates 
+tests/unit/test_block_uf_unification.py::test_arguments_equal_only_in_some_models_are_not_merged 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_arguments_equal_only_in_some_models_are_not_merged 
+tests/unit/test_block_uf_unification.py::test_opaque_uf_results_do_not_invent_argument_equalities 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_opaque_uf_results_do_not_invent_argument_equalities 
+tests/unit/test_block_uf_unification.py::test_sweep_merges_only_entailed_equalities 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_sweep_merges_only_entailed_equalities 
+tests/unit/test_block_uf_unification.py::test_case_split_requires_every_case 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_case_split_requires_every_case 
+tests/unit/test_block_uf_unification.py::test_timeouts_never_become_proofs 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_timeouts_never_become_proofs 
+tests/unit/test_block_uf_unification.py::test_prover_proves_through_unification_when_direct_query_is_unknown 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_prover_proves_through_unification_when_direct_query_is_unknown 
+tests/unit/test_block_uf_unification.py::test_final_query_unknown_keeps_obligation_open 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_final_query_unknown_keeps_obligation_open 
+tests/unit/test_block_uf_unification.py::test_unrefuted_lemma_invalidates_record 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_unrefuted_lemma_invalidates_record 
+tests/unit/test_block_uf_unification.py::test_square_monotonicity_axioms_hold_for_bvmul 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_square_monotonicity_axioms_hold_for_bvmul 
+tests/unit/test_block_uf_unification.py::test_equality_cache_never_transfers_to_a_weaker_premise 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_equality_cache_never_transfers_to_a_weaker_premise 
+tests/unit/test_block_uf_unification.py::test_unification_first_still_falls_back_to_mul_abstraction 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_unification_first_still_falls_back_to_mul_abstraction 
+tests/unit/test_block_uf_unification.py::test_unify_across_merges_only_under_shared_premise 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_unify_across_merges_only_under_shared_premise 
+tests/unit/test_block_uf_unification.py::test_word_rewrite_schemas_are_identities 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_word_rewrite_schemas_are_identities 
+tests/unit/test_block_uf_unification.py::test_word_rewrite_rejects_non_identities 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_word_rewrite_rejects_non_identities 
+tests/unit/test_block_uf_unification.py::test_normalize_word_arith_refutes_mstore_gas_pair 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_normalize_word_arith_refutes_mstore_gas_pair 
+tests/unit/test_block_uf_unification.py::test_normalize_word_arith_keeps_satisfiable_pairs_satisfiable 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_normalize_word_arith_keeps_satisfiable_pairs_satisfiable 
+tests/unit/test_block_uf_unification.py::test_prover_proves_mstore_gas_pair_through_normalized_route 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_prover_proves_mstore_gas_pair_through_normalized_route 
+tests/unit/test_block_uf_unification.py::test_offset_view_select_reads_x86_memory_in_evm_offsets 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_offset_view_select_reads_x86_memory_in_evm_offsets 
+tests/unit/test_block_uf_unification.py::test_multi_part_concat_join_is_checked_slice_by_slice 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_multi_part_concat_join_is_checked_slice_by_slice 
+tests/unit/test_block_uf_unification.py::test_div_quotient_axioms_are_valid_and_guarded 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_div_quotient_axioms_are_valid_and_guarded 
+tests/unit/test_block_uf_unification.py::test_mul_truncation_axioms_hold_for_bvmul 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_mul_truncation_axioms_hold_for_bvmul 
+tests/unit/test_block_uf_unification.py::test_generalized_products_prove_only_tautologies 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_generalized_products_prove_only_tautologies 
+tests/unit/test_block_uf_unification.py::test_offset_view_identity_is_proved_by_generalisation 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_offset_view_identity_is_proved_by_generalisation 
+tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_proves_the_rewrite_without_per_read_queries 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_proves_the_rewrite_without_per_read_queries 
+tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_never_accepts_a_wrong_rewrite 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_never_accepts_a_wrong_rewrite 
+tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_falls_back_on_non_syntactic_steps 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_falls_back_on_non_syntactic_steps 
+tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_is_not_cached_when_unproved 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_is_not_cached_when_unproved 
+tests/unit/test_block_uf_unification.py::test_alias_split_refutes_mstore_then_mload 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_alias_split_refutes_mstore_then_mload 
+tests/unit/test_block_uf_unification.py::test_alias_split_keeps_satisfiable_pairs_open 
+[gw1] FAILED tests/unit/test_block_uf_unification.py::test_alias_split_keeps_satisfiable_pairs_open 
+tests/unit/test_block_uf_unification.py::test_alias_split_rejects_an_unjustified_forwarding 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_alias_split_rejects_an_unjustified_forwarding 
+tests/unit/test_block_uf_unification.py::test_alias_split_needs_one_base_pair 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_alias_split_needs_one_base_pair 
+tests/unit/test_block_uf_unification.py::test_alias_split_cases_on_a_term_offset_store 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_alias_split_cases_on_a_term_offset_store 
+tests/unit/test_block_uf_unification.py::test_alias_split_term_offset_keeps_a_wrong_byte_open 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_alias_split_term_offset_keeps_a_wrong_byte_open 
+tests/unit/test_block_uf_unification.py::test_alias_split_term_offset_needs_a_free_read_constant 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_alias_split_term_offset_needs_a_free_read_constant 
+tests/unit/test_block_uf_unification.py::test_alias_split_hands_only_unknown_cases_to_the_fallback 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_alias_split_hands_only_unknown_cases_to_the_fallback 
+tests/unit/test_block_uf_unification.py::test_power_of_two_times_zero_extension_becomes_a_shift 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_power_of_two_times_zero_extension_becomes_a_shift 
+tests/unit/test_block_uf_unification.py::test_restore_rewritten_conjuncts_only_readds_conjuncts_of_the_input 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_restore_rewritten_conjuncts_only_readds_conjuncts_of_the_input 
+tests/unit/test_block_uf_unification.py::test_unify_route_survives_sweep_self_erasure 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_unify_route_survives_sweep_self_erasure 
+tests/unit/test_block_uf_unification.py::test_safe_9733_mcopy_gas_obligation_is_refuted 
+[gw1] FAILED tests/unit/test_block_uf_unification.py::test_safe_9733_mcopy_gas_obligation_is_refuted 
+tests/unit/test_block_uf_unification.py::test_telescope_step_is_an_identity 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_telescope_step_is_an_identity 
+tests/unit/test_block_uf_unification.py::test_literal_branch_is_read_as_its_word_count 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_literal_branch_is_read_as_its_word_count 
+tests/unit/test_block_uf_unification.py::test_potential_route_refutes_charges_in_different_steps 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_potential_route_refutes_charges_in_different_steps 
+tests/unit/test_block_uf_unification.py::test_potential_route_keeps_a_differing_total_unproved 
+[gw1] PASSED tests/unit/test_block_uf_unification.py::test_potential_route_keeps_a_differing_total_unproved 
+tests/unit/test_block_uf_unification.py::test_safe_11803_mcopy_gas_map_is_refuted_by_potential 
+[gw1] FAILED tests/unit/test_block_uf_unification.py::test_safe_11803_mcopy_gas_map_is_refuted_by_potential 
+tests/unit/test_block_unify_potential.py::test_f4_skips_a_pair_whose_applications_already_failed_to_merge 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_f4_skips_a_pair_whose_applications_already_failed_to_merge 
+tests/unit/test_block_unify_potential.py::test_f4_still_merges_a_pair_another_application_pair_needs 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_f4_still_merges_a_pair_another_application_pair_needs 
+tests/unit/test_block_unify_potential.py::test_f4_soundness_unprovable_arguments_are_never_merged 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_f4_soundness_unprovable_arguments_are_never_merged 
+tests/unit/test_block_unify_potential.py::test_potcap_final_solve_capped_at_four_query_timeouts 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_potcap_final_solve_capped_at_four_query_timeouts 
+tests/unit/test_block_unify_potential.py::test_potcap_sat_is_not_left_pending 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_potcap_sat_is_not_left_pending 
+tests/unit/test_block_unify_potential.py::test_potresume_every_route_fails_then_the_capped_solve_is_resumed 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_potresume_every_route_fails_then_the_capped_solve_is_resumed 
+tests/unit/test_block_unify_potential.py::test_potresume_without_a_node_deadline_nothing_is_resumed 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_potresume_without_a_node_deadline_nothing_is_resumed 
+tests/unit/test_block_unify_potential.py::test_potresume_soundness_foreign_pending_entry_is_not_claimed 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_potresume_soundness_foreign_pending_entry_is_not_claimed 
+tests/unit/test_block_unify_potential.py::test_potresume_soundness_nested_check_pending_is_not_claimed 
+[gw1] PASSED tests/unit/test_block_unify_potential.py::test_potresume_soundness_nested_check_pending_is_not_claimed 
+tests/unit/test_block_unknown_blocks.py::test_cached_timeout_no_longer_fails_entry_nonempty 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_cached_timeout_no_longer_fails_entry_nonempty 
+tests/unit/test_block_unknown_blocks.py::test_entry_premises_of_the_r3c_instances_are_sat 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_entry_premises_of_the_r3c_instances_are_sat 
+tests/unit/test_block_unknown_blocks.py::test_decided_cached_answers_are_still_trusted 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_decided_cached_answers_are_still_trusted 
+tests/unit/test_block_unknown_blocks.py::test_lambda_inside_a_bitvector_argument_is_restricted 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_lambda_inside_a_bitvector_argument_is_restricted 
+tests/unit/test_block_unknown_blocks.py::test_tiers_grow_and_end_with_every_uf 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_tiers_grow_and_end_with_every_uf 
+tests/unit/test_block_unknown_blocks.py::test_witness_never_claims_sat_for_unsat 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_witness_never_claims_sat_for_unsat 
+tests/unit/test_block_unknown_blocks.py::test_poolmanager_5802_model_domain_nonempty 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_poolmanager_5802_model_domain_nonempty 
+tests/unit/test_block_unknown_blocks.py::test_shift_split_refutes_limbwise_shl 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_shift_split_refutes_limbwise_shl 
+tests/unit/test_block_unknown_blocks.py::test_shift_split_reports_a_real_counterexample 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_shift_split_reports_a_real_counterexample 
+tests/unit/test_block_unknown_blocks.py::test_shift_split_needs_small_bounds 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_shift_split_needs_small_bounds 
+tests/unit/test_block_unknown_blocks.py::test_shift_split_empty_bounds_refute 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_shift_split_empty_bounds_refute 
+tests/unit/test_block_unknown_blocks.py::test_permit2_4837_x86_maps_14_0 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_permit2_4837_x86_maps_14_0 
+tests/unit/test_block_unknown_blocks.py::test_same_level_pairs_are_tried_first 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_same_level_pairs_are_tried_first 
+tests/unit/test_block_unknown_blocks.py::test_nesting_counts_binder_bodies 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_nesting_counts_binder_bodies 
+tests/unit/test_block_unknown_blocks.py::test_on_merge_can_stop_merging 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_on_merge_can_stop_merging 
+tests/unit/test_block_unknown_blocks.py::test_memory_merge_probe_refutes_early 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_memory_merge_probe_refutes_early 
+tests/unit/test_block_unknown_blocks.py::test_bitvector_merges_are_not_probed 
+[gw1] PASSED tests/unit/test_block_unknown_blocks.py::test_bitvector_merges_are_not_probed 
+tests/unit/test_call_provenance.py::test_measured_depth_class_numbers[CErc20] 
+[gw1] PASSED tests/unit/test_call_provenance.py::test_measured_depth_class_numbers[CErc20] 
+tests/unit/test_call_provenance.py::test_measured_depth_class_numbers[ENSRegistry] 
+[gw1] PASSED tests/unit/test_call_provenance.py::test_measured_depth_class_numbers[ENSRegistry] 
+tests/unit/test_call_provenance.py::test_measured_depth_class_numbers[Safe] 
+[gw1] PASSED tests/unit/test_call_provenance.py::test_measured_depth_class_numbers[Safe] 
+tests/unit/test_call_provenance.py::test_recovery_is_total_and_fixpoint_converges[CErc20] 
+[gw1] PASSED tests/unit/test_call_provenance.py::test_recovery_is_total_and_fixpoint_converges[CErc20] 
+tests/unit/test_call_provenance.py::test_recovery_is_total_and_fixpoint_converges[ENSRegistry] 
+[gw1] PASSED tests/unit/test_call_provenance.py::test_recovery_is_total_and_fixpoint_converges[ENSRegistry] 
+tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_x86_cfg_visualization 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_x86_cfg_visualization 
+tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_auto_detect_cfg_type 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_auto_detect_cfg_type 
+tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_get_statistics 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_get_statistics 
+tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_save_to_file 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_save_to_file 
+tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_custom_title 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGVisualizer::test_custom_title 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_evm_cfg_visualize_method 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_evm_cfg_visualize_method 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_x86_cfg_visualize_method 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_x86_cfg_visualize_method 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_three_block_json 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_three_block_json 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_real_x86_cfg 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_real_x86_cfg 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_complex_diamond_cfg 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_complex_diamond_cfg 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_muti_block_json 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_muti_block_json 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_muti_block_cfg_structure 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_muti_block_cfg_structure 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_muti_block_visualization_compact_mode 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_muti_block_visualization_compact_mode 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_muti_block_build_dynamic_cfg_real 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_muti_block_build_dynamic_cfg_real 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_static_bounded_execution 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_static_bounded_execution 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_dynamic_bounded_execution 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_dynamic_bounded_execution 
+tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_unbounded_execution 
+[gw1] PASSED tests/unit/test_cfg_visualizer.py::TestCFGIntegration::test_unbounded_execution 
+tests/unit/test_copy_induction_gate.py::test_symbolic_copy_has_complete_induction_certificate 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_symbolic_copy_has_complete_induction_certificate 
+tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[path] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[path] 
+tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[frame] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[frame] 
+tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[memory] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[memory] 
+tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[progress] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[progress] 
+tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[assumption] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_raw_cycle_mutations_cannot_mint_a_certificate[assumption] 
+tests/unit/test_copy_induction_gate.py::test_parameterized_result_must_instantiate_the_actual_candidate 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_parameterized_result_must_instantiate_the_actual_candidate 
+tests/unit/test_copy_induction_gate.py::test_lemma_is_proved_once_and_shared_across_paths_and_nodes 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_lemma_is_proved_once_and_shared_across_paths_and_nodes 
+tests/unit/test_copy_induction_gate.py::test_tampered_loop_gets_no_lemma_even_after_the_genuine_one_is_cached[bound] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_tampered_loop_gets_no_lemma_even_after_the_genuine_one_is_cached[bound] 
+tests/unit/test_copy_induction_gate.py::test_tampered_loop_gets_no_lemma_even_after_the_genuine_one_is_cached[direction] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_tampered_loop_gets_no_lemma_even_after_the_genuine_one_is_cached[direction] 
+tests/unit/test_copy_induction_gate.py::test_tampered_loop_gets_no_lemma_even_after_the_genuine_one_is_cached[step] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_tampered_loop_gets_no_lemma_even_after_the_genuine_one_is_cached[step] 
+tests/unit/test_copy_induction_gate.py::test_tampered_loop_gets_no_lemma_even_after_the_genuine_one_is_cached[store] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_tampered_loop_gets_no_lemma_even_after_the_genuine_one_is_cached[store] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_domain] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_domain] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_param_entry] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_param_entry] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_param_result] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_param_result] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_base] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_base] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[coverage] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[coverage] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_progress_] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_progress_] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_exit_] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[copy_exit_] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[effect_0] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[effect_0] 
+tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[effect_1_other] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_missing_any_obligation_is_not_proved[effect_1_other] 
+tests/unit/test_copy_induction_gate.py::test_certificate_with_an_unproved_obligation_is_not_proved 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_certificate_with_an_unproved_obligation_is_not_proved 
+tests/unit/test_copy_induction_gate.py::test_source_register_must_equal_its_pointer_field_per_hit 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_source_register_must_equal_its_pointer_field_per_hit 
+tests/unit/test_copy_induction_gate.py::test_too_coarse_key_fails_closed[residue_tag] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_too_coarse_key_fails_closed[residue_tag] 
+tests/unit/test_copy_induction_gate.py::test_too_coarse_key_fails_closed[source_provenance] 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_too_coarse_key_fails_closed[source_provenance] 
+tests/unit/test_copy_induction_gate.py::test_nontrivial_scratch_provenance_is_refused 
+[gw1] PASSED tests/unit/test_copy_induction_gate.py::test_nontrivial_scratch_provenance_is_refused 
+tests/unit/test_copy_loop_summary.py::test_copy_loop_summary_is_explicitly_enabled 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_copy_loop_summary_is_explicitly_enabled 
+tests/unit/test_copy_loop_summary.py::test_summary_precondition_error_keeps_full_premise_but_truncates_message 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_summary_precondition_error_keeps_full_premise_but_truncates_message 
+tests/unit/test_copy_loop_summary.py::test_makedata_copy_loop_summary_applies_getdata_closed_form 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_makedata_copy_loop_summary_applies_getdata_closed_form 
+tests/unit/test_copy_loop_summary.py::test_makedata_copy_loop_summary_uses_shared_relational_transformer 
+[gw1] SKIPPED tests/unit/test_copy_loop_summary.py::test_makedata_copy_loop_summary_uses_shared_relational_transformer 
+tests/unit/test_copy_loop_summary.py::test_makedata_byte_copy_rejects_unproved_symbolic_no_wrap 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_makedata_byte_copy_rejects_unproved_symbolic_no_wrap 
+tests/unit/test_copy_loop_summary.py::test_fallback_mode_executes_original_loop_after_precondition_failure 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_fallback_mode_executes_original_loop_after_precondition_failure 
+tests/unit/test_copy_loop_summary.py::test_unknown_summary_premise_is_fail_closed 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_unknown_summary_premise_is_fail_closed 
+tests/unit/test_copy_loop_summary.py::test_copy_summary_uses_runtime_precondition_timeout 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_copy_summary_uses_runtime_precondition_timeout 
+tests/unit/test_copy_loop_summary.py::test_combined_unknown_accepts_only_when_all_components_are_proved 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_combined_unknown_accepts_only_when_all_components_are_proved 
+tests/unit/test_copy_loop_summary.py::test_combined_unknown_reports_first_unproved_component 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_combined_unknown_reports_first_unproved_component 
+tests/unit/test_copy_loop_summary.py::test_combined_sat_remains_fail_closed_even_if_components_report_unsat 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_combined_sat_remains_fail_closed_even_if_components_report_unsat 
+tests/unit/test_copy_loop_summary.py::test_summary_premise_proof_forwards_exact_deep_store_chain 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_summary_premise_proof_forwards_exact_deep_store_chain 
+tests/unit/test_copy_loop_summary.py::test_summary_premise_structural_fact_fast_path_flattens_nested_and[path] 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_summary_premise_structural_fact_fast_path_flattens_nested_and[path] 
+tests/unit/test_copy_loop_summary.py::test_summary_premise_structural_fact_fast_path_flattens_nested_and[assumptions] 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_summary_premise_structural_fact_fast_path_flattens_nested_and[assumptions] 
+tests/unit/test_copy_loop_summary.py::test_summary_premise_structural_fact_fast_path_rejects_nonmatches[<lambda>-<lambda>0] 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_summary_premise_structural_fact_fast_path_rejects_nonmatches[<lambda>-<lambda>0] 
+tests/unit/test_copy_loop_summary.py::test_summary_premise_structural_fact_fast_path_rejects_nonmatches[<lambda>-<lambda>1] 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_summary_premise_structural_fact_fast_path_rejects_nonmatches[<lambda>-<lambda>1] 
+tests/unit/test_copy_loop_summary.py::test_array_reading_premise_is_tried_by_the_plain_solver_first 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_array_reading_premise_is_tried_by_the_plain_solver_first 
+tests/unit/test_copy_loop_summary.py::test_structural_fact_fallback_reuses_one_forward_cache 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_structural_fact_fallback_reuses_one_forward_cache 
+tests/unit/test_copy_loop_summary.py::test_makedata_byte_copy_rejects_shifted_source_pointer 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_makedata_byte_copy_rejects_shifted_source_pointer 
+tests/unit/test_copy_loop_summary.py::test_cerc20_copy_loop_summary_discovers_both_mcopy_clusters 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_cerc20_copy_loop_summary_discovers_both_mcopy_clusters 
+tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_applies_closed_form 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_applies_closed_form 
+tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_uses_shared_relational_transformer_when_enabled 
+[gw1] SKIPPED tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_uses_shared_relational_transformer_when_enabled 
+tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_requires_evm_pointer_tags 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_requires_evm_pointer_tags 
+tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_rejects_wrong_direction 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_rejects_wrong_direction 
+tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_rejects_small_size 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_rejects_small_size 
+tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_rejects_unproved_symbolic_no_wrap 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_high_summary_rejects_unproved_symbolic_no_wrap 
+tests/unit/test_copy_loop_summary.py::test_mcopy_high_discovery_fail_closed_on_perturbed_align_block 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_high_discovery_fail_closed_on_perturbed_align_block 
+tests/unit/test_copy_loop_summary.py::test_mcopy_low_summary_requires_evm_pointer_tags 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_low_summary_requires_evm_pointer_tags 
+tests/unit/test_copy_loop_summary.py::test_mcopy_low_summary_accepts_reversed_overlap_when_size_is_small 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_low_summary_accepts_reversed_overlap_when_size_is_small 
+tests/unit/test_copy_loop_summary.py::test_mcopy_low_summary_rejects_reversed_overlap_when_size_exceeds_qword 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_low_summary_rejects_reversed_overlap_when_size_exceeds_qword 
+tests/unit/test_copy_loop_summary.py::test_mcopy_low_signed_dispatch_proves_under_normalized_memory_base 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_low_signed_dispatch_proves_under_normalized_memory_base 
+tests/unit/test_copy_loop_summary.py::test_mcopy_low_summary_does_not_claim_an_unproved_src_final_value 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::test_mcopy_low_summary_does_not_claim_an_unproved_src_final_value 
+tests/unit/test_copy_loop_summary.py::TestStrictModeReportsUnmatchedCandidates::test_strict_is_silent_when_everything_matches 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestStrictModeReportsUnmatchedCandidates::test_strict_is_silent_when_everything_matches 
+tests/unit/test_copy_loop_summary.py::TestStrictModeReportsUnmatchedCandidates::test_strict_reports_a_template_that_is_not_proven 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestStrictModeReportsUnmatchedCandidates::test_strict_reports_a_template_that_is_not_proven 
+tests/unit/test_copy_loop_summary.py::TestStrictModeReportsUnmatchedCandidates::test_non_strict_stays_silent_on_the_same_input 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestStrictModeReportsUnmatchedCandidates::test_non_strict_stays_silent_on_the_same_input 
+tests/unit/test_copy_loop_summary.py::TestStrictModeReportsUnmatchedCandidates::test_copy_loop_shape_heuristic_needs_both_read_and_write 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestStrictModeReportsUnmatchedCandidates::test_copy_loop_shape_heuristic_needs_both_read_and_write 
+tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_external_edge_into_a_non_entry_covered_block_is_rejected 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_external_edge_into_a_non_entry_covered_block_is_rejected 
+tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_entry_only_predecessors_are_accepted 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_entry_only_predecessors_are_accepted 
+tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_covered_internal_edges_are_not_bypasses 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_covered_internal_edges_are_not_bypasses 
+tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_unresolved_indirect_jump_is_fail_closed 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_unresolved_indirect_jump_is_fail_closed 
+tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_same_block_summary_is_exempt 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_same_block_summary_is_exempt 
+tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_discovery_rejects_a_bypassed_copy_loop 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_discovery_rejects_a_bypassed_copy_loop 
+tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_discovery_keeps_the_unmodified_copy_loop_and_still_applies_it 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_discovery_keeps_the_unmodified_copy_loop_and_still_applies_it 
+tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_cerc20_mcopy_clusters_pass_a_non_vacuous_check 
+[gw1] PASSED tests/unit/test_copy_loop_summary.py::TestSingleEntryCheck::test_cerc20_mcopy_clusters_pass_a_non_vacuous_check 
+tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_havoc_and_goals_cover_every_declared_component 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_havoc_and_goals_cover_every_declared_component 
+tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_symmetry_guard_rejects_partially_bound_component[host_gas_seq] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_symmetry_guard_rejects_partially_bound_component[host_gas_seq] 
+tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_symmetry_guard_rejects_partially_bound_component[return_data_source] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_symmetry_guard_rejects_partially_bound_component[return_data_source] 
+tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_symmetry_guard_rejects_partially_bound_component[gas] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_symmetry_guard_rejects_partially_bound_component[gas] 
+tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_symmetry_guard_rejects_partially_bound_component[memory_gas] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_symmetry_guard_rejects_partially_bound_component[memory_gas] 
+tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_relation_holds_on_the_havoc_state_itself 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestComponentSymmetry::test_relation_holds_on_the_havoc_state_itself 
+tests/unit/test_cutpoint_relation.py::TestEvolvingQuantitiesAreSymbolic::test_host_gas_seq_is_havoced_to_fresh_symbols_not_zero 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestEvolvingQuantitiesAreSymbolic::test_host_gas_seq_is_havoced_to_fresh_symbols_not_zero 
+tests/unit/test_cutpoint_relation.py::TestEvolvingQuantitiesAreSymbolic::test_return_data_size_is_havoced_not_left_at_initial_zero 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestEvolvingQuantitiesAreSymbolic::test_return_data_size_is_havoced_not_left_at_initial_zero 
+tests/unit/test_cutpoint_relation.py::TestEvolvingQuantitiesAreSymbolic::test_memory_size_and_gas_are_symbolic 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestEvolvingQuantitiesAreSymbolic::test_memory_size_and_gas_are_symbolic 
+tests/unit/test_cutpoint_relation.py::TestGasIsRelational::test_gas_is_shared_across_both_sides_by_construction 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestGasIsRelational::test_gas_is_shared_across_both_sides_by_construction 
+tests/unit/test_cutpoint_relation.py::TestGasIsRelational::test_gas_goal_is_a_two_sided_equality 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestGasIsRelational::test_gas_goal_is_a_two_sided_equality 
+tests/unit/test_cutpoint_relation.py::TestMemoryGasInvariant::test_last_gas_cost_is_derived_from_memory_size 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestMemoryGasInvariant::test_last_gas_cost_is_derived_from_memory_size 
+tests/unit/test_cutpoint_relation.py::TestMemoryGasInvariant::test_memory_gas_goal_requires_both_sides_and_the_derivation 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestMemoryGasInvariant::test_memory_gas_goal_requires_both_sides_and_the_derivation 
+tests/unit/test_cutpoint_relation.py::TestReturnDataIsNotTreatedAsReadonlyEnvironment::test_readonly_environment_excludes_return_data 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestReturnDataIsNotTreatedAsReadonlyEnvironment::test_readonly_environment_excludes_return_data 
+tests/unit/test_cutpoint_relation.py::TestReturnDataIsNotTreatedAsReadonlyEnvironment::test_return_data_source_goal_covers_content_size_and_pointer 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestReturnDataIsNotTreatedAsReadonlyEnvironment::test_return_data_source_goal_covers_content_size_and_pointer 
+tests/unit/test_cutpoint_relation.py::TestDomainPredicateReadsTheRightFieldPerSide::test_evm_side_reads_the_semantic_msize_not_the_mirror 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestDomainPredicateReadsTheRightFieldPerSide::test_evm_side_reads_the_semantic_msize_not_the_mirror 
+tests/unit/test_cutpoint_relation.py::TestDomainPredicateReadsTheRightFieldPerSide::test_x86_side_reads_the_callengine_mirror 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestDomainPredicateReadsTheRightFieldPerSide::test_x86_side_reads_the_callengine_mirror 
+tests/unit/test_cutpoint_relation.py::TestDomainPredicateReadsTheRightFieldPerSide::test_side_omitted_constrains_both_representations 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestDomainPredicateReadsTheRightFieldPerSide::test_side_omitted_constrains_both_representations 
+tests/unit/test_cutpoint_relation.py::TestDomainPredicateReadsTheRightFieldPerSide::test_unknown_side_fails_hard 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestDomainPredicateReadsTheRightFieldPerSide::test_unknown_side_fails_hard 
+tests/unit/test_cutpoint_relation.py::TestDomainBoundIsTheProtocolCap::test_schema_cap_mirrors_the_interpreter_constant 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestDomainBoundIsTheProtocolCap::test_schema_cap_mirrors_the_interpreter_constant 
+tests/unit/test_cutpoint_relation.py::TestDomainBoundIsTheProtocolCap::test_protocol_cap_is_closed_under_one_expansion 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestDomainBoundIsTheProtocolCap::test_protocol_cap_is_closed_under_one_expansion 
+tests/unit/test_cutpoint_relation.py::TestDomainBoundIsTheProtocolCap::test_four_mib_bound_is_not_closed 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestDomainBoundIsTheProtocolCap::test_four_mib_bound_is_not_closed 
+tests/unit/test_cutpoint_relation.py::TestMemoryGasCostDistributesOverIte::test_distribution_preserves_semantics 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestMemoryGasCostDistributesOverIte::test_distribution_preserves_semantics 
+tests/unit/test_cutpoint_relation.py::TestMemoryGasCostDistributesOverIte::test_distribution_hoists_the_ite_above_the_multiplication 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestMemoryGasCostDistributesOverIte::test_distribution_hoists_the_ite_above_the_multiplication 
+tests/unit/test_cutpoint_relation.py::TestMemoryGasCostDistributesOverIte::test_plain_argument_is_unchanged 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestMemoryGasCostDistributesOverIte::test_plain_argument_is_unchanged 
+tests/unit/test_cutpoint_relation.py::TestFingerprint::test_fingerprint_is_stable_for_equal_schemas 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestFingerprint::test_fingerprint_is_stable_for_equal_schemas 
+tests/unit/test_cutpoint_relation.py::TestFingerprint::test_fingerprint_tracks_component_set 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestFingerprint::test_fingerprint_tracks_component_set 
+tests/unit/test_cutpoint_relation.py::TestFingerprint::test_fingerprint_tracks_host_gas_seq_kinds 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestFingerprint::test_fingerprint_tracks_host_gas_seq_kinds 
+tests/unit/test_cutpoint_relation.py::TestMemoryGasDerivationPremise::test_memory_size_stays_32_aligned_across_expansion 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestMemoryGasDerivationPremise::test_memory_size_stays_32_aligned_across_expansion 
+tests/unit/test_cutpoint_relation.py::TestMemoryGasDerivationPremise::test_last_gas_cost_tracks_memory_gas_cost_of_memory_size 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestMemoryGasDerivationPremise::test_last_gas_cost_tracks_memory_gas_cost_of_memory_size 
+tests/unit/test_cutpoint_relation.py::TestHostGasSeqComponent::test_havoc_covers_every_sequenced_opcode 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestHostGasSeqComponent::test_havoc_covers_every_sequenced_opcode 
+tests/unit/test_cutpoint_relation.py::TestHostGasSeqComponent::test_one_sided_extra_host_call_is_caught 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestHostGasSeqComponent::test_one_sided_extra_host_call_is_caught 
+tests/unit/test_cutpoint_relation.py::TestModelRangeErrorIsDistinct::test_out_of_range_depth_raises_the_dedicated_error 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestModelRangeErrorIsDistinct::test_out_of_range_depth_raises_the_dedicated_error 
+tests/unit/test_cutpoint_relation.py::TestModelRangeErrorIsDistinct::test_mismatched_byte_offset_also_uses_it 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestModelRangeErrorIsDistinct::test_mismatched_byte_offset_also_uses_it 
+tests/unit/test_cutpoint_relation.py::TestModelRangeErrorIsDistinct::test_it_is_a_valueerror_subclass_for_compatibility 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestModelRangeErrorIsDistinct::test_it_is_a_valueerror_subclass_for_compatibility 
+tests/unit/test_cutpoint_relation.py::TestPersistentInvariantsAppearInGoals::test_goals_include_persistent_invariants 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestPersistentInvariantsAppearInGoals::test_goals_include_persistent_invariants 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[block_number] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[block_number] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[block_timestamp] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[block_timestamp] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[gaslimit] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[gaslimit] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[stack_byte_offset] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[stack_byte_offset] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[memory_size] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[memory_size] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[last_gas_cost] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[last_gas_cost] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[gas_remaining] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[gas_remaining] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[return_data_size] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[return_data_size] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[return_data_pointer] 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_stale_limb_is_rejected[return_data_pointer] 
+tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_mirror_field_list_matches_what_havoc_syncs 
+[gw1] PASSED tests/unit/test_cutpoint_relation.py::TestCallengineMirrorClosure::test_mirror_field_list_matches_what_havoc_syncs 
+tests/unit/test_cutpoint_specialization.py::test_free_memory_pointer_is_a_declared_component 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_free_memory_pointer_is_a_declared_component 
+tests/unit/test_cutpoint_specialization.py::test_havoc_binds_the_new_component 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_havoc_binds_the_new_component 
+tests/unit/test_cutpoint_specialization.py::test_context_carries_the_specialization_parameters 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_context_carries_the_specialization_parameters 
+tests/unit/test_cutpoint_specialization.py::test_goals_cover_every_component_including_the_new_one 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_goals_cover_every_component_including_the_new_one 
+tests/unit/test_cutpoint_specialization.py::test_free_pointer_is_concrete_on_both_sides 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_free_pointer_is_concrete_on_both_sides 
+tests/unit/test_cutpoint_specialization.py::test_memory_size_is_concrete_on_both_sides 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_memory_size_is_concrete_on_both_sides 
+tests/unit/test_cutpoint_specialization.py::test_specialized_goals_pin_the_values_not_merely_equality 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_specialized_goals_pin_the_values_not_merely_equality 
+tests/unit/test_cutpoint_specialization.py::test_unspecialized_free_pointer_goal_is_vacuously_true 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_unspecialized_free_pointer_goal_is_vacuously_true 
+tests/unit/test_cutpoint_specialization.py::test_unspecialized_memory_size_stays_symbolic 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_unspecialized_memory_size_stays_symbolic 
+tests/unit/test_cutpoint_specialization.py::test_out_of_range_memory_size_is_rejected 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_out_of_range_memory_size_is_rejected 
+tests/unit/test_cutpoint_specialization.py::test_misaligned_memory_size_is_rejected 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_misaligned_memory_size_is_rejected 
+tests/unit/test_cutpoint_specialization.py::test_context_and_explicit_parameters_conflict 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_context_and_explicit_parameters_conflict 
+tests/unit/test_cutpoint_specialization.py::test_exit_site_drops_the_r14_reconstruction_term 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_exit_site_drops_the_r14_reconstruction_term 
+tests/unit/test_cutpoint_specialization.py::test_exit_site_still_asserts_the_byte_offset 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_exit_site_still_asserts_the_byte_offset 
+tests/unit/test_cutpoint_specialization.py::test_unknown_site_is_rejected 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_unknown_site_is_rejected 
+tests/unit/test_cutpoint_specialization.py::test_entry_is_the_default_site 
+[gw1] PASSED tests/unit/test_cutpoint_specialization.py::test_entry_is_the_default_site 
+tests/unit/test_discovery_stats.py::test_recursive_means_a_repeated_return_tag 
+[gw1] PASSED tests/unit/test_discovery_stats.py::test_recursive_means_a_repeated_return_tag 
+tests/unit/test_discovery_stats.py::test_analyze_counts_dimension_projections 
+[gw1] PASSED tests/unit/test_discovery_stats.py::test_analyze_counts_dimension_projections 
+tests/unit/test_div_bridge.py::test_collect_groups_udiv_variants_together 
+[gw1] PASSED tests/unit/test_div_bridge.py::test_collect_groups_udiv_variants_together 
+tests/unit/test_div_bridge.py::test_bridge_added_when_args_provably_equal 
+[gw1] PASSED tests/unit/test_div_bridge.py::test_bridge_added_when_args_provably_equal 
+tests/unit/test_div_bridge.py::test_no_bridge_when_args_not_provably_equal 
+[gw1] PASSED tests/unit/test_div_bridge.py::test_no_bridge_when_args_not_provably_equal 
+tests/unit/test_div_bridge.py::test_no_bridge_when_category_ambiguous 
+[gw1] PASSED tests/unit/test_div_bridge.py::test_no_bridge_when_category_ambiguous 
+tests/unit/test_div_bridge.py::test_bridge_is_truthy_lemma_not_input_restriction 
+[gw1] PASSED tests/unit/test_div_bridge.py::test_bridge_is_truthy_lemma_not_input_restriction 
+tests/unit/test_div_bridge.py::test_collect_handles_deeper_nesting_than_python_recursion_limit 
+[gw1] PASSED tests/unit/test_div_bridge.py::test_collect_handles_deeper_nesting_than_python_recursion_limit 
+tests/unit/test_div_summary.py::test_matcher_recovers_div_slice_layout 
+[gw1] PASSED tests/unit/test_div_summary.py::test_matcher_recovers_div_slice_layout 
+tests/unit/test_div_summary.py::test_matcher_finds_every_div_inside_sdiv_and_nothing_in_mod 
+[gw1] PASSED tests/unit/test_div_summary.py::test_matcher_finds_every_div_inside_sdiv_and_nothing_in_mod 
+tests/unit/test_div_summary.py::test_lemma_proves_every_path_including_builtin_bridge 
+[gw1] PASSED tests/unit/test_div_summary.py::test_lemma_proves_every_path_including_builtin_bridge 
+tests/unit/test_div_summary.py::test_lemma_rejects_a_slice_whose_builtin_reads_the_wrong_stack_slots 
+[gw1] PASSED tests/unit/test_div_summary.py::test_lemma_rejects_a_slice_whose_builtin_reads_the_wrong_stack_slots 
+tests/unit/test_div_summary.py::test_apply_rejects_unproved_stack_geometry 
+[gw0] FAILED tests/integration/test_equivalence_checker.py::test_verify_muti_block_08_program_pair_full 
+tests/integration/test_ext_contract_verification.py::test_verify_ext_ens_registry_whole_contract 
+[gw0] SKIPPED tests/integration/test_ext_contract_verification.py::test_verify_ext_ens_registry_whole_contract 
+tests/integration/test_ext_contract_verification.py::test_verify_ext_compound_cerc20_decimals_selector 
+[gw1] PASSED tests/unit/test_div_summary.py::test_apply_rejects_unproved_stack_geometry 
+tests/unit/test_div_summary.py::test_block_runtime_instantiates_the_lemma_with_a_complete_certificate 
+[gw0] PASSED tests/integration/test_ext_contract_verification.py::test_verify_ext_compound_cerc20_decimals_selector 
+tests/integration/test_ext_contract_verification.py::test_verify_ext_dabe_manager_system_admin_selector 
+[gw0] SKIPPED tests/integration/test_ext_contract_verification.py::test_verify_ext_dabe_manager_system_admin_selector 
+tests/integration/test_ext_contract_verification.py::test_verify_ext_dabe_manager_whole_contract 
+[gw0] SKIPPED tests/integration/test_ext_contract_verification.py::test_verify_ext_dabe_manager_whole_contract 
+tests/integration/test_gas_consistency_contracts.py::test_perf_erc20_lite_gas_fixed_budget 
+[gw0] PASSED tests/integration/test_gas_consistency_contracts.py::test_perf_erc20_lite_gas_fixed_budget 
+tests/integration/test_gas_consistency_contracts.py::test_perf_erc20_lite_gas_full 
+[gw0] PASSED tests/integration/test_gas_consistency_contracts.py::test_perf_erc20_lite_gas_full 
+tests/integration/test_gas_consistency_contracts.py::test_cerc20_decimals_gas[fixed_budget-gas equivalent for the fixed initial budget] 
+[gw0] PASSED tests/integration/test_gas_consistency_contracts.py::test_cerc20_decimals_gas[fixed_budget-gas equivalent for the fixed initial budget] 
+tests/integration/test_gas_consistency_contracts.py::test_cerc20_decimals_gas[full-gas and OOG paths equivalent over all initial gas values] 
+[gw1] PASSED tests/unit/test_div_summary.py::test_block_runtime_instantiates_the_lemma_with_a_complete_certificate 
+tests/unit/test_equivalence_gas_checks.py::test_both_sides_missing_gas_is_fail_closed 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_both_sides_missing_gas_is_fail_closed 
+tests/unit/test_equivalence_gas_checks.py::test_one_side_missing_gas_is_fail_closed[EVM-None-x86_gas0] 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_one_side_missing_gas_is_fail_closed[EVM-None-x86_gas0] 
+tests/unit/test_equivalence_gas_checks.py::test_one_side_missing_gas_is_fail_closed[x86-evm_gas1-None] 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_one_side_missing_gas_is_fail_closed[x86-evm_gas1-None] 
+tests/unit/test_equivalence_gas_checks.py::test_equal_gas_verifies 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_equal_gas_verifies 
+tests/unit/test_equivalence_gas_checks.py::test_differing_gas_yields_counterexample 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_differing_gas_yields_counterexample 
+tests/unit/test_equivalence_gas_checks.py::test_symbolically_differing_gas_yields_counterexample 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_symbolically_differing_gas_yields_counterexample 
+tests/unit/test_equivalence_gas_checks.py::test_inherited_unsat_base_does_not_vacuously_pass 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_inherited_unsat_base_does_not_vacuously_pass 
+tests/unit/test_equivalence_gas_checks.py::test_unknown_result_is_fail_closed 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_unknown_result_is_fail_closed 
+tests/unit/test_equivalence_gas_checks.py::test_merged_path_fails_closed_on_missing_gas 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_merged_path_fails_closed_on_missing_gas 
+tests/unit/test_equivalence_gas_checks.py::test_serial_path_pair_fails_closed_on_missing_gas 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_serial_path_pair_fails_closed_on_missing_gas 
+tests/unit/test_equivalence_gas_checks.py::test_parallel_worker_fails_closed_on_missing_gas 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_parallel_worker_fails_closed_on_missing_gas 
+tests/unit/test_equivalence_gas_checks.py::test_aggregate_fallback_fails_closed_on_missing_gas 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_aggregate_fallback_fails_closed_on_missing_gas 
+tests/unit/test_equivalence_gas_checks.py::test_gas_is_in_parallel_translation_whitelist 
+[gw1] PASSED tests/unit/test_equivalence_gas_checks.py::test_gas_is_in_parallel_translation_whitelist 
+tests/unit/test_equivalence_return_data.py::test_return_and_revert_with_same_return_data_are_equivalent_under_current_abstraction 
+[gw1] PASSED tests/unit/test_equivalence_return_data.py::test_return_and_revert_with_same_return_data_are_equivalent_under_current_abstraction 
+tests/unit/test_equivalence_return_data.py::test_stop_and_zero_length_return_are_equivalent_under_current_abstraction 
+[gw1] PASSED tests/unit/test_equivalence_return_data.py::test_stop_and_zero_length_return_are_equivalent_under_current_abstraction 
+tests/unit/test_equivalence_return_data.py::test_zero_length_fast_path_still_checks_return_presence 
+[gw1] PASSED tests/unit/test_equivalence_return_data.py::test_zero_length_fast_path_still_checks_return_presence 
+tests/unit/test_equivalence_return_data.py::test_symbolic_later_store_alias_is_not_hidden_by_memory_select_cache 
+[gw1] PASSED tests/unit/test_equivalence_return_data.py::test_symbolic_later_store_alias_is_not_hidden_by_memory_select_cache 
+tests/unit/test_equivalence_return_data.py::test_status_code_mismatch_is_counterexample 
+[gw1] PASSED tests/unit/test_equivalence_return_data.py::test_status_code_mismatch_is_counterexample 
+tests/unit/test_equivalence_return_data.py::test_missing_status_code_is_fail_closed 
+[gw1] PASSED tests/unit/test_equivalence_return_data.py::test_missing_status_code_is_fail_closed 
+tests/unit/test_equivalence_return_data.py::test_both_sides_missing_status_code_is_fail_closed 
+[gw1] PASSED tests/unit/test_equivalence_return_data.py::test_both_sides_missing_status_code_is_fail_closed 
+tests/unit/test_equivalence_return_data.py::test_status_code_with_wrong_width_is_fail_closed 
+[gw1] PASSED tests/unit/test_equivalence_return_data.py::test_status_code_with_wrong_width_is_fail_closed 
+tests/unit/test_equivalence_stack_check.py::test_stack_check_succeeds_without_concrete_host_layout_pins 
+[gw1] PASSED tests/unit/test_equivalence_stack_check.py::test_stack_check_succeeds_without_concrete_host_layout_pins 
+tests/unit/test_equivalence_stack_check.py::test_stack_check_reports_real_counterexample_instead_of_vacuous_pass 
+[gw1] PASSED tests/unit/test_equivalence_stack_check.py::test_stack_check_reports_real_counterexample_instead_of_vacuous_pass 
+tests/unit/test_equivalence_storage.py::test_storage_path_aware_fast_path_resolves_merged_if 
+[gw1] PASSED tests/unit/test_equivalence_storage.py::test_storage_path_aware_fast_path_resolves_merged_if 
+tests/unit/test_equivalence_storage.py::test_storage_path_aware_fast_path_does_not_hide_wrong_branch 
+[gw1] PASSED tests/unit/test_equivalence_storage.py::test_storage_path_aware_fast_path_does_not_hide_wrong_branch 
+tests/unit/test_equivalence_storage.py::test_storage_path_aware_fast_path_proves_store_key_expr_equality 
+[gw1] PASSED tests/unit/test_equivalence_storage.py::test_storage_path_aware_fast_path_proves_store_key_expr_equality 
+tests/unit/test_equivalence_storage.py::test_storage_calldatasize_partition_proves_noop_store_under_path 
+[gw1] PASSED tests/unit/test_equivalence_storage.py::test_storage_calldatasize_partition_proves_noop_store_under_path 
+tests/unit/test_equivalence_storage.py::test_calldatasize_partition_shape_is_exhaustive_tail_split 
+[gw1] PASSED tests/unit/test_equivalence_storage.py::test_calldatasize_partition_shape_is_exhaustive_tail_split 
+tests/unit/test_equivalence_storage.py::test_calldatasize_partition_fast_path_runs_after_exact_substitution 
+[gw1] PASSED tests/unit/test_equivalence_storage.py::test_calldatasize_partition_fast_path_runs_after_exact_substitution 
+tests/unit/test_equivalence_storage.py::test_calldatasize_partition_coalesces_remaining_exact_infeasible_range 
+[gw1] PASSED tests/unit/test_equivalence_storage.py::test_calldatasize_partition_coalesces_remaining_exact_infeasible_range 
+tests/unit/test_equivalence_storage.py::test_storage_quick_unknown_uses_infeasible_path_rescue 
+[gw1] PASSED tests/unit/test_equivalence_storage.py::test_storage_quick_unknown_uses_infeasible_path_rescue 
+tests/unit/test_error.py::test_revert_error_code_matches_x86_status_code 
+[gw1] PASSED tests/unit/test_error.py::test_revert_error_code_matches_x86_status_code 
+tests/unit/test_error.py::test_return_error_code_matches_x86_status_code 
+[gw1] PASSED tests/unit/test_error.py::test_return_error_code_matches_x86_status_code 
+tests/unit/test_error.py::test_invalid_error_code_matches_x86_status_code 
+[gw1] PASSED tests/unit/test_error.py::test_invalid_error_code_matches_x86_status_code 
+tests/unit/test_error.py::test_stop_error_code_matches_x86_status_code 
+[gw1] PASSED tests/unit/test_error.py::test_stop_error_code_matches_x86_status_code 
+tests/unit/test_error.py::test_jump_to_invalid_dest_error_code 
+[gw1] PASSED tests/unit/test_error.py::test_jump_to_invalid_dest_error_code 
+tests/unit/test_error.py::test_jumpi_to_invalid_dest_error_code 
+[gw1] PASSED tests/unit/test_error.py::test_jumpi_to_invalid_dest_error_code 
+tests/unit/test_error.py::test_jumpi_cond_zero_no_error 
+[gw1] PASSED tests/unit/test_error.py::test_jumpi_cond_zero_no_error 
+tests/unit/test_error.py::test_tag_stack_underflow_program_level 
+[gw1] PASSED tests/unit/test_error.py::test_tag_stack_underflow_program_level 
+tests/unit/test_error.py::test_tag_stack_reached_limit_program_level 
+[gw1] PASSED tests/unit/test_error.py::test_tag_stack_reached_limit_program_level 
+tests/unit/test_error.py::test_tag_depth_guard_prunes_unsatisfiable_error_paths 
+[gw1] PASSED tests/unit/test_error.py::test_tag_depth_guard_prunes_unsatisfiable_error_paths 
+tests/unit/test_error.py::test_tag_depth_guard_keeps_all_symbolic_regions 
+[gw1] PASSED tests/unit/test_error.py::test_tag_depth_guard_keeps_all_symbolic_regions 
+tests/unit/test_error.py::test_tag_depth_guard_drops_impossible_normal_terminal 
+[gw1] PASSED tests/unit/test_error.py::test_tag_depth_guard_drops_impossible_normal_terminal 
+tests/unit/test_error.py::test_no_final_state_has_literally_false_condition 
+[gw0] PASSED tests/integration/test_gas_consistency_contracts.py::test_cerc20_decimals_gas[full-gas and OOG paths equivalent over all initial gas values] 
+tests/integration/test_gas_consistency_contracts.py::test_ens_registry_owner_gas_fixed_budget 
+[gw1] PASSED tests/unit/test_error.py::test_no_final_state_has_literally_false_condition 
+tests/unit/test_error.py::test_tag_depth_guard_models_overflow_at_max_depth_1024 
+[gw1] PASSED tests/unit/test_error.py::test_tag_depth_guard_models_overflow_at_max_depth_1024 
+tests/unit/test_error.py::test_tag_depth_guard_underflow_takes_priority_over_overflow 
+[gw1] PASSED tests/unit/test_error.py::test_tag_depth_guard_underflow_takes_priority_over_overflow 
+tests/unit/test_error.py::test_block_without_tag_has_no_depth_guard 
+[gw1] PASSED tests/unit/test_error.py::test_block_without_tag_has_no_depth_guard 
+tests/unit/test_error.py::test_missing_max_depth_defaults_to_go_initial_value 
+[gw1] PASSED tests/unit/test_error.py::test_missing_max_depth_defaults_to_go_initial_value 
+tests/unit/test_error.py::test_returndatacopy_out_of_bounds_status_matches_x86 
+[gw1] PASSED tests/unit/test_error.py::test_returndatacopy_out_of_bounds_status_matches_x86 
+tests/unit/test_error.py::test_returndatacopy_data_offset_overflow_status_matches_x86 
+[gw1] PASSED tests/unit/test_error.py::test_returndatacopy_data_offset_overflow_status_matches_x86 
+tests/unit/test_error.py::test_returndatacopy_in_bounds_x86_reaches_stop_exit 
+[gw1] PASSED tests/unit/test_error.py::test_returndatacopy_in_bounds_x86_reaches_stop_exit 
+tests/unit/test_error.py::test_returndatacopy_oob_then_stop_keeps_error_status 
+[gw1] PASSED tests/unit/test_error.py::test_returndatacopy_oob_then_stop_keeps_error_status 
+tests/unit/test_error.py::test_returndatacopy_symbolic_offset_splits_exclusive_covering_paths 
+[gw1] PASSED tests/unit/test_error.py::test_returndatacopy_symbolic_offset_splits_exclusive_covering_paths 
+tests/unit/test_error.py::test_static_invalid_jump_produces_terminal_status_not_exception 
+[gw1] PASSED tests/unit/test_error.py::test_static_invalid_jump_produces_terminal_status_not_exception 
+tests/unit/test_error.py::test_program_without_jumpdest_makes_every_jump_invalid 
+[gw1] PASSED tests/unit/test_error.py::test_program_without_jumpdest_makes_every_jump_invalid 
+tests/unit/test_error.py::test_mutated_status_immediate_is_detected 
+[gw1] PASSED tests/unit/test_error.py::test_mutated_status_immediate_is_detected 
+tests/unit/test_error.py::test_returndatacopy_symbolic_offset_status_matches_x86_end_to_end 
+[gw1] PASSED tests/unit/test_error.py::test_returndatacopy_symbolic_offset_status_matches_x86_end_to_end 
+tests/unit/test_error.py::test_symbolic_condition_invalid_jumpi_splits_instead_of_raising 
+[gw1] PASSED tests/unit/test_error.py::test_symbolic_condition_invalid_jumpi_splits_instead_of_raising 
+tests/unit/test_error.py::test_copy_with_unconsumed_pending_error_fails_closed 
+[gw1] PASSED tests/unit/test_error.py::test_copy_with_unconsumed_pending_error_fails_closed 
+tests/unit/test_evm_coverage_certificate.py::test_dfs_strategy_counts_depth_pruned_states 
+[gw1] PASSED tests/unit/test_evm_coverage_certificate.py::test_dfs_strategy_counts_depth_pruned_states 
+tests/unit/test_evm_coverage_certificate.py::test_loop_free_program_certificate_complete 
+[gw1] PASSED tests/unit/test_evm_coverage_certificate.py::test_loop_free_program_certificate_complete 
+tests/unit/test_evm_coverage_certificate.py::test_depth_pruned_loop_certificate_incomplete 
+[gw1] PASSED tests/unit/test_evm_coverage_certificate.py::test_depth_pruned_loop_certificate_incomplete 
+tests/unit/test_evm_coverage_certificate.py::test_fallthrough_off_end_marks_incomplete 
+[gw1] PASSED tests/unit/test_evm_coverage_certificate.py::test_fallthrough_off_end_marks_incomplete 
+tests/unit/test_evm_coverage_certificate.py::test_to_z3_merged_result_carries_certificate 
+[gw1] PASSED tests/unit/test_evm_coverage_certificate.py::test_to_z3_merged_result_carries_certificate 
+tests/unit/test_evm_coverage_certificate.py::test_merged_coverage_failure_fail_closed 
+[gw1] PASSED tests/unit/test_evm_coverage_certificate.py::test_merged_coverage_failure_fail_closed 
+tests/unit/test_evm_ir_parser.py::test_operator_parses_immediate_set 
+[gw1] PASSED tests/unit/test_evm_ir_parser.py::test_operator_parses_immediate_set 
+tests/unit/test_evm_ir_parser.py::test_operator_without_immediate_set_defaults_to_none 
+[gw1] PASSED tests/unit/test_evm_ir_parser.py::test_operator_without_immediate_set_defaults_to_none 
+tests/unit/test_evm_ir_parser.py::test_json_parsing 
+[gw1] PASSED tests/unit/test_evm_ir_parser.py::test_json_parsing 
+tests/unit/test_evm_state.py::TestEVMStackState::test_initial_stack 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_initial_stack 
+tests/unit/test_evm_state.py::TestEVMStackState::test_push_single_value 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_push_single_value 
+tests/unit/test_evm_state.py::TestEVMStackState::test_pop_single_value 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_pop_single_value 
+tests/unit/test_evm_state.py::TestEVMStackState::test_dup1 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_dup1 
+tests/unit/test_evm_state.py::TestEVMStackState::test_dup2 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_dup2 
+tests/unit/test_evm_state.py::TestEVMStackState::test_dup_invalid_range 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_dup_invalid_range 
+tests/unit/test_evm_state.py::TestEVMStackState::test_swap1 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_swap1 
+tests/unit/test_evm_state.py::TestEVMStackState::test_swap_invalid_range 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_swap_invalid_range 
+tests/unit/test_evm_state.py::TestEVMStackState::test_peek 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_peek 
+tests/unit/test_evm_state.py::TestEVMStackState::test_back 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_back 
+tests/unit/test_evm_state.py::TestEVMStackState::test_copy 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStackState::test_copy 
+tests/unit/test_evm_state.py::TestSMTInitialState::test_initial_calldata_size_is_shared_symbolic_u64 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTInitialState::test_initial_calldata_size_is_shared_symbolic_u64 
+tests/unit/test_evm_state.py::TestSMTInitialState::test_initial_calldata_size_can_be_fixed 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTInitialState::test_initial_calldata_size_can_be_fixed 
+tests/unit/test_evm_state.py::TestSMTInitialState::test_initial_calldata_size_must_fit_uint64 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTInitialState::test_initial_calldata_size_must_fit_uint64 
+tests/unit/test_evm_state.py::TestSMTInitialState::test_symbolic_calldata_size_can_have_uint64_upper_bound 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTInitialState::test_symbolic_calldata_size_can_have_uint64_upper_bound 
+tests/unit/test_evm_state.py::TestSMTInitialState::test_calldata_size_upper_bound_is_validated 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTInitialState::test_calldata_size_upper_bound_is_validated 
+tests/unit/test_evm_state.py::TestSMTInitialState::test_return_data_size_defaults_to_zero_on_both_sides 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTInitialState::test_return_data_size_defaults_to_zero_on_both_sides 
+tests/unit/test_evm_state.py::TestSMTInitialState::test_return_data_size_is_written_to_both_sides 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTInitialState::test_return_data_size_is_written_to_both_sides 
+tests/unit/test_evm_state.py::TestSMTInitialState::test_return_data_size_must_fit_uint64 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTInitialState::test_return_data_size_must_fit_uint64 
+tests/unit/test_evm_state.py::TestEVMStorageState::test_initial_storage 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStorageState::test_initial_storage 
+tests/unit/test_evm_state.py::TestEVMStorageState::test_sload 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStorageState::test_sload 
+tests/unit/test_evm_state.py::TestEVMStorageState::test_sstore 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStorageState::test_sstore 
+tests/unit/test_evm_state.py::TestEVMStorageState::test_sload_invalid_key_size 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStorageState::test_sload_invalid_key_size 
+tests/unit/test_evm_state.py::TestEVMStorageState::test_sstore_invalid_value_size 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStorageState::test_sstore_invalid_value_size 
+tests/unit/test_evm_state.py::TestEVMStorageState::test_copy 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMStorageState::test_copy 
+tests/unit/test_evm_state.py::TestEVMGasState::test_initial_gas 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMGasState::test_initial_gas 
+tests/unit/test_evm_state.py::TestEVMGasState::test_consume_static 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMGasState::test_consume_static 
+tests/unit/test_evm_state.py::TestEVMGasState::test_consume_static_is_plain_subtraction 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMGasState::test_consume_static_is_plain_subtraction 
+tests/unit/test_evm_state.py::TestEVMGasState::test_consume_dynamic 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMGasState::test_consume_dynamic 
+tests/unit/test_evm_state.py::TestEVMGasState::test_is_out_of_gas 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMGasState::test_is_out_of_gas 
+tests/unit/test_evm_state.py::TestEVMGasState::test_copy 
+[gw1] PASSED tests/unit/test_evm_state.py::TestEVMGasState::test_copy 
+tests/unit/test_evm_state.py::TestSMTState::test_initial_state 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTState::test_initial_state 
+tests/unit/test_evm_state.py::TestSMTState::test_copy_state 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTState::test_copy_state 
+tests/unit/test_evm_state.py::TestSMTState::test_state_with_operations 
+[gw1] PASSED tests/unit/test_evm_state.py::TestSMTState::test_state_with_operations 
+tests/unit/test_evm_storage_gas.py::TestEVMStorageOperations::test_sload_operation 
+[gw1] PASSED tests/unit/test_evm_storage_gas.py::TestEVMStorageOperations::test_sload_operation 
+tests/unit/test_evm_storage_gas.py::TestEVMStorageOperations::test_sstore_operation 
+[gw1] PASSED tests/unit/test_evm_storage_gas.py::TestEVMStorageOperations::test_sstore_operation 
+tests/unit/test_evm_storage_gas.py::TestEVMStorageOperations::test_sload_sstore_sequence 
+[gw1] PASSED tests/unit/test_evm_storage_gas.py::TestEVMStorageOperations::test_sload_sstore_sequence 
+tests/unit/test_evm_storage_gas.py::TestEVMGasOperations::test_sload_gas_consumption 
+[gw1] PASSED tests/unit/test_evm_storage_gas.py::TestEVMGasOperations::test_sload_gas_consumption 
+tests/unit/test_evm_storage_gas.py::TestEVMGasOperations::test_sstore_gas_consumption 
+[gw1] PASSED tests/unit/test_evm_storage_gas.py::TestEVMGasOperations::test_sstore_gas_consumption 
+tests/unit/test_evm_storage_gas.py::TestEVMGasOperations::test_multiple_operations_gas 
+[gw1] PASSED tests/unit/test_evm_storage_gas.py::TestEVMGasOperations::test_multiple_operations_gas 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_normal_input_leaves_no_error_branch 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_normal_input_leaves_no_error_branch 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_zero_length_skips_offset_check 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_zero_length_skips_offset_check 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_length_not_uint64_is_first_branch 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_length_not_uint64_is_first_branch 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_offset_not_uint64_when_length_nonzero 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_offset_not_uint64_when_length_nonzero 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_offset_plus_length_carry 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_offset_plus_length_carry 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_all_branches_are_pre_fee_snapshots 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_all_branches_are_pre_fee_snapshots 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_symbolic_operands_keep_branches_live 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64::test_symbolic_operands_keep_branches_live 
+tests/unit/test_gas_error_codes.py::TestMemSizeCap::test_cap_exceeded_gives_out_of_gas_not_overflow 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestMemSizeCap::test_cap_exceeded_gives_out_of_gas_not_overflow 
+tests/unit/test_gas_error_codes.py::TestMemSizeCap::test_requested_equal_to_cap_is_allowed 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestMemSizeCap::test_requested_equal_to_cap_is_allowed 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64WithUint::test_no_length_branches 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64WithUint::test_no_length_branches 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64WithUint::test_offset_overflow_detected 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64WithUint::test_offset_overflow_detected 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64WithUint::test_normal_offset 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64WithUint::test_normal_offset 
+tests/unit/test_gas_error_codes.py::TestCalcMemSize64WithUint::test_zero_const_size_is_fail_closed 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCalcMemSize64WithUint::test_zero_const_size_is_fail_closed 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasNormalPath::test_plain_subtraction_no_clamp 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasNormalPath::test_plain_subtraction_no_clamp 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasNormalPath::test_second_expansion_charges_delta_only 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasNormalPath::test_second_expansion_charges_delta_only 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasNormalPath::test_word_fee_folded_into_total 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasNormalPath::test_word_fee_folded_into_total 
+tests/unit/test_gas_error_codes.py::TestGasStateEvolvesInAllModes::test_memory_grow_matches_ir_bookkeeping_without_symbolic_gas 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestGasStateEvolvesInAllModes::test_memory_grow_matches_ir_bookkeeping_without_symbolic_gas 
+tests/unit/test_gas_error_codes.py::TestGasStateEvolvesInAllModes::test_static_oog_after_dynamic_consumption_in_earlier_block[9-2] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestGasStateEvolvesInAllModes::test_static_oog_after_dynamic_consumption_in_earlier_block[9-2] 
+tests/unit/test_gas_error_codes.py::TestGasStateEvolvesInAllModes::test_static_oog_after_dynamic_consumption_in_earlier_block[8-12] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestGasStateEvolvesInAllModes::test_static_oog_after_dynamic_consumption_in_earlier_block[8-12] 
+tests/unit/test_gas_error_codes.py::TestGasStateEvolvesInAllModes::test_static_then_dynamic_gas_accumulates_before_oog 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestGasStateEvolvesInAllModes::test_static_then_dynamic_gas_accumulates_before_oog 
+tests/unit/test_gas_error_codes.py::TestCreateOpsNowInGasScope::test_not_rejected_by_dynamic_gas_guard[EXTCODECOPY] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCreateOpsNowInGasScope::test_not_rejected_by_dynamic_gas_guard[EXTCODECOPY] 
+tests/unit/test_gas_error_codes.py::TestCreateOpsNowInGasScope::test_not_rejected_by_dynamic_gas_guard[CREATE] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCreateOpsNowInGasScope::test_not_rejected_by_dynamic_gas_guard[CREATE] 
+tests/unit/test_gas_error_codes.py::TestCreateOpsNowInGasScope::test_not_rejected_by_dynamic_gas_guard[CREATE2] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestCreateOpsNowInGasScope::test_not_rejected_by_dynamic_gas_guard[CREATE2] 
+tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_return_gas_raises_oog_threshold[CREATE-2] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_return_gas_raises_oog_threshold[CREATE-2] 
+tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_return_gas_raises_oog_threshold[CREATE2-8] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_return_gas_raises_oog_threshold[CREATE2-8] 
+tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_still_oog_when_return_gas_insufficient[CREATE-2] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_still_oog_when_return_gas_insufficient[CREATE-2] 
+tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_still_oog_when_return_gas_insufficient[CREATE2-8] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_still_oog_when_return_gas_insufficient[CREATE2-8] 
+tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_return_gas_cancels_in_final_value[CREATE] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_return_gas_cancels_in_final_value[CREATE] 
+tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_return_gas_cancels_in_final_value[CREATE2] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestReturnGasWindow::test_return_gas_cancels_in_final_value[CREATE2] 
+tests/unit/test_gas_error_codes.py::TestReturndatacopySnapshotPoints::test_gas_branch_snapshot_keeps_operands_on_stack 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestReturndatacopySnapshotPoints::test_gas_branch_snapshot_keeps_operands_on_stack 
+tests/unit/test_gas_error_codes.py::TestReturndatacopySnapshotPoints::test_oob_branch_snapshot_is_after_pop 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestReturndatacopySnapshotPoints::test_oob_branch_snapshot_is_after_pop 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_mcopy_max_is_compared_at_256_bits 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_mcopy_max_is_compared_at_256_bits 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_mcopy_picks_larger_offset 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_mcopy_picks_larger_offset 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[MSTORE-operands0-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[MSTORE-operands0-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[MSTORE8-operands1-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[MSTORE8-operands1-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[MLOAD-operands2-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[MLOAD-operands2-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[RETURN-operands3-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[RETURN-operands3-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[REVERT-operands4-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[REVERT-operands4-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[SHA3-operands5-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[SHA3-operands5-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[CALLDATACOPY-operands6-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[CALLDATACOPY-operands6-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[CODECOPY-operands7-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[CODECOPY-operands7-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[RETURNDATACOPY-operands8-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[RETURNDATACOPY-operands8-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[LOG-operands9-0] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[LOG-operands9-0] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[EXTCODECOPY-operands10-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[EXTCODECOPY-operands10-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[CREATE-operands11-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[CREATE-operands11-None] 
+tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[CREATE2-operands12-None] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestPerOpcodeWiring::test_offset_overflow_yields_gas_uint_overflow[CREATE2-operands12-None] 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_concrete_gas_prunes_branch 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_concrete_gas_prunes_branch 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_symbolic_gas_forks_with_correct_condition 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_symbolic_gas_forks_with_correct_condition 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_snapshot_is_post_fee 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_snapshot_is_post_fee 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_boundary_total_fee_versus_gas[3-False] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_boundary_total_fee_versus_gas[3-False] 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_boundary_total_fee_versus_gas[2-True] 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_boundary_total_fee_versus_gas[2-True] 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_pre_fee_snapshot_keeps_old_last_gas_cost 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_pre_fee_snapshot_keeps_old_last_gas_cost 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_each_branch_owns_its_snapshot 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_each_branch_owns_its_snapshot 
+tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_snapshot_works_when_other_branches_already_queued 
+[gw1] PASSED tests/unit/test_gas_error_codes.py::TestChargeDynamicGasE4::test_snapshot_works_when_other_branches_already_queued 
+tests/unit/test_gas_stage0_semantics.py::TestGasOpcodeRefund::test_gas_pushes_remaining_plus_after_gas 
+[gw1] PASSED tests/unit/test_gas_stage0_semantics.py::TestGasOpcodeRefund::test_gas_pushes_remaining_plus_after_gas 
+tests/unit/test_gas_stage0_semantics.py::TestGasOpcodeRefund::test_gas_high_bits_zero 
+[gw1] PASSED tests/unit/test_gas_stage0_semantics.py::TestGasOpcodeRefund::test_gas_high_bits_zero 
+tests/unit/test_gas_stage0_semantics.py::TestGasOpcodeRefund::test_gas_bare_op_fallback 
+[gw1] PASSED tests/unit/test_gas_stage0_semantics.py::TestGasOpcodeRefund::test_gas_bare_op_fallback 
+tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_uses_byte_size_directly 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_uses_byte_size_directly 
+tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_larger_size 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_larger_size 
+tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_uses_byte_size_in_all_modes 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_uses_byte_size_in_all_modes 
+tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_does_not_shrink 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_does_not_shrink 
+tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_still_expands_when_larger 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMemoryGrowBuiltin::test_memory_grow_still_expands_when_larger 
+tests/unit/test_gas_stage1_memory.py::TestMemoryExpansionGasHelper::test_first_expansion_charges_gas 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMemoryExpansionGasHelper::test_first_expansion_charges_gas 
+tests/unit/test_gas_stage1_memory.py::TestMemoryExpansionGasHelper::test_second_same_range_charges_zero 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMemoryExpansionGasHelper::test_second_same_range_charges_zero 
+tests/unit/test_gas_stage1_memory.py::TestMemoryExpansionGasHelper::test_quad_div_is_128bit_for_bridge 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMemoryExpansionGasHelper::test_quad_div_is_128bit_for_bridge 
+tests/unit/test_gas_stage1_memory.py::TestMloadMstore8GasWiring::test_mload_gas_matches_mstore 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMloadMstore8GasWiring::test_mload_gas_matches_mstore 
+tests/unit/test_gas_stage1_memory.py::TestMloadMstore8GasWiring::test_mstore8_charges_smaller_or_equal 
+[gw1] PASSED tests/unit/test_gas_stage1_memory.py::TestMloadMstore8GasWiring::test_mstore8_charges_smaller_or_equal 
+tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_allows_static_gas_ops 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_allows_static_gas_ops 
+tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_rejects_dynamic_gas_ops_before_x86_execution 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_rejects_dynamic_gas_ops_before_x86_execution 
+tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_allows_log 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_allows_log 
+tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_allows_host_uf_ops 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_allows_host_uf_ops 
+tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_allows_create_family 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_stage0_gas_guard_allows_create_family 
+tests/unit/test_gas_verifier_stage0_guard.py::test_dynamic_gas_allowlist_has_no_gap 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_dynamic_gas_allowlist_has_no_gap 
+tests/unit/test_gas_verifier_stage0_guard.py::test_dynamic_gas_allowlist_rejects_unmodeled_kind 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_dynamic_gas_allowlist_rejects_unmodeled_kind 
+tests/unit/test_gas_verifier_stage0_guard.py::test_manual_reject_hook_still_works 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_manual_reject_hook_still_works 
+tests/unit/test_gas_verifier_stage0_guard.py::test_cli_parse_args_exposes_gas_check 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_cli_parse_args_exposes_gas_check 
+tests/unit/test_gas_verifier_stage0_guard.py::test_cli_gas_check_defaults_to_off 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_cli_gas_check_defaults_to_off 
+tests/unit/test_gas_verifier_stage0_guard.py::test_cli_gas_check_rejects_unknown_mode usage: main.py [-h] [--base-addr ADDR] [--timeout MS] [--verbose]
+               [--gas-check {off,fixed-budget,full}] [--gas-budget GAS_BUDGET]
+               [--proof-mode {paths,block-lockstep}] [--num-inputs NUM_INPUTS]
+               [--block-fallback {none,full-program}]
+               ir_json_path x86_hex
+main.py: error: argument --gas-check: invalid choice: 'bogus' (choose from 'off', 'fixed-budget', 'full')
+
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_cli_gas_check_rejects_unknown_mode 
+tests/unit/test_gas_verifier_stage0_guard.py::test_verify_programs_wires_gas_mode_to_matching_initial_gas 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_verify_programs_wires_gas_mode_to_matching_initial_gas 
+tests/unit/test_gas_verifier_stage0_guard.py::test_static_gas_without_tag_is_rejected 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_static_gas_without_tag_is_rejected 
+tests/unit/test_gas_verifier_stage0_guard.py::test_zero_static_gas_without_tag_is_allowed 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_zero_static_gas_without_tag_is_allowed 
+tests/unit/test_gas_verifier_stage0_guard.py::test_ir_invariant_applies_regardless_of_gas_mode 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_ir_invariant_applies_regardless_of_gas_mode 
+tests/unit/test_gas_verifier_stage0_guard.py::test_cli_prints_full_scope_message_without_verbose 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_cli_prints_full_scope_message_without_verbose 
+tests/unit/test_gas_verifier_stage0_guard.py::test_cli_does_not_synthesize_its_own_verdict_text 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_cli_does_not_synthesize_its_own_verdict_text 
+tests/unit/test_gas_verifier_stage0_guard.py::test_cli_fails_closed_when_success_has_no_scope_message 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_cli_fails_closed_when_success_has_no_scope_message 
+tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_names_the_ops_without_a_bound 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_names_the_ops_without_a_bound 
+tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_returns_empty_when_every_host_op_is_bounded 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_returns_empty_when_every_host_op_is_bounded 
+tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_fails_closed_when_the_ir_cannot_be_walked[broken0] 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_fails_closed_when_the_ir_cannot_be_walked[broken0] 
+tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_fails_closed_when_the_ir_cannot_be_walked[broken1] 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_fails_closed_when_the_ir_cannot_be_walked[broken1] 
+tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_fails_closed_when_the_ir_cannot_be_walked[broken2] 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_unbounded_scan_fails_closed_when_the_ir_cannot_be_walked[broken2] 
+tests/unit/test_gas_verifier_stage0_guard.py::test_scope_message_says_unknown_when_coverage_cannot_be_determined 
+[gw1] PASSED tests/unit/test_gas_verifier_stage0_guard.py::test_scope_message_says_unknown_when_coverage_cannot_be_determined 
+tests/unit/test_go_function_semantics.py::TestPopPush::test_pop_single_value 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestPopPush::test_pop_single_value 
+tests/unit/test_go_function_semantics.py::TestPopPush::test_push_then_pop_roundtrip 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestPopPush::test_push_then_pop_roundtrip 
+tests/unit/test_go_function_semantics.py::TestPopPush::test_pop_two_values_order 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestPopPush::test_pop_two_values_order 
+tests/unit/test_go_function_semantics.py::TestSloadSstore::test_sstore_modifies_storage 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSloadSstore::test_sstore_modifies_storage 
+tests/unit/test_go_function_semantics.py::TestSloadSstore::test_sload_reads_storage 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSloadSstore::test_sload_reads_storage 
+tests/unit/test_go_function_semantics.py::TestSloadSstore::test_sstore_sload_roundtrip 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSloadSstore::test_sstore_sload_roundtrip 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_staticcall_writes_symbolic_return_data 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_staticcall_writes_symbolic_return_data 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_return_data_range_is_decided_in_offset_space_like_evm 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_return_data_range_is_decided_in_offset_space_like_evm 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_staticcall_same_args_different_pc_are_independent 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_staticcall_same_args_different_pc_are_independent 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_staticcall_updates_return_data_source_and_callengine_mirror 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_staticcall_updates_return_data_source_and_callengine_mirror 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_and_x86_call_family_agree_on_return_data_source[CALL-3-call-stack_values0] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_and_x86_call_family_agree_on_return_data_source[CALL-3-call-stack_values0] 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_and_x86_call_family_agree_on_return_data_source[CALLCODE-6-callCode-stack_values1] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_and_x86_call_family_agree_on_return_data_source[CALLCODE-6-callCode-stack_values1] 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_and_x86_call_family_agree_on_return_data_source[DELEGATECALL-7-delegateCall-stack_values2] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_and_x86_call_family_agree_on_return_data_source[DELEGATECALL-7-delegateCall-stack_values2] 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_and_x86_call_family_agree_on_return_data_source[STATICCALL-5-staticCall-stack_values3] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_and_x86_call_family_agree_on_return_data_source[STATICCALL-5-staticCall-stack_values3] 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_call_return_data_source_is_not_left_at_initial_value 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_evm_call_return_data_source_is_not_left_at_initial_value 
+tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_apply_clears_caller_saved_pointer_tags 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestCallFamilyEffects::test_apply_clears_caller_saved_pointer_tags 
+tests/unit/test_go_function_semantics.py::TestExtCodeCopyEffects::test_extcodecopy_writes_symbolic_bytes_to_x86_memory 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestExtCodeCopyEffects::test_extcodecopy_writes_symbolic_bytes_to_x86_memory 
+tests/unit/test_go_function_semantics.py::TestExtCodeCopyEffects::test_extcodecopy_zero_size_leaves_x86_memory_unchanged 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestExtCodeCopyEffects::test_extcodecopy_zero_size_leaves_x86_memory_unchanged 
+tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_gas_cost 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_gas_cost 
+tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_div 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_div 
+tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_div_by_zero 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_div_by_zero 
+tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_mod 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_mod 
+tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_exp 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestBuiltinFunctions::test_builtin_exp 
+tests/unit/test_go_function_semantics.py::TestExtractMethods::test_extract_from_real_go_bridge_block 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestExtractMethods::test_extract_from_real_go_bridge_block 
+tests/unit/test_go_function_semantics.py::TestStorageEquivalence::test_same_storage_is_equivalent 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestStorageEquivalence::test_same_storage_is_equivalent 
+tests/unit/test_go_function_semantics.py::TestStorageEquivalence::test_different_storage_not_equivalent 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestStorageEquivalence::test_different_storage_not_equivalent 
+tests/unit/test_go_function_semantics.py::TestStorageEquivalence::test_same_write_is_equivalent 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestStorageEquivalence::test_same_write_is_equivalent 
+tests/unit/test_go_function_semantics.py::TestErrorHandling::test_host_func_index_none_warns_and_skips 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestErrorHandling::test_host_func_index_none_warns_and_skips 
+tests/unit/test_go_function_semantics.py::TestErrorHandling::test_host_func_index_unknown_raises_error 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestErrorHandling::test_host_func_index_unknown_raises_error 
+tests/unit/test_go_function_semantics.py::TestErrorHandling::test_builtin_func_index_none_warns_and_skips 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestErrorHandling::test_builtin_func_index_none_warns_and_skips 
+tests/unit/test_go_function_semantics.py::TestErrorHandling::test_builtin_func_index_unknown_raises_error 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestErrorHandling::test_builtin_func_index_unknown_raises_error 
+tests/unit/test_go_function_semantics.py::TestErrorHandling::test_unknown_host_function_raises_error 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestErrorHandling::test_unknown_host_function_raises_error 
+tests/unit/test_go_function_semantics.py::TestErrorHandling::test_unknown_builtin_function_raises_error 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestErrorHandling::test_unknown_builtin_function_raises_error 
+tests/unit/test_go_function_semantics.py::TestErrorHandling::test_misaligned_sp_raises_stack_alignment_error 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestErrorHandling::test_misaligned_sp_raises_stack_alignment_error 
+tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_uses_x86_memory 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_uses_x86_memory 
+tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_fast_path_ignores_slice_external_writes 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_fast_path_ignores_slice_external_writes 
+tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_fast_path_equates_different_write_order 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_fast_path_equates_different_write_order 
+tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_fast_path_uses_concrete_length_data_width 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_fast_path_uses_concrete_length_data_width 
+tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_single_byte_fast_path_hashes_the_byte 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_single_byte_fast_path_hashes_the_byte 
+tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_single_byte_x86_handler_matches_shared_semantics 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_single_byte_x86_handler_matches_shared_semantics 
+tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_length_identity_keeps_same_padding_unconstrained 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_length_identity_keeps_same_padding_unconstrained 
+tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_symbolic_length_uses_slice_fallback 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestSha3Memory::test_sha3_symbolic_length_uses_slice_fallback 
+tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_matching_stack_value_pops_matching_topics 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_matching_stack_value_pops_matching_topics 
+tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_matches_low64_when_topic_count_high_limbs_are_dirty 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_matches_low64_when_topic_count_high_limbs_are_dirty 
+tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_mismatching_stack_value_raises 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_mismatching_stack_value_raises 
+tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_with_symbolic_stack_value_raises 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_with_symbolic_stack_value_raises 
+tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_out_of_log_range_raises_even_if_stack_matches 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_evm_immediate_out_of_log_range_raises_even_if_stack_matches 
+tests/unit/test_go_function_semantics.py::TestLog::test_evm_and_x86_create_family_agree_on_return_data_source[CREATE-8-create-stack_values0] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_evm_and_x86_create_family_agree_on_return_data_source[CREATE-8-create-stack_values0] 
+tests/unit/test_go_function_semantics.py::TestLog::test_evm_and_x86_create_family_agree_on_return_data_source[CREATE2-9-create2-stack_values1] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_evm_and_x86_create_family_agree_on_return_data_source[CREATE2-9-create2-stack_values1] 
+tests/unit/test_go_function_semantics.py::TestLog::test_create_does_not_leave_stale_return_data 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_create_does_not_leave_stale_return_data 
+tests/unit/test_go_function_semantics.py::TestLog::test_return_data_size_is_not_the_caller_supplied_ret_size 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_return_data_size_is_not_the_caller_supplied_ret_size 
+tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[CALL-call-values0] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[CALL-call-values0] 
+tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[CALLCODE-callCode-values1] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[CALLCODE-callCode-values1] 
+tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[DELEGATECALL-delegateCall-values2] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[DELEGATECALL-delegateCall-values2] 
+tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[STATICCALL-staticCall-values3] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[STATICCALL-staticCall-values3] 
+tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[CREATE-create-values4] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[CREATE-create-values4] 
+tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[CREATE2-create2-values5] 
+[gw1] PASSED tests/unit/test_go_function_semantics.py::TestLog::test_host_memory_coordinates_with_symbolic_base[CREATE2-create2-values5] 
+tests/unit/test_host_gas_bounds.py::test_bounded_opcode_emits_upper_bound 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_bounded_opcode_emits_upper_bound 
+tests/unit/test_host_gas_bounds.py::test_selfdestruct_bound_pins_cost_to_zero 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_selfdestruct_bound_pins_cost_to_zero 
+tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[CALL] 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[CALL] 
+tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[CALLCODE] 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[CALLCODE] 
+tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[CREATE] 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[CREATE] 
+tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[CREATE2] 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[CREATE2] 
+tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[DELEGATECALL] 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[DELEGATECALL] 
+tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[STATICCALL] 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_unbounded_opcode_emits_nothing[STATICCALL] 
+tests/unit/test_host_gas_bounds.py::test_unbounded_set_is_derived_not_hardcoded 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_unbounded_set_is_derived_not_hardcoded 
+tests/unit/test_host_gas_bounds.py::test_evm_executor_drains_bound_into_path_constraints 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_evm_executor_drains_bound_into_path_constraints 
+tests/unit/test_host_gas_bounds.py::test_evm_state_carrying_undrained_constraints_fails_closed 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_evm_state_carrying_undrained_constraints_fails_closed 
+tests/unit/test_host_gas_bounds.py::test_pending_constraints_are_not_shared_across_copies 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_pending_constraints_are_not_shared_across_copies 
+tests/unit/test_host_gas_bounds.py::test_x86_executor_drains_bound_into_path_constraints 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_x86_executor_drains_bound_into_path_constraints 
+tests/unit/test_host_gas_bounds.py::test_x86_bridge_carrying_undrained_constraints_fails_closed 
+[gw1] PASSED tests/unit/test_host_gas_bounds.py::test_x86_bridge_carrying_undrained_constraints_fails_closed 
+tests/unit/test_host_gas_seq_merge.py::test_divergent_seq_merges_into_if_chain 
+[gw1] PASSED tests/unit/test_host_gas_seq_merge.py::test_divergent_seq_merges_into_if_chain 
+tests/unit/test_host_gas_seq_merge.py::test_seq_after_divergent_merge_keeps_advancing_per_branch 
+[gw1] PASSED tests/unit/test_host_gas_seq_merge.py::test_seq_after_divergent_merge_keeps_advancing_per_branch 
+tests/unit/test_host_gas_seq_merge.py::test_identical_seq_folds_to_constant 
+[gw1] PASSED tests/unit/test_host_gas_seq_merge.py::test_identical_seq_folds_to_constant 
+tests/unit/test_host_gas_seq_merge.py::test_merge_without_any_seq_is_empty 
+[gw1] PASSED tests/unit/test_host_gas_seq_merge.py::test_merge_without_any_seq_is_empty 
+tests/unit/test_host_gas_uf.py::test_same_opcode_same_args_cancel 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_same_opcode_same_args_cancel 
+tests/unit/test_host_gas_uf.py::test_same_opcode_diff_args_not_cancel 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_same_opcode_diff_args_not_cancel 
+tests/unit/test_host_gas_uf.py::test_same_args_diff_seq_not_cancel 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_same_args_diff_seq_not_cancel 
+tests/unit/test_host_gas_uf.py::test_seq_kind_opcode_requires_seq 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_seq_kind_opcode_requires_seq 
+tests/unit/test_host_gas_uf.py::test_different_opcode_not_cancel 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_different_opcode_not_cancel 
+tests/unit/test_host_gas_uf.py::test_uf_preserves_full_256bit_identity 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_uf_preserves_full_256bit_identity 
+tests/unit/test_host_gas_uf.py::test_uf_same_full_value_still_cancels 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_uf_same_full_value_still_cancels 
+tests/unit/test_host_gas_uf.py::test_charge_off_when_host_gas_uf_disabled 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_charge_off_when_host_gas_uf_disabled 
+tests/unit/test_host_gas_uf.py::test_charge_on_when_host_gas_uf_enabled 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_charge_on_when_host_gas_uf_enabled 
+tests/unit/test_host_gas_uf.py::test_host_and_builtin_kinds_partition 
+[gw1] PASSED tests/unit/test_host_gas_uf.py::test_host_and_builtin_kinds_partition 
+tests/unit/test_instruction_equivalence_helpers.py::test_normalize_equivalence_bv_folds_bytewise_zero_ite_concat 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_normalize_equivalence_bv_folds_bytewise_zero_ite_concat 
+tests/unit/test_instruction_equivalence_helpers.py::test_normalize_equivalence_bv_rejects_mixed_conditions 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_normalize_equivalence_bv_rejects_mixed_conditions 
+tests/unit/test_instruction_equivalence_helpers.py::test_normalize_equivalence_bv_rejects_mixed_sources 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_normalize_equivalence_bv_rejects_mixed_sources 
+tests/unit/test_instruction_equivalence_helpers.py::test_normalize_equivalence_bv_rejects_non_contiguous_extracts 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_normalize_equivalence_bv_rejects_non_contiguous_extracts 
+tests/unit/test_instruction_equivalence_helpers.py::test_rewrite_stack_outputs_under_path_prunes_implied_large_bv_ite 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_rewrite_stack_outputs_under_path_prunes_implied_large_bv_ite 
+tests/unit/test_instruction_equivalence_helpers.py::test_rewrite_stack_outputs_under_path_keeps_unproved_large_bv_ite 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_rewrite_stack_outputs_under_path_keeps_unproved_large_bv_ite 
+tests/unit/test_instruction_equivalence_helpers.py::test_instruction_equivalence_evm_uses_symbolic_calldata_size_when_unfixed 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_instruction_equivalence_evm_uses_symbolic_calldata_size_when_unfixed 
+tests/unit/test_instruction_equivalence_helpers.py::test_instruction_equivalence_x86_stores_symbolic_calldata_size_when_unfixed 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_instruction_equivalence_x86_stores_symbolic_calldata_size_when_unfixed 
+tests/unit/test_instruction_equivalence_helpers.py::test_instruction_equivalence_cfg_uses_merged_state_by_default 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_instruction_equivalence_cfg_uses_merged_state_by_default 
+tests/unit/test_instruction_equivalence_helpers.py::test_instruction_equivalence_cfg_can_compare_terminal_paths 
+[gw1] PASSED tests/unit/test_instruction_equivalence_helpers.py::test_instruction_equivalence_cfg_can_compare_terminal_paths 
+tests/unit/test_instruction_equivalence_path_assumptions.py::test_path_local_assumption_does_not_leak_to_sibling_path 
+[gw1] PASSED tests/unit/test_instruction_equivalence_path_assumptions.py::test_path_local_assumption_does_not_leak_to_sibling_path 
+tests/unit/test_loop_certificate_prover.py::TestOrchestration::test_base_feeds_depth_classes_into_the_inductive_step 
+[gw0] PASSED tests/integration/test_gas_consistency_contracts.py::test_ens_registry_owner_gas_fixed_budget 
+tests/integration/test_gas_consistency_contracts.py::test_perf_erc20_lite_tampered_static_gas_caught 
+[gw1] PASSED tests/unit/test_loop_certificate_prover.py::TestOrchestration::test_base_feeds_depth_classes_into_the_inductive_step 
+tests/unit/test_loop_certificate_prover.py::TestOrchestration::test_synchronisation_without_termination_is_reported_honestly 
+[gw1] PASSED tests/unit/test_loop_certificate_prover.py::TestOrchestration::test_synchronisation_without_termination_is_reported_honestly 
+tests/unit/test_loop_certificate_prover.py::TestOrchestration::test_exit_query_catches_the_unfaithful_exit_status 
