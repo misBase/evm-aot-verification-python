@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import time
 from typing import List, Optional, Dict, TYPE_CHECKING
-from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, unknown, is_true, And, simplify
+from z3 import BoolRef, BoolVal, Solver, SolverFor, unsat, sat, unknown, is_true, And, simplify, Z3_get_estimated_alloc_size
 
 from state.smt_state import SMTState
 
@@ -30,6 +30,11 @@ DEFAULT_REACHABILITY_SOLVER_TIMEOUT_MS = 1000
 # The wall clock is only a safety net for pathological tactics.
 REACHABILITY_RLIMIT_PER_MS = 10000
 REACHABILITY_WALL_SAFETY_FACTOR = 10
+# A check may add at most this much to Z3's memory (its "max_memory" is process-wide, so the cap is
+# set per check above what Z3 holds already). Above it the answer is unknown: the path is kept.
+# ponytail: 1 GB; PoolManager 22747 grew +1.5 GB in 5s inside one reachability check after a DIV
+# summary (the servers' 15-24 GB spikes, killing whole process pools).
+REACHABILITY_MEMORY_MB = 1024
 
 
 def _bounded_check(solver, timeout_ms, tag, wall_ms=None):
@@ -42,6 +47,8 @@ def _bounded_check(solver, timeout_ms, tag, wall_ms=None):
         wall = timeout_ms * REACHABILITY_WALL_SAFETY_FACTOR if wall_ms is None else max(wall_ms, 1)
         solver.set("rlimit", min(timeout_ms * REACHABILITY_RLIMIT_PER_MS, cap))
         solver.set("timeout", min(wall, cap))
+    held = Z3_get_estimated_alloc_size() // 2**20
+    solver.set("max_memory", min(held + REACHABILITY_MEMORY_MB, 2**32 - 1))
     stats = os.environ.get("REACH_STATS_FILE")
     if not stats:
         return solver.check()

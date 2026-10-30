@@ -205,3 +205,20 @@ def test_lia_limb_joins_stop_at_the_deadline(monkeypatch):
     started = monotonic()
     assert prover._retry_over_lia(ULT(x, 3))[1] == "unknown"
     assert monotonic() - started < 2 and len(calls) < 20  # 100 joins x 4 rounds without the check
+
+
+# --- fix 23: a reachability check may add at most REACHABILITY_MEMORY_MB to Z3's memory --------
+
+def test_reachability_check_stops_at_its_memory_cap_and_keeps_the_path(monkeypatch):
+    import time
+    import z3
+    import x86_64.cfg_state as cs
+    from common.node_monitor import rss_bytes
+    monkeypatch.setattr(cs, "REACHABILITY_MEMORY_MB", 100)
+    x, y, q = z3.BitVec("n4_mm_x", 512), z3.BitVec("n4_mm_y", 512), z3.BitVec("n4_mm_q", 512)
+    solver = z3.SolverFor("QF_AUFBV")
+    solver.add(z3.UDiv(x, y) * y + z3.URem(x, y) != x, y != 0, z3.UDiv(x * q, y + 1) == q * x)
+    before, started = rss_bytes(), time.monotonic()
+    assert cs._bounded_check(solver, 60000, "test") == z3.unknown  # unknown: the caller keeps the path
+    assert "memory" in solver.reason_unknown() and time.monotonic() - started < 30
+    assert rss_bytes() - before < 1500 * 2**20

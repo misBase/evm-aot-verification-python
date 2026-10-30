@@ -1,0 +1,50 @@
+spec BlockSpecialization(pc=18089, stack_depth=18, memory_size=None, free_memory_pointer=320, stack_constants=((3, 4418),))
+[   108.9s] applied mul@0xb49b1 in 5.5s: slow records [('effect_0', 'unsat', 1.4)]
+[   125.5s] reachability check 16.4s at 0xb4f7f -> True
+[   146.5s] reachability check 17.5s at 0xb577f -> True
+[   169.9s] reachability check 19.8s at 0xb6032 -> True
+[   176.9s] applied mul@0xb6254 in 6.7s: slow records [('effect_0', 'unsat', 1.9)]
+[   205.2s] reachability check 28.1s at 0xb699f -> True
+[   230.5s] reachability check 19.4s at 0xb7352 -> True
+[   256.4s] reachability check 19.5s at 0xb7d12 -> True
+[   285.7s] reachability check 22.7s at 0xb86d2 -> True
+[   292.6s] applied mul@0xb890d in 5.2s: slow records [('effect_0', 'unsat', 2.7)]
+[   317.1s] reachability check 24.3s at 0xb9092 -> True
+[   317.2s] progress: executed 214 live 0 final/cut (0, 1) reach 40 checks 179.2s pruned 9
+   top blocks: [('0xb3aa2', 1), ('0xb3aae', 1), ('0xb3ac6', 1), ('0xb3ace', 1), ('0xb3b0a', 1), ('0xb3b25', 1), ('0xb3c54', 1), ('0xb3c6d', 1), ('0xb3cbf', 1), ('0xb3cd6', 1), ('0xb3cdf', 1), ('0xb3d31', 1)]
+   top forks: [('0xb3aa2', 1), ('0xb408d', 1), ('0xb4096', 1), ('0xb47cd', 1), ('0xb47d6', 1), ('0xb4f2d', 1), ('0xb4f36', 1), ('0xb571d', 1), ('0xb5726', 1), ('0xb5fcd', 1), ('0xb5fd6', 1), ('0xb693d', 1)]
+   summaries: {'seconds': 41.437779857998976, 'mul@0xb3b25': 1, 'mul@0xb426a': 1, 'mul@0xb49b1': 1, 'mul@0xb5111': 1, 'mul@0xb591a': 1, 'mul@0xb6254': 1, 'mul@0xb6bbb': 1, 'mul@0xb7590': 1, 'mul@0xb7f4d': 1, 'mul@0xb890d': 1}
+   complement: {}
+[   328.7s] applied mul@0xb92cd in 9.6s: slow records [('effect_0', 'unsat', 3.3)]
+[   350.7s] reachability check 21.7s at 0xb9a32 -> True
+[   359.1s] applied mul@0xb9c6d in 6.8s: slow records [('effect_0', 'unsat', 4.1)]
+[   386.0s] reachability check 26.5s at 0xba3f2 -> True
+[   394.9s] applied mul@0xba62d in 7.0s: slow records [('effect_0', 'unsat', 4.1)]
+[   415.0s] reachability check 19.6s at 0xbadff -> True
+[   441.1s] reachability check 17.1s at 0xbdfb9 -> True
+[   458.8s] reachability check 17.6s at 0xbe5b6 -> True
+[   475.8s] reachability check 17.0s at 0xbe586 -> True
+[   492.5s] reachability check 16.5s at 0xbe81a -> True
+[   509.7s] reachability check 17.2s at 0xbe629 -> True
+[   526.4s] reachability check 16.5s at 0xbec16 -> True
+[   543.1s] reachability check 16.7s at 0xbebe6 -> True
+[   559.4s] reachability check 16.1s at 0xbec97 -> True
+[   575.9s] reachability check 16.5s at 0xbec7f -> True
+[   593.9s] reachability check 16.7s at 0xbec16 -> True
+[   604.9s] reachability check 11.1s at 0xbebe6 -> False
+[   615.8s] reachability check 10.3s at 0xbe81a -> False
+[   632.3s] reachability check 16.5s at 0xbe629 -> True
+[   632.3s] progress: executed 449 live 0 final/cut (0, 1) reach 68 checks 458.9s pruned 15
+   top blocks: [('0xbec9e', 4), ('0xbecdb', 4), ('0xbec26', 3), ('0xbec97', 3), ('0xbeca4', 3), ('0xbecb1', 3), ('0xbecbe', 3), ('0xbeccb', 3), ('0xbe5c6', 2), ('0xbe629', 2), ('0xbeab3', 2), ('0xbeac9', 2)]
+   top forks: [('0xbe5c6', 2), ('0xbebd0', 2), ('0xb3aa2', 1), ('0xb408d', 1), ('0xb4096', 1), ('0xb47cd', 1), ('0xb47d6', 1), ('0xb4f2d', 1), ('0xb4f36', 1), ('0xb571d', 1), ('0xb5726', 1), ('0xb5fcd', 1)]
+   summaries: {'seconds': 72.33578245599983, 'mul@0xb3b25': 1, 'mul@0xb426a': 1, 'mul@0xb49b1': 1, 'mul@0xb5111': 1, 'mul@0xb591a': 1, 'mul@0xb6254': 1, 'mul@0xb6bbb': 1, 'mul@0xb7590': 1, 'mul@0xb7f4d': 1, 'mul@0xb890d': 1, 'mul@0xb92cd': 1, 'mul@0xb9c6d': 1, 'mul@0xba62d': 1, 'mul@0xbb01b': 1, 'mul@0xbde9f': 1}
+   complement: {}
+[   648.9s] reachability check 16.4s at 0xbec16 -> True
+[   665.9s] reachability check 16.9s at 0xbebe6 -> True
+[   682.8s] reachability check 16.4s at 0xbec97 -> True
+[   699.4s] reachability check 16.6s at 0xbec7f -> True
+[   718.0s] reachability check 17.5s at 0xbe5b6 -> True
+[   734.6s] reachability check 16.4s at 0xbe629 -> True
+[   751.9s] reachability check 17.1s at 0xbec16 -> True
+[   763.2s] reachability check 11.3s at 0xbebe6 -> False
+[   780.9s] reachability check 17.1s at 0xbec16 -> True

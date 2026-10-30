@@ -1,0 +1,58 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "cloud-inputs/n2/fixtures/PoolManager",
+  "started_at_utc": "2026-10-30T03:53:59.747329+00:00",
+  "configuration": {
+    "nodes": "cloud-inputs/n4b/nodes/22747-sym.json",
+    "output": "cloud-inputs/n4/runs/tri-22747.json",
+    "timeout_ms": "30000",
+    "node_seconds": "3600.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "None",
+    "node_memory_mb": "2500.0",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "1d40b9d12b04c2984c95621b8093f59dd0687892a8aa4d1baa13616a94d15a03",
+    ".hex": "1ae33a365dabbdb8a22451bd57d029cbb04074a87d3e1b6a3de6722492e33c1a"
+  },
+  "model_sources_sha256": "3ae49b339bf8d11e6561030cf81e5c8adccac9be715fdafe58b3c0c761ea8995",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 22747,
+        "stack_depth": 40,
+        "memory_size": null,
+        "free_memory_pointer": null,
+        "stack_constants": [
+          [
+            4,
+            20572
+          ]
+        ]
+      },
+      "scope": "block-local",
+      "status": "inconclusive",
+      "seconds": 134.68145842099966,
+      "wall_seconds": 134.68145943499985,
+      "reasons": [
+        "node memory budget exceeded: RSS 3104.9 MB > budget 2500.0 MB (pid 4323)"
+      ],
+      "failed_obligations": [],
+      "keep_going_failures": [],
+      "summary_hits": 0,
+      "pid": 4323,
+      "started_at": 1793332444.7068515,
+      "start_rss_mb": 1150.0,
+      "peak_rss_mb": 3104.9,
+      "memory_budget_mb": 2500.0,
+      "memory_exceeded": "node memory budget exceeded: RSS 3104.9 MB > budget 2500.0 MB (pid 4323)"
+    }
+  ],
+  "locally_proved": 0,
+  "ended_at_utc": "2026-10-30T03:56:21.152533+00:00"
+}
