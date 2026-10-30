@@ -1267,3 +1267,61 @@ tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounde
 tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_return_loop] 
 [gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_return_loop] 
 tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_storage_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_storage_loop] 
+tests/integration/test_block_symbolic_loops.py::test_symbolic_havoc_has_multiple_memory_parameters 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_symbolic_havoc_has_multiple_memory_parameters 
+tests/integration/test_block_symbolic_loops.py::test_local_failure_does_not_skip_another_queued_instance 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_local_failure_does_not_skip_another_queued_instance 
+tests/integration/test_block_symbolic_loops.py::test_symbolic_successor_still_checks_memory_equality 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_symbolic_successor_still_checks_memory_equality 
+tests/integration/test_block_symbolic_loops.py::test_obligation_manifest_does_not_follow_deleted_query_records 
+[gw1] FAILED tests/integration/test_block_symbolic_loops.py::test_obligation_manifest_does_not_follow_deleted_query_records 
+tests/integration/test_block_symbolic_loops.py::test_return_tag_predicate_is_checked_at_actual_arrival 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_return_tag_predicate_is_checked_at_actual_arrival 
+tests/integration/test_block_symbolic_loops.py::test_return_tag_predicate_havoc_binds_both_views 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_return_tag_predicate_havoc_binds_both_views 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants0] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants0] 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants1] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants1] 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants2] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants2] 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants3] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants3] 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants4] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants4] 
+tests/integration/test_block_symbolic_loops.py::test_node_budget_expiry_continues_queue_and_restores_program_deadline 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_node_budget_expiry_continues_queue_and_restores_program_deadline 
+tests/integration/test_block_symbolic_loops.py::test_loop_storage_corruption_is_rejected_by_edge_closure 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_loop_storage_corruption_is_rejected_by_edge_closure 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_calldatacopy] 
+[gw1] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_calldatacopy] 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_codecopy] 
+[gw1] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_codecopy] 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_returndatacopy] 
+[gw1] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_returndatacopy] 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_mcopy] 
+[gw1] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_mcopy] 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_actually_fires_on_a_copy_fixture 
+[gw1] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_actually_fires_on_a_copy_fixture 
+tests/integration/test_equivalence_checker.py::test_verifier_import 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verifier_import 
+tests/integration/test_equivalence_checker.py::test_verify_add_program_pair 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_add_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_add_program_pair_full 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_add_program_pair_full 
+tests/integration/test_equivalence_checker.py::test_verify_mstore_return_program_pair 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_mstore_return_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_sstore_load_program_pair 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_sstore_load_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_two_block_program_pair 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_two_block_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_three_block_program_pair 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_three_block_program_pair 
+tests/integration/test_equivalence_checker.py::test_jumpi_2block_err_program_pair 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_jumpi_2block_err_program_pair 
+tests/integration/test_equivalence_checker.py::test_jumpi_2block_ok_program_pair 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_jumpi_2block_ok_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_perf_erc20_lite_program_pair 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_perf_erc20_lite_program_pair 
+tests/integration/test_equivalence_checker.py::test_detects_perf_erc20_lite_sbb_to_sub_bug 

@@ -99,6 +99,10 @@
 - **修法**：改用 `memory_high_watermark_mb`。它不在分配器里检查，只在 Z3 的协作检查点读取：SAT/SMT 内核与 tactic 的 checkpoint，也就是超时和 `interrupt()` 让求解器停下来的同一批位置。所以触顶的结束方式和超时一样，要么是 unknown（原因 "max. memory exceeded" 或 "canceled"），要么是可捕获的 `Z3Exception`，Z3 之后照常可用。`out_of_memory()` 把这三种说法都算作"在上限处停下"：可达性检查保留路径并 reset 增量求解器，证明查询为 unknown 且不写 proof cache。"canceled" 的另一个来源是节点预算的 `interrupt()`，那种 unknown 本来也不是答案，`solve_query` 在返回前先 `check_abort()`。
 - **取舍**：水位线只在检查点生效，所以没有检查点的单个大步骤停不下来（本机测量：512 位除法 bit-blast 一步约 500MB）。`memory_max_size` 虽然能在分配时立刻拦住，但会让进程中止，所以不能用。不能被上限拦住的增长由节点内存预算兜底：软预算超出 → 中断并记为 inconclusive，1.5 倍硬上限 → worker 以 86 退出，`NodePool` 只丢这一个节点。另外，在节点预算下每个受限调用最多再用"剩余余量的一半"（`memory_headroom_mb()`；上限按 Z3 自己的分配量计，本机 RSS 的增长约是它的 1.6 倍），让一个调用里的逐步增长先让这个调用 unknown，而不是整个节点超预算。
 - **回归测试**（`tests/unit/test_block_remaining_blocks_4.py`）：`test_tiny_memory_caps_give_unknown_and_never_abort_the_process` 在子进程（`tests/unit/data/z3_memory_cap_child.py`）里把上限设成 1MB，依次跑 `check(assumptions)`、增量 `PrefixSolver`（逐合取项 push 和单个合取项两种形状）、`solve_query`、`solve_pure_bv`、`simplify(blast_select_store)`，要求子进程正常退出、各项为 unknown 或被识别的内存异常、之后 Z3 仍能解出一个小查询。`test_the_memory_cap_is_at_most_half_the_node_headroom` 检查节点预算下设出的水位线。说明：这个合成子进程在旧的 `memory_max_size` 上**也不会**中止（中止取决于在哪一次分配上触顶），所以真正的确认是 18089 整节点复跑（下面）。
+- **18089 d18 整节点复跑**（与服务器相同的 4500 MB 预算，43200s）：
+  - 旧上限（`memory_max_size`，用 `cloud-inputs/n4/tools/save_reach.py --old-cap` 还原）：本机第 2084s 在 `Z3_solver_reset` 中止（`PrefixSolver` 在一次内存触顶后、仍在 `is_possible` 的外层上限之内 reset，`r18089-oldcap-abort.log`）；6810c73 的剖析在 212s 以与服务器相同的 `out_of_memory_error` 中止（`tri-18089.log`）。
+  - 新上限 66bd7a4：没有中止，1200s 时被节点预算停下（RSS 4851 MB，峰值 6072 MB，`n4-18089-d18-66bd7a4.*`）。
+  - 最终代码 d35e027：**没有中止**，进程正常结束（退出码 1 = 未证出，不是 134），2695s 时被节点预算停下（RSS 4517 MB > 4500 MB，峰值 6507 MB < 硬上限 6750 MB），节点记为 inconclusive。每 60s 的栈采样（`n4-18089-d18.stacks`）显示最后的增长在 summary 命中入口的 SAT 检查（`_sat_model`）和可达性检查里。两者都已经受上限保护，所以这正是上面说的没有检查点的单个步骤，由节点预算兜底。18089 本身仍未证出，根因与建议见 §2.8。
 
 ### 2.10 `--node-memory-mb` 与 worker 数的建议（补充说明 §3）
 
