@@ -1327,3 +1327,349 @@ tests/integration/test_equivalence_checker.py::test_verify_perf_erc20_lite_progr
 tests/integration/test_equivalence_checker.py::test_detects_perf_erc20_lite_sbb_to_sub_bug 
 [gw1] PASSED tests/integration/test_equivalence_checker.py::test_detects_perf_erc20_lite_sbb_to_sub_bug 
 tests/integration/test_equivalence_checker.py::test_verify_muti_block_program_pair_full 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_muti_block_program_pair_full 
+tests/integration/test_equivalence_checker.py::test_verify_muti_block_08_program_pair_full 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_pm16670_goal_2_is_refuted_by_guard_cases 
+tests/unit/test_block_remaining_blocks_3.py::test_shared_forwarding_equals_fresh_forwarding 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_shared_forwarding_equals_fresh_forwarding 
+tests/unit/test_block_remaining_blocks_3.py::test_forwarded_limb_is_unchanged_by_the_shared_cache 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_forwarded_limb_is_unchanged_by_the_shared_cache 
+tests/unit/test_block_remaining_blocks_3.py::test_resume_waits_for_every_route_without_history 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_resume_waits_for_every_route_without_history 
+tests/unit/test_block_remaining_blocks_3.py::test_resume_comes_first_once_it_refuted_the_class 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_resume_comes_first_once_it_refuted_the_class 
+tests/unit/test_block_remaining_blocks_3.py::test_blasted_model_is_a_model_of_the_formula 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_blasted_model_is_a_model_of_the_formula 
+tests/unit/test_block_remaining_blocks_3.py::test_correspondence_falls_back_to_the_blasted_model 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_correspondence_falls_back_to_the_blasted_model 
+tests/unit/test_block_remaining_blocks_3.py::test_entry_model_is_reused_on_the_next_hit 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_entry_model_is_reused_on_the_next_hit 
+tests/unit/test_block_remaining_blocks_3.py::test_an_entry_model_counts_only_if_it_satisfies_the_premise 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_an_entry_model_counts_only_if_it_satisfies_the_premise 
+tests/unit/test_block_remaining_blocks_3.py::test_sat_model_is_a_model_of_the_formula 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_sat_model_is_a_model_of_the_formula 
+tests/unit/test_block_remaining_blocks_3.py::test_executor_adopts_the_entry_model_only_over_a_stale_witness 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_executor_adopts_the_entry_model_only_over_a_stale_witness 
+tests/unit/test_block_remaining_blocks_3.py::test_rewrite_candidate_matches_the_uncached_rewrite 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_rewrite_candidate_matches_the_uncached_rewrite 
+tests/unit/test_block_remaining_blocks_3.py::test_normalisation_is_unchanged_by_the_memo 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_3.py::test_normalisation_is_unchanged_by_the_memo 
+tests/unit/test_block_remaining_blocks_4.py::test_summary_text_is_the_fingerprint_slim_records 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_summary_text_is_the_fingerprint_slim_records 
+tests/unit/test_block_remaining_blocks_4.py::test_hit_certificate_keeps_names_and_answers_and_slim_keeps_the_fingerprint 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_hit_certificate_keeps_names_and_answers_and_slim_keeps_the_fingerprint 
+tests/unit/test_block_remaining_blocks_4.py::test_row_group_proves_every_member_with_one_refutation 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_row_group_proves_every_member_with_one_refutation 
+tests/unit/test_block_remaining_blocks_4.py::test_failing_group_is_halved_and_never_proves_a_false_member 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_failing_group_is_halved_and_never_proves_a_false_member 
+tests/unit/test_block_remaining_blocks_4.py::test_row_groups_skip_unmapped_rows_and_small_remainders 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_row_groups_skip_unmapped_rows_and_small_remainders 
+tests/unit/test_block_remaining_blocks_4.py::test_register_only_diamond_merges_into_one_exact_state 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_register_only_diamond_merges_into_one_exact_state 
+tests/unit/test_block_remaining_blocks_4.py::test_diamonds_merge_only_once_the_run_has_more_paths_than_the_threshold 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_diamonds_merge_only_once_the_run_has_more_paths_than_the_threshold 
+tests/unit/test_block_remaining_blocks_4.py::test_diamond_whose_sides_differ_in_memory_stays_apart 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_diamond_whose_sides_differ_in_memory_stays_apart 
+tests/unit/test_block_remaining_blocks_4.py::test_unify_across_stops_after_a_stall_and_never_merges_unproved 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_unify_across_stops_after_a_stall_and_never_merges_unproved 
+tests/unit/test_block_remaining_blocks_4.py::test_shared_forward_cache_is_kept_within_a_scope_and_dropped_between_scopes 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_shared_forward_cache_is_kept_within_a_scope_and_dropped_between_scopes 
+tests/unit/test_block_remaining_blocks_4.py::test_correspondence_is_kept_when_disjointness_needs_few_group_queries 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_correspondence_is_kept_when_disjointness_needs_few_group_queries 
+tests/unit/test_block_remaining_blocks_4.py::test_lia_limb_joins_stop_at_the_deadline 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_lia_limb_joins_stop_at_the_deadline 
+tests/unit/test_block_remaining_blocks_4.py::test_incremental_reachability_check_stops_at_its_memory_cap_and_keeps_the_path 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_incremental_reachability_check_stops_at_its_memory_cap_and_keeps_the_path 
+tests/unit/test_block_remaining_blocks_4.py::test_unknown_rows_with_a_mapped_sibling_skip_the_blast_fallback 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_unknown_rows_with_a_mapped_sibling_skip_the_blast_fallback 
+tests/unit/test_block_remaining_blocks_4.py::test_prefix_tree_coverage_discharges_branch_pairs_without_queries 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_prefix_tree_coverage_discharges_branch_pairs_without_queries 
+tests/unit/test_block_remaining_blocks_4.py::test_prefix_tree_coverage_reproves_pruned_branches_and_rejects_missing_ones 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_prefix_tree_coverage_reproves_pruned_branches_and_rejects_missing_ones 
+tests/unit/test_block_remaining_blocks_4.py::test_proof_query_out_of_memory_is_unknown_and_not_cached 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_proof_query_out_of_memory_is_unknown_and_not_cached 
+tests/unit/test_block_remaining_blocks_4.py::test_div_lemma_retries_an_unknown_effect_with_a_larger_budget 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_div_lemma_retries_an_unknown_effect_with_a_larger_budget 
+tests/unit/test_block_remaining_blocks_4.py::test_tiny_memory_caps_give_unknown_and_never_abort_the_process 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_tiny_memory_caps_give_unknown_and_never_abort_the_process 
+tests/unit/test_block_remaining_blocks_4.py::test_the_memory_cap_is_at_most_half_the_node_headroom 
+[gw0] PASSED tests/unit/test_block_remaining_blocks_4.py::test_the_memory_cap_is_at_most_half_the_node_headroom 
+tests/unit/test_block_report_progress.py::test_verified_report_consumes_the_certificate_exactly_once 
+[gw0] PASSED tests/unit/test_block_report_progress.py::test_verified_report_consumes_the_certificate_exactly_once 
+tests/unit/test_block_report_progress.py::test_progress_reports_never_validate 
+[gw0] PASSED tests/unit/test_block_report_progress.py::test_progress_reports_never_validate 
+tests/unit/test_block_report_progress.py::test_tampered_node_is_rejected_and_still_validated_once 
+[gw0] PASSED tests/unit/test_block_report_progress.py::test_tampered_node_is_rejected_and_still_validated_once 
+tests/unit/test_block_report_progress.py::test_forged_lookalike_certificate_is_not_accepted 
+[gw0] PASSED tests/unit/test_block_report_progress.py::test_forged_lookalike_certificate_is_not_accepted 
+tests/unit/test_block_report_progress.py::test_status_alone_is_not_a_certificate 
+[gw0] PASSED tests/unit/test_block_report_progress.py::test_status_alone_is_not_a_certificate 
+tests/unit/test_block_report_progress.py::test_independent_rerun_keeps_its_own_wording 
+[gw0] PASSED tests/unit/test_block_report_progress.py::test_independent_rerun_keeps_its_own_wording 
+tests/unit/test_block_report_progress.py::test_interrupted_report_keeps_local_failures_and_claims_nothing 
+[gw0] PASSED tests/unit/test_block_report_progress.py::test_interrupted_report_keeps_local_failures_and_claims_nothing 
+tests/unit/test_block_review_3b.py::test_light_premise_proofs_are_sound_on_random_conjunctions 
+[gw0] PASSED tests/unit/test_block_review_3b.py::test_light_premise_proofs_are_sound_on_random_conjunctions 
+tests/unit/test_block_review_3b.py::test_prefix_solver_never_wrong_unsat_with_budgets_that_cancel_checks 
+[gw0] FAILED tests/unit/test_block_review_3b.py::test_prefix_solver_never_wrong_unsat_with_budgets_that_cancel_checks 
+tests/unit/test_block_review_3b.py::test_prefix_solver_rlimit_is_per_check_and_witness_outlives_pops 
+[gw0] PASSED tests/unit/test_block_review_3b.py::test_prefix_solver_rlimit_is_per_check_and_witness_outlives_pops 
+tests/unit/test_block_review_3b.py::test_model_eval_is_never_literally_true_for_unsat_premises 
+[gw0] PASSED tests/unit/test_block_review_3b.py::test_model_eval_is_never_literally_true_for_unsat_premises 
+tests/unit/test_block_review_3b.py::test_disjoint_groups_formulas_are_sub_conjunctions_on_random_trees 
+[gw0] PASSED tests/unit/test_block_review_3b.py::test_disjoint_groups_formulas_are_sub_conjunctions_on_random_trees 
+tests/unit/test_block_review_3b.py::test_complement_refutation_agrees_with_the_solver_on_random_terms 
+[gw0] PASSED tests/unit/test_block_review_3b.py::test_complement_refutation_agrees_with_the_solver_on_random_terms 
+tests/unit/test_block_route_order.py::test_route_class_drops_path_indices_and_keeps_goal_parts 
+[gw0] PASSED tests/unit/test_block_route_order.py::test_route_class_drops_path_indices_and_keeps_goal_parts 
+tests/unit/test_block_route_order.py::test_winners_first_keeps_the_table_without_wins 
+[gw0] PASSED tests/unit/test_block_route_order.py::test_winners_first_keeps_the_table_without_wins 
+tests/unit/test_block_route_order.py::test_winners_first_orders_by_refutations_per_second 
+[gw0] PASSED tests/unit/test_block_route_order.py::test_winners_first_orders_by_refutations_per_second 
+tests/unit/test_block_route_order.py::test_route_that_refuted_a_class_goes_first_for_its_siblings 
+[gw0] PASSED tests/unit/test_block_route_order.py::test_route_that_refuted_a_class_goes_first_for_its_siblings 
+tests/unit/test_block_route_order.py::test_static_switch_keeps_the_table 
+[gw0] PASSED tests/unit/test_block_route_order.py::test_static_switch_keeps_the_table 
+tests/unit/test_block_route_order.py::test_promoted_route_failing_falls_back_to_every_other_route 
+[gw0] PASSED tests/unit/test_block_route_order.py::test_promoted_route_failing_falls_back_to_every_other_route 
+tests/unit/test_block_route_order.py::test_nothing_refutes_nothing_is_proved 
+[gw0] PASSED tests/unit/test_block_route_order.py::test_nothing_refutes_nothing_is_proved 
+tests/unit/test_block_route_order.py::test_promoted_route_gets_half_of_what_is_left 
+[gw0] PASSED tests/unit/test_block_route_order.py::test_promoted_route_gets_half_of_what_is_left 
+tests/unit/test_block_sat_witness.py::test_lambda_under_uf_is_unknown_to_the_direct_solver 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_lambda_under_uf_is_unknown_to_the_direct_solver 
+tests/unit/test_block_sat_witness.py::test_witness_proves_oracle_axiom_over_lambda 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_witness_proves_oracle_axiom_over_lambda 
+tests/unit/test_block_sat_witness.py::test_witness_value_is_chosen_by_the_solver 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_witness_value_is_chosen_by_the_solver 
+tests/unit/test_block_sat_witness.py::test_uf_under_lambda_binder_is_restricted 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_uf_under_lambda_binder_is_restricted 
+tests/unit/test_block_sat_witness.py::test_needs_nonconstant_function_is_unknown_not_unsat 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_needs_nonconstant_function_is_unknown_not_unsat 
+tests/unit/test_block_sat_witness.py::test_unsat_formula_is_never_sat 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_unsat_formula_is_never_sat 
+tests/unit/test_block_sat_witness.py::test_no_array_ufs_returns_at_once 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_no_array_ufs_returns_at_once 
+tests/unit/test_block_sat_witness.py::test_function_referenced_as_value_is_refused 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_function_referenced_as_value_is_refused 
+tests/unit/test_block_sat_witness.py::test_unsat_expected_checks_do_not_use_the_witness 
+[gw0] PASSED tests/unit/test_block_sat_witness.py::test_unsat_expected_checks_do_not_use_the_witness 
+tests/unit/test_block_sat_witness.py::test_permit2_1327_model_domain_nonempty 
+[gw0] SKIPPED tests/unit/test_block_sat_witness.py::test_permit2_1327_model_domain_nonempty 
+tests/unit/test_block_solver_logic.py::test_bv_arrays_and_lambda_keep_their_semantics 
+[gw0] PASSED tests/unit/test_block_solver_logic.py::test_bv_arrays_and_lambda_keep_their_semantics 
+tests/unit/test_block_solver_logic.py::test_ints_nested_array_sorts_and_quantifiers_use_general_solver 
+[gw0] PASSED tests/unit/test_block_solver_logic.py::test_ints_nested_array_sorts_and_quantifiers_use_general_solver 
+tests/unit/test_block_specialization.py::test_all_concrete_blocks_are_specializable 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_all_concrete_blocks_are_specializable 
+tests/unit/test_block_specialization.py::test_specialization_feeds_build_havoc 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_specialization_feeds_build_havoc 
+tests/unit/test_block_specialization.py::test_multiple_depth_classes_produce_one_instance_each 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_multiple_depth_classes_produce_one_instance_each 
+tests/unit/test_block_specialization.py::test_top_memory_size_becomes_symbolic_relation 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_top_memory_size_becomes_symbolic_relation 
+tests/unit/test_block_specialization.py::test_top_fmp_becomes_symbolic_relation 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_top_fmp_becomes_symbolic_relation 
+tests/unit/test_block_specialization.py::test_degraded_and_specializable_partition_the_reachable_set 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_degraded_and_specializable_partition_the_reachable_set 
+tests/unit/test_block_specialization.py::test_empty_depth_class_on_a_reachable_block_is_a_violation 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_empty_depth_class_on_a_reachable_block_is_a_violation 
+tests/unit/test_block_specialization.py::test_empty_value_set_is_a_violation_not_a_degrade 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_empty_value_set_is_a_violation_not_a_degrade 
+tests/unit/test_block_specialization.py::test_missing_analysis_defaults_to_symbolic_parameter 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_missing_analysis_defaults_to_symbolic_parameter 
+tests/unit/test_block_specialization.py::test_many_finite_candidates_do_not_prove_or_disprove_convergence 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_many_finite_candidates_do_not_prove_or_disprove_convergence 
+tests/unit/test_block_specialization.py::test_candidate_resource_budget_is_explicit 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_candidate_resource_budget_is_explicit 
+tests/unit/test_block_specialization.py::test_missing_successor_is_not_silently_degraded 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_missing_successor_is_not_silently_degraded 
+tests/unit/test_block_specialization.py::test_coverage_summary_mentions_both_sides 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_coverage_summary_mentions_both_sides 
+tests/unit/test_block_specialization.py::test_specialization_is_hashable_for_use_as_a_theorem_key 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_specialization_is_hashable_for_use_as_a_theorem_key 
+tests/unit/test_block_specialization.py::test_actual_abstract_interpreter_top_is_a_symbolic_candidate 
+[gw0] PASSED tests/unit/test_block_specialization.py::test_actual_abstract_interpreter_top_is_a_symbolic_candidate 
+tests/unit/test_block_speedups.py::test_prefix_solver_matches_fresh_solver_across_pops 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_prefix_solver_matches_fresh_solver_across_pops 
+tests/unit/test_block_speedups.py::test_is_possible_with_prefix_solver_agrees_and_keeps_witness 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_is_possible_with_prefix_solver_agrees_and_keeps_witness 
+tests/unit/test_block_speedups.py::test_prefix_unknown_keeps_path_unless_probe_refutes 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_prefix_unknown_keeps_path_unless_probe_refutes 
+tests/unit/test_block_speedups.py::test_prefix_unknown_pruned_only_by_probe_unsat 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_prefix_unknown_pruned_only_by_probe_unsat 
+tests/unit/test_block_speedups.py::test_prefix_solver_matches_fresh_solver_on_random_dfs 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_prefix_solver_matches_fresh_solver_on_random_dfs 
+tests/unit/test_block_speedups.py::test_prefix_solver_recovers_from_failure_mid_sync 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_prefix_solver_recovers_from_failure_mid_sync 
+tests/unit/test_block_speedups.py::test_summary_entry_answered_by_path_witness 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_summary_entry_answered_by_path_witness 
+tests/unit/test_block_speedups.py::test_summary_entry_solved_when_witness_misses 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_summary_entry_solved_when_witness_misses 
+tests/unit/test_block_speedups.py::test_disjoint_groups_cover_every_pair_once_and_weaken_it 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_disjoint_groups_cover_every_pair_once_and_weaken_it 
+tests/unit/test_block_speedups.py::test_correspondence_records_and_mapping 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_correspondence_records_and_mapping 
+tests/unit/test_block_speedups.py::test_disjoint_dedup_keeps_names_and_coverage 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_disjoint_dedup_keeps_names_and_coverage 
+tests/unit/test_block_speedups.py::test_disjoint_group_failure_falls_back_to_full_pair_queries 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_disjoint_group_failure_falls_back_to_full_pair_queries 
+tests/unit/test_block_speedups.py::test_disjoint_overlap_gives_full_product 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_disjoint_overlap_gives_full_product 
+tests/unit/test_block_speedups.py::test_coverage_refuted_over_mul_abstraction_first 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_coverage_refuted_over_mul_abstraction_first 
+tests/unit/test_block_speedups.py::test_complement_refutation_hit_and_miss 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_complement_refutation_hit_and_miss 
+tests/unit/test_block_speedups.py::test_summary_solve_skips_solver_on_complement 
+[gw0] PASSED tests/unit/test_block_speedups.py::test_summary_solve_skips_solver_on_complement 
+tests/unit/test_block_store_forwarding_join.py::test_join_extracts_rejoins_byte_splits_exactly 
+[gw0] PASSED tests/unit/test_block_store_forwarding_join.py::test_join_extracts_rejoins_byte_splits_exactly 
+tests/unit/test_block_store_forwarding_join.py::test_join_extracts_soundness_never_joins_across_sources_or_gaps 
+[gw0] PASSED tests/unit/test_block_store_forwarding_join.py::test_join_extracts_soundness_never_joins_across_sources_or_gaps 
+tests/unit/test_block_store_forwarding_join.py::test_forward_then_join_makes_the_mirror_goal_trivial 
+[gw0] PASSED tests/unit/test_block_store_forwarding_join.py::test_forward_then_join_makes_the_mirror_goal_trivial 
+tests/unit/test_block_store_forwarding_join.py::test_forward_then_join_soundness_overwritten_byte_is_not_trivial 
+[gw0] PASSED tests/unit/test_block_store_forwarding_join.py::test_forward_then_join_soundness_overwritten_byte_is_not_trivial 
+tests/unit/test_block_store_forwarding_join.py::test_subtract_base_term_memoized_equals_unmemoized 
+[gw0] PASSED tests/unit/test_block_store_forwarding_join.py::test_subtract_base_term_memoized_equals_unmemoized 
+tests/unit/test_block_store_forwarding_join.py::test_subtract_base_term_memo_soundness_keys_on_both_terms 
+[gw0] PASSED tests/unit/test_block_store_forwarding_join.py::test_subtract_base_term_memo_soundness_keys_on_both_terms 
+tests/unit/test_block_store_forwarding_join.py::test_join_extracts_shared_cache_survives_id_recycling 
+[gw0] PASSED tests/unit/test_block_store_forwarding_join.py::test_join_extracts_shared_cache_survives_id_recycling 
+tests/unit/test_block_store_forwarding_join.py::test_forward_selects_shared_cache_survives_id_recycling 
+[gw0] PASSED tests/unit/test_block_store_forwarding_join.py::test_forward_selects_shared_cache_survives_id_recycling 
+tests/unit/test_block_store_peel.py::test_matching_stores_peel_down_to_the_bases 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_matching_stores_peel_down_to_the_bases 
+tests/unit/test_block_store_peel.py::test_distinct_and_flipped_offset_forms_peel_too 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_distinct_and_flipped_offset_forms_peel_too 
+tests/unit/test_block_store_peel.py::test_peeling_stops_at_the_first_mismatch 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeling_stops_at_the_first_mismatch 
+tests/unit/test_block_store_peel.py::test_peeled_formula_is_only_a_weakening 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_formula_is_only_a_weakening 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[0] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[0] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[1] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[1] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[2] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[2] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[3] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[3] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[4] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[4] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[5] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[5] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[6] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[6] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[7] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[7] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[8] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[8] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[9] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[9] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[10] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[10] 
+tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[11] 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_peeled_unsat_implies_original_unsat_on_random_chains[11] 
+tests/unit/test_block_store_peel.py::test_unification_route_refutes_the_peeled_memory_goal 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_unification_route_refutes_the_peeled_memory_goal 
+tests/unit/test_block_store_peel.py::test_unpeeled_query_still_runs_when_the_peeled_one_is_not_refuted 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_unpeeled_query_still_runs_when_the_peeled_one_is_not_refuted 
+tests/unit/test_block_store_peel.py::test_timed_out_light_probe_is_retried_with_the_callers_budget 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_timed_out_light_probe_is_retried_with_the_callers_budget 
+tests/unit/test_block_store_peel.py::test_sat_light_probe_is_not_retried 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_sat_light_probe_is_not_retried 
+tests/unit/test_block_store_peel.py::test_prove_equal_retries_with_its_budget_bounded_by_the_deadline 
+[gw0] PASSED tests/unit/test_block_store_peel.py::test_prove_equal_retries_with_its_budget_bounded_by_the_deadline 
+tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[0] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[0] 
+tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[7] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[7] 
+tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[8] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[8] 
+tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[9] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_copy_per_hit_proves_zero_padding_frame_and_finite_execution[9] 
+tests/unit/test_block_summary_certificates.py::test_summary_wrong_memory_effect_rejected 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_summary_wrong_memory_effect_rejected 
+tests/unit/test_block_summary_certificates.py::test_summary_missing_progress_is_rejected 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_summary_missing_progress_is_rejected 
+tests/unit/test_block_summary_certificates.py::test_summary_cannot_cross_a_block_cutpoint 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_summary_cannot_cross_a_block_cutpoint 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[0] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[0] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[7] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[7] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[8] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[8] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[9] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[9] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[31] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[31] 
+tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[32] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_actual_slice_zero_padding[32] 
+tests/unit/test_block_summary_certificates.py::test_symbolic_calldata_offset_is_proved_under_current_guard 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_symbolic_calldata_offset_is_proved_under_current_guard 
+tests/unit/test_block_summary_certificates.py::test_calldata_wrap_boundary_never_gets_an_assumed_no_overflow 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_wrap_boundary_never_gets_an_assumed_no_overflow 
+tests/unit/test_block_summary_certificates.py::test_actual_mcopy_overlap_and_direction[mcopy-low-word-4096-4098] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_actual_mcopy_overlap_and_direction[mcopy-low-word-4096-4098] 
+tests/unit/test_block_summary_certificates.py::test_actual_mcopy_overlap_and_direction[mcopy-high-word-4098-4096] 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_actual_mcopy_overlap_and_direction[mcopy-high-word-4098-4096] 
+tests/unit/test_block_summary_certificates.py::test_summary_deadline_expiry_is_not_converted_to_raw_fallback 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_summary_deadline_expiry_is_not_converted_to_raw_fallback 
+tests/unit/test_block_summary_certificates.py::test_raw_replay_timeout_is_not_converted_to_fallback 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_raw_replay_timeout_is_not_converted_to_fallback 
+tests/unit/test_block_summary_certificates.py::test_calldata_uint64_wrap_counterexample_cannot_be_summarized_away 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_calldata_uint64_wrap_counterexample_cannot_be_summarized_away 
+tests/unit/test_block_summary_certificates.py::test_summary_hit_certificate_requires_manifest_match 
+[gw0] PASSED tests/unit/test_block_summary_certificates.py::test_summary_hit_certificate_requires_manifest_match 
+tests/unit/test_block_uf_unification.py::test_entailed_argument_equality_is_merged 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_entailed_argument_equality_is_merged 
+tests/unit/test_block_uf_unification.py::test_argument_containing_its_partner_terminates 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_argument_containing_its_partner_terminates 
+tests/unit/test_block_uf_unification.py::test_arguments_equal_only_in_some_models_are_not_merged 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_arguments_equal_only_in_some_models_are_not_merged 
+tests/unit/test_block_uf_unification.py::test_opaque_uf_results_do_not_invent_argument_equalities 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_opaque_uf_results_do_not_invent_argument_equalities 
+tests/unit/test_block_uf_unification.py::test_sweep_merges_only_entailed_equalities 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_sweep_merges_only_entailed_equalities 
+tests/unit/test_block_uf_unification.py::test_case_split_requires_every_case 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_case_split_requires_every_case 
+tests/unit/test_block_uf_unification.py::test_timeouts_never_become_proofs 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_timeouts_never_become_proofs 
+tests/unit/test_block_uf_unification.py::test_prover_proves_through_unification_when_direct_query_is_unknown 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_prover_proves_through_unification_when_direct_query_is_unknown 
+tests/unit/test_block_uf_unification.py::test_final_query_unknown_keeps_obligation_open 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_final_query_unknown_keeps_obligation_open 
+tests/unit/test_block_uf_unification.py::test_unrefuted_lemma_invalidates_record 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_unrefuted_lemma_invalidates_record 
+tests/unit/test_block_uf_unification.py::test_square_monotonicity_axioms_hold_for_bvmul 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_square_monotonicity_axioms_hold_for_bvmul 
+tests/unit/test_block_uf_unification.py::test_equality_cache_never_transfers_to_a_weaker_premise 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_equality_cache_never_transfers_to_a_weaker_premise 
+tests/unit/test_block_uf_unification.py::test_unification_first_still_falls_back_to_mul_abstraction 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_unification_first_still_falls_back_to_mul_abstraction 
+tests/unit/test_block_uf_unification.py::test_unify_across_merges_only_under_shared_premise 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_unify_across_merges_only_under_shared_premise 
+tests/unit/test_block_uf_unification.py::test_word_rewrite_schemas_are_identities 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_word_rewrite_schemas_are_identities 
+tests/unit/test_block_uf_unification.py::test_word_rewrite_rejects_non_identities 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_word_rewrite_rejects_non_identities 
+tests/unit/test_block_uf_unification.py::test_normalize_word_arith_refutes_mstore_gas_pair 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_normalize_word_arith_refutes_mstore_gas_pair 
+tests/unit/test_block_uf_unification.py::test_normalize_word_arith_keeps_satisfiable_pairs_satisfiable 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_normalize_word_arith_keeps_satisfiable_pairs_satisfiable 
+tests/unit/test_block_uf_unification.py::test_prover_proves_mstore_gas_pair_through_normalized_route 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_prover_proves_mstore_gas_pair_through_normalized_route 
+tests/unit/test_block_uf_unification.py::test_offset_view_select_reads_x86_memory_in_evm_offsets 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_offset_view_select_reads_x86_memory_in_evm_offsets 
+tests/unit/test_block_uf_unification.py::test_multi_part_concat_join_is_checked_slice_by_slice 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_multi_part_concat_join_is_checked_slice_by_slice 
+tests/unit/test_block_uf_unification.py::test_div_quotient_axioms_are_valid_and_guarded 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_div_quotient_axioms_are_valid_and_guarded 
+tests/unit/test_block_uf_unification.py::test_mul_truncation_axioms_hold_for_bvmul 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_mul_truncation_axioms_hold_for_bvmul 
+tests/unit/test_block_uf_unification.py::test_generalized_products_prove_only_tautologies 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_generalized_products_prove_only_tautologies 
+tests/unit/test_block_uf_unification.py::test_offset_view_identity_is_proved_by_generalisation 
+[gw0] PASSED tests/unit/test_block_uf_unification.py::test_offset_view_identity_is_proved_by_generalisation 
+tests/unit/test_block_uf_unification.py::test_offset_view_step_lemma_proves_the_rewrite_without_per_read_queries 
