@@ -1,0 +1,7 @@
+[    11.0s] entry_nonempty sat 0.0s
+[    11.8s] havoc_relation unsat 0.7s
+[  2612.1s] model_domain_nonempty sat 22.2s
+[  2613.2s] evm_assumption_7 unsat 0.4s
+[  2616.1s] evm_assumption_8 unsat 1.5s
+Terminated
+tri-21213 exit 143

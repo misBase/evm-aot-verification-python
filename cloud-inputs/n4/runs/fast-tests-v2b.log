@@ -1085,3 +1085,247 @@ tests/unit/test_block_remaining_blocks.py::test_summary_entry_falls_back_to_the_
 tests/unit/test_block_remaining_blocks.py::test_summary_unsat_check_falls_back_to_the_blasted_query 
 [gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_summary_unsat_check_falls_back_to_the_blasted_query 
 tests/unit/test_block_remaining_blocks.py::test_aave_7200_hit_premise_is_sat_once_blasted 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_aave_7200_hit_premise_is_sat_once_blasted 
+tests/unit/test_block_remaining_blocks.py::test_copy_precondition_falls_back_to_the_blasted_query 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_copy_precondition_falls_back_to_the_blasted_query 
+tests/unit/test_block_remaining_blocks.py::test_undecided_entry_still_applies_the_summary 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_undecided_entry_still_applies_the_summary 
+tests/unit/test_block_remaining_blocks.py::test_undecided_entry_does_not_excuse_a_failed_obligation 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_undecided_entry_does_not_excuse_a_failed_obligation 
+tests/unit/test_block_remaining_blocks.py::test_refuted_entry_is_still_rejected 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_refuted_entry_is_still_rejected 
+tests/unit/test_block_remaining_blocks.py::test_byte_copy_hit_on_infeasible_path_is_vacuous 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_byte_copy_hit_on_infeasible_path_is_vacuous 
+tests/unit/test_block_remaining_blocks.py::test_node_unification_gets_a_quarter_of_what_is_left 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_node_unification_gets_a_quarter_of_what_is_left 
+tests/unit/test_block_remaining_blocks.py::test_permit2_1327_x86_row_is_empty[6] 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_permit2_1327_x86_row_is_empty[6] 
+tests/unit/test_block_remaining_blocks.py::test_permit2_1327_x86_row_is_empty[7] 
+[gw1] PASSED tests/unit/test_block_remaining_blocks.py::test_permit2_1327_x86_row_is_empty[7] 
+tests/unit/test_block_remaining_blocks_2.py::test_identity_proof_is_solved_once 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_2.py::test_identity_proof_is_solved_once 
+tests/unit/test_block_remaining_blocks_2.py::test_failed_identity_is_retried 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_2.py::test_failed_identity_is_retried 
+tests/unit/test_block_remaining_blocks_2.py::test_memo_never_proves_a_non_identity 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_2.py::test_memo_never_proves_a_non_identity 
+tests/unit/test_block_remaining_blocks_2.py::test_clear_memo_drops_identity_proofs 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_2.py::test_clear_memo_drops_identity_proofs 
+tests/unit/test_block_remaining_blocks_2.py::test_normalize_does_not_retry_a_failed_rewrite_within_one_call 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_2.py::test_normalize_does_not_retry_a_failed_rewrite_within_one_call 
+tests/unit/test_block_remaining_blocks_2.py::test_sibling_normalization_reuses_proofs 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_2.py::test_sibling_normalization_reuses_proofs 
+tests/unit/test_block_remaining_blocks_3.py::test_uf_guards_finds_the_branch_guards_smallest_first 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_uf_guards_finds_the_branch_guards_smallest_first 
+tests/unit/test_block_remaining_blocks_3.py::test_uf_guards_ignores_formulas_without_repeated_ufs 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_uf_guards_ignores_formulas_without_repeated_ufs 
+tests/unit/test_block_remaining_blocks_3.py::test_guard_cases_cover_the_formula 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_guard_cases_cover_the_formula 
+tests/unit/test_block_remaining_blocks_3.py::test_assume_guard_is_equivalent_under_its_literal 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_assume_guard_is_equivalent_under_its_literal 
+tests/unit/test_block_remaining_blocks_3.py::test_guard_cases_refute_the_sdiv_shape 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_guard_cases_refute_the_sdiv_shape 
+tests/unit/test_block_remaining_blocks_3.py::test_guard_cases_never_refute_a_satisfiable_formula 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_guard_cases_never_refute_a_satisfiable_formula 
+tests/unit/test_block_remaining_blocks_3.py::test_guard_route_returns_at_once_without_guards 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_guard_route_returns_at_once_without_guards 
+tests/unit/test_block_remaining_blocks_3.py::test_guard_route_is_in_both_route_tables 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_guard_route_is_in_both_route_tables 
+tests/unit/test_block_remaining_blocks_3.py::test_text_size_is_the_sexpr_length 
+[gw1] PASSED tests/unit/test_block_remaining_blocks_3.py::test_text_size_is_the_sexpr_length 
+tests/unit/test_block_remaining_blocks_3.py::test_pm16670_goal_2_is_refuted_by_guard_cases 
+[gw0] FAILED tests/integration/test_block_constant_insensitive.py::test_muti_block_verifies_with_fewer_proofs 
+tests/integration/test_block_environment.py::test_symbolic_block_environment_certificate_and_wrong_field_reads[None] 
+[gw0] PASSED tests/integration/test_block_environment.py::test_symbolic_block_environment_certificate_and_wrong_field_reads[None] 
+tests/integration/test_block_environment.py::test_symbolic_block_environment_certificate_and_wrong_field_reads[80] 
+[gw0] PASSED tests/integration/test_block_environment.py::test_symbolic_block_environment_certificate_and_wrong_field_reads[80] 
+tests/integration/test_block_environment.py::test_symbolic_block_environment_certificate_and_wrong_field_reads[88] 
+[gw0] PASSED tests/integration/test_block_environment.py::test_symbolic_block_environment_certificate_and_wrong_field_reads[88] 
+tests/integration/test_block_environment.py::test_symbolic_block_environment_certificate_and_wrong_field_reads[96] 
+[gw0] PASSED tests/integration/test_block_environment.py::test_symbolic_block_environment_certificate_and_wrong_field_reads[96] 
+tests/integration/test_block_equivalence.py::test_alignment_and_raw_entry_are_distinct 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_alignment_and_raw_entry_are_distinct 
+tests/integration/test_block_equivalence.py::test_real_local_baselines[0] 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_real_local_baselines[0] 
+tests/integration/test_block_equivalence.py::test_real_local_baselines[13] 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_real_local_baselines[13] 
+tests/integration/test_block_equivalence.py::test_real_local_baselines[120] 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_real_local_baselines[120] 
+tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[status] 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[status] 
+tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[return_bytes] 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[return_bytes] 
+tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[storage] 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[storage] 
+tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[transient] 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[transient] 
+tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[gas] 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_real_terminal_producer_mutation[gas] 
+tests/integration/test_block_equivalence.py::test_unmapped_block_is_rejected 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_unmapped_block_is_rejected 
+tests/integration/test_block_equivalence.py::test_node_deadline_interrupts_raw_execution_without_a_theorem 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_node_deadline_interrupts_raw_execution_without_a_theorem 
+tests/integration/test_block_equivalence.py::test_summary_templates_are_discovered_once_per_program 
+[gw0] PASSED tests/integration/test_block_equivalence.py::test_summary_templates_are_discovered_once_per_program 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[None-none] 
+[gw0] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[None-none] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[None-full-program] 
+[gw0] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[None-full-program] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[call_site-none] 
+[gw0] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[call_site-none] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[call_site-full-program] 
+[gw0] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[call_site-full-program] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[memory_coordinates-none] 
+[gw0] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[memory_coordinates-none] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[memory_coordinates-full-program] 
+[gw0] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[memory_coordinates-full-program] 
+tests/integration/test_block_parallel.py::test_parallel_schedule_verifies_like_the_worklist 
+[gw0] PASSED tests/integration/test_block_parallel.py::test_parallel_schedule_verifies_like_the_worklist 
+tests/integration/test_block_parallel.py::test_other_programs[mstore_return] 
+[gw0] PASSED tests/integration/test_block_parallel.py::test_other_programs[mstore_return] 
+tests/integration/test_block_parallel.py::test_other_programs[gas_sstore] 
+[gw0] PASSED tests/integration/test_block_parallel.py::test_other_programs[gas_sstore] 
+tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[node] 
+[gw0] PASSED tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[node] 
+tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[edge] 
+[gw0] PASSED tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[edge] 
+tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[entry] 
+[gw0] PASSED tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[entry] 
+tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[identity] 
+[gw0] PASSED tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[identity] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-three_block] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-three_block] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-mstore_return] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-mstore_return] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_sload] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_sload] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_two_sload] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_two_sload] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_sstore] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_sstore] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-three_block] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-three_block] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-mstore_return] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-mstore_return] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_sload] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_sload] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_two_sload] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_two_sload] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_sstore] 
+[gw0] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_sstore] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[base] 
+[gw0] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[base] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[edge] 
+[gw0] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[edge] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[node] 
+[gw0] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[node] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[scope] 
+[gw0] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[scope] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[identity] 
+[gw0] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[identity] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[progress] 
+[gw0] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[progress] 
+tests/integration/test_block_program.py::test_wrong_initial_specialization_is_not_saved_by_local_success 
+[gw0] PASSED tests/integration/test_block_program.py::test_wrong_initial_specialization_is_not_saved_by_local_success 
+tests/integration/test_block_program.py::test_missing_successor_is_rejected 
+[gw0] PASSED tests/integration/test_block_program.py::test_missing_successor_is_rejected 
+tests/integration/test_block_program.py::test_primary_verifier_uses_same_consumer 
+[gw0] PASSED tests/integration/test_block_program.py::test_primary_verifier_uses_same_consumer 
+tests/integration/test_block_program.py::test_empty_initial_domain_not_vacuously_verified 
+[gw0] PASSED tests/integration/test_block_program.py::test_empty_initial_domain_not_vacuously_verified 
+tests/integration/test_block_program.py::test_independent_fallback_is_a_fresh_complete_proof 
+[gw0] PASSED tests/integration/test_block_program.py::test_independent_fallback_is_a_fresh_complete_proof 
+tests/integration/test_block_program.py::test_self_loop_closes_without_unrolling_to_initial_gas 
+[gw0] PASSED tests/integration/test_block_program.py::test_self_loop_closes_without_unrolling_to_initial_gas 
+tests/integration/test_block_program.py::test_internal_one_sided_spin_is_not_a_finite_macro 
+[gw0] PASSED tests/integration/test_block_program.py::test_internal_one_sided_spin_is_not_a_finite_macro 
+tests/integration/test_block_program.py::test_r14_rebuild_mutation_checked_by_actual_semantics 
+[gw0] PASSED tests/integration/test_block_program.py::test_r14_rebuild_mutation_checked_by_actual_semantics 
+tests/integration/test_block_scheduling.py::test_baseline_explores_every_block_and_verifies 
+[gw0] PASSED tests/integration/test_block_scheduling.py::test_baseline_explores_every_block_and_verifies 
+tests/integration/test_block_scheduling.py::test_failed_entry_node_still_discovers_its_successors 
+[gw0] PASSED tests/integration/test_block_scheduling.py::test_failed_entry_node_still_discovers_its_successors 
+tests/integration/test_block_scheduling.py::test_deferred_node_is_retried_with_the_full_budget 
+[gw0] PASSED tests/integration/test_block_scheduling.py::test_deferred_node_is_retried_with_the_full_budget 
+tests/integration/test_block_scheduling.py::test_a_node_failing_twice_stays_a_failure 
+[gw0] PASSED tests/integration/test_block_scheduling.py::test_a_node_failing_twice_stays_a_failure 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_counter_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_counter_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_fmp_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_fmp_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_calldata_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_calldata_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_return_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_return_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_storage_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_storage_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_counter_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_counter_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_fmp_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_fmp_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_calldata_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_calldata_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_return_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_return_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_storage_loop] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_storage_loop] 
+tests/integration/test_block_symbolic_loops.py::test_symbolic_havoc_has_multiple_memory_parameters 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_symbolic_havoc_has_multiple_memory_parameters 
+tests/integration/test_block_symbolic_loops.py::test_local_failure_does_not_skip_another_queued_instance 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_local_failure_does_not_skip_another_queued_instance 
+tests/integration/test_block_symbolic_loops.py::test_symbolic_successor_still_checks_memory_equality 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_symbolic_successor_still_checks_memory_equality 
+tests/integration/test_block_symbolic_loops.py::test_obligation_manifest_does_not_follow_deleted_query_records 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_obligation_manifest_does_not_follow_deleted_query_records 
+tests/integration/test_block_symbolic_loops.py::test_return_tag_predicate_is_checked_at_actual_arrival 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_return_tag_predicate_is_checked_at_actual_arrival 
+tests/integration/test_block_symbolic_loops.py::test_return_tag_predicate_havoc_binds_both_views 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_return_tag_predicate_havoc_binds_both_views 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants0] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants0] 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants1] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants1] 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants2] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants2] 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants3] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants3] 
+tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants4] 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_malformed_stack_predicates_rejected[constants4] 
+tests/integration/test_block_symbolic_loops.py::test_node_budget_expiry_continues_queue_and_restores_program_deadline 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_node_budget_expiry_continues_queue_and_restores_program_deadline 
+tests/integration/test_block_symbolic_loops.py::test_loop_storage_corruption_is_rejected_by_edge_closure 
+[gw0] PASSED tests/integration/test_block_symbolic_loops.py::test_loop_storage_corruption_is_rejected_by_edge_closure 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_calldatacopy] 
+[gw0] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_calldatacopy] 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_codecopy] 
+[gw0] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_codecopy] 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_returndatacopy] 
+[gw0] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_returndatacopy] 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_mcopy] 
+[gw0] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_is_gas_neutral[gas_mcopy] 
+tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_actually_fires_on_a_copy_fixture 
+[gw0] PASSED tests/integration/test_copy_loop_gas_parity.py::test_copy_loop_summary_actually_fires_on_a_copy_fixture 
+tests/integration/test_equivalence_checker.py::test_verifier_import 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verifier_import 
+tests/integration/test_equivalence_checker.py::test_verify_add_program_pair 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verify_add_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_add_program_pair_full 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verify_add_program_pair_full 
+tests/integration/test_equivalence_checker.py::test_verify_mstore_return_program_pair 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verify_mstore_return_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_sstore_load_program_pair 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verify_sstore_load_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_two_block_program_pair 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verify_two_block_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_three_block_program_pair 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verify_three_block_program_pair 
+tests/integration/test_equivalence_checker.py::test_jumpi_2block_err_program_pair 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_jumpi_2block_err_program_pair 
+tests/integration/test_equivalence_checker.py::test_jumpi_2block_ok_program_pair 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_jumpi_2block_ok_program_pair 
+tests/integration/test_equivalence_checker.py::test_verify_perf_erc20_lite_program_pair 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verify_perf_erc20_lite_program_pair 
+tests/integration/test_equivalence_checker.py::test_detects_perf_erc20_lite_sbb_to_sub_bug 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_detects_perf_erc20_lite_sbb_to_sub_bug 
+tests/integration/test_equivalence_checker.py::test_verify_muti_block_program_pair_full 
+[gw0] PASSED tests/integration/test_equivalence_checker.py::test_verify_muti_block_program_pair_full 
+tests/integration/test_equivalence_checker.py::test_verify_muti_block_08_program_pair_full 
