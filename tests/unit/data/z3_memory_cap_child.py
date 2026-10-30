@@ -18,8 +18,12 @@ try:
 except z3.Z3Exception as exc:
     out.append("memory" if cs.out_of_memory(exc) else "other")
 
-prefix = cs.PrefixSolver()  # incremental: one push per conjunct
-out.append(str(prefix.check(hard, 60000, "test")))
+# Incremental, one push per conjunct: at 128 bits (pushes internalize terms outside any cap, so the
+# 512-bit version grows to GBs before the check starts).
+a, b, c = z3.BitVec("n4c_a", 128), z3.BitVec("n4c_b", 128), z3.BitVec("n4c_c", 128)
+prefix = cs.PrefixSolver()
+out.append(str(prefix.check([b != 0, z3.UDiv(a, b) * b + z3.URem(a, b) != a, z3.UDiv(a * c, b + 1) == c * a],
+                            60000, "test")))
 out.append(str(prefix.check([z3.And(hard)], 60000, "test")))
 # As is_possible: the check trips, then PrefixSolver resets the solver inside the enclosing cap
 # (memory_max_size: SIGABRT in Z3_solver_reset, PoolManager 18089 locally after 2084s).

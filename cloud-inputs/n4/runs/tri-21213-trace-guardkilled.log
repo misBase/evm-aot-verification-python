@@ -1,0 +1,11 @@
+[     6.9s] entry_nonempty sat 0.0s
+[     7.6s] havoc_relation unsat 0.6s
+[    62.3s] TRACE solve_query unknown 3.1s z3 148->148 MB
+[    65.5s] TRACE solve_query unknown 3.1s z3 148->148 MB
+[    76.0s] TRACE solve_query unsat 3.2s z3 148->148 MB
+[    80.3s] TRACE solve_query unsat 2.5s z3 148->148 MB
+[    83.4s] TRACE solve_query unsat 3.1s z3 148->148 MB
+[    91.9s] TRACE solve_query unsat 8.4s z3 148->149 MB
+[    96.7s] TRACE solve_query unsat 2.6s z3 149->149 MB
+Terminated
+tri-21213 exit 143
