@@ -1,0 +1,319 @@
+{
+ "4418": [
+  {
+   "spec": "BlockSpecialization(pc=4418, stack_depth=15, memory_size=None, free_memory_pointer=None, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "ProofBudgetExceeded: proof wall budget exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 43208.46329290513,
+   "queries": 2545,
+   "failed_obligations": [
+    {
+     "name": "x86_maps_1_0",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 13894.507199442014
+    }
+   ]
+  },
+  {
+   "spec": "BlockSpecialization(pc=4418, stack_depth=15, memory_size=None, free_memory_pointer=320, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "ProofBudgetExceeded: proof wall budget exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 43205.40065346612,
+   "queries": 1828,
+   "failed_obligations": []
+  }
+ ],
+ "6084": [
+  {
+   "spec": "BlockSpecialization(pc=6084, stack_depth=13, memory_size=None, free_memory_pointer=768, stack_constants=((7, 6222), (8, 6240)))",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: outcome mismatch x86_maps_2_8: x86 path 2 implies conjunct 8 of evm path 0 (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 43135.81192063098,
+   "queries": 1755,
+   "failed_obligations": [
+    {
+     "name": "x86_maps_2_8",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 582.6576268150238
+    }
+   ]
+  },
+  {
+   "spec": "BlockSpecialization(pc=6084, stack_depth=13, memory_size=864, free_memory_pointer=768, stack_constants=((7, 6222), (8, 6240)))",
+   "status": "inconclusive",
+   "reasons": [
+    "ProofBudgetExceeded: proof wall budget exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 43208.53526382707,
+   "queries": 1706,
+   "failed_obligations": []
+  }
+ ],
+ "16670": [
+  {
+   "spec": "BlockSpecialization(pc=16670, stack_depth=16, memory_size=None, free_memory_pointer=None, stack_constants=((3, 7296),))",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: outcome mismatch pair_4_84: terminal@16670 / terminal@689761 (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 43202.48521751212,
+   "queries": 428,
+   "failed_obligations": [
+    {
+     "name": "pair_4_84",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 26001.79531852668
+    }
+   ]
+  },
+  {
+   "spec": "BlockSpecialization(pc=16670, stack_depth=16, memory_size=768, free_memory_pointer=768, stack_constants=((3, 7324),))",
+   "status": "split",
+   "reasons": [
+    "worker: BrokenProcessPool: A process in the process pool was terminated abruptly while the future was running or pending."
+   ],
+   "contexts": 1,
+   "seconds": 0.0,
+   "queries": 0,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=16670, stack_depth=16, memory_size=None, free_memory_pointer=None, stack_constants=((3, 7324),))",
+   "status": "error",
+   "reasons": [
+    "worker: BrokenProcessPool: A process in the process pool was terminated abruptly while the future was running or pending."
+   ],
+   "contexts": 1,
+   "seconds": 0.0,
+   "queries": 0,
+   "failed_obligations": []
+  }
+ ],
+ "18089": [
+  {
+   "spec": "BlockSpecialization(pc=18089, stack_depth=18, memory_size=None, free_memory_pointer=320, stack_constants=((3, 4418),))",
+   "status": "inconclusive",
+   "reasons": [
+    "TimeoutError: x86 segment execution deadline exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 43221.95773023699,
+   "queries": 641,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=18089, stack_depth=18, memory_size=None, free_memory_pointer=320, stack_constants=((3, 4418), (4, 6901745935414424457133245323534729813113482726486420146767558386647040), (6, 0), (7, 160), (8, 100085580808691389569162032148122597711910207533909161009197301988533323260984), (16, 32)))",
+   "status": "inconclusive",
+   "reasons": [
+    "TimeoutError: x86 segment execution deadline exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 43224.88885283802,
+   "queries": 563,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=18089, stack_depth=29, memory_size=None, free_memory_pointer=928, stack_constants=((3, 20208), (5, 1755), (23, 1935), (25, 1954)))",
+   "status": "inconclusive",
+   "reasons": [
+    "TimeoutError: x86 segment execution deadline exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 43227.15883478802,
+   "queries": 641,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=18089, stack_depth=29, memory_size=928, free_memory_pointer=928, stack_constants=((3, 20208), (5, 1755), (6, 416), (11, 0), (13, 672), (15, 576), (17, 16777215), (18, 320), (22, 0), (23, 1935), (24, 160), (25, 1954), (26, 288), (27, 32)))",
+   "status": "inconclusive",
+   "reasons": [
+    "TimeoutError: x86 segment execution deadline exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 43206.77962503402,
+   "queries": 635,
+   "failed_obligations": []
+  }
+ ],
+ "19169": [
+  {
+   "spec": "BlockSpecialization(pc=19169, stack_depth=25, memory_size=None, free_memory_pointer=None, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 44357.26810247917,
+   "queries": 2659,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=19169, stack_depth=25, memory_size=None, free_memory_pointer=928, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 44606.40913573187,
+   "queries": 2659,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=19169, stack_depth=25, memory_size=928, free_memory_pointer=928, stack_constants=())",
+   "status": "inconclusive",
+   "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 44697.68556743581,
+   "queries": 2659,
+   "failed_obligations": []
+  }
+ ],
+ "21213": [
+  {
+   "spec": "BlockSpecialization(pc=21213, stack_depth=29, memory_size=None, free_memory_pointer=None, stack_constants=((5, 1755), (23, 1935), (25, 1954)))",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: x86: outcome guards do not cover the entry domain"
+   ],
+   "contexts": 1,
+   "seconds": 29878.563959514024,
+   "queries": 1303,
+   "failed_obligations": [
+    {
+     "name": "x86_coverage",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 27279.854227492993
+    }
+   ]
+  },
+  {
+   "spec": "BlockSpecialization(pc=21213, stack_depth=29, memory_size=928, free_memory_pointer=928, stack_constants=((5, 1755), (6, 416), (7, 0), (11, 0), (13, 672), (15, 576), (17, 16777215), (18, 320), (22, 0), (23, 1935), (24, 160), (25, 1954), (26, 288), (27, 32)))",
+   "status": "inconclusive",
+   "reasons": [
+    "ValueError: x86: outcome guards do not cover the entry domain"
+   ],
+   "contexts": 1,
+   "seconds": 29967.572898426035,
+   "queries": 1303,
+   "failed_obligations": [
+    {
+     "name": "x86_coverage",
+     "answer": "unknown",
+     "expected": "unsat",
+     "seconds": 27099.68494580104
+    }
+   ]
+  }
+ ],
+ "22747": [
+  {
+   "spec": "BlockSpecialization(pc=22747, stack_depth=40, memory_size=None, free_memory_pointer=None, stack_constants=((4, 20572),))",
+   "status": "split",
+   "reasons": [
+    "worker: BrokenProcessPool: A process in the process pool was terminated abruptly while the future was running or pending."
+   ],
+   "contexts": 1,
+   "seconds": 0.0,
+   "queries": 0,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=22747, stack_depth=40, memory_size=928, free_memory_pointer=928, stack_constants=((4, 20572),))",
+   "status": "split",
+   "reasons": [
+    "worker: BrokenProcessPool: A process in the process pool was terminated abruptly while the future was running or pending."
+   ],
+   "contexts": 1,
+   "seconds": 0.0,
+   "queries": 0,
+   "failed_obligations": []
+  }
+ ],
+ "22918": [
+  {
+   "spec": "BlockSpecialization(pc=22918, stack_depth=39, memory_size=928, free_memory_pointer=928, stack_constants=((5, 23504),))",
+   "status": "deferred",
+   "reasons": [
+    "TimeoutError: x86 segment execution deadline exhausted"
+   ],
+   "contexts": 1,
+   "seconds": 312.5333788829739,
+   "queries": 50,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=22918, stack_depth=22, memory_size=None, free_memory_pointer=None, stack_constants=((5, 23504),))",
+   "status": "split",
+   "reasons": [
+    "worker: BrokenProcessPool: A process in the process pool was terminated abruptly while the future was running or pending."
+   ],
+   "contexts": 1,
+   "seconds": 0.0,
+   "queries": 0,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=22918, stack_depth=22, memory_size=None, free_memory_pointer=768, stack_constants=((5, 23504),))",
+   "status": "split",
+   "reasons": [
+    "worker: BrokenProcessPool: A process in the process pool was terminated abruptly while the future was running or pending."
+   ],
+   "contexts": 1,
+   "seconds": 0.0,
+   "queries": 0,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=22918, stack_depth=22, memory_size=864, free_memory_pointer=768, stack_constants=((5, 23504),))",
+   "status": "split",
+   "reasons": [
+    "worker: BrokenProcessPool: A process in the process pool was terminated abruptly while the future was running or pending."
+   ],
+   "contexts": 2,
+   "seconds": 0.0,
+   "queries": 0,
+   "failed_obligations": []
+  }
+ ],
+ "23522": [
+  {
+   "spec": "BlockSpecialization(pc=23522, stack_depth=41, memory_size=928, free_memory_pointer=928, stack_constants=((1, 19383),))",
+   "status": "deferred",
+   "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 5645.47535860003,
+   "queries": 777,
+   "failed_obligations": []
+  },
+  {
+   "spec": "BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383),))",
+   "status": "deferred",
+   "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+   ],
+   "contexts": 1,
+   "seconds": 5729.91328427702,
+   "queries": 777,
+   "failed_obligations": []
+  }
+ ]
+}
