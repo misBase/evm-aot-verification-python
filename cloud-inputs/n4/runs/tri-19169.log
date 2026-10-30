@@ -1,4 +1,1 @@
-[     5.9s] init_nonempty sat 0.0s
-[   900.5s] discovered 5052 instances, 0 defects
-BlockSpecialization(pc=19169, stack_depth=25, memory_size=None, free_memory_pointer=None, stack_constants=()) is not in the frozen set
-exit 1
+[     7.2s] init_nonempty sat 0.0s
