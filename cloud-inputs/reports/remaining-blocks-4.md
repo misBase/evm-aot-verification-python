@@ -191,7 +191,7 @@
 | PoolManager 22918 d22 / d39 | `tri-22918-d22*` / `-d39*` | 8e4793a | inconclusive（内存预算 5000 MB） | 214–242s | | 5.2–6.3 GB | 进程池 OOM / x86 超时 |
 | PoolManager 6084 f768 | `tri-6084` | 24e375d+ | 行组证出（1h 分诊） | | | | 预算耗尽 |
 
-smt2 回归（`regress-a.log`、`regress-b.log`、`regress-n3n4.log`）：m、n、r3c、n2 与 N3 一致（见前文）；n3/n4：`aave6182_pair_63_2` proved 2955.8s、`aave6182_x86_maps_2_group` 127.0s、`pm6084_x86_maps_10_group` 112.7s、`pm6084_x86_maps_2_group` 103.9s；`pm16670_sym7296_pair_4_84_goal_2_of_7` 3600s unknown（N3 923.6s，本任务前一次复跑 797.1s；关掉单查询内存上限的复跑：（待补））。`aave6182_x86_maps_2_7` 单独在所有路线上都 unknown（§2.4），没有再跑。
+smt2 回归（`regress-a.log`、`regress-b.log`、`regress-n3n4.log`）：m、n、r3c、n2 与 N3 一致（见前文）；n3/n4：`aave6182_pair_63_2` proved 2955.8s、`aave6182_x86_maps_2_group` 127.0s、`pm6084_x86_maps_10_group` 112.7s、`pm6084_x86_maps_2_group` 103.9s；`pm16670_sym7296_pair_4_84_goal_2_of_7` 3600s unknown（N3 923.6s，本任务前一次复跑 797.1s；同样轻负载下复跑：开着单查询内存上限 **1111.9s proved**，关掉 1332.4s proved，所以那次 unknown 是负载（4 核上 4 个重进程），不是上限）。`aave6182_x86_maps_2_7` 单独在所有路线上都 unknown（§2.4），没有再跑。
 
 ## 7. 诊断工具（`cloud-inputs/n4/tools/`，仅用于诊断）
 
@@ -215,5 +215,5 @@ smt2 回归（`regress-a.log`、`regress-b.log`、`regress-n3n4.log`）：m、n�
 3. **PoolManager 4418**：预算耗尽。行组阶段在这里几乎没有收益（建议按早期结果自适应结束），`x86_maps_0_0` 一条 14747s（需要单独分析）（§2.5）。
 4. **H2**：19169 的 `live_stack_prefix_31` 在 3098s 后仍 unknown（公式未导出，根因未知）；23522 的 H2 全部可证，但约 300 条出边逐条证明同样的目标太慢（建议按相同 EVM 路径和目标把出边分组，在 x86 路径条件的公共前缀上一次证明）。
 5. **Aave 7200**：内存已稳定（~3.1–3.4 GB，峰值 ~4.1 GB，以前 9h 46.7 GB），但 x86 分段本身很慢（§2.3）。
-6. **`pm16670 pair_4_84 goal_2` 回归**：最终代码在负载下 3600s unknown（以前 797–924s）；关掉单查询上限的复跑结果见 §6。
+6. **`pm16670 pair_4_84 goal_2`**：不是回归。负载下 3600s unknown，轻负载下开/关单查询上限分别 1111.9s / 1332.4s 证出（§6）；说明这个 pair 对 CPU 竞争很敏感。
 7. Z3 的内存上限（修法 23/26）只在 Z3 的协作检查点生效：没有检查点的单步（512 位除法的位爆破约 500 MB，push 时的内部化）以及不经计数分配器的内存都拦不住；节点内存预算（软预算中断 + 1.5 倍硬上限退出）是唯一的保证，所以 §2.10 的 worker 数按硬上限计算。
