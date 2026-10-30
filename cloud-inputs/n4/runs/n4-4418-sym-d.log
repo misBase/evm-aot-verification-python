@@ -252,3 +252,20 @@
 [ 18045.0s] x86_maps_2_group unsat 12.6s
 [ 19543.1s] x86_maps_2_group unsat 0.7s
 [ 22487.3s] _unify_node over 9087 obligations: 986.9s, 10 lemmas
+[ 37234.4s] x86_maps_0_0 unsat 14747.1s
+[ 37244.3s] x86_maps_0_1 unsat 9.9s
+[ 37293.3s] x86_maps_0_2 unsat 49.0s
+[ 37294.6s] x86_maps_0_3 unsat 1.3s
+[ 37295.3s] x86_maps_0_4 unsat 0.7s
+[ 37298.0s] x86_maps_0_5 unsat 2.7s
+[ 37298.7s] x86_maps_0_6 unsat 0.7s
+[ 37299.4s] x86_maps_0_7 unsat 0.7s
+[ 37300.3s] x86_maps_0_8 unsat 0.9s
+[ 37301.7s] x86_maps_0_22 unsat 1.4s
+[ 37302.5s] x86_maps_0_24 unsat 0.7s
+[ 37303.3s] x86_maps_0_25 unsat 0.8s
+[ 37869.3s] x86_maps_0_26 unsat 566.0s
+[ 37905.4s] x86_maps_0_27 unsat 36.2s
+[ 37906.4s] x86_maps_0_28 unsat 1.0s
+[ 37907.0s] x86_maps_0_29 unsat 0.6s
+[ 37909.4s] x86_maps_0_30 unsat 2.4s

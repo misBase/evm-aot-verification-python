@@ -374,3 +374,27 @@ def test_prefix_tree_retries_an_unknown_local_query_once_with_a_larger_budget(mo
     budgets.clear()
     monkeypatch.setattr(PrefixSolver, "check", lambda self, *a: budgets.append(a[1]) or z3.unknown)
     assert be.coverage_by_prefix_tree(BoolVal(True), paths, 1000) is None and budgets == [1000, 4000]
+
+
+# --- fix 28: state/path digests by structural hashing, linear in the term DAG -------------------
+
+def test_term_digest_identifies_terms_as_their_text_does_and_shares_subterms():
+    import time
+    import z3
+    x, y = z3.BitVec("n4_dg_x", 64), z3.BitVec("n4_dg_y", 64)
+    mem = z3.Array("n4_dg_m", z3.BitVecSort(64), z3.BitVecSort(8))
+    i = z3.BitVec("n4_dg_i", 64)
+    terms = [x + y, y + x, z3.Extract(7, 0, x), z3.Extract(8, 1, x), z3.ZeroExt(8, x), z3.SignExt(8, x),
+             z3.BitVecVal(5, 64), z3.BitVec("n4_dg_x", 32), z3.Store(mem, x, z3.BitVecVal(1, 8)),
+             z3.Lambda([i], z3.Select(mem, i + x)), z3.Lambda([i], z3.Select(mem, i + y)),
+             z3.K(z3.BitVecSort(64), z3.BitVecVal(0, 8)), z3.K(z3.BitVecSort(32), z3.BitVecVal(0, 8))]
+    digests = [be.term_digest(t, {}) for t in terms]
+    assert len(set(digests)) == len({t.sexpr() for t in terms}) == len(terms)
+    assert be.term_digest(z3.BitVec("n4_dg_x", 64) + z3.BitVec("n4_dg_y", 64), {}) == digests[0]
+    # 300 memories sharing a 300-store prefix (x86 path states): text re-prints the prefix per path.
+    chain = mem
+    for k in range(300):
+        chain = z3.Store(chain, x + k, z3.Extract(7, 0, y + k))
+    paths = [z3.Store(chain, y + k, z3.BitVecVal(k % 256, 8)) for k in range(300)]
+    started, memo = time.monotonic(), {}
+    assert len({be.term_digest(p, memo) for p in paths}) == 300 and time.monotonic() - started < 10

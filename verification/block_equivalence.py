@@ -17,7 +17,7 @@ from time import monotonic
 from typing import Tuple
 
 from z3 import (And, Not, Or, is_expr, Solver, SolverFor, sat, unsat, unknown, simplify, is_bool, is_app, is_bv_value,
-                is_quantifier, Z3_BOOL_SORT, Z3_BV_SORT, Z3_ARRAY_SORT,
+                is_quantifier, get_var_index, Z3_BOOL_SORT, Z3_BV_SORT, Z3_ARRAY_SORT,
                 substitute, BitVecSort, FreshFunction, Z3_OP_BMUL, Z3_OP_UNINTERPRETED, ULE,
                 is_and, is_array, FreshConst, Select, BoolVal, Z3_OP_ITE, is_false, is_bv, BitVecVal,
                 Implies, ULT, Var, substitute_funs, Extract, If, Z3_OP_EXTRACT, Z3_OP_BADD, Z3_OP_CONCAT, Z3_OP_EQ, Z3_OP_SELECT, is_true,
@@ -3237,17 +3237,55 @@ class BlockTheorem:
                 and all(c.complete for c in self.summary_hits))
 
 
+def term_digest(root, memo):
+    """sha256 of a term's structure: operator name, parameters, domain and range
+    sorts and the children's digests (binder names/sorts and body for a
+    quantifier or lambda, index and sort for a bound variable). It identifies
+    the term as its sexpr text does, but each shared subterm is hashed once
+    per `memo` (keyed by AST id: the terms are alive for the whole traversal),
+    so the cost is linear in the DAG. sexpr re-prints shared subterms for every
+    top-level expression: PoolManager 23522's 304 x86 path states (store chains
+    sharing long prefixes) ran 50+ min and grew the node by GBs in paths_digest."""
+    work = [(root, False)]
+    while work:
+        term, ready = work.pop()
+        key = term.get_id()
+        if key in memo:
+            continue
+        if is_quantifier(term):
+            kids = [term.body()]
+        elif is_app(term):
+            kids = term.children()
+        else:
+            kids = []
+        if not ready:
+            work.append((term, True))
+            work.extend((kid, False) for kid in kids if kid.get_id() not in memo)
+            continue
+        if is_quantifier(term):
+            head = ("binder", term.is_lambda(), term.is_forall(), term.weight(),
+                    tuple((term.var_name(i), term.var_sort(i).sexpr()) for i in range(term.num_vars())),
+                    tuple(term.pattern(i).sexpr() for i in range(term.num_patterns())))
+        elif is_app(term):
+            decl = term.decl()
+            head = ("app", decl.name(), tuple(str(p) for p in decl.params()),
+                    tuple(decl.domain(i).sexpr() for i in range(decl.arity())), decl.range().sexpr())
+        else:
+            head = ("var", get_var_index(term), term.sort().sexpr())
+        memo[key] = sha256(repr((head, tuple(memo[kid.get_id()] for kid in kids))).encode()).hexdigest()
+    return memo[root.get_id()]
+
+
 def state_digest(state, expression_cache=None):
     """Run-local identity; includes every field, expression and model option."""
     expressions = {} if expression_cache is None else expression_cache
     def encode(obj):
         if isinstance(obj, Enum):
             return (type(obj).__qualname__, obj.value)
-        if hasattr(obj, "sexpr"):
-            key = (id(obj.ctx), obj.get_id())
-            if key not in expressions:
-                expressions[key] = obj.sexpr()
-            return expressions[key]
+        if is_expr(obj):
+            return term_digest(obj, expressions)
+        if hasattr(obj, "sexpr"):  # sorts, declarations: small
+            return obj.sexpr()
         if isinstance(obj, dict):
             return tuple(sorted((str(k), encode(v)) for k, v in obj.items()))
         if isinstance(obj, (list, tuple)):
@@ -3262,9 +3300,9 @@ def state_digest(state, expression_cache=None):
 
 
 def paths_digest(evm, x86):
-    # Z3 terms are immutable; reuse rendering only during this fresh traversal.
+    # Z3 terms are immutable; reuse subterm digests only during this fresh traversal.
     expressions = {}
-    return digest(tuple((p.kind, p.location, p.condition.sexpr(), state_digest(p.state, expressions))
+    return digest(tuple((p.kind, p.location, term_digest(p.condition, expressions), state_digest(p.state, expressions))
                         for p in (*evm, *x86)))
 
 
