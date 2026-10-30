@@ -1325,3 +1325,5 @@ tests/integration/test_equivalence_checker.py::test_jumpi_2block_ok_program_pair
 tests/integration/test_equivalence_checker.py::test_verify_perf_erc20_lite_program_pair 
 [gw1] PASSED tests/integration/test_equivalence_checker.py::test_verify_perf_erc20_lite_program_pair 
 tests/integration/test_equivalence_checker.py::test_detects_perf_erc20_lite_sbb_to_sub_bug 
+[gw1] PASSED tests/integration/test_equivalence_checker.py::test_detects_perf_erc20_lite_sbb_to_sub_bug 
+tests/integration/test_equivalence_checker.py::test_verify_muti_block_program_pair_full 

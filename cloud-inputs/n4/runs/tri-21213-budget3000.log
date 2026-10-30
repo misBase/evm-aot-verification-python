@@ -1,0 +1,8 @@
+[     6.4s] entry_nonempty sat 0.0s
+[     6.9s] havoc_relation unsat 0.4s
+[  1636.3s] model_domain_nonempty sat 17.5s
+[  1636.8s] evm_assumption_7 unsat 0.2s
+[  1638.5s] evm_assumption_8 unsat 0.8s
+{'spec': {'pc': 21213, 'stack_depth': 29, 'memory_size': None, 'free_memory_pointer': None, 'stack_constants': ((5, 1755), (23, 1935), (25, 1954))}, 'scope': 'block-local', 'status': 'inconclusive', 'seconds': 1892.6498653429999, 'wall_seconds': 1892.6498671690001, 'reasons': ['node memory budget exceeded: RSS 3006.6 MB > budget 3000.0 MB (pid 1695)'], 'keep_going_failures': [], 'summary_hits': 0, 'pid': 1695, 'started_at': 1793338395.228449, 'start_rss_mb': 1150.1, 'peak_rss_mb': 3006.6, 'memory_budget_mb': 3000.0, 'memory_exceeded': 'node memory budget exceeded: RSS 3006.6 MB > budget 3000.0 MB (pid 1695)'}
+LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.
+tri-21213 exit 1
