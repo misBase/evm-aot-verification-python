@@ -142,7 +142,12 @@
 - `verification/block_equivalence.py`：修法 21 `_correspondence` 开头的规模估计（先算 `disjoint_groups`）。
 - `verification/block_summaries.py`：修法 16 `summary_text`，用于所有 summary 命中义务的记录。
 - `common/store_forwarding.py`：修法 20 `_SHARED_FORWARD_LIMIT = 25_000`、`forward_selects_shared` 不再自清、`shared_forward_scope`；`x86_64/summaries/div.py`：`apply_div_summary` 开头开一个作用域。
-- 测试：`tests/unit/test_block_node_isolation.py`（新，8 条）、`tests/unit/test_block_remaining_blocks_4.py`（新，修法 16–20）、`tests/unit/test_block_correspondence.py`（§2.1）。
+- 修法 22：`verification/block_equivalence.py` `_retry_over_lia` 的拼接循环查截止时间。
+- 修法 23/26（v2/v2b）：`x86_64/cfg_state.py` `REACHABILITY_MEMORY_MB`、`z3_memory_cap(mb)`（`memory_high_watermark_mb`，嵌套取小，节点预算下取剩余余量的一半）、`_at_cap`、`out_of_memory`、`_bounded_check` / `_check`、`memory_tripped`、`PrefixSolver.check` 触顶后 reset、`X86Constraints.is_possible` / `_is_possible`；`common/node_monitor.py` `memory_headroom_mb`；`verification/block_equivalence.py` `QUERY_MEMORY_MB`（`BLOCK_QUERY_MEMORY_MB`）、`solve_query` / `_solve_query` / `solve_pure_bv`；`verification/block_summaries.py` `_sat_model`（受限外壳）/ `_sat_model_uncapped`、`VerifiedSummaryRuntime._blasted_sat`。
+- 修法 24：`verification/block_equivalence.py` `_correspondence`（unknown 行延后、只对没有已映射兄弟的行做 blast 回退）、`_read_proposal`。
+- 修法 25/25b：`verification/block_equivalence.py` `coverage_by_prefix_tree`、`_TREE_QUERIES`、`_TREE_RETRY_FACTOR`，`check_paths` 的覆盖步骤（先 3s 精确查询，再前缀树，再原有路线）。
+- 修法 27：`x86_64/summaries/div_proof.py` `_EFFECT_RETRY_FACTOR`，`prove_div_slice` 中 unknown 的 effect 重试一次。
+- 测试：`tests/unit/test_block_node_isolation.py`（新，8 条）、`tests/unit/test_block_remaining_blocks_4.py`（新，22 条：修法 16–27、23/26 v2/v2b、25b）、`tests/unit/data/z3_memory_cap_child.py`（子进程）、`tests/unit/test_block_correspondence.py`（§2.1）、`tests/integration/test_block_symbolic_loops.py`（覆盖记录改为在 `check_paths` 之后删除）。
 - 工具：`cloud-inputs/n4/tools/`（§7）。
 
 ## 4. 健全性论证
@@ -152,6 +157,9 @@
 - **修法 17**：成员义务 `premise ∧ x_j ∧ ¬c_k` 的每个模型都满足组查询 `premise ∧ x_j ∧ ¬(∧_{k∈K} c_k)`（¬c_k 蕴含合取的否定），所以组查询是每个成员的弱化：组 UNSAT ⟹ 每个成员 UNSAT，与修法前已有的 `_prove_stuck_groups`（前缀组）同一论证。组的记录（改名后）就是被反驳的组查询加上反驳它的引理，`_check` 对它的路线与任何义务相同；组 sat / unknown / 超时不产生任何记录，成员留给自己的义务。合取项的下标用的是 `_check_rows` 命名 `x86_maps_j_k` 时同一个 `_conjuncts` 顺序（测试中特意检查了反向顺序下真假成员的归属）。
 - **修法 18**：合并只在两个状态位于同一地址、除寄存器和标志外每个叶子都相同、路径条件为 P ∧ T_a 与 P ∧ T_b 且 T_a ∧ T_b 不可满足时进行（T_a、T_b 的第一个约束是同一分支的两边：语法上互补，或 simplify 为 false，或 200ms 内被求解器反驳；否则不合并）。合并后路径条件 P ∧ (T_a ∨ T_b)、寄存器 ite(T_a, a, b)：任一模型若满足 T_a，合并状态在这个模型下就是 a；若满足 T_b（此时 T_a 必假），就是 b——所以合并状态的执行集合恰好是 a 与 b 的并集，不增不减，覆盖和有限执行都不变。见证模型取某一边的（它满足那一边的路径条件，因而满足合并后的），使用前照常求值确认。两边状态是用主循环同样的单步函数执行的；没到 J 或不满足条件的状态原样交回。测试：合并后的 rcx 在全部输入上等于程序语义（求解器验证），路径条件覆盖全部输入；一边写内存的菱形不合并。
 - **修法 21**：对应关系只是提议（原有约定，见 `_correspondence` / `_pair_phase`）；走全积还是走对应关系由一个规模估计决定，两条路的定理都由 `BlockTheorem.complete` 按各自的清单判定，估计值只影响耗时。
+- **修法 22、24、27**：只影响耗时。22 让一个改写路线在截止时间提前返回 unknown；24 只改变哪些行先得到对应关系提议（对应关系只是提议，定理按清单判定）；27 给一个已有的查询更大的预算再试一次，引理仍然只在每条 effect 都被反驳时成立。
+- **修法 23/26（v2/v2b）**：内存上限只会让一次 Z3 调用以 unknown 或异常结束，Z3 只是在检查点停下，不改变任何 sat/unsat 答案。可达性检查只在显式 UNSAT 时剪掉路径，unknown 保留路径；summary 入口检查 unknown 时命中未决（原有处理）；证明查询 unknown 时义务走其余路线或不被证明。被上限停下的 unknown 不写进 proof cache（`solve_query` 返回前先 `check_abort()`）。增量求解器触顶后 reset：它的不变式是"作用域 k 恰好断言 stack[k]"，reset 后从空开始、下一次检查重新 push，所以 UNSAT 仍是所问合取的 UNSAT。v2b 只缩小了"什么算触顶"的判断，只影响是否 reset、是否缓存 unknown。
+- **修法 25/25b**：trie 中每个结点要么有一条路径在此结束（路径条件 = 前缀），要么 premise ∧ 前缀 ∧ ¬(子结点合取项的析取) UNSAT。任一满足 premise 的模型从根（前缀为真）沿它满足的子结点下降，必到达某条路径的终点，于是满足那条路径条件，即覆盖公式 UNSAT。免查询的三种情形都是蕴含：两个子结点 x 与 Not(x)（析取恒真）；某个子结点是 premise 的合取项或已被证明的执行假设（premise 蕴含它）；¬(∨ c_i) 单独 UNSAT（同义反复）。局部查询的 UNSAT 来自 Z3，增量求解器的作用域恰好是 [premise, *前缀, ¬∨c_i]（`PrefixSolver` 的不变式）。任何局部查询不是 UNSAT，整体就返回 None，走原来的整体路线；25b 只是同一查询更大的预算。覆盖记录的文本是 "(prefix-tree coverage, N local queries)"：记录文本没有消费者读取（证书按名字、答案判定，`slim` 本来就换成指纹），与修法 16 同理。
 - **修法 19**：只是更早停止一个预处理；`unify_across` 返回的每条引理和改写与之前一样由被反驳的查询支持，没合并的 pair 原样留下（测试：停滞为 0 时不做任何改写）。
 - **修法 20**：`forward_selects` 对每个结点是纯函数，缓存保活所有键结点（id 不会复用），只在作用域边界整体清空——清空后结果与新缓存相同（测试：作用域内大小不受限，跨作用域超过上限即清空，清空后结果不变）。只影响耗时和内存。
 
@@ -174,6 +182,13 @@
 - `row_group.py`：在 dump 目录上对某些行做前缀阶段 + 组证明（`--split` 另外逐条计时）。
 - `single_vs_group.py`：单个合取项 vs 行组的 normalize 与 blast 求解对照。
 - `regress.py`：同 `cloud-inputs/n/tools/regress.py`，名字含 `_entry_` 的（summary 命中入口）也按预期 SAT。
+- `probe_stacks.py`：`run_probe.sh` 的 `PROBE=`，每 `STACKS_EVERY` 秒把所有线程的 Python 栈写到 `STACKS_FILE`（faulthandler），用来定位暴涨发生在哪个调用里。
+- `mem_guard.sh`：按本 cgroup 的剩余内存（limit − usage），低于阈值时只杀诊断进程，保护长时间的整节点运行。
+- `h2_triage.py`：重新发现冻结实例集，在进程内跑一个证明实例的节点证明 + H2 出边（与 `block_parallel` worker 相同的选项），逐个 `_check` 计时；`--dump-dir` 保存所有未判定检查的公式。
+- `trace_coverage.py`：覆盖步骤的追踪（前缀树结果、mul→UF 路线、超过 2s 的 `solve_query` / `solve_pure_bv`，并保存覆盖公式）。
+- `trace_blast.py`：每个 summary 入口 SAT 检查的位爆破估计量、答案、耗时与 Z3 分配量（`TRACE_SOLVE=1` 照常求解）。
+- `trace_divslice.py`：每个 DIV 切片引理证明的入口地址、耗时与 RSS。
+- `save_reach.py`：每次 x86 可达性检查前把查询（按 push 顺序的合取项）写到文件；`--old-cap` 把内存上限还原成 `memory_max_size`（修法 23 v1），用来复现中止。
 
 ## 8. 未解决的问题
 
