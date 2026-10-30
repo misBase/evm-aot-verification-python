@@ -1,0 +1,8 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.17, pytest-9.0.2, pluggy-1.6.0
+rootdir: /home/user/evm-aot-verification-python
+configfile: pyproject.toml
+plugins: xdist-3.8.0
+collected 1 item
+
+tests/integration/test_block_constant_insensitive.py 
