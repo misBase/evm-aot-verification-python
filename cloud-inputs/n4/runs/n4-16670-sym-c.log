@@ -408,3 +408,13 @@
 [ 19987.2s] x86_maps_93_2 unsat 5.3s
 [ 19992.2s] pair_4_93_goal_0_of_7 unsat 0.1s
 [ 19992.3s] pair_4_93_goal_1_of_7 unsat 0.1s
+[ 23804.7s] pair_4_93_goal_2_of_7 unsat 3812.3s
+[ 23805.0s] pair_4_93_goal_3_of_7 unsat 0.3s
+[ 23805.3s] pair_4_93_goal_4_of_7 unsat 0.3s
+[ 23805.4s] pair_4_93_goal_5_of_7 unsat 0.1s
+[ 23805.6s] pair_4_93_goal_6_of_7 unsat 0.2s
+[ 23805.8s] pair_4_93 unsat 3818.6s
+[ 23810.2s] x86_maps_94_0 unsat 4.5s
+[ 23814.7s] x86_maps_94_1 unsat 4.5s
+[ 23818.2s] pair_3_94_goal_0_of_7 unsat 0.1s
+[ 23818.3s] pair_3_94_goal_1_of_7 unsat 0.1s
