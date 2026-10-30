@@ -1,2 +1,3 @@
 04:52:41 headroom 1557 MB: killed  7419 3256348 .venv/bin/python cloud-inputs/n4/tools/probe_stacks.py cloud-inputs/n2/fixtures/PoolManager cloud-inputs/n4b/nodes/22747-sym.json --output cloud-inputs/n4/runs/tri-22747.json --timeout-m
 05:46:51 headroom 1155 MB: killed  2943 2507824 .venv/bin/python cloud-inputs/n3/tools/node_profile.py cloud-inputs/n2/fixtures/PoolManager cloud-inputs/n4b/nodes/18089-d18.json 0 cloud-inputs/n4/runs/tri-18089.json --seconds 3600 --e
+10:26:29 headroom 677 MB: killed  5806 2142616 .venv/bin/python cloud-inputs/n4/tools/probe_stacks.py cloud-inputs/n2/fixtures/PoolManager cloud-inputs/n4b/nodes/21213-d29.json --output cloud-inputs/n4/runs/tri-21213.json --timeout-m
