@@ -1165,3 +1165,105 @@ tests/integration/test_block_equivalence.py::test_unmapped_block_is_rejected
 tests/integration/test_block_equivalence.py::test_node_deadline_interrupts_raw_execution_without_a_theorem 
 [gw1] PASSED tests/integration/test_block_equivalence.py::test_node_deadline_interrupts_raw_execution_without_a_theorem 
 tests/integration/test_block_equivalence.py::test_summary_templates_are_discovered_once_per_program 
+[gw1] PASSED tests/integration/test_block_equivalence.py::test_summary_templates_are_discovered_once_per_program 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[None-none] 
+[gw1] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[None-none] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[None-full-program] 
+[gw1] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[None-full-program] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[call_site-none] 
+[gw1] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[call_site-none] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[call_site-full-program] 
+[gw1] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[call_site-full-program] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[memory_coordinates-none] 
+[gw1] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[memory_coordinates-none] 
+tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[memory_coordinates-full-program] 
+[gw1] PASSED tests/integration/test_block_host_memory.py::test_host_call_certificate_and_one_sided_faults[memory_coordinates-full-program] 
+tests/integration/test_block_parallel.py::test_parallel_schedule_verifies_like_the_worklist 
+[gw1] PASSED tests/integration/test_block_parallel.py::test_parallel_schedule_verifies_like_the_worklist 
+tests/integration/test_block_parallel.py::test_other_programs[mstore_return] 
+[gw1] PASSED tests/integration/test_block_parallel.py::test_other_programs[mstore_return] 
+tests/integration/test_block_parallel.py::test_other_programs[gas_sstore] 
+[gw1] PASSED tests/integration/test_block_parallel.py::test_other_programs[gas_sstore] 
+tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[node] 
+[gw1] PASSED tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[node] 
+tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[edge] 
+[gw1] PASSED tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[edge] 
+tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[entry] 
+[gw1] PASSED tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[entry] 
+tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[identity] 
+[gw1] PASSED tests/integration/test_block_parallel.py::test_consumer_rejects_missing_evidence[identity] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-three_block] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-three_block] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-mstore_return] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-mstore_return] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_sload] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_sload] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_two_sload] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_two_sload] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_sstore] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[fixed_budget-gas_sstore] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-three_block] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-three_block] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-mstore_return] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-mstore_return] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_sload] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_sload] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_two_sload] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_two_sload] 
+tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_sstore] 
+[gw1] PASSED tests/integration/test_block_program.py::test_real_programs_have_base_edges_and_closed_graph[full-gas_sstore] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[base] 
+[gw1] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[base] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[edge] 
+[gw1] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[edge] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[node] 
+[gw1] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[node] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[scope] 
+[gw1] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[scope] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[identity] 
+[gw1] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[identity] 
+tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[progress] 
+[gw1] PASSED tests/integration/test_block_program.py::test_consumer_rejects_deleted_evidence[progress] 
+tests/integration/test_block_program.py::test_wrong_initial_specialization_is_not_saved_by_local_success 
+[gw1] PASSED tests/integration/test_block_program.py::test_wrong_initial_specialization_is_not_saved_by_local_success 
+tests/integration/test_block_program.py::test_missing_successor_is_rejected 
+[gw1] PASSED tests/integration/test_block_program.py::test_missing_successor_is_rejected 
+tests/integration/test_block_program.py::test_primary_verifier_uses_same_consumer 
+[gw1] PASSED tests/integration/test_block_program.py::test_primary_verifier_uses_same_consumer 
+tests/integration/test_block_program.py::test_empty_initial_domain_not_vacuously_verified 
+[gw1] PASSED tests/integration/test_block_program.py::test_empty_initial_domain_not_vacuously_verified 
+tests/integration/test_block_program.py::test_independent_fallback_is_a_fresh_complete_proof 
+[gw1] PASSED tests/integration/test_block_program.py::test_independent_fallback_is_a_fresh_complete_proof 
+tests/integration/test_block_program.py::test_self_loop_closes_without_unrolling_to_initial_gas 
+[gw1] PASSED tests/integration/test_block_program.py::test_self_loop_closes_without_unrolling_to_initial_gas 
+tests/integration/test_block_program.py::test_internal_one_sided_spin_is_not_a_finite_macro 
+[gw1] PASSED tests/integration/test_block_program.py::test_internal_one_sided_spin_is_not_a_finite_macro 
+tests/integration/test_block_program.py::test_r14_rebuild_mutation_checked_by_actual_semantics 
+[gw1] PASSED tests/integration/test_block_program.py::test_r14_rebuild_mutation_checked_by_actual_semantics 
+tests/integration/test_block_scheduling.py::test_baseline_explores_every_block_and_verifies 
+[gw1] PASSED tests/integration/test_block_scheduling.py::test_baseline_explores_every_block_and_verifies 
+tests/integration/test_block_scheduling.py::test_failed_entry_node_still_discovers_its_successors 
+[gw1] PASSED tests/integration/test_block_scheduling.py::test_failed_entry_node_still_discovers_its_successors 
+tests/integration/test_block_scheduling.py::test_deferred_node_is_retried_with_the_full_budget 
+[gw1] PASSED tests/integration/test_block_scheduling.py::test_deferred_node_is_retried_with_the_full_budget 
+tests/integration/test_block_scheduling.py::test_a_node_failing_twice_stays_a_failure 
+[gw1] PASSED tests/integration/test_block_scheduling.py::test_a_node_failing_twice_stays_a_failure 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_counter_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_counter_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_fmp_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_fmp_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_calldata_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_calldata_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_return_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_return_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_storage_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[fixed_budget-lockstep_storage_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_counter_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_counter_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_fmp_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_fmp_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_calldata_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_calldata_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_return_loop] 
+[gw1] PASSED tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_return_loop] 
+tests/integration/test_block_symbolic_loops.py::test_compiler_generated_unbounded_loops_have_complete_certificates[full-lockstep_storage_loop] 
