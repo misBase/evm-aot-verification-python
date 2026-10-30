@@ -1,2 +1,5 @@
 [     6.7s] entry_nonempty sat 0.0s
 [     7.2s] havoc_relation unsat 0.5s
+[    58.8s] TRACE solve_query unknown 3.1s z3 148->148 MB
+[    62.1s] TRACE solve_query unknown 3.1s z3 148->148 MB
+[    71.8s] TRACE solve_query unsat 3.2s z3 148->148 MB
