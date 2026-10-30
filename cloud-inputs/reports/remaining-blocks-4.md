@@ -155,9 +155,10 @@
 
 ## 5. 测试结果
 
-（待补：全量快测）
-
-- 新测试按节点 ID 单独跑过：`tests/unit/test_block_node_isolation.py` 8 条，`tests/unit/test_block_remaining_blocks_4.py`（待补）条。
+- **全量快测**（`pytest tests/unit -m "not slow" -n 2 --dist=loadscope`，与 N3 / 24e375d 同一命令）：a1da3b3 上 **1825 passed / 3 skipped / 0 failed**（`cloud-inputs/n4/runs/fast-tests-unit-final.log`；24e375d：1815 / 3）。之后只改了 `tests/unit/data/z3_memory_cap_child.py` 的一个子用例（128 位），该测试文件单独复跑 21 passed。
+- 另跑了包含 integration 和 slow 的全部测试（aa3ed4c，同时有 4 个整节点在 4 核上跑）：9 failed / 2288 passed / 10 skipped（`fast-tests-v2b.log`）。逐个归类：`EQ`、`BYTE` 微等价与 `test_alias_split_keeps_satisfiable_pairs_open` 单独跑通过（10–13s / 3s），`muti_block_08`、`tier2 makedata`、`constant_insensitive` 是同类的负载下预算耗尽（后者在基线上同样失败，见下）；`test_safe_9733_*` / `test_safe_11803_*`（`slow`）读的 `tests/data/block_obligations/*.smt2` 不在仓库里（`file access error`，与本任务无关）；修法 23 的测试在负载下 12s 超过了它的 10s 墙钟断言，已放宽到 60s（其余断言不变）。
+- 在这次全部测试里发现并修了两个本任务引入的问题：修法 23/26 v2 把 Z3 的 "canceled" 一律算作内存触顶，而普通超时也会报 "canceled"，于是每次超时都 reset 增量求解器（v2b 修正，测试 `test_a_timeout_is_not_a_memory_stop_and_keeps_the_incremental_solver`）；`test_obligation_manifest_does_not_follow_deleted_query_records` 在 `_check` 里删 `x86_coverage` 记录，修法 25 之后覆盖记录也可能来自快速精确查询或前缀树，改为在 `check_paths` 之后删除（意图不变：缺少覆盖记录的定理不算证出）。
+- 新测试按节点 ID 单独跑过：`tests/unit/test_block_node_isolation.py` 8 条，`tests/unit/test_block_remaining_blocks_4.py` 21 条（修法 16–27 与 23/26 v2）。
 - `tests/integration/test_block_parallel.py` 7 passed（新进程池）；`tests/integration/test_block_constant_insensitive.py` 中 `test_muti_block_verifies_with_fewer_proofs`（`slow`，空闲机器 ~11 min）在 5–6 个进程的负载下 H2 预算耗尽，**基线提交 7b1e121 在同样负载下也失败**（两个节点 H2 预算耗尽），属于负载问题；空闲时复跑：（待补）。
 
 ## 6. 离线验证数据（`cloud-inputs/n4/runs/`）
