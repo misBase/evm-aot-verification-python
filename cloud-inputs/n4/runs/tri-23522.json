@@ -1,0 +1,19 @@
+{
+  "proved": true,
+  "status": "proved",
+  "reasons": [
+    "H2 c0_budget exhausted (solver=unknown)"
+  ],
+  "seconds": 4108.031216727999,
+  "queries": 613,
+  "failed": [],
+  "pid": 1049,
+  "peak_rss_mb": 4662.2,
+  "memory_exceeded": null,
+  "spec": "BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383),))",
+  "contexts": [
+    "BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383), (17, 1755), (35, 1935), (37, 1954)))"
+  ],
+  "edges": 32,
+  "open_edges": []
+}

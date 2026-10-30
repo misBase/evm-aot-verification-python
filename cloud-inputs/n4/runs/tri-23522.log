@@ -727,3 +727,29 @@
 [  4052.1s] H2_c0_0_25_t0_stack_constant_predicate_0 unsat 0.7s
 [  4052.9s] H2_c0_0_25_t0_stack_constant_predicate_2 unsat 0.8s
 [  4053.7s] H2_c0_0_25_t0_stack_constant_predicate_4 unsat 0.8s
+[  4159.9s] H2_c0_0_26_t0_live_stack_prefix_39 unsat 1.5s
+[  4160.6s] H2_c0_0_26_t0_stack_constant_predicate_0 unsat 0.7s
+[  4161.3s] H2_c0_0_26_t0_stack_constant_predicate_2 unsat 0.7s
+[  4162.0s] H2_c0_0_26_t0_stack_constant_predicate_4 unsat 0.7s
+[  4268.5s] H2_c0_0_27_t0_live_stack_prefix_39 unsat 1.3s
+[  4269.2s] H2_c0_0_27_t0_stack_constant_predicate_0 unsat 0.6s
+[  4269.8s] H2_c0_0_27_t0_stack_constant_predicate_2 unsat 0.6s
+[  4270.5s] H2_c0_0_27_t0_stack_constant_predicate_4 unsat 0.6s
+[  4377.8s] H2_c0_0_28_t0_live_stack_prefix_39 unsat 1.3s
+[  4378.6s] H2_c0_0_28_t0_stack_constant_predicate_0 unsat 0.8s
+[  4379.3s] H2_c0_0_28_t0_stack_constant_predicate_2 unsat 0.6s
+[  4379.9s] H2_c0_0_28_t0_stack_constant_predicate_4 unsat 0.6s
+[  4483.5s] H2_c0_0_29_t0_live_stack_prefix_39 unsat 1.4s
+[  4484.1s] H2_c0_0_29_t0_stack_constant_predicate_0 unsat 0.6s
+[  4484.7s] H2_c0_0_29_t0_stack_constant_predicate_2 unsat 0.6s
+[  4485.4s] H2_c0_0_29_t0_stack_constant_predicate_4 unsat 0.7s
+[  4592.5s] H2_c0_0_30_t0_live_stack_prefix_39 unsat 1.5s
+[  4593.3s] H2_c0_0_30_t0_stack_constant_predicate_0 unsat 0.8s
+[  4594.0s] H2_c0_0_30_t0_stack_constant_predicate_2 unsat 0.7s
+[  4594.7s] H2_c0_0_30_t0_stack_constant_predicate_4 unsat 0.8s
+[  4705.3s] H2_c0_0_31_t0_live_stack_prefix_39 unsat 1.5s
+[  4706.3s] H2_c0_0_31_t0_stack_constant_predicate_0 unsat 1.0s
+[  4707.4s] H2_c0_0_31_t0_stack_constant_predicate_2 unsat 1.1s
+[  4708.0s] H2_c0_0_31_t0_stack_constant_predicate_4 unsat 0.6s
+[  5033.0s] result {'proved': True, 'status': 'proved', 'reasons': ('H2 c0_budget exhausted (solver=unknown)',), 'seconds': 4108.031216727999, 'queries': 613, 'failed': [], 'pid': 1049, 'peak_rss_mb': 4662.2, 'memory_exceeded': None, 'spec': 'BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383),))', 'contexts': ['BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383), (17, 1755), (35, 1935), (37, 1954)))'], 'edges': 32, 'open_edges': []}
+tri-23522 exit 0
