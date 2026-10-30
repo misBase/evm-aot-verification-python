@@ -2,7 +2,7 @@
 into the frozen instance set, as a block_parallel worker runs it (diagnostics only).
 
 Usage (repo root, PYTHONPATH=.): h2_triage.py STEM 'BlockSpecialization(...)' OUT.json
-    [--node-seconds N] [--memory-mb M]
+    [--node-seconds N] [--memory-mb M] [--dump-dir DIR]
 
 Options are the server's 3G run (--gas-check full --timeout-ms 30000 --max-depth 400
 --max-instances 8192 --max-parameter-values 32 --summaries --discover-first --constant-insensitive).
@@ -13,6 +13,8 @@ import json
 import sys
 import time
 from pathlib import Path
+
+import z3
 
 import verification.block_equivalence as be
 import verification.block_parallel as bp
@@ -34,12 +36,20 @@ def log(*a):
 
 
 orig_check = be.BlockEquivalenceProver._check
+DUMP = Path(argv[argv.index("--dump-dir") + 1]) if "--dump-dir" in argv else None  # undecided checks' formulas
+if DUMP is not None:
+    DUMP.mkdir(parents=True, exist_ok=True)
 
 
 def check(self, name, formula, records, **kw):
     started = time.monotonic()
     ok = orig_check(self, name, formula, records, **kw)
-    log(name, records[-1].answer if records else "-", f"{time.monotonic() - started:.1f}s")
+    answer = records[-1].answer if records else "-"
+    log(name, answer, f"{time.monotonic() - started:.1f}s")
+    if answer != "unsat" and DUMP is not None:  # the formula of every undecided check, for offline analysis
+        solver = z3.Solver()
+        solver.add(formula)
+        (DUMP / f"{name}.smt2").write_text(solver.to_smt2())
     return ok
 
 

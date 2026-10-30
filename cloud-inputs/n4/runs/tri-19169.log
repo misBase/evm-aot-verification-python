@@ -354,3 +354,4 @@
 [  3307.9s] H2_c0_0_2_t0_stack_constant_predicate_2 unsat 0.5s
 [  3308.4s] H2_c0_0_2_t0_stack_constant_predicate_4 unsat 0.5s
 [  3402.4s] H2_c0_0_4_t0_live_stack_prefix_30 unsat 7.0s
+[  6500.4s] H2_c0_0_4_t0_live_stack_prefix_31 unknown 3098.0s

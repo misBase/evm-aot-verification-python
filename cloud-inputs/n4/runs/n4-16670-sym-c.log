@@ -462,3 +462,5 @@
 [ 31518.4s] pair_4_99 unsat 2577.9s
 [ 31524.8s] x86_maps_100_0 unsat 6.5s
 [ 31531.0s] x86_maps_100_1 unsat 6.2s
+[ 31536.2s] pair_3_100_goal_0_of_7 unsat 0.2s
+[ 31536.4s] pair_3_100_goal_1_of_7 unsat 0.2s
