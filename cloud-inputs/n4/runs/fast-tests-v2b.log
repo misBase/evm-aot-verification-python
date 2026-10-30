@@ -1,0 +1,261 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.17, pytest-9.0.2, pluggy-1.6.0 -- /home/user/evm-aot-verification-python/.venv/bin/python
+rootdir: /home/user/evm-aot-verification-python
+configfile: pyproject.toml
+testpaths: tests
+plugins: xdist-3.8.0
+created: 2/2 workers
+2 workers [2307 items]
+
+scheduling tests via LoadScheduling
+
+tests/composition/test_div_r64_quotient_fits_composition.py::test_x86_div_r64_quotient_fits_hint_is_sound 
+tests/integration/test_gas_consistency_stage1.py::test_log4_tampered_topic_gas_caught 
+[gw1] PASSED tests/integration/test_gas_consistency_stage1.py::test_log4_tampered_topic_gas_caught 
+tests/integration/test_gas_consistency_stage1.py::test_log_fee_actually_charged_with_expected_topic_count[gas_log0-0] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage1.py::test_log_fee_actually_charged_with_expected_topic_count[gas_log0-0] 
+tests/integration/test_gas_consistency_stage1.py::test_log_fee_actually_charged_with_expected_topic_count[gas_log1-1] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage1.py::test_log_fee_actually_charged_with_expected_topic_count[gas_log1-1] 
+tests/integration/test_gas_consistency_stage1.py::test_log_fee_actually_charged_with_expected_topic_count[gas_log4-4] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage1.py::test_log_fee_actually_charged_with_expected_topic_count[gas_log4-4] 
+tests/integration/test_gas_consistency_stage1.py::test_log_gas_check_off_unaffected 
+[gw0] PASSED tests/composition/test_div_r64_quotient_fits_composition.py::test_x86_div_r64_quotient_fits_hint_is_sound 
+tests/composition/test_eq_borrow_chain_composition.py::test_eq_semantics_equiv_borrow_chain 
+[gw1] PASSED tests/integration/test_gas_consistency_stage1.py::test_log_gas_check_off_unaffected 
+tests/integration/test_gas_consistency_stage1.py::test_memory_gas_parallel_pathobs_passes 
+[gw1] PASSED tests/integration/test_gas_consistency_stage1.py::test_memory_gas_parallel_pathobs_passes 
+tests/integration/test_gas_consistency_stage1.py::test_memory_gas_parallel_pathobs_tamper_caught 
+[gw1] PASSED tests/integration/test_gas_consistency_stage1.py::test_memory_gas_parallel_pathobs_tamper_caught 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_mload-state_kwargs0-2] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_mload-state_kwargs0-2] 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_sha3-state_kwargs1-2] 
+[gw0] PASSED tests/composition/test_eq_borrow_chain_composition.py::test_eq_semantics_equiv_borrow_chain 
+tests/composition/test_eq_borrow_chain_composition.py::test_eq_as_borrow_chain_matches_helper 
+[gw0] PASSED tests/composition/test_eq_borrow_chain_composition.py::test_eq_as_borrow_chain_matches_helper 
+tests/composition/test_eq_borrow_chain_composition.py::test_eq_borrow_chain_assumption_is_sound 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_sha3-state_kwargs1-2] 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_revert-state_kwargs2-1] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_revert-state_kwargs2-1] 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_mstore8-state_kwargs3-2] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_mstore8-state_kwargs3-2] 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_codecopy-state_kwargs4-2] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_codecopy-state_kwargs4-2] 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_log0-state_kwargs5-2] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_log0-state_kwargs5-2] 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_log4-state_kwargs6-2] 
+[gw0] PASSED tests/composition/test_eq_borrow_chain_composition.py::test_eq_borrow_chain_assumption_is_sound 
+tests/composition/test_eq_borrow_chain_composition.py::test_x86_div64_quotient_fits_assumption_is_sound 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_log4-state_kwargs6-2] 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_returndatacopy-state_kwargs7-7] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_returndatacopy-state_kwargs7-7] 
+tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_returndatacopy-state_kwargs8-2] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_code_consistency_passes[gas_returndatacopy-state_kwargs8-2] 
+tests/integration/test_gas_consistency_stage3.py::test_tampered_status_code_caught 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_tampered_status_code_caught 
+tests/integration/test_gas_consistency_stage3.py::test_oog_path_status_consistency_passes 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_oog_path_status_consistency_passes 
+tests/integration/test_gas_consistency_stage3.py::test_oog_tampered_status_caught 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_oog_tampered_status_caught 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_mload-state_kwargs0] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_mload-state_kwargs0] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_mstore8-state_kwargs1] 
+[gw0] PASSED tests/composition/test_eq_borrow_chain_composition.py::test_x86_div64_quotient_fits_assumption_is_sound 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=full-q3=full-q4=full] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_mstore8-state_kwargs1] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_revert-state_kwargs2] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_revert-state_kwargs2] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_sha3-state_kwargs3] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_sha3-state_kwargs3] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_codecopy-state_kwargs4] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_codecopy-state_kwargs4] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_mcopy-state_kwargs5] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=full-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=full-q3=full-q4=zero] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_mcopy-state_kwargs5] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_log1-state_kwargs6] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_log1-state_kwargs6] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_log0-state_kwargs7] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=full-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=full-q3=zero-q4=full] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_log0-state_kwargs7] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_log4-state_kwargs8] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_log4-state_kwargs8] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_returndatacopy-state_kwargs9] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_returndatacopy-state_kwargs9] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_returndatacopy-state_kwargs10] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=full-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=full-q3=zero-q4=zero] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_path_status_consistency[gas_returndatacopy-state_kwargs10] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_branch_is_reachable_beyond_static_gas[gas_log0-state_kwargs0] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_branch_is_reachable_beyond_static_gas[gas_log0-state_kwargs0] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_branch_is_reachable_beyond_static_gas[gas_log4-state_kwargs1] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_branch_is_reachable_beyond_static_gas[gas_log4-state_kwargs1] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_branch_is_reachable_beyond_static_gas[gas_returndatacopy-state_kwargs2] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_branch_is_reachable_beyond_static_gas[gas_returndatacopy-state_kwargs2] 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_branch_is_reachable_beyond_static_gas[gas_returndatacopy-state_kwargs3] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_branch_is_reachable_beyond_static_gas[gas_returndatacopy-state_kwargs3] 
+tests/integration/test_gas_consistency_stage3.py::test_static_oog_alone_does_not_satisfy_the_dynamic_oog_probe 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_static_oog_alone_does_not_satisfy_the_dynamic_oog_probe 
+tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_tampered_status_caught 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_dynamic_oog_tampered_status_caught 
+tests/integration/test_gas_consistency_stage3.py::test_merged_status_is_not_none_for_multipath 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=full-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=zero-q3=full-q4=full] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_merged_status_is_not_none_for_multipath 
+tests/integration/test_gas_consistency_stage3.py::test_full_rejects_unmodeled_dynamic_gas 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_full_rejects_unmodeled_dynamic_gas 
+tests/integration/test_gas_consistency_stage3.py::test_oog_precedes_stack_underflow_in_tag_guard 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_oog_precedes_stack_underflow_in_tag_guard 
+tests/integration/test_gas_consistency_stage3.py::test_status_check_parallel_workers_cross_context 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_status_check_parallel_workers_cross_context 
+tests/integration/test_gas_consistency_stage3.py::test_evm_derived_status_matches_aot_profile_codes 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_evm_derived_status_matches_aot_profile_codes 
+tests/integration/test_gas_consistency_stage3.py::test_host_dynamic_gas_ops_allowed_in_both_gas_modes[fixed_budget] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_host_dynamic_gas_ops_allowed_in_both_gas_modes[fixed_budget] 
+tests/integration/test_gas_consistency_stage3.py::test_host_dynamic_gas_ops_allowed_in_both_gas_modes[full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=zero-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=zero-q3=full-q4=zero] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_host_dynamic_gas_ops_allowed_in_both_gas_modes[full] 
+tests/integration/test_gas_consistency_stage3.py::test_fixed_budget_rejects_symbolic_gas 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_fixed_budget_rejects_symbolic_gas 
+tests/integration/test_gas_consistency_stage3.py::test_fixed_budget_honours_explicit_budget 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_fixed_budget_honours_explicit_budget 
+tests/integration/test_gas_consistency_stage3.py::test_check_gas_forces_host_gas_uf_on 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_check_gas_forces_host_gas_uf_on 
+tests/integration/test_gas_consistency_stage3.py::test_full_rejects_concrete_gas 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_full_rejects_concrete_gas 
+tests/integration/test_gas_consistency_stage3.py::test_full_rejects_gas_that_simplifies_to_a_constant 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_full_rejects_gas_that_simplifies_to_a_constant 
+tests/integration/test_gas_consistency_stage3.py::test_fixed_budget_accepts_gas_that_simplifies_to_a_constant 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_fixed_budget_accepts_gas_that_simplifies_to_a_constant 
+tests/integration/test_gas_consistency_stage3.py::test_mismatched_initial_gas_between_sides_is_rejected 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_mismatched_initial_gas_between_sides_is_rejected 
+tests/integration/test_gas_consistency_stage3.py::test_success_message_carries_gas_scope 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_success_message_carries_gas_scope 
+tests/integration/test_gas_consistency_stage3.py::test_off_rejects_symbolic_gas 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_off_rejects_symbolic_gas 
+tests/integration/test_gas_consistency_stage3.py::test_mismatched_initial_gas_rejected_in_every_mode 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_mismatched_initial_gas_rejected_in_every_mode 
+tests/integration/test_gas_consistency_stage3.py::test_off_still_verifies_with_concrete_budget 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_off_still_verifies_with_concrete_budget 
+tests/integration/test_gas_consistency_stage3.py::test_off_success_message_discloses_unmodeled_host_gas 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_off_success_message_discloses_unmodeled_host_gas 
+tests/integration/test_gas_consistency_stage3.py::test_gas_modes_do_not_overclaim_bounds 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_gas_modes_do_not_overclaim_bounds 
+tests/integration/test_gas_consistency_stage3.py::test_scope_message_names_unbounded_host_ops_present 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=zero-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=zero-q3=zero-q4=full] 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_scope_message_names_unbounded_host_ops_present 
+tests/integration/test_gas_consistency_stage3.py::test_scope_message_says_so_when_everything_is_bounded 
+[gw1] PASSED tests/integration/test_gas_consistency_stage3.py::test_scope_message_says_so_when_everything_is_bounded 
+tests/integration/test_loop_folding_integration.py::test_fold_loops_requires_path_observations 
+[gw1] PASSED tests/integration/test_loop_folding_integration.py::test_fold_loops_requires_path_observations 
+tests/integration/test_loop_folding_integration.py::test_failed_folding_plan_blocks_verification 
+[gw1] PASSED tests/integration/test_loop_folding_integration.py::test_failed_folding_plan_blocks_verification 
+tests/integration/test_loop_folding_integration.py::test_cut_state_outside_certified_depth_is_rejected 
+[gw1] PASSED tests/integration/test_loop_folding_integration.py::test_cut_state_outside_certified_depth_is_rejected 
+tests/integration/test_loop_folding_integration.py::test_folding_disabled_by_default_keeps_behaviour 
+[gw1] PASSED tests/integration/test_loop_folding_integration.py::test_folding_disabled_by_default_keeps_behaviour 
+tests/integration/test_loop_guard_enforcement.py::test_unpaired_x86_loop_is_rejected_when_guard_enabled 
+[gw1] PASSED tests/integration/test_loop_guard_enforcement.py::test_unpaired_x86_loop_is_rejected_when_guard_enabled 
+tests/integration/test_loop_guard_enforcement.py::test_dynamic_unresolved_jump_is_rejected_when_guard_enabled 
+[gw1] PASSED tests/integration/test_loop_guard_enforcement.py::test_dynamic_unresolved_jump_is_rejected_when_guard_enabled 
+tests/integration/test_loop_guard_enforcement.py::test_guard_runs_before_any_path_enumeration 
+[gw1] PASSED tests/integration/test_loop_guard_enforcement.py::test_guard_runs_before_any_path_enumeration 
+tests/integration/test_loop_guard_enforcement.py::test_guard_without_static_blocks_fails_closed 
+[gw1] PASSED tests/integration/test_loop_guard_enforcement.py::test_guard_without_static_blocks_fails_closed 
+tests/integration/test_loop_guard_enforcement.py::test_guard_reads_blocks_the_way_the_executor_does 
+[gw1] PASSED tests/integration/test_loop_guard_enforcement.py::test_guard_reads_blocks_the_way_the_executor_does 
+tests/integration/test_loop_guard_enforcement.py::test_guard_disabled_by_default_lets_rejected_pair_through 
+[gw1] PASSED tests/integration/test_loop_guard_enforcement.py::test_guard_disabled_by_default_lets_rejected_pair_through 
+tests/integration/test_loop_guard_enforcement.py::test_verified_message_declares_guard_not_enforced 
+[gw1] PASSED tests/integration/test_loop_guard_enforcement.py::test_verified_message_declares_guard_not_enforced 
+tests/integration/test_loop_guard_enforcement.py::test_verified_message_declares_guard_enforced 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=zero-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=zero-q3=zero-q4=zero] 
+[gw1] PASSED tests/integration/test_loop_guard_enforcement.py::test_verified_message_declares_guard_enforced 
+tests/integration/test_loop_guard_enforcement.py::test_guard_passes_cerc20_and_keeps_informational_notes 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_raw_slice_refines_summary_semantics[q2=zero-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=full-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=full-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=full-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=full-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=full-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=full-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=full-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=full-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=zero-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=zero-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=zero-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=zero-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=zero-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=zero-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=zero-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_primitives_match_limb_helpers[q2=zero-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_x86_order_umul_step_matches_normalized_step 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_x86_order_umul_step_matches_normalized_step 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=full-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=full-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=full-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=full-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=full-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=full-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=full-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=full-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=zero-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=zero-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=zero-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=zero-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=zero-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=zero-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=zero-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_accumulator_matches_branch_formula[q2=zero-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=full-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=full-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=full-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=full-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=full-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=full-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=full-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=full-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=zero-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=zero-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=zero-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=zero-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=zero-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=zero-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=zero-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_z3_branch_formula_matches_uint256_semantics[q2=zero-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=full-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=full-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=full-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=full-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=full-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=full-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=full-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=full-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=zero-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=zero-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=zero-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=zero-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=zero-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=zero-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=zero-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_limb_composition_matches_uint256_semantics[q2=zero-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=full-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=full-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=full-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=full-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=full-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=full-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=full-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=full-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=zero-q3=full-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=zero-q3=full-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=zero-q3=full-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=zero-q3=full-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=zero-q3=zero-q4=full] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=zero-q3=zero-q4=full] 
+tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=zero-q3=zero-q4=zero] 
+[gw0] PASSED tests/composition/test_mul_summary_composition.py::test_compiler_mul_output_frame_and_clobbers_are_covered_by_summary[q2=zero-q3=zero-q4=zero] 
+tests/composition/test_mul_summary_composition.py::test_go_compiler_generated_mul_outputs_match_proven_summary_contract 
