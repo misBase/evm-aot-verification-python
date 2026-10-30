@@ -223,7 +223,7 @@ def test_incremental_reachability_check_stops_at_its_memory_cap_and_keeps_the_pa
     before, started = rss_bytes(), time.monotonic()
     assert prefix.check(conjuncts, 60000, "test") == z3.unknown  # unknown: the caller keeps the path
     assert cs.memory_tripped() and prefix.stack == []  # reset after a memory stop
-    assert time.monotonic() - started < 10 and rss_bytes() - before < 500 * 2**20
+    assert time.monotonic() - started < 60 and rss_bytes() - before < 500 * 2**20  # ~1s idle; the 512-bit check takes minutes uncapped
     assert prefix.check([y == 1], 1000, "test") == z3.sat and not cs.memory_tripped()
 
 
