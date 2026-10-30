@@ -1,0 +1,67 @@
+[
+ [
+  "aave7200",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/Pool",
+  "BlockSpecialization(pc=7200, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=())"
+ ],
+ [
+  "pm4418-sym",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=4418, stack_depth=15, memory_size=None, free_memory_pointer=None, stack_constants=())"
+ ],
+ [
+  "pm6084-sym",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=6084, stack_depth=13, memory_size=None, free_memory_pointer=768, stack_constants=((7, 6222), (8, 6240)))"
+ ],
+ [
+  "pm6084-m864",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=6084, stack_depth=13, memory_size=864, free_memory_pointer=768, stack_constants=((7, 6222), (8, 6240)))"
+ ],
+ [
+  "pm16670-7324",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=16670, stack_depth=16, memory_size=None, free_memory_pointer=None, stack_constants=((3, 7324),))"
+ ],
+ [
+  "pm18089-d18",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=18089, stack_depth=18, memory_size=None, free_memory_pointer=320, stack_constants=((3, 4418),))"
+ ],
+ [
+  "pm18089-d29",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=18089, stack_depth=29, memory_size=None, free_memory_pointer=928, stack_constants=((3, 20208), (5, 1755), (23, 1935), (25, 1954)))"
+ ],
+ [
+  "pm19169-sym",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=19169, stack_depth=25, memory_size=None, free_memory_pointer=None, stack_constants=())"
+ ],
+ [
+  "pm21213-sym",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=21213, stack_depth=29, memory_size=None, free_memory_pointer=None, stack_constants=((5, 1755), (23, 1935), (25, 1954)))"
+ ],
+ [
+  "pm22747-sym",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=22747, stack_depth=40, memory_size=None, free_memory_pointer=None, stack_constants=((4, 20572),))"
+ ],
+ [
+  "pm22918-d22",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=22918, stack_depth=22, memory_size=None, free_memory_pointer=None, stack_constants=((5, 23504),))"
+ ],
+ [
+  "pm22918-d39",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=22918, stack_depth=39, memory_size=928, free_memory_pointer=928, stack_constants=((5, 23504),))"
+ ],
+ [
+  "pm23522-sym",
+  "/home/heqi/evm-verif/bl-runs/r5/fixtures/PoolManager",
+  "BlockSpecialization(pc=23522, stack_depth=41, memory_size=None, free_memory_pointer=None, stack_constants=((1, 19383),))"
+ ]
+]
