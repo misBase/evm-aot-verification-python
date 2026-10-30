@@ -16,7 +16,7 @@ from enum import Enum
 from time import monotonic
 from typing import Tuple
 
-from z3 import (And, Not, Or, is_expr, Solver, SolverFor, sat, unsat, simplify, is_bool, is_app, is_bv_value,
+from z3 import (And, Not, Or, is_expr, Solver, SolverFor, sat, unsat, unknown, simplify, is_bool, is_app, is_bv_value,
                 is_quantifier, Z3_BOOL_SORT, Z3_BV_SORT, Z3_ARRAY_SORT,
                 substitute, BitVecSort, FreshFunction, Z3_OP_BMUL, Z3_OP_UNINTERPRETED, ULE,
                 is_and, is_array, FreshConst, Select, BoolVal, Z3_OP_ITE, is_false, is_bv, BitVecVal,
@@ -3020,6 +3020,7 @@ def _ordered_conjuncts(condition):
 
 
 _TREE_QUERIES = 20  # ponytail: coverage_by_prefix_tree's total budget, in query timeouts
+_TREE_RETRY_FACTOR = 4  # ponytail: budget of the one retry of an unknown local query, in query timeouts
 
 
 def coverage_by_prefix_tree(premise, conditions, timeout_ms, implied=(), deadline=None):
@@ -3038,8 +3039,9 @@ def coverage_by_prefix_tree(premise, conditions, timeout_ms, implied=(), deadlin
     exactly such pairs; a single child is a pruned branch whose UNSAT is
     re-proved here with its prefix (PoolManager 21213 x86: 274 paths, 51
     local queries, 145s; the monolithic query unknown after 27000s on the
-    server). Each local query gets `timeout_ms`; gives up on the first one
-    that is not UNSAT, or after _TREE_QUERIES x timeout_ms in all.
+    server). Each local query gets `timeout_ms`, an unknown one a retry at
+    _TREE_RETRY_FACTOR x; gives up on the first one still not UNSAT, or after
+    _TREE_QUERIES x timeout_ms in all.
     """
     started = monotonic()
     end = started + _TREE_QUERIES * timeout_ms / 1000
@@ -3072,7 +3074,14 @@ def coverage_by_prefix_tree(premise, conditions, timeout_ms, implied=(), deadlin
         # Depth-first, so one incremental solver shares each prefix like the executor's
         # reachability checks that pruned these branches (a fresh solve per node: 5s+ each).
         local = min(left, timeout_ms)
-        if left <= 0 or solver.check([premise, *prefix, missing], local, "coverage", local) != unsat:
+        answer = solver.check([premise, *prefix, missing], local, "coverage", local) if left > 0 else unknown
+        if answer == unknown:
+            # One retry at 4x on the same (still pushed) prefix: a pruned branch can take a little
+            # over one budget (21213: 22-34s of 30s) and one unknown would discard the whole tree.
+            left = int((end - monotonic()) * 1000)
+            local = min(left, _TREE_RETRY_FACTOR * timeout_ms)
+            answer = solver.check([premise, *prefix, missing], local, "coverage", local) if left > 0 else unknown
+        if answer != unsat:
             return None
     return queries
 

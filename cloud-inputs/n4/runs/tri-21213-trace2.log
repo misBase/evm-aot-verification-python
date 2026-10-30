@@ -1,0 +1,26 @@
+[     6.7s] entry_nonempty sat 0.0s
+[     7.2s] havoc_relation unsat 0.5s
+[    58.8s] TRACE solve_query unknown 3.1s z3 148->148 MB
+[    62.1s] TRACE solve_query unknown 3.1s z3 148->148 MB
+[    71.8s] TRACE solve_query unsat 3.2s z3 148->148 MB
+[    76.0s] TRACE solve_query unsat 2.3s z3 148->148 MB
+[    78.9s] TRACE solve_query unsat 2.9s z3 148->148 MB
+[    87.2s] TRACE solve_query unsat 8.2s z3 148->149 MB
+[    92.3s] TRACE solve_query unsat 2.7s z3 149->149 MB
+[  1852.1s] TRACE solve_query sat 16.3s z3 255->505 MB
+[  1852.1s] model_domain_nonempty sat 16.4s
+[  1852.8s] evm_assumption_7 unsat 0.3s
+[  1854.7s] evm_assumption_8 unsat 0.8s
+[  1858.9s] TRACE solve_query unknown 4.2s z3 284->801 MB
+[  2014.9s] TRACE prefix tree 275 paths -> None 156.0s z3 436 MB
+[  2041.7s] TRACE solve_query sat 26.3s z3 435->436 MB
+[  2044.4s] TRACE mul->UF (And(And(And(ULE(blk21213_29_None_None_m 29.5s z3 436->436 MB
+[  2048.4s] TRACE solve_query unknown 3.9s z3 436->627 MB
+[  2065.0s] TRACE solve_query unknown 10.4s z3 293->294 MB
+[  2076.6s] TRACE solve_query sat 8.8s z3 294->294 MB
+[  2087.4s] TRACE solve_query unknown 10.1s z3 294->295 MB
+[  2095.1s] TRACE solve_query unknown 3.9s z3 294->816 MB
+[  2163.9s] TRACE solve_query unknown 31.7s z3 837->814 MB
+[  2197.3s] TRACE solve_pure_bv unknown 31.4s z3 814->814 MB
+Terminated
+tri-21213 exit 143

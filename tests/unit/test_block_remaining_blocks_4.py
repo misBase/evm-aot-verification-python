@@ -356,3 +356,21 @@ def test_a_timeout_is_not_a_memory_stop_and_keeps_the_incremental_solver():
     assert prefix.check(hard, 50, "test", 200) == z3.unknown  # budget, not memory ("canceled" / "timeout")
     assert not cs.memory_tripped() and len(prefix.stack) == 3  # the prefix stays pushed
     assert not cs.out_of_memory("canceled")  # outside any cap and Z3 nowhere near one
+
+
+def test_prefix_tree_retries_an_unknown_local_query_once_with_a_larger_budget(monkeypatch):
+    import z3
+    from z3 import Not
+    from x86_64.cfg_state import PrefixSolver
+    x = BitVec("n4_tree_r", 64)
+    real, budgets = PrefixSolver.check, []
+
+    def flaky(self, conjuncts, timeout_ms, tag="incremental", wall_ms=None):  # first try times out
+        budgets.append(timeout_ms)
+        return z3.unknown if len(budgets) == 1 else real(self, conjuncts, timeout_ms, tag, wall_ms)
+    monkeypatch.setattr(PrefixSolver, "check", flaky)
+    paths = [And(ULT(x, 5), ULT(x, 10)), Not(ULT(x, 5))]  # one pruned branch: one local query
+    assert be.coverage_by_prefix_tree(BoolVal(True), paths, 1000) == 1 and budgets == [1000, 4000]
+    budgets.clear()
+    monkeypatch.setattr(PrefixSolver, "check", lambda self, *a: budgets.append(a[1]) or z3.unknown)
+    assert be.coverage_by_prefix_tree(BoolVal(True), paths, 1000) is None and budgets == [1000, 4000]
