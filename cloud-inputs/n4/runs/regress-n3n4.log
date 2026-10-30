@@ -1,3 +1,4 @@
 aave6182_pair_63_2 expected=unsat proved 2955.8s lemmas=7
 pm16670_sym7296_pair_4_84_goal_2_of_7 expected=unsat unknown 3600.4s lemmas=1
 aave6182_x86_maps_2_group expected=unsat proved 127.0s lemmas=474
+pm6084_x86_maps_10_group expected=unsat proved 112.7s lemmas=173
