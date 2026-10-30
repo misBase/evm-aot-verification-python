@@ -17,3 +17,668 @@
 [  2312.0s] TRACE solve_query unknown 4.0s z3 296->813 MB
 [  2568.8s] TRACE prefix tree 274 paths -> 51 256.8s z3 448 MB
 [  2568.8s] pair phase: evm 2 x86 274 found []
+[  2591.4s] _unify_node over 548 obligations: 18.8s, 0 lemmas
+[  2591.5s] pair_0_0 unsat 0.1s
+[  2591.5s] pair_0_1 unsat 0.1s
+[  2591.6s] pair_0_2 unsat 0.0s
+[  2591.6s] pair_0_3 unsat 0.0s
+[  2591.7s] pair_0_4 unsat 0.1s
+[  2591.8s] pair_0_5 unsat 0.1s
+[  2591.8s] pair_0_6 unsat 0.0s
+[  2591.9s] pair_0_7 unsat 0.0s
+[  2591.9s] pair_0_8 unsat 0.0s
+[  2592.0s] pair_0_9 unsat 0.0s
+[  2592.0s] pair_0_10 unsat 0.0s
+[  2592.0s] pair_0_11 unsat 0.0s
+[  2592.1s] pair_0_12 unsat 0.0s
+[  2592.1s] pair_0_13 unsat 0.0s
+[  2592.2s] pair_0_14 unsat 0.1s
+[  2592.2s] pair_0_15 unsat 0.0s
+[  2592.3s] pair_0_16 unsat 0.0s
+[  2592.3s] pair_0_17 unsat 0.1s
+[  2592.4s] pair_0_18 unsat 0.1s
+[  2592.4s] pair_0_19 unsat 0.1s
+[  2592.5s] pair_0_20 unsat 0.1s
+[  2592.6s] pair_0_21 unsat 0.1s
+[  2592.6s] pair_0_22 unsat 0.1s
+[  2592.7s] pair_0_23 unsat 0.1s
+[  2592.7s] pair_0_24 unsat 0.1s
+[  2592.8s] pair_0_25 unsat 0.1s
+[  2592.8s] pair_0_26 unsat 0.1s
+[  2592.9s] pair_0_27 unsat 0.0s
+[  2592.9s] pair_0_28 unsat 0.0s
+[  2593.0s] pair_0_29 unsat 0.0s
+[  2593.0s] pair_0_30 unsat 0.0s
+[  2593.1s] pair_0_31 unsat 0.0s
+[  2593.1s] pair_0_32 unsat 0.0s
+[  2593.2s] pair_0_33 unsat 0.1s
+[  2593.2s] pair_0_34 unsat 0.1s
+[  2593.3s] pair_0_35 unsat 0.1s
+[  2593.3s] pair_0_36 unsat 0.1s
+[  2593.4s] pair_0_37 unsat 0.1s
+[  2593.4s] pair_0_38 unsat 0.1s
+[  2593.5s] pair_0_39 unsat 0.0s
+[  2593.5s] pair_0_40 unsat 0.0s
+[  2593.6s] pair_0_41 unsat 0.1s
+[  2593.7s] pair_0_42 unsat 0.1s
+[  2593.7s] pair_0_43 unsat 0.1s
+[  2593.8s] pair_0_44 unsat 0.1s
+[  2593.8s] pair_0_45 unsat 0.1s
+[  2593.9s] pair_0_46 unsat 0.1s
+[  2593.9s] pair_0_47 unsat 0.0s
+[  2594.0s] pair_0_48 unsat 0.0s
+[  2594.0s] pair_0_49 unsat 0.0s
+[  2594.0s] pair_0_50 unsat 0.0s
+[  2594.1s] pair_0_51 unsat 0.0s
+[  2594.1s] pair_0_52 unsat 0.0s
+[  2594.1s] pair_0_53 unsat 0.0s
+[  2594.2s] pair_0_54 unsat 0.0s
+[  2594.2s] pair_0_55 unsat 0.0s
+[  2594.3s] pair_0_56 unsat 0.0s
+[  2594.3s] pair_0_57 unsat 0.0s
+[  2594.3s] pair_0_58 unsat 0.0s
+[  2594.4s] pair_0_59 unsat 0.0s
+[  2594.4s] pair_0_60 unsat 0.0s
+[  2594.5s] pair_0_61 unsat 0.0s
+[  2594.5s] pair_0_62 unsat 0.0s
+[  2594.6s] pair_0_63 unsat 0.0s
+[  2594.6s] pair_0_64 unsat 0.1s
+[  2594.7s] pair_0_65 unsat 0.0s
+[  2594.7s] pair_0_66 unsat 0.1s
+[  2594.8s] pair_0_67 unsat 0.0s
+[  2594.8s] pair_0_68 unsat 0.1s
+[  2594.9s] pair_0_69 unsat 0.0s
+[  2594.9s] pair_0_70 unsat 0.0s
+[  2595.0s] pair_0_71 unsat 0.1s
+[  2595.0s] pair_0_72 unsat 0.1s
+[  2595.1s] pair_0_73 unsat 0.0s
+[  2595.1s] pair_0_74 unsat 0.0s
+[  2595.2s] pair_0_75 unsat 0.0s
+[  2595.2s] pair_0_76 unsat 0.0s
+[  2595.3s] pair_0_77 unsat 0.0s
+[  2595.3s] pair_0_78 unsat 0.0s
+[  2595.4s] pair_0_79 unsat 0.0s
+[  2595.4s] pair_0_80 unsat 0.0s
+[  2595.4s] pair_0_81 unsat 0.0s
+[  2595.5s] pair_0_82 unsat 0.0s
+[  2595.5s] pair_0_83 unsat 0.1s
+[  2595.6s] pair_0_84 unsat 0.0s
+[  2595.6s] pair_0_85 unsat 0.0s
+[  2595.7s] pair_0_86 unsat 0.0s
+[  2595.7s] pair_0_87 unsat 0.0s
+[  2595.8s] pair_0_88 unsat 0.0s
+[  2595.8s] pair_0_89 unsat 0.0s
+[  2595.9s] pair_0_90 unsat 0.1s
+[  2595.9s] pair_0_91 unsat 0.0s
+[  2596.0s] pair_0_92 unsat 0.1s
+[  2596.0s] pair_0_93 unsat 0.1s
+[  2596.1s] pair_0_94 unsat 0.1s
+[  2596.2s] pair_0_95 unsat 0.1s
+[  2596.2s] pair_0_96 unsat 0.1s
+[  2596.3s] pair_0_97 unsat 0.0s
+[  2596.3s] pair_0_98 unsat 0.1s
+[  2596.4s] pair_0_99 unsat 0.0s
+[  2596.4s] pair_0_100 unsat 0.0s
+[  2596.5s] pair_0_101 unsat 0.0s
+[  2596.5s] pair_0_102 unsat 0.1s
+[  2596.6s] pair_0_103 unsat 0.0s
+[  2596.6s] pair_0_104 unsat 0.1s
+[  2596.7s] pair_0_105 unsat 0.1s
+[  2596.7s] pair_0_106 unsat 0.1s
+[  2596.8s] pair_0_107 unsat 0.0s
+[  2596.8s] pair_0_108 unsat 0.0s
+[  2596.9s] pair_0_109 unsat 0.0s
+[  2596.9s] pair_0_110 unsat 0.0s
+[  2597.0s] pair_0_111 unsat 0.1s
+[  2597.0s] pair_0_112 unsat 0.1s
+[  2597.1s] pair_0_113 unsat 0.0s
+[  2597.1s] pair_0_114 unsat 0.0s
+[  2597.2s] pair_0_115 unsat 0.0s
+[  2597.2s] pair_0_116 unsat 0.1s
+[  2597.3s] pair_0_117 unsat 0.1s
+[  2597.3s] pair_0_118 unsat 0.1s
+[  2597.4s] pair_0_119 unsat 0.1s
+[  2597.5s] pair_0_120 unsat 0.0s
+[  2597.5s] pair_0_121 unsat 0.1s
+[  2597.6s] pair_0_122 unsat 0.0s
+[  2597.6s] pair_0_123 unsat 0.0s
+[  2597.7s] pair_0_124 unsat 0.1s
+[  2597.7s] pair_0_125 unsat 0.1s
+[  2597.8s] pair_0_126 unsat 0.0s
+[  2597.8s] pair_0_127 unsat 0.0s
+[  2597.9s] pair_0_128 unsat 0.0s
+[  2597.9s] pair_0_129 unsat 0.0s
+[  2598.0s] pair_0_130 unsat 0.0s
+[  2598.0s] pair_0_131 unsat 0.0s
+[  2598.1s] pair_0_132 unsat 0.1s
+[  2598.1s] pair_0_133 unsat 0.1s
+[  2598.2s] pair_0_134 unsat 0.1s
+[  2598.3s] pair_0_135 unsat 0.1s
+[  2598.3s] pair_0_136 unsat 0.1s
+[  2598.4s] pair_0_137 unsat 0.0s
+[  2598.4s] pair_0_138 unsat 0.0s
+[  2598.4s] pair_0_139 unsat 0.0s
+[  2598.5s] pair_0_140 unsat 0.1s
+[  2598.6s] pair_0_141 unsat 0.1s
+[  2598.6s] pair_0_142 unsat 0.1s
+[  2598.7s] pair_0_143 unsat 0.1s
+[  2598.8s] pair_0_144 unsat 0.1s
+[  2598.8s] pair_0_145 unsat 0.1s
+[  2598.9s] pair_0_146 unsat 0.1s
+[  2599.0s] pair_0_147 unsat 0.1s
+[  2599.1s] pair_0_148 unsat 0.1s
+[  2599.1s] pair_0_149 unsat 0.1s
+[  2599.2s] pair_0_150 unsat 0.1s
+[  2599.3s] pair_0_151 unsat 0.1s
+[  2599.4s] pair_0_152 unsat 0.1s
+[  2599.4s] pair_0_153 unsat 0.1s
+[  2599.5s] pair_0_154 unsat 0.1s
+[  2599.5s] pair_0_155 unsat 0.0s
+[  2599.6s] pair_0_156 unsat 0.0s
+[  2599.6s] pair_0_157 unsat 0.0s
+[  2599.7s] pair_0_158 unsat 0.1s
+[  2599.8s] pair_0_159 unsat 0.1s
+[  2599.8s] pair_0_160 unsat 0.1s
+[  2599.9s] pair_0_161 unsat 0.1s
+[  2600.0s] pair_0_162 unsat 0.1s
+[  2600.0s] pair_0_163 unsat 0.1s
+[  2600.1s] pair_0_164 unsat 0.1s
+[  2600.1s] pair_0_165 unsat 0.1s
+[  2600.2s] pair_0_166 unsat 0.1s
+[  2600.3s] pair_0_167 unsat 0.1s
+[  2600.3s] pair_0_168 unsat 0.0s
+[  2600.4s] pair_0_169 unsat 0.1s
+[  2600.4s] pair_0_170 unsat 0.1s
+[  2600.5s] pair_0_171 unsat 0.1s
+[  2600.6s] pair_0_172 unsat 0.1s
+[  2600.6s] pair_0_173 unsat 0.0s
+[  2600.7s] pair_0_174 unsat 0.0s
+[  2600.7s] pair_0_175 unsat 0.0s
+[  2600.8s] pair_0_176 unsat 0.0s
+[  2600.8s] pair_0_177 unsat 0.1s
+[  2600.9s] pair_0_178 unsat 0.1s
+[  2600.9s] pair_0_179 unsat 0.1s
+[  2601.0s] pair_0_180 unsat 0.1s
+[  2601.1s] pair_0_181 unsat 0.1s
+[  2601.1s] pair_0_182 unsat 0.1s
+[  2601.2s] pair_0_183 unsat 0.1s
+[  2601.3s] pair_0_184 unsat 0.1s
+[  2601.3s] pair_0_185 unsat 0.1s
+[  2601.4s] pair_0_186 unsat 0.1s
+[  2601.5s] pair_0_187 unsat 0.1s
+[  2601.5s] pair_0_188 unsat 0.1s
+[  2601.6s] pair_0_189 unsat 0.1s
+[  2601.6s] pair_0_190 unsat 0.1s
+[  2601.7s] pair_0_191 unsat 0.1s
+[  2601.8s] pair_0_192 unsat 0.1s
+[  2601.8s] pair_0_193 unsat 0.1s
+[  2601.9s] pair_0_194 unsat 0.1s
+[  2602.0s] pair_0_195 unsat 0.1s
+[  2602.0s] pair_0_196 unsat 0.1s
+[  2602.1s] pair_0_197 unsat 0.1s
+[  2602.2s] pair_0_198 unsat 0.1s
+[  2602.2s] pair_0_199 unsat 0.1s
+[  2602.3s] pair_0_200 unsat 0.1s
+[  2602.4s] pair_0_201 unsat 0.1s
+[  2602.4s] pair_0_202 unsat 0.1s
+[  2602.5s] pair_0_203 unsat 0.1s
+[  2602.6s] pair_0_204 unsat 0.1s
+[  2602.7s] pair_0_205 unsat 0.1s
+[  2602.7s] pair_0_206 unsat 0.1s
+[  2602.8s] pair_0_207 unsat 0.1s
+[  2602.8s] pair_0_208 unsat 0.1s
+[  2602.9s] pair_0_209 unsat 0.1s
+[  2603.0s] pair_0_210 unsat 0.1s
+[  2603.1s] pair_0_211 unsat 0.1s
+[  2603.2s] pair_0_212 unsat 0.1s
+[  2603.2s] pair_0_213 unsat 0.1s
+[  2603.4s] pair_0_214 unsat 0.1s
+[  2603.5s] pair_0_215 unsat 0.1s
+[  2603.6s] pair_0_216 unsat 0.1s
+[  2603.7s] pair_0_217 unsat 0.1s
+[  2603.7s] pair_0_218 unsat 0.1s
+[  2603.8s] pair_0_219 unsat 0.1s
+[  2603.9s] pair_0_220 unsat 0.1s
+[  2604.0s] pair_0_221 unsat 0.1s
+[  2604.1s] pair_0_222 unsat 0.1s
+[  2604.2s] pair_0_223 unsat 0.1s
+[  2604.3s] pair_0_224 unsat 0.1s
+[  2604.4s] pair_0_225 unsat 0.1s
+[  2604.4s] pair_0_226 unsat 0.1s
+[  2604.5s] pair_0_227 unsat 0.1s
+[  2604.6s] pair_0_228 unsat 0.1s
+[  2604.6s] pair_0_229 unsat 0.1s
+[  2604.7s] pair_0_230 unsat 0.1s
+[  2604.8s] pair_0_231 unsat 0.1s
+[  2604.8s] pair_0_232 unsat 0.1s
+[  2604.9s] pair_0_233 unsat 0.1s
+[  2605.0s] pair_0_234 unsat 0.1s
+[  2605.0s] pair_0_235 unsat 0.1s
+[  2605.1s] pair_0_236 unsat 0.1s
+[  2605.2s] pair_0_237 unsat 0.1s
+[  2605.3s] pair_0_238 unsat 0.1s
+[  2605.4s] pair_0_239 unsat 0.1s
+[  2605.4s] pair_0_240 unsat 0.1s
+[  2605.5s] pair_0_241 unsat 0.1s
+[  2605.6s] pair_0_242 unsat 0.1s
+[  2605.7s] pair_0_243 unsat 0.1s
+[  2605.8s] pair_0_244 unsat 0.1s
+[  2605.9s] pair_0_245 unsat 0.1s
+[  2606.0s] pair_0_246 unsat 0.1s
+[  2606.1s] pair_0_247 unsat 0.1s
+[  2606.2s] pair_0_248 unsat 0.1s
+[  2606.3s] pair_0_249 unsat 0.1s
+[  2606.4s] pair_0_250 unsat 0.1s
+[  2606.5s] pair_0_251 unsat 0.1s
+[  2606.5s] pair_0_252 unsat 0.1s
+[  2606.6s] pair_0_253 unsat 0.1s
+[  2606.7s] pair_0_254 unsat 0.1s
+[  2606.8s] pair_0_255 unsat 0.1s
+[  2606.8s] pair_0_256 unsat 0.1s
+[  2606.9s] pair_0_257 unsat 0.1s
+[  2607.0s] pair_0_258 unsat 0.1s
+[  2607.1s] pair_0_259 unsat 0.1s
+[  2607.1s] pair_0_260 unsat 0.1s
+[  2607.2s] pair_0_261 unsat 0.0s
+[  2607.2s] pair_0_262 unsat 0.0s
+[  2607.3s] pair_0_263 unsat 0.1s
+[  2607.4s] pair_0_264 unsat 0.1s
+[  2607.4s] pair_0_265 unsat 0.1s
+[  2607.5s] pair_0_266 unsat 0.0s
+[  2607.5s] pair_0_267 unsat 0.0s
+[  2607.6s] pair_0_268 unsat 0.0s
+[  2607.6s] pair_0_269 unsat 0.1s
+[  2607.7s] pair_0_270 unsat 0.1s
+[  2607.8s] pair_0_271 unsat 0.1s
+[  2607.8s] pair_0_272 unsat 0.1s
+[  2611.4s] TRACE solve_query unknown 3.6s z3 447->895 MB
+[  2652.5s] TRACE solve_query unsat 4.0s z3 895->529 MB
+[  2652.6s] pair_0_273 unsat 44.7s
+[  2655.5s] TRACE solve_query unsat 2.9s z3 529->389 MB
+[  2655.6s] pair_1_0 unsat 3.0s
+[  2659.4s] TRACE solve_query unknown 3.8s z3 389->385 MB
+[  2662.9s] TRACE solve_query unsat 3.3s z3 385->383 MB
+[  2662.9s] pair_1_1 unsat 7.4s
+[  2666.1s] TRACE solve_query unsat 3.2s z3 383->383 MB
+[  2666.2s] pair_1_2 unsat 3.2s
+[  2669.4s] TRACE solve_query unsat 3.3s z3 383->384 MB
+[  2669.5s] pair_1_3 unsat 3.3s
+[  2672.3s] TRACE solve_query unsat 2.8s z3 384->384 MB
+[  2672.3s] pair_1_4 unsat 2.9s
+[  2675.1s] TRACE solve_query unsat 2.7s z3 384->384 MB
+[  2675.1s] pair_1_5 unsat 2.8s
+[  2678.1s] TRACE solve_query unsat 3.0s z3 384->384 MB
+[  2678.1s] pair_1_6 unsat 3.0s
+[  2681.0s] TRACE solve_query unsat 2.8s z3 384->384 MB
+[  2681.1s] pair_1_7 unsat 2.9s
+[  2684.2s] TRACE solve_query unsat 3.1s z3 384->384 MB
+[  2684.2s] pair_1_8 unsat 3.2s
+[  2687.3s] TRACE solve_query unsat 3.1s z3 384->384 MB
+[  2687.4s] pair_1_9 unsat 3.1s
+[  2690.4s] TRACE solve_query unsat 3.0s z3 384->384 MB
+[  2690.5s] pair_1_10 unsat 3.1s
+[  2693.6s] TRACE solve_query unsat 3.2s z3 384->384 MB
+[  2693.7s] pair_1_11 unsat 3.2s
+[  2696.6s] TRACE solve_query unsat 2.9s z3 384->384 MB
+[  2696.7s] pair_1_12 unsat 3.0s
+[  2699.8s] TRACE solve_query unsat 3.2s z3 384->384 MB
+[  2699.9s] pair_1_13 unsat 3.2s
+[  2703.4s] TRACE solve_query unknown 3.5s z3 384->384 MB
+[  2706.3s] TRACE solve_query unsat 2.8s z3 384->384 MB
+[  2706.3s] pair_1_14 unsat 6.4s
+[  2709.3s] TRACE solve_query unsat 2.9s z3 384->384 MB
+[  2709.3s] pair_1_15 unsat 3.0s
+[  2712.4s] TRACE solve_query unsat 3.1s z3 384->384 MB
+[  2712.5s] pair_1_16 unsat 3.2s
+[  2715.9s] TRACE solve_query unknown 3.4s z3 384->384 MB
+[  2719.6s] TRACE solve_query unsat 3.6s z3 384->384 MB
+[  2719.7s] pair_1_17 unsat 7.2s
+[  2723.0s] TRACE solve_query unsat 3.3s z3 384->384 MB
+[  2723.0s] pair_1_18 unsat 3.3s
+[  2726.5s] TRACE solve_query unknown 3.4s z3 384->384 MB
+[  2730.6s] TRACE solve_query unsat 3.9s z3 384->384 MB
+[  2730.7s] pair_1_19 unsat 7.6s
+[  2734.2s] TRACE solve_query unknown 3.5s z3 384->515 MB
+[  2738.3s] TRACE solve_query unsat 3.9s z3 515->384 MB
+[  2738.3s] pair_1_20 unsat 7.6s
+[  2741.8s] TRACE solve_query unknown 3.5s z3 384->515 MB
+[  2746.8s] TRACE solve_query unsat 4.7s z3 515->385 MB
+[  2746.8s] pair_1_21 unsat 8.5s
+[  2750.3s] TRACE solve_query unknown 3.4s z3 385->515 MB
+[  2754.0s] TRACE solve_query unsat 3.5s z3 515->385 MB
+[  2754.0s] pair_1_22 unsat 7.2s
+[  2757.2s] TRACE solve_query unsat 3.2s z3 385->385 MB
+[  2757.3s] pair_1_23 unsat 3.2s
+[  2760.3s] TRACE solve_query unsat 3.0s z3 385->385 MB
+[  2760.4s] pair_1_24 unsat 3.1s
+[  2763.5s] TRACE solve_query unsat 3.1s z3 385->385 MB
+[  2763.5s] pair_1_25 unsat 3.2s
+[  2766.8s] TRACE solve_query unsat 3.3s z3 385->385 MB
+[  2766.8s] pair_1_26 unsat 3.3s
+[  2769.6s] TRACE solve_query unsat 2.8s z3 385->385 MB
+[  2769.7s] pair_1_27 unsat 2.8s
+[  2773.0s] TRACE solve_query unknown 3.3s z3 385->385 MB
+[  2776.3s] TRACE solve_query unsat 3.1s z3 385->385 MB
+[  2776.3s] pair_1_28 unsat 6.7s
+[  2779.4s] TRACE solve_query unsat 3.0s z3 385->384 MB
+[  2779.4s] pair_1_29 unsat 3.1s
+[  2782.4s] TRACE solve_query unsat 2.9s z3 385->385 MB
+[  2782.4s] pair_1_30 unsat 3.0s
+[  2785.7s] TRACE solve_query unsat 3.3s z3 385->385 MB
+[  2785.7s] pair_1_31 unsat 3.3s
+[  2788.9s] TRACE solve_query unsat 3.1s z3 385->384 MB
+[  2788.9s] pair_1_32 unsat 3.2s
+[  2791.9s] TRACE solve_query unsat 3.0s z3 384->385 MB
+[  2791.9s] pair_1_33 unsat 3.0s
+[  2795.0s] TRACE solve_query unsat 3.1s z3 385->385 MB
+[  2795.0s] pair_1_34 unsat 3.1s
+[  2798.0s] TRACE solve_query unsat 3.0s z3 385->385 MB
+[  2798.1s] pair_1_35 unsat 3.0s
+[  2800.8s] TRACE solve_query unsat 2.8s z3 385->385 MB
+[  2800.9s] pair_1_36 unsat 2.8s
+[  2803.7s] TRACE solve_query unsat 2.8s z3 385->385 MB
+[  2803.7s] pair_1_37 unsat 2.9s
+[  2807.1s] TRACE solve_query unsat 3.3s z3 385->384 MB
+[  2807.1s] pair_1_38 unsat 3.4s
+[  2810.3s] TRACE solve_query unsat 3.2s z3 384->385 MB
+[  2810.3s] pair_1_39 unsat 3.2s
+[  2813.2s] TRACE solve_query unsat 2.8s z3 385->385 MB
+[  2813.2s] pair_1_40 unsat 2.9s
+[  2816.4s] TRACE solve_query unsat 3.1s z3 385->385 MB
+[  2816.4s] pair_1_41 unsat 3.2s
+[  2819.3s] TRACE solve_query unsat 2.9s z3 385->385 MB
+[  2819.4s] pair_1_42 unsat 2.9s
+[  2822.2s] TRACE solve_query unsat 2.8s z3 385->385 MB
+[  2822.2s] pair_1_43 unsat 2.9s
+[  2825.1s] TRACE solve_query unsat 2.8s z3 385->385 MB
+[  2825.1s] pair_1_44 unsat 2.9s
+[  2828.1s] TRACE solve_query unsat 3.0s z3 385->385 MB
+[  2828.1s] pair_1_45 unsat 3.0s
+[  2830.9s] TRACE solve_query unsat 2.8s z3 385->385 MB
+[  2830.9s] pair_1_46 unsat 2.8s
+[  2834.0s] TRACE solve_query unsat 3.1s z3 385->384 MB
+[  2834.0s] pair_1_47 unsat 3.1s
+[  2837.0s] TRACE solve_query unsat 2.9s z3 384->385 MB
+[  2837.0s] pair_1_48 unsat 3.0s
+[  2839.8s] TRACE solve_query unsat 2.7s z3 385->384 MB
+[  2839.8s] pair_1_49 unsat 2.8s
+[  2842.7s] TRACE solve_query unsat 2.9s z3 384->384 MB
+[  2842.7s] pair_1_50 unsat 2.9s
+[  2845.3s] TRACE solve_query unsat 2.5s z3 384->384 MB
+[  2845.3s] pair_1_51 unsat 2.6s
+[  2848.3s] TRACE solve_query unsat 3.0s z3 384->383 MB
+[  2848.4s] pair_1_52 unsat 3.1s
+[  2851.3s] TRACE solve_query unsat 2.9s z3 383->383 MB
+[  2851.3s] pair_1_53 unsat 2.9s
+[  2854.0s] TRACE solve_query unsat 2.7s z3 383->384 MB
+[  2854.1s] pair_1_54 unsat 2.7s
+[  2857.5s] TRACE solve_query unknown 3.4s z3 384->818 MB
+[  2861.7s] TRACE solve_query unsat 4.0s z3 818->540 MB
+[  2861.7s] pair_1_55 unsat 7.7s
+[  2865.2s] TRACE solve_query unknown 3.5s z3 539->818 MB
+[  2869.8s] TRACE solve_query unsat 4.4s z3 818->540 MB
+[  2869.8s] pair_1_56 unsat 8.1s
+[  2874.1s] TRACE solve_query unknown 4.2s z3 540->541 MB
+[  2880.4s] TRACE solve_query unsat 6.0s z3 541->541 MB
+[  2880.5s] pair_1_57 unsat 10.7s
+[  2884.0s] TRACE solve_query unknown 3.5s z3 541->818 MB
+[  2889.8s] TRACE solve_query unsat 5.6s z3 818->542 MB
+[  2889.9s] pair_1_58 unsat 9.4s
+[  2893.4s] TRACE solve_query unknown 3.5s z3 542->558 MB
+[  2899.4s] TRACE solve_query unsat 5.9s z3 558->542 MB
+[  2899.5s] pair_1_59 unsat 9.7s
+[  2903.1s] TRACE solve_query unknown 3.5s z3 542->818 MB
+[  2907.7s] TRACE solve_query unsat 4.4s z3 818->544 MB
+[  2907.8s] pair_1_60 unsat 8.3s
+[  2911.7s] TRACE solve_query unknown 3.9s z3 544->544 MB
+[  2916.8s] TRACE solve_query unsat 4.8s z3 544->544 MB
+[  2916.8s] pair_1_61 unsat 9.0s
+[  2921.0s] TRACE solve_query unknown 4.2s z3 544->543 MB
+[  2925.9s] TRACE solve_query unsat 4.7s z3 543->543 MB
+[  2925.9s] pair_1_62 unsat 9.2s
+[  2929.4s] TRACE solve_query unknown 3.5s z3 543->819 MB
+[  2934.3s] TRACE solve_query unsat 4.6s z3 818->544 MB
+[  2934.4s] pair_1_63 unsat 8.4s
+[  2937.9s] TRACE solve_query unknown 3.5s z3 544->819 MB
+[  2943.9s] TRACE solve_query unsat 5.8s z3 819->544 MB
+[  2943.9s] pair_1_64 unsat 9.5s
+[  2947.5s] TRACE solve_query unknown 3.6s z3 544->558 MB
+[  2953.1s] TRACE solve_query unsat 5.2s z3 558->546 MB
+[  2953.1s] pair_1_65 unsat 9.2s
+[  2956.7s] TRACE solve_query unknown 3.6s z3 546->819 MB
+[  2961.5s] TRACE solve_query unsat 4.6s z3 819->545 MB
+[  2961.5s] pair_1_66 unsat 8.4s
+[  2965.6s] TRACE solve_query unknown 4.0s z3 545->544 MB
+[  2970.7s] TRACE solve_query unsat 4.9s z3 544->546 MB
+[  2970.8s] pair_1_67 unsat 9.2s
+[  2974.3s] TRACE solve_query unknown 3.5s z3 545->819 MB
+[  2979.0s] TRACE solve_query unsat 4.5s z3 819->545 MB
+[  2979.1s] pair_1_68 unsat 8.3s
+[  2983.5s] TRACE solve_query unknown 4.4s z3 545->543 MB
+[  2990.0s] TRACE solve_query unsat 6.1s z3 543->546 MB
+[  2990.0s] pair_1_69 unsat 10.9s
+[  2993.5s] TRACE solve_query unknown 3.5s z3 546->819 MB
+[  2998.9s] TRACE solve_query unsat 5.1s z3 819->545 MB
+[  2999.0s] pair_1_70 unsat 9.0s
+[  3002.5s] TRACE solve_query unknown 3.5s z3 545->819 MB
+[  3009.2s] TRACE solve_query unsat 6.4s z3 819->545 MB
+[  3009.3s] pair_1_71 unsat 10.3s
+[  3012.8s] TRACE solve_query unknown 3.5s z3 545->559 MB
+[  3019.7s] TRACE solve_query unsat 6.5s z3 559->546 MB
+[  3019.8s] pair_1_72 unsat 10.5s
+[  3023.5s] TRACE solve_query unknown 3.7s z3 546->819 MB
+[  3029.6s] TRACE solve_query unsat 5.7s z3 819->547 MB
+[  3029.7s] pair_1_73 unsat 9.9s
+[  3033.3s] TRACE solve_query unknown 3.6s z3 547->559 MB
+[  3039.5s] TRACE solve_query unsat 5.7s z3 559->546 MB
+[  3039.5s] pair_1_74 unsat 9.8s
+[  3043.1s] TRACE solve_query unknown 3.5s z3 546->559 MB
+[  3048.8s] TRACE solve_query unsat 5.4s z3 559->546 MB
+[  3048.8s] pair_1_75 unsat 9.3s
+[  3052.3s] TRACE solve_query unknown 3.4s z3 546->559 MB
+[  3058.1s] TRACE solve_query unsat 5.6s z3 559->546 MB
+[  3058.1s] pair_1_76 unsat 9.3s
+[  3062.4s] TRACE solve_query unknown 4.3s z3 546->546 MB
+[  3068.3s] TRACE solve_query unsat 5.5s z3 546->549 MB
+[  3068.3s] pair_1_77 unsat 10.2s
+[  3071.9s] TRACE solve_query unknown 3.6s z3 548->559 MB
+[  3077.5s] TRACE solve_query unsat 5.3s z3 559->546 MB
+[  3077.6s] pair_1_78 unsat 9.3s
+[  3081.8s] TRACE solve_query unknown 4.2s z3 546->546 MB
+[  3087.4s] TRACE solve_query unsat 5.3s z3 546->545 MB
+[  3087.4s] pair_1_79 unsat 9.9s
+[  3091.0s] TRACE solve_query unknown 3.5s z3 545->819 MB
+[  3096.0s] TRACE solve_query unsat 4.7s z3 819->545 MB
+[  3096.0s] pair_1_80 unsat 8.6s
+[  3099.5s] TRACE solve_query unknown 3.5s z3 545->819 MB
+[  3104.3s] TRACE solve_query unsat 4.4s z3 819->545 MB
+[  3104.3s] pair_1_81 unsat 8.3s
+[  3107.9s] TRACE solve_query unknown 3.6s z3 545->819 MB
+[  3113.3s] TRACE solve_query unsat 5.1s z3 819->545 MB
+[  3113.3s] pair_1_82 unsat 9.0s
+[  3116.8s] TRACE solve_query unknown 3.5s z3 545->819 MB
+[  3121.6s] TRACE solve_query unsat 4.5s z3 819->546 MB
+[  3121.6s] pair_1_83 unsat 8.3s
+[  3125.8s] TRACE solve_query unknown 4.2s z3 546->544 MB
+[  3131.2s] TRACE solve_query unsat 5.0s z3 544->545 MB
+[  3131.2s] pair_1_84 unsat 9.6s
+[  3135.6s] TRACE solve_query unknown 4.4s z3 545->546 MB
+[  3140.5s] TRACE solve_query unsat 4.5s z3 546->546 MB
+[  3140.5s] pair_1_85 unsat 9.3s
+[  3144.2s] TRACE solve_query unknown 3.7s z3 546->545 MB
+[  3149.5s] TRACE solve_query unsat 5.0s z3 545->544 MB
+[  3149.6s] pair_1_86 unsat 9.1s
+[  3153.1s] TRACE solve_query unknown 3.5s z3 544->819 MB
+[  3158.0s] TRACE solve_query unsat 4.6s z3 819->546 MB
+[  3158.0s] pair_1_87 unsat 8.4s
+[  3162.0s] TRACE solve_query unknown 3.9s z3 546->545 MB
+[  3167.0s] TRACE solve_query unsat 4.8s z3 545->549 MB
+[  3167.0s] pair_1_88 unsat 9.0s
+[  3170.5s] TRACE solve_query unknown 3.4s z3 549->819 MB
+[  3175.5s] TRACE solve_query unsat 4.7s z3 819->547 MB
+[  3175.5s] pair_1_89 unsat 8.5s
+[  3179.5s] TRACE solve_query unknown 3.9s z3 547->546 MB
+[  3183.8s] TRACE solve_query unsat 4.1s z3 546->546 MB
+[  3183.8s] pair_1_90 unsat 8.3s
+[  3187.3s] TRACE solve_query unknown 3.5s z3 546->819 MB
+[  3192.5s] TRACE solve_query unsat 4.8s z3 819->545 MB
+[  3192.5s] pair_1_91 unsat 8.7s
+[  3196.0s] TRACE solve_query unknown 3.5s z3 545->819 MB
+[  3200.5s] TRACE solve_query unsat 4.3s z3 819->547 MB
+[  3200.6s] pair_1_92 unsat 8.0s
+[  3204.1s] TRACE solve_query unknown 3.5s z3 547->819 MB
+[  3209.3s] TRACE solve_query unsat 5.0s z3 819->549 MB
+[  3209.4s] pair_1_93 unsat 8.8s
+[  3213.5s] TRACE solve_query unknown 4.1s z3 549->545 MB
+[  3218.5s] TRACE solve_query unsat 4.8s z3 545->548 MB
+[  3218.5s] pair_1_94 unsat 9.2s
+[  3222.1s] TRACE solve_query unknown 3.5s z3 548->559 MB
+[  3227.3s] TRACE solve_query unsat 5.0s z3 559->548 MB
+[  3227.4s] pair_1_95 unsat 8.8s
+[  3231.3s] TRACE solve_query unknown 3.9s z3 548->545 MB
+[  3235.8s] TRACE solve_query unsat 4.3s z3 545->546 MB
+[  3235.8s] pair_1_96 unsat 8.5s
+[  3239.9s] TRACE solve_query unknown 4.0s z3 546->546 MB
+[  3244.8s] TRACE solve_query unsat 4.7s z3 546->544 MB
+[  3244.9s] pair_1_97 unsat 9.0s
+[  3249.0s] TRACE solve_query unknown 4.1s z3 544->544 MB
+[  3253.7s] TRACE solve_query unsat 4.5s z3 544->545 MB
+[  3253.8s] pair_1_98 unsat 8.9s
+[  3257.3s] TRACE solve_query unknown 3.5s z3 545->819 MB
+[  3262.4s] TRACE solve_query unsat 4.8s z3 819->544 MB
+[  3262.4s] pair_1_99 unsat 8.7s
+[  3265.9s] TRACE solve_query unknown 3.5s z3 544->819 MB
+[  3270.9s] TRACE solve_query unsat 4.6s z3 819->547 MB
+[  3270.9s] pair_1_100 unsat 8.5s
+[  3274.4s] TRACE solve_query unknown 3.4s z3 547->819 MB
+[  3279.3s] TRACE solve_query unsat 4.7s z3 819->547 MB
+[  3279.4s] pair_1_101 unsat 8.5s
+[  3283.4s] TRACE solve_query unknown 4.0s z3 547->546 MB
+[  3289.0s] TRACE solve_query unsat 5.4s z3 546->547 MB
+[  3289.1s] pair_1_102 unsat 9.7s
+[  3292.6s] TRACE solve_query unknown 3.5s z3 547->819 MB
+[  3297.8s] TRACE solve_query unsat 4.9s z3 819->546 MB
+[  3297.9s] pair_1_103 unsat 8.8s
+[  3301.3s] TRACE solve_query unknown 3.4s z3 546->819 MB
+[  3306.5s] TRACE solve_query unsat 5.0s z3 819->547 MB
+[  3306.6s] pair_1_104 unsat 8.7s
+[  3310.1s] TRACE solve_query unknown 3.5s z3 547->559 MB
+[  3315.1s] TRACE solve_query unsat 4.7s z3 559->547 MB
+[  3315.2s] pair_1_105 unsat 8.6s
+[  3318.7s] TRACE solve_query unknown 3.5s z3 547->559 MB
+[  3324.3s] TRACE solve_query unsat 5.4s z3 559->548 MB
+[  3324.4s] pair_1_106 unsat 9.2s
+[  3327.9s] TRACE solve_query unknown 3.5s z3 548->819 MB
+[  3333.7s] TRACE solve_query unsat 5.5s z3 819->548 MB
+[  3333.7s] pair_1_107 unsat 9.4s
+[  3337.3s] TRACE solve_query unknown 3.5s z3 548->819 MB
+[  3342.3s] TRACE solve_query unsat 4.7s z3 819->549 MB
+[  3342.4s] pair_1_108 unsat 8.6s
+[  3346.4s] TRACE solve_query unknown 4.0s z3 549->547 MB
+[  3351.1s] TRACE solve_query unsat 4.4s z3 547->548 MB
+[  3351.2s] pair_1_109 unsat 8.8s
+[  3355.5s] TRACE solve_query unknown 4.3s z3 548->550 MB
+[  3361.2s] TRACE solve_query unsat 5.5s z3 550->548 MB
+[  3361.2s] pair_1_110 unsat 10.0s
+[  3364.7s] TRACE solve_query unknown 3.5s z3 548->819 MB
+[  3369.7s] TRACE solve_query unsat 4.8s z3 819->548 MB
+[  3369.8s] pair_1_111 unsat 8.6s
+[  3374.1s] TRACE solve_query unknown 4.3s z3 548->548 MB
+[  3379.8s] TRACE solve_query unsat 5.4s z3 548->549 MB
+[  3379.8s] pair_1_112 unsat 10.1s
+[  3383.3s] TRACE solve_query unknown 3.4s z3 549->819 MB
+[  3388.3s] TRACE solve_query unsat 4.7s z3 819->547 MB
+[  3388.3s] pair_1_113 unsat 8.5s
+[  3391.8s] TRACE solve_query unknown 3.5s z3 547->559 MB
+[  3397.0s] TRACE solve_query unsat 4.7s z3 559->547 MB
+[  3397.0s] pair_1_114 unsat 8.7s
+[  3400.5s] TRACE solve_query unknown 3.5s z3 547->819 MB
+[  3405.2s] TRACE solve_query unsat 4.4s z3 819->548 MB
+[  3405.3s] pair_1_115 unsat 8.2s
+[  3408.7s] TRACE solve_query unknown 3.4s z3 548->819 MB
+[  3414.3s] TRACE solve_query unsat 5.4s z3 819->549 MB
+[  3414.4s] pair_1_116 unsat 9.1s
+[  3418.0s] TRACE solve_query unknown 3.6s z3 549->819 MB
+[  3423.1s] TRACE solve_query unsat 4.8s z3 819->549 MB
+[  3423.1s] pair_1_117 unsat 8.7s
+[  3426.7s] TRACE solve_query unknown 3.6s z3 549->559 MB
+[  3432.3s] TRACE solve_query unsat 5.2s z3 559->549 MB
+[  3432.3s] pair_1_118 unsat 9.2s
+[  3435.9s] TRACE solve_query unknown 3.6s z3 549->559 MB
+[  3441.9s] TRACE solve_query unsat 5.5s z3 559->547 MB
+[  3441.9s] pair_1_119 unsat 9.6s
+[  3446.3s] TRACE solve_query unknown 4.4s z3 547->545 MB
+[  3451.9s] TRACE solve_query unsat 5.2s z3 545->544 MB
+[  3451.9s] pair_1_120 unsat 10.0s
+[  3456.1s] TRACE solve_query unknown 4.2s z3 544->544 MB
+[  3460.6s] TRACE solve_query unsat 4.1s z3 544->546 MB
+[  3460.7s] pair_1_121 unsat 8.7s
+[  3464.2s] TRACE solve_query unknown 3.5s z3 546->819 MB
+[  3469.6s] TRACE solve_query unsat 5.2s z3 819->547 MB
+[  3469.7s] pair_1_122 unsat 9.0s
+[  3473.1s] TRACE solve_query unknown 3.4s z3 547->559 MB
+[  3478.6s] TRACE solve_query unsat 5.2s z3 559->547 MB
+[  3478.6s] pair_1_123 unsat 9.0s
+[  3483.0s] TRACE solve_query unknown 4.4s z3 547->546 MB
+[  3488.0s] TRACE solve_query unsat 4.8s z3 546->545 MB
+[  3488.0s] pair_1_124 unsat 9.4s
+[  3491.9s] TRACE solve_query unknown 3.9s z3 545->546 MB
+[  3497.0s] TRACE solve_query unsat 4.8s z3 546->547 MB
+[  3497.0s] pair_1_125 unsat 9.0s
+[  3500.6s] TRACE solve_query unknown 3.5s z3 547->819 MB
+[  3505.0s] TRACE solve_query unsat 4.2s z3 819->549 MB
+[  3505.1s] pair_1_126 unsat 8.0s
+[  3509.4s] TRACE solve_query unknown 4.3s z3 549->548 MB
+[  3513.8s] TRACE solve_query unsat 4.1s z3 548->546 MB
+[  3513.8s] pair_1_127 unsat 8.7s
+[  3517.3s] TRACE solve_query unknown 3.5s z3 546->819 MB
+[  3521.8s] TRACE solve_query unsat 4.3s z3 819->550 MB
+[  3521.9s] pair_1_128 unsat 8.1s
+[  3525.4s] TRACE solve_query unknown 3.5s z3 550->819 MB
+[  3530.3s] TRACE solve_query unsat 4.7s z3 819->551 MB
+[  3530.4s] pair_1_129 unsat 8.5s
+[  3534.6s] TRACE solve_query unknown 4.2s z3 551->549 MB
+[  3539.7s] TRACE solve_query unsat 4.8s z3 549->549 MB
+[  3539.7s] pair_1_130 unsat 9.3s
+[  3543.6s] TRACE solve_query unknown 3.9s z3 549->549 MB
+[  3548.8s] TRACE solve_query unsat 5.0s z3 549->549 MB
+[  3548.9s] pair_1_131 unsat 9.2s
+[  3552.4s] TRACE solve_query unknown 3.5s z3 549->559 MB
+[  3557.3s] TRACE solve_query unsat 4.7s z3 559->551 MB
+[  3557.4s] pair_1_132 unsat 8.5s
+[  3560.9s] TRACE solve_query unknown 3.5s z3 551->819 MB
+[  3565.4s] TRACE solve_query unsat 4.2s z3 819->552 MB
+[  3565.4s] pair_1_133 unsat 8.1s
+[  3568.9s] TRACE solve_query unknown 3.5s z3 552->819 MB
+[  3573.9s] TRACE solve_query unsat 4.7s z3 819->553 MB
+[  3574.0s] pair_1_134 unsat 8.5s
+[  3577.5s] TRACE solve_query unknown 3.5s z3 553->819 MB
+[  3582.3s] TRACE solve_query unsat 4.5s z3 819->554 MB
+[  3582.3s] pair_1_135 unsat 8.3s
+[  3585.8s] TRACE solve_query unknown 3.5s z3 554->819 MB
+[  3590.5s] TRACE solve_query unsat 4.5s z3 819->555 MB
+[  3590.6s] pair_1_136 unsat 8.2s
+[  3594.8s] TRACE solve_query unknown 4.3s z3 555->554 MB
+[  3600.1s] TRACE solve_query unsat 5.0s z3 554->553 MB
+[  3600.2s] pair_1_137 unsat 9.7s
+[  3603.8s] TRACE solve_query unknown 3.6s z3 553->559 MB
+[  3608.4s] TRACE solve_query unsat 4.4s z3 559->555 MB
+[  3608.4s] pair_1_138 unsat 8.2s
+[  3611.9s] TRACE solve_query unknown 3.5s z3 555->819 MB
+[  3616.6s] TRACE solve_query unsat 4.5s z3 819->555 MB
+[  3616.7s] pair_1_139 unsat 8.3s
+[  3620.2s] TRACE solve_query unknown 3.5s z3 555->819 MB
+[  3624.8s] TRACE solve_query unsat 4.5s z3 819->557 MB
+[  3624.9s] pair_1_140 unsat 8.2s
+[  3629.0s] TRACE solve_query unknown 4.1s z3 557->553 MB
+[  3634.0s] TRACE solve_query unsat 4.7s z3 553->553 MB
+[  3634.0s] pair_1_141 unsat 9.1s
+[  3638.2s] TRACE solve_query unknown 4.1s z3 553->554 MB
+[  3643.5s] TRACE solve_query unsat 5.0s z3 554->553 MB
+[  3643.5s] pair_1_142 unsat 9.5s
+[  3647.7s] TRACE solve_query unknown 4.2s z3 553->553 MB
+[  3652.7s] TRACE solve_query unsat 4.8s z3 553->552 MB
+[  3652.7s] pair_1_143 unsat 9.2s
+[  3656.2s] TRACE solve_query unknown 3.5s z3 552->819 MB
+[  3660.8s] TRACE solve_query unsat 4.3s z3 819->554 MB
+[  3660.8s] pair_1_144 unsat 8.1s
