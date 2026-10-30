@@ -1,2 +1,5 @@
 [     7.4s] entry_nonempty sat 0.0s
 [     7.8s] havoc_relation unsat 0.3s
+[   235.1s] BLAST 1 dag 157 -> 177 z3 1703->1703 MB 0.0s
+Terminated
+tri-22918-d22b exit 143
