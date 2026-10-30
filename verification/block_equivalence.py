@@ -3952,9 +3952,13 @@ class BlockEquivalenceProver:
         target, lemmas = simplify(formula, bv_sort_ac=True), []
         if budget <= 0 or not _nonlinear_mul_terms(target):
             return formula, "unknown", ()  # built for product limbs; skip the cost elsewhere
+        # The joins share the route's deadline: one 1s query each, up to 4 rounds, used to run
+        # 50-60s per call on Aave 6182 x86_maps whatever the share (more on wide row groups).
         for _ in range(4):  # a join can expose another inside the new Extract
             proved = []
             for old, new in split_limb_joins(target):
+                if self.deadline is not None and monotonic() >= self.deadline:
+                    return formula, "unknown", ()
                 started, goal = monotonic(), Not(old == new)
                 if solve_query(goal, 1000) == "unsat":
                     proved.append((old, new))

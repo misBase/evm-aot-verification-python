@@ -184,3 +184,24 @@ def test_correspondence_is_kept_when_disjointness_needs_few_group_queries():
     # Counted per EVM pair (45 + 2·5 >= 50) this was the full product.
     assert corr == (0, 3, 5, 7, 9)
     assert {r.name for r in records} == {f"evm_disjoint_{i}_{k}" for i in range(10) for k in range(i + 1, 10)}
+
+
+# --- fix 22: the lia route's limb joins respect the route deadline ---------------------
+
+def test_lia_limb_joins_stop_at_the_deadline(monkeypatch):
+    import time
+    x = BitVec("n4_lia_x", 64)
+    calls = []
+
+    def slow(query, timeout_ms):
+        calls.append(timeout_ms)
+        time.sleep(0.05)
+        return "unknown"
+    monkeypatch.setattr(be, "_nonlinear_mul_terms", lambda t: True)
+    monkeypatch.setattr(be, "split_limb_joins", lambda t: [(x + i, x + i + 1) for i in range(100)])
+    monkeypatch.setattr(be, "solve_query", slow)
+    prover = be.BlockEquivalenceProver([], [], {}, timeout_ms=30000)
+    prover.deadline = monotonic() + 0.3
+    started = monotonic()
+    assert prover._retry_over_lia(ULT(x, 3))[1] == "unknown"
+    assert monotonic() - started < 2 and len(calls) < 20  # 100 joins x 4 rounds without the check
