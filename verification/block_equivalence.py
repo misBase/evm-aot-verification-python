@@ -3812,7 +3812,7 @@ class BlockEquivalenceProver:
         finally:
             checks.close()
         records.extend(proofs[f"evm_disjoint_{i}_{k}"] for i in range(n) for k in range(i + 1, n))  # manifest order
-        correspondence, unknown = [], []
+        correspondence, unknown, deferred = [], [], []
         # Mapping proposals. First the executor's last model of the path, if it
         # still satisfies premise ∧ x_j (170 of 171 rows on Safe 5377); else one
         # incremental solver over [premise, conjuncts of x_j]: rows share long
@@ -3838,6 +3838,22 @@ class BlockEquivalenceProver:
             answer = prefix.check([premise, *_ordered_conjuncts(x.condition)], budget, "correspondence", budget)
             model = prefix.solver.model() if answer == sat else None
             if answer not in (sat, unsat):
+                deferred.append(j)  # after every row: siblings first (below)
+            self._read_proposal(evm, correspondence, answer, model)
+        def sibling(x):  # propose_from_siblings' key; a row without a location has no sibling
+            location = getattr(x, "location", None)
+            return None if location is None else (x.kind, location)
+        mapped = {}
+        for j, target in enumerate(correspondence):
+            if type(target) is int and sibling(x86[j]) is not None:
+                mapped.setdefault(sibling(x86[j]), set()).add(target)
+        for j in deferred:
+            x = x86[j]
+            answer, model = None, None  # undecided unless the fallback below decides it
+            # A row whose sibling (same kind and location) is mapped gets that mapping proposed
+            # (propose_from_siblings) without this fallback: on PoolManager 4418 (~500 rows, most
+            # of them siblings) it ran ~3400s of the node before any obligation.
+            if sibling(x) is None or not mapped.get(sibling(x)):
                 # Reads through store chains blasted into ites (an exact rewrite, as in
                 # X86Constraints.is_possible): Aave Pool 6182 rows 2/3/4 are unknown even at
                 # 30s directly and SAT in ~6s blasted, each model hitting exactly one EVM
@@ -3850,16 +3866,9 @@ class BlockEquivalenceProver:
                     answer, model = self._blasted_model(And(premise, x.condition), 4 * self.timeout_ms)
             if answer not in (sat, unsat):
                 unknown.append(j)
-            if answer == unsat:
-                correspondence.append(None)
-                continue
-            target = "all"
-            if answer == sat:
-                hits = [i for i, e in enumerate(evm)
-                        if is_true(model.eval(e.condition, model_completion=True))]
-                if len(hits) == 1:
-                    target = hits[0]
-            correspondence.append(target)
+            correspondence[j] = self._read_proposal(evm, [], answer, model)[0]
+            if type(correspondence[j]) is int and sibling(x) is not None:
+                mapped.setdefault(sibling(x), set()).add(correspondence[j])
         # A row sibling-proposed (propose_from_siblings) tries "empty" only if
         # prove() cannot confirm the proposal (Safe 5377: ~300s on 16 rows here).
         proposed = propose_from_siblings(correspondence, x86) if unknown else ()
@@ -3867,6 +3876,18 @@ class BlockEquivalenceProver:
             if proposed[j] == "all" and self._empty_by_bvabs(premise, x86[j]):
                 correspondence[j] = None
         return tuple(correspondence)
+
+    @staticmethod
+    def _read_proposal(evm, out, answer, model):
+        """Append (and return `out`) the proposal read off one row's answer: None
+        (UNSAT: empty), the one EVM path the model satisfies, else "all"."""
+        target = None if answer == unsat else "all"
+        if answer == sat:
+            hits = [i for i, e in enumerate(evm) if is_true(model.eval(e.condition, model_completion=True))]
+            if len(hits) == 1:
+                target = hits[0]
+        out.append(target)
+        return out
 
     def _blasted_model(self, formula, budget=None):
         """(answer, model or None) of simplify(formula, blast_select_store=True)

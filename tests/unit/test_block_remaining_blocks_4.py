@@ -222,3 +222,27 @@ def test_reachability_check_stops_at_its_memory_cap_and_keeps_the_path(monkeypat
     assert cs._bounded_check(solver, 60000, "test") == z3.unknown  # unknown: the caller keeps the path
     assert "memory" in solver.reason_unknown() and time.monotonic() - started < 30
     assert rss_bytes() - before < 1500 * 2**20
+
+
+# --- fix 24: the blast fallback of _correspondence only for rows without a mapped sibling -----
+
+def test_unknown_rows_with_a_mapped_sibling_skip_the_blast_fallback(monkeypatch):
+    import z3
+    from x86_64.cfg_state import PrefixSolver
+    x = BitVec("n4_sib_x", 8)
+    at = lambda c, loc: SimpleNamespace(condition=c, kind="exit", location=loc, witness=None)
+    evm = [_row(ULT(x, 10)), _row(And(UGE(x, 10), ULT(x, 20))), _row(UGE(x, 20))]
+    terms = [x == 1, x == 7, x == 8, x == 30, x == 12]  # kept alive: ids are not recycled
+    hard = {terms[k].get_id() for k in (1, 2, 3)}  # rows whose quick query is "unknown"
+    x86 = [at(t, loc) for t, loc in zip(terms, "AAACB")]
+    real, blasted = PrefixSolver.check, []
+    monkeypatch.setattr(PrefixSolver, "check", lambda self, conjuncts, *a: z3.unknown
+                        if any(c.get_id() in hard for c in conjuncts) else real(self, conjuncts, *a))
+    original = be.BlockEquivalenceProver._blasted_model
+    monkeypatch.setattr(be.BlockEquivalenceProver, "_blasted_model",
+                        lambda self, f, budget=None: blasted.append(f) or original(self, f, budget))
+    corr = be.BlockEquivalenceProver([], [], {}, timeout_ms=3000)._correspondence(evm, x86, BoolVal(True), [])
+    # Rows 1 and 2 have a mapped sibling at A (row 0 -> EVM 0): left for propose_from_siblings.
+    # Row 3 has none at C: the blasted query maps it (EVM 2).
+    assert corr == (0, "all", "all", 2, 1) and len(blasted) == 1
+    assert be.propose_from_siblings(list(corr), x86)[:3] == [0, 0, 0]
