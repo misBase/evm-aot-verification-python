@@ -1,2 +1,5 @@
 [    13.6s] entry_nonempty sat 0.0s
 [    14.1s] havoc_relation unsat 0.3s
+{'spec': {'pc': 7200, 'stack_depth': 13, 'memory_size': 96, 'free_memory_pointer': 128, 'stack_constants': ()}, 'scope': 'block-local', 'status': 'inconclusive', 'seconds': 43210.06981427, 'wall_seconds': 43210.105600351, 'queries': 1142, 'evm_paths': 0, 'x86_paths': 0, 'paired_transitions': 0, 'terminals_proved': 0, 'reasons': ['ProofBudgetExceeded: summary proof deadline exhausted'], 'keep_going_failures': [], 'summary_hits': 0, 'pid': 8124, 'started_at': 1793356866.8935862, 'start_rss_mb': 1263.9, 'peak_rss_mb': 4283.7, 'memory_budget_mb': 6000.0, 'memory_exceeded': None}
+LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.
+n4-7200-h exit 1

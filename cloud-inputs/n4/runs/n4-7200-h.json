@@ -1,0 +1,58 @@
+{
+  "scope": "block-local",
+  "disclaimer": "LOCAL ONLY: block-local theorems under the declared entry relation. No program certificate is issued here; proved counts never mean the program is verified, and nodes absent from this batch are not unreachable.",
+  "stem": "cloud-inputs/n2/fixtures/Pool",
+  "started_at_utc": "2026-10-30T10:40:55.973358+00:00",
+  "configuration": {
+    "nodes": "cloud-inputs/n4/n3-server-probes/aave7200-node.json",
+    "output": "cloud-inputs/n4/runs/n4-7200-h.json",
+    "timeout_ms": "30000",
+    "node_seconds": "43200.0",
+    "max_depth": "400",
+    "base_addr": "4096",
+    "summaries": "True",
+    "formula_dir": "None",
+    "node_memory_mb": "6000.0",
+    "keep_going": "False"
+  },
+  "program_sha256": {
+    ".json": "8b7ff12132610ce147c70ccc257dca54555b72993d506c7f73e62588c867a5d2",
+    ".hex": "04aa03ffcc5a70f0d297184b602c948c945534c5edef918747a3e045ef86195c"
+  },
+  "model_sources_sha256": "5c0270e5b8b7215346540602be7283f599df54c01e9280bea6d51743d4d3e194",
+  "requested_nodes": 1,
+  "nodes": [
+    {
+      "spec": {
+        "pc": 7200,
+        "stack_depth": 13,
+        "memory_size": 96,
+        "free_memory_pointer": 128,
+        "stack_constants": []
+      },
+      "scope": "block-local",
+      "status": "inconclusive",
+      "seconds": 43210.06981427,
+      "wall_seconds": 43210.105600351,
+      "queries": 1142,
+      "evm_paths": 0,
+      "x86_paths": 0,
+      "paired_transitions": 0,
+      "terminals_proved": 0,
+      "reasons": [
+        "ProofBudgetExceeded: summary proof deadline exhausted"
+      ],
+      "failed_obligations": [],
+      "keep_going_failures": [],
+      "summary_hits": 0,
+      "pid": 8124,
+      "started_at": 1793356866.8935862,
+      "start_rss_mb": 1263.9,
+      "peak_rss_mb": 4283.7,
+      "memory_budget_mb": 6000.0,
+      "memory_exceeded": null
+    }
+  ],
+  "locally_proved": 0,
+  "ended_at_utc": "2026-10-30T22:41:16.999259+00:00"
+}
