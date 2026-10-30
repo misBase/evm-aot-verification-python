@@ -91,6 +91,9 @@ def _slice_blocks(summary: X86Summary, blocks: Sequence[X86Block]):
     return split_at_cutpoints(local, {payload.entry_addr, payload.continuation_addr})
 
 
+_EFFECT_RETRY_FACTOR = 4  # ponytail: budget of the one retry of an unknown effect, in query timeouts
+
+
 def prove_div_slice(summary: X86Summary, blocks: Sequence[X86Block], *,
                     profile: X86AOTProfile = GO_HPC_EVM_PROFILE, timeout_ms: int = 30_000,
                     max_depth: int = 200) -> DivLemma:
@@ -146,6 +149,11 @@ def prove_div_slice(summary: X86Summary, blocks: Sequence[X86Block], *,
             fail(f"effect_{i}", str(exc))
         started = monotonic()
         answer, split = refute_goal(path.condition, goal, timeout_ms)
+        if answer == "unknown":
+            # One retry with a larger budget: the lemma is proved once per slice shape and serves
+            # every node of the process, while a failure fails each node that reaches the slice
+            # (PoolManager 22747, slice 0xe5f62: effect_1 needs ~38s alone, unknown under load).
+            answer, split = refute_goal(path.condition, goal, _EFFECT_RETRY_FACTOR * timeout_ms)
         records.append(Obligation(f"effect_{i}", And(path.condition, Not(goal)).sexpr(), answer, "unsat",
                                   monotonic() - started, split))
         if answer != "unsat":

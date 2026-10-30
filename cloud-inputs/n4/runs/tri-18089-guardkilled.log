@@ -1,0 +1,6 @@
+spec BlockSpecialization(pc=18089, stack_depth=18, memory_size=None, free_memory_pointer=320, stack_constants=((3, 4418),))
+[    80.9s] reachability check 10.7s at 0xb4f7f -> True
+[    94.4s] reachability check 11.5s at 0xb577f -> True
+[   110.0s] reachability check 13.6s at 0xb6032 -> True
+[   135.9s] reachability check 21.7s at 0xb699f -> True
+exit 143

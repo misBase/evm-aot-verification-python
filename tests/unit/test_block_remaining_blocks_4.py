@@ -288,3 +288,24 @@ def test_proof_query_out_of_memory_is_unknown_and_not_cached(monkeypatch, tmp_pa
     assert proof_cache.cached_answer(proof_cache.query_key("check", query), 1) is None  # not a timeout
     assert be.solve_pure_bv(query, 60000) == "unknown"
     assert be.solve_query(ULT(BitVec("n4_qm_small", 8), 3), 1000) == "sat"  # Z3 still usable
+
+
+# --- fix 27: an unknown DIV slice effect is retried once with a larger budget ------------------
+
+def test_div_lemma_retries_an_unknown_effect_with_a_larger_budget(monkeypatch):
+    import x86_64.summaries.div_proof as dp
+    from tests.integration.test_single_ins_equivalence import X86_DIV_CORE_HEX_SEQUENCE
+    from x86_64.cfg import identify_basic_blocks
+    from x86_64.disassembler import disassemble_hex
+    from x86_64.summaries.div import discover_div_summaries
+    blocks = identify_basic_blocks(disassemble_hex(X86_DIV_CORE_HEX_SEQUENCE, 0))
+    [summary] = discover_div_summaries(blocks, strict=True)
+    import verification.block_summaries as bs
+    real, budgets = bs.refute_goal, []
+
+    def flaky(pre, goal, timeout_ms, deadline=None):  # the first try of every effect times out
+        budgets.append(timeout_ms)
+        return ("unknown", ()) if len(budgets) % 2 else real(pre, goal, timeout_ms, deadline)
+    monkeypatch.setattr(bs, "refute_goal", flaky)
+    lemma = dp.prove_div_slice(summary, blocks, timeout_ms=30000)
+    assert lemma.complete and budgets == [30000, 120000] * lemma.path_count

@@ -1,0 +1,12 @@
+spec BlockSpecialization(pc=18089, stack_depth=18, memory_size=None, free_memory_pointer=320, stack_constants=((3, 4418),))
+[    61.9s] reachability check 8.6s at 0xb4f7f -> True
+[    72.5s] reachability check 9.1s at 0xb577f -> True
+[    85.5s] reachability check 11.2s at 0xb6032 -> True
+[   105.4s] reachability check 16.6s at 0xb699f -> True
+[   120.8s] reachability check 12.4s at 0xb7352 -> True
+[   135.9s] reachability check 12.2s at 0xb7d12 -> True
+[   152.2s] reachability check 13.1s at 0xb86d2 -> True
+[   168.4s] reachability check 12.8s at 0xb9092 -> True
+[   184.8s] reachability check 10.9s at 0xb9a32 -> True
+[   204.0s] reachability check 13.3s at 0xba3f2 -> True
+[   211.9s] reachability check 7.9s at 0xba3bc -> False

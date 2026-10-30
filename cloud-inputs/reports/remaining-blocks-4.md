@@ -68,6 +68,14 @@
 
 服务器上 16670 两个实例的 `_unify_node` 各用 10816s / 10818s（节点预算的 1/4 份额全部用完），只得到 2 条引理，占节点时间的 85% / 55%。`unify_across` 现在在连续 10 个查询超时（300s）没有新的合并时停止；没合并的 pair 照常走自己的路线（包括它自己的 unify 路线），所以只影响耗时。整节点 16670 m=768（`n4-16670-m768`）：（待补）
 
+### 2.7 修法 22–26（10-30 补充）
+
+- **修法 22**（`_retry_over_lia`）：lia 路线的 limb 拼接引理（`split_limb_joins`，每个 1s 查询，最多 4 轮）不看路线截止时间，在 6182 的宽行组上一次调用 50–60s，不管分到的份额多小。现在每个拼接查询前检查 `self.deadline`，到点即返回 unknown（只影响耗时）。
+- **修法 23**（x86 可达性 / summary 入口的 Z3 内存上限，`x86_64/cfg_state.py`）：PoolManager 22747（3G 进程池被 OOM 整池打断的节点之一）在 DIV summary 之后的一次可达性检查里 5s 内 +1.5GB，随后 10s 内再 +2.3GB；之后 summary 命中的入口 SAT 检查也一样。Z3 的求解器参数 `max_memory` 在增量求解器（`PrefixSolver`，每个合取项一个 push）上被忽略，`interrupt()` 在 bit-blast 里几十秒后才生效，所以改用 Z3 的进程级 `memory_max_size`，只在检查期间设置（`z3_memory_cap()`：当前 Z3 已分配量 + 1024MB，嵌套时取更小者，退出时恢复）。超出时 Z3 抛 "out of memory"（或非增量求解器返回 unknown，原因 "out of memory"），之后 Z3 照常可用（实验：同一求解器 reset 后、新求解器、旧的项都正常）。用在：`is_possible` 整个检查（见证求值、增量求解、blast 回退）、`_bounded_check`、summary 命中入口的 `_sat_model` 与其 blast 重试。内存超限 = unknown：可达性检查保留路径（并 reset 增量求解器），入口检查算未决（`apply` 原本就这样处理 unknown）。22747 复跑：x86 分段峰值 ≤1.85GB（之前几秒内 +2GB），进入 pair 阶段。**已知局限**：同一个 512 位除法查询若拆成每个合取项一个 push 作用域，Z3 要到 ~30s / +2.7GB 才报超限（smt 内核的某些部分很晚才检查上限），所以上限是"大致"的，节点内存预算仍是兜底。
+- **修法 24**（`_correspondence` 的 blast 回退）：4418（自适应合并后 497 行 x86）在 `_correspondence` 的 blast 回退（修法 11）里花了 ~3400s：每个 unknown 行 30s + 120s 重试。现在 unknown 行先放到第一遍之后；一行如果同类型同位置的兄弟行已经映射，就留给 `propose_from_siblings`（与修法前对回退后仍 unknown 的行的处理相同），只有没有已映射兄弟的行才做 blast 回退。对应关系只是提议，不影响证书判定。
+- **修法 25**（路径覆盖按前缀树证明，`coverage_by_prefix_tree`）：见 §2.8 21213。
+- **修法 26**（单个证明查询的 Z3 内存上限）：`solve_query` 与 `solve_pure_bv` 在 `z3_memory_cap(QUERY_MEMORY_MB)` 下求解（`BLOCK_QUERY_MEMORY_MB`，默认 4096）。触顶的查询是 unknown，并且**不写进 proof cache**（它不是"这个预算下超时"）；义务照常走其余路线。22747 的 pair 阶段在 `solve_query` 里几秒内涨了数 GB（栈采样 `tri-22747.stacks`）。
+
 ## 3. 改动位置
 
 - `common/node_monitor.py`（新）：`NodeMemoryExceeded`、`check_abort`、`rss_bytes`、`release_memory`、`NodeMonitor`、`read_status`。

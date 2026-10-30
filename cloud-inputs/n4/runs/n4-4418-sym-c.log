@@ -1,0 +1,3 @@
+[    16.3s] entry_nonempty sat 0.0s
+[    16.7s] havoc_relation unsat 0.3s
+[  2389.2s] model_domain_nonempty sat 0.3s

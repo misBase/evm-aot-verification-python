@@ -6,7 +6,7 @@ Usage (repo root, PYTHONPATH=.): h2_triage.py STEM 'BlockSpecialization(...)' OU
 
 Options are the server's 3G run (--gas-check full --timeout-ms 30000 --max-depth 400
 --max-instances 8192 --max-parameter-values 32 --summaries --discover-first --constant-insensitive).
-The frozen set is rediscovered (EVM only); the given context's proof instance k = π(c) is proved with
+The frozen set is rediscovered (EVM only); the given proof instance k (or a context's k = π(c)) is proved with
 all its contexts, under NodeMonitor. Every _check is logged (name, answer, seconds) with H2 parts.
 """
 import json
@@ -49,9 +49,10 @@ setup = verifier._setup(evm, x86, initial, BlockProgramResult(), time.monotonic(
 ordered, defects = bp.discover(verifier, setup, lambda: None)
 log("discovered", len(ordered), "instances,", len(defects), "defects")
 groups = bp.proof_groups(ordered, setup.evm, True)
-k = next((k for k, cs in groups.items() if wanted in cs), None)
+k = wanted if wanted in groups else next((k for k, cs in groups.items() if wanted in cs), None)  # instance or context
 if k is None:
-    raise SystemExit(f"{wanted!r} is not in the frozen set")
+    raise SystemExit(f"{wanted!r} is not in the frozen set; same pc: "
+                     + "; ".join(f"{k!r} <- {list(map(repr, cs))}" for k, cs in groups.items() if k.pc == wanted.pc))
 log("proof instance", k, "contexts", len(groups[k]))
 bp.load_worker(stem, options, ordered)
 node = bp.prove_instance(k, node_seconds, time.time() + 10 ** 6, groups[k])
