@@ -326,3 +326,21 @@ def test_tiny_memory_caps_give_unknown_and_never_abort_the_process():
     # check(assumptions), PrefixSolver (two shapes), solve_query, solve_pure_bv, simplify; Z3 usable after.
     words = run.stdout.split()
     assert words[0] == "memory" and words[1:5] == ["unknown"] * 4 and words[-1] == "sat", run.stdout
+
+
+def test_the_memory_cap_is_at_most_half_the_node_headroom():
+    import z3
+    import x86_64.cfg_state as cs
+    from common.node_monitor import NodeMonitor, memory_headroom_mb, rss_bytes
+
+    def cap():
+        return int(z3.get_param("memory_high_watermark_mb")) - z3.Z3_get_estimated_alloc_size() // 2**20
+
+    assert memory_headroom_mb() is None  # no node budget: the call's own cap
+    with cs.z3_memory_cap(4096):
+        assert abs(cap() - 4096) <= 1
+    with NodeMonitor("headroom", rss_bytes() + 600 * 2**20, interval=60):
+        assert 0 < memory_headroom_mb() <= 600
+        with cs.z3_memory_cap(4096):
+            assert 250 <= cap() <= 301  # half the headroom: the cap counts Z3's allocations, RSS grows more
+    assert memory_headroom_mb() is None and z3.get_param("memory_high_watermark_mb") == "0"

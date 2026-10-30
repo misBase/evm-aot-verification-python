@@ -53,8 +53,19 @@ def z3_memory_cap(mb=None):
     """Z3 may allocate at most `mb` (default REACHABILITY_MEMORY_MB) more inside
     the block (and never more than an enclosing cap); beyond it Z3 stops at its
     next checkpoint: the call answers unknown or raises a Z3Exception (see
-    out_of_memory), it never aborts the process."""
-    limit = Z3_get_estimated_alloc_size() // 2**20 + (REACHABILITY_MEMORY_MB if mb is None else mb)
+    out_of_memory), it never aborts the process. Under a node memory budget
+    (common.node_monitor) also at most half the node's remaining headroom, so
+    that gradual growth inside one call ends that call (unknown) before it ends
+    the node. Neither bounds a single step without a checkpoint (bit-blasting a
+    512-bit division: ~500 MB at once); the node budget's hard limit does."""
+    from common.node_monitor import memory_headroom_mb  # lazy: layer order
+    extra = REACHABILITY_MEMORY_MB if mb is None else mb
+    headroom = memory_headroom_mb()
+    if headroom is not None:
+        # Half: the cap counts Z3's own allocations, while the process grew ~1.6x that in RSS
+        # (allocator overhead, untracked buffers), and Z3 stops only at its next checkpoint.
+        extra = max(1, min(extra, headroom // 2))
+    limit = Z3_get_estimated_alloc_size() // 2**20 + extra
     _CAPS.append(min(limit, _CAPS[-1]) if _CAPS else limit)
     set_param("memory_high_watermark_mb", _CAPS[-1])
     try:

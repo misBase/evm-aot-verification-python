@@ -33,12 +33,22 @@ class NodeMemoryExceeded(BaseException):
 
 
 _ABORT = [None]  # message while the running node is over its memory budget
+_BUDGET = [None]  # bytes: the running node's memory budget (memory_headroom_mb)
 
 
 def check_abort():
     """Raise NodeMemoryExceeded while the running node is over its budget."""
     if _ABORT[0] is not None:
         raise NodeMemoryExceeded(_ABORT[0])
+
+
+def memory_headroom_mb():
+    """MB the running node may still grow before its memory budget, or None
+    without a budget: z3_memory_cap never lets one Z3 call take more, so a call
+    that would push the node over its budget ends as unknown on its own."""
+    if _BUDGET[0] is None:
+        return None
+    return max(0, (_BUDGET[0] - rss_bytes()) // 2**20)
 
 
 def rss_bytes():
@@ -105,7 +115,7 @@ class NodeMonitor:
     def __enter__(self):
         self.started_at = time.time()
         self.start_rss = self.peak_rss = rss_bytes()
-        _ABORT[0] = None
+        _ABORT[0], _BUDGET[0] = None, self.budget
         self._write_status("running")
         self._thread = threading.Thread(target=self._run, name="node-monitor", daemon=True)
         self._thread.start()
@@ -115,7 +125,7 @@ class NodeMonitor:
         self._stop.set()
         self._thread.join()
         self._sample()
-        _ABORT[0] = None
+        _ABORT[0] = _BUDGET[0] = None
         self.finished_at = time.time()
         self.end_rss = rss_bytes()
         self._write_status("finished")
