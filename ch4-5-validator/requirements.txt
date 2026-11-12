@@ -1,0 +1,8 @@
+# Exact versions of the paper's runs (Python 3.13.7). Results depend on the Z3 version.
+z3-solver==4.15.4.0
+capstone==5.0.6
+graphviz==0.21
+pytest==9.0.2
+pytest-xdist==3.8.0
+# figures of experiments E6 and E7
+matplotlib==3.10.7

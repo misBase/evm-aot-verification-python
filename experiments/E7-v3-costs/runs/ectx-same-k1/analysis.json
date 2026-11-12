@@ -1,0 +1,482 @@
+{
+ "run": "tmp/v3exp/runs/ectx-same-k1/",
+ "program": {
+  "program.setup": 0.0,
+  "program.discovery": 0.2,
+  "program.groups": 0.0,
+  "program.proofs_H2": 244.9,
+  "program.consumer": 0.1,
+  "program.verify": 246.0
+ },
+ "tasks": 5,
+ "task_wall": 244.3,
+ "buckets": {
+  "check@local.prove": {
+   "n": 57,
+   "s": 77.1,
+   "share": 0.3155
+  },
+  "local.x86_segment": {
+   "n": 5,
+   "s": 59.1,
+   "share": 0.242
+  },
+  "summary.apply_div": {
+   "n": 3,
+   "s": 42.4,
+   "share": 0.1737
+  },
+  "local.prove": {
+   "n": 5,
+   "s": 24.3,
+   "share": 0.0995
+  },
+  "h2.quick": {
+   "n": 5,
+   "s": 16.6,
+   "share": 0.0681
+  },
+  "lemma.prove": {
+   "n": 2,
+   "s": 13.0,
+   "share": 0.0533
+  },
+  "lemma.discharge": {
+   "n": 2,
+   "s": 6.7,
+   "share": 0.0276
+  },
+  "task": {
+   "n": 5,
+   "s": 4.2,
+   "share": 0.0171
+  },
+  "check@other": {
+   "n": 2,
+   "s": 0.8,
+   "share": 0.0031
+  },
+  "local.evm_segment": {
+   "n": 5,
+   "s": 0.0,
+   "share": 0.0001
+  },
+  "summary.apply_lemma": {
+   "n": 2,
+   "s": 0.0,
+   "share": 0.0001
+  },
+  "lemma.cache_lookup": {
+   "n": 2,
+   "s": 0.0,
+   "share": 0.0
+  }
+ },
+ "counters": {
+  "z3.check": {
+   "n": 1423,
+   "s": 198.3,
+   "share": 0.8117
+  },
+  "cache.query_key": {
+   "n": 365,
+   "s": 3.0,
+   "share": 0.0121
+  },
+  "z3.isolated_child": {
+   "n": 3,
+   "s": 1.7,
+   "share": 0.0068
+  },
+  "expr.forward_selects": {
+   "n": 64,
+   "s": 1.0,
+   "share": 0.0042
+  },
+  "worker.reset_caches": {
+   "n": 10,
+   "s": 0.2,
+   "share": 0.0007
+  },
+  "cache.statement_key": {
+   "n": 2,
+   "s": 0.1,
+   "share": 0.0005
+  },
+  "expr.normalize": {
+   "n": 1,
+   "s": 0.0,
+   "share": 0.0002
+  }
+ },
+ "routes": {
+  "local.prove": {
+   "unify": {
+    "runs": 1,
+    "wins": 0,
+    "s": 12.4,
+    "lost_s": 12.4
+   },
+   "lia": {
+    "runs": 1,
+    "wins": 0,
+    "s": 7.5,
+    "lost_s": 7.5
+   },
+   "divrem": {
+    "runs": 3,
+    "wins": 2,
+    "s": 4.2,
+    "lost_s": 2.7
+   },
+   "blast+n": {
+    "runs": 1,
+    "wins": 0,
+    "s": 2.7,
+    "lost_s": 2.7
+   },
+   "mul": {
+    "runs": 1,
+    "wins": 0,
+    "s": 1.8,
+    "lost_s": 1.8
+   },
+   "bvabs": {
+    "runs": 1,
+    "wins": 0,
+    "s": 1.7,
+    "lost_s": 1.7
+   },
+   "guards": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "stores": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "potential+n": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "shift": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "alias+n": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   }
+  }
+ },
+ "slow_checks": [
+  {
+   "wall": 49.4,
+   "name": "x86_maps_group_0",
+   "phase": "local.prove",
+   "proved": false,
+   "answer": "unknown",
+   "routes": {
+    "divrem": [
+     0,
+     2.738
+    ],
+    "lia": [
+     0,
+     7.47
+    ],
+    "stores": [
+     0,
+     0.012
+    ],
+    "shift": [
+     0,
+     0.006
+    ],
+    "blast+n": [
+     0,
+     2.725
+    ],
+    "alias+n": [
+     0,
+     0.006
+    ],
+    "potential+n": [
+     0,
+     0.007
+    ],
+    "bvabs": [
+     0,
+     1.663
+    ],
+    "mul": [
+     0,
+     1.779
+    ],
+    "guards": [
+     0,
+     0.013
+    ],
+    "unify": [
+     0,
+     12.421
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 4.4,
+   "name": "x86_maps_5_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {
+    "divrem": [
+     1,
+     0.97
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 3.8,
+   "name": "x86_maps_6_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {
+    "divrem": [
+     1,
+     0.509
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 3.2,
+   "name": "x86_maps_8_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 3.1,
+   "name": "x86_maps_9_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 2.8,
+   "name": "x86_maps_7_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 2.2,
+   "name": "x86_maps_0_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.6,
+   "name": "x86_maps_1_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.5,
+   "name": "x86_maps_4_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.3,
+   "name": "x86_maps_2_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.2,
+   "name": "x86_maps_3_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.6,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.6,
+   "name": "evm_assumption_8",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.5,
+   "name": "model_domain_nonempty",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.4,
+   "name": "evm_assumption_7",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  }
+ ],
+ "task_rows": [
+  {
+   "spec": {
+    "pc": 0,
+    "d": 0,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 21.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 19.747,
+   "z3": [
+    1163,
+    4.5676
+   ],
+   "rss": 208.6
+  },
+  {
+   "spec": {
+    "pc": 15,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.013
+   ],
+   "rss": 208.6
+  },
+  {
+   "spec": {
+    "pc": 20,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 217.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    227,
+    193.2767
+   ],
+   "rss": 989.8
+  },
+  {
+   "spec": {
+    "pc": 36,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    20,
+    0.3925
+   ],
+   "rss": 989.8
+  },
+  {
+   "spec": {
+    "pc": 40,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      15
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0474
+   ],
+   "rss": 989.8
+  }
+ ],
+ "unfinished": []
+}

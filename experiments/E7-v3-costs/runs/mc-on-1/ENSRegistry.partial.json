@@ -1,0 +1,3550 @@
+{
+  "kind": "progress",
+  "status": "inconclusive",
+  "diagnostics": {
+    "0": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=0, stack_depth=0, memory_size=0, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.0485532921738923,
+          "queries": 62,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465632.190837,
+          "finished_at": 1794465635.572845,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "12": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=12, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.541395208798349,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465632.200207,
+          "finished_at": 1794465635.0431108,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "15": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=15, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.404449624940753,
+          "queries": 43,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465632.186002,
+          "finished_at": 1794465634.865472,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "25": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=25, stack_depth=0, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.71356283291243,
+          "queries": 80,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465632.187742,
+          "finished_at": 1794465641.211682,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "41": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=41, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.329977709101513,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465634.867674,
+          "finished_at": 1794465636.4010072,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "52": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=52, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2485628749709576,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465635.0447328,
+          "finished_at": 1794465636.504582,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "63": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=63, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.216537875123322,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465635.615041,
+          "finished_at": 1794465637.0270069,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "74": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=74, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2359946661163121,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465636.4041102,
+          "finished_at": 1794465637.86432,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "85": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=85, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2434849999845028,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465636.507105,
+          "finished_at": 1794465637.9645069,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "96": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=96, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.26311962492764,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465637.029827,
+          "finished_at": 1794465638.502901,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "107": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=107, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9412520420737565,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465637.866266,
+          "finished_at": 1794465639.026437,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "110": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=110, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.1987649169750512,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465637.970216,
+          "finished_at": 1794465639.390652,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "122": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=122, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2776844161562622,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465638.5045462,
+          "finished_at": 1794465639.968087,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "133": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=133, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2691367089282721,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465639.0284412,
+          "finished_at": 1794465640.4655612,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "144": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=144, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2374374999199063,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465639.3926332,
+          "finished_at": 1794465640.818114,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "155": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=155, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2011826250236481,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465639.969975,
+          "finished_at": 1794465641.385667,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "166": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=166, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2825050831306726,
+          "queries": 79,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465640.467346,
+          "finished_at": 1794465641.94549,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "177": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=177, stack_depth=0, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.780524541856721,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465640.82053,
+          "finished_at": 1794465641.790551,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=177, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2632946248631924,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466257.23843,
+          "finished_at": 1794466258.773629,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "181": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=181, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9000913749914616,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465641.214124,
+          "finished_at": 1794465642.3211641,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "195": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=195, stack_depth=3, memory_size=96, free_memory_pointer=128, stack_constants=((1, 224),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 4.115439166780561,
+          "queries": 22,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465641.387651,
+          "finished_at": 1794465645.720486,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "224": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=224, stack_depth=2, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.3898644999135286,
+          "queries": 20,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465641.795271,
+          "finished_at": 1794465644.399198,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "244": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=244, stack_depth=2, memory_size=160, free_memory_pointer=128, stack_constants=((0, 160),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.4534219589550048,
+          "queries": 13,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465641.947465,
+          "finished_at": 1794465643.5941179,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=244, stack_depth=2, memory_size=256, free_memory_pointer=224, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 34.71563820797019,
+          "queries": 161,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465642.322888,
+          "finished_at": 1794465677.23457,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "253": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=253, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.8845053748227656,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465643.596054,
+          "finished_at": 1794465644.7093918,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "267": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=267, stack_depth=3, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.8345493751112372,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465644.4013572,
+          "finished_at": 1794465645.416922,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "272": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=272, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.7644214578904212,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465644.711303,
+          "finished_at": 1794465645.671173,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "286": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=286, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.091408833162859,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465645.4185998,
+          "finished_at": 1794465646.7170749,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "291": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=291, stack_depth=2, memory_size=256, free_memory_pointer=224, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.55045579187572,
+          "queries": 13,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465645.673141,
+          "finished_at": 1794465647.428511,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "305": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=305, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.7962800001259893,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465645.722188,
+          "finished_at": 1794465646.7084239,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "319": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=319, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9366841670125723,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465646.710413,
+          "finished_at": 1794465647.840074,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "324": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=324, stack_depth=1, memory_size=160, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.6397587498649955,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465646.71946,
+          "finished_at": 1794465647.568761,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=324, stack_depth=1, memory_size=256, free_memory_pointer=224, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.6582490829750896,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465647.43021,
+          "finished_at": 1794465648.3219619,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "326": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=326, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9507851249072701,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465647.570322,
+          "finished_at": 1794465648.7750368,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "340": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=340, stack_depth=3, memory_size=96, free_memory_pointer=128, stack_constants=((1, 377),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 13.706131584011018,
+          "queries": 26,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465647.8432598,
+          "finished_at": 1794465661.794283,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "377": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=377, stack_depth=2, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.326342208078131,
+          "queries": 18,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465648.323679,
+          "finished_at": 1794465650.8652391,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "402": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=402, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.12527120904997,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465648.7769432,
+          "finished_at": 1794465650.1581628,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "416": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=416, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9382965411059558,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465650.159969,
+          "finished_at": 1794465651.318665,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "421": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=421, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9461447910871357,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465650.867038,
+          "finished_at": 1794465652.028181,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "435": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=435, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2123636670876294,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465651.3221178,
+          "finished_at": 1794465652.827671,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "440": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=440, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9448756668716669,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465652.030613,
+          "finished_at": 1794465653.24508,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "454": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=454, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.3716013340745121,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465652.829507,
+          "finished_at": 1794465654.476581,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "459": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=459, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9348385420162231,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465653.246891,
+          "finished_at": 1794465654.465753,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "473": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=473, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.040981417056173,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465654.470473,
+          "finished_at": 1794465655.779354,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "478": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=478, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.819213957991451,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465654.4785988,
+          "finished_at": 1794465655.535381,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "492": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=492, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.4467199160717428,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465655.540638,
+          "finished_at": 1794465657.2469811,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "497": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=497, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.0641004159115255,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465655.780986,
+          "finished_at": 1794465657.083746,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "511": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=511, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=((2, 556),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.490607416024432,
+          "queries": 75,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465657.0901592,
+          "finished_at": 1794465665.8241658,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "556": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=556, stack_depth=2, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.8628883329220116,
+          "queries": 73,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465657.2547379,
+          "finished_at": 1794465660.43462,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "572": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=572, stack_depth=1, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9386106671299785,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465660.4378939,
+          "finished_at": 1794465661.641139,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "586": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=586, stack_depth=3, memory_size=96, free_memory_pointer=128, stack_constants=((1, 556),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 4.008851082995534,
+          "queries": 65,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465661.642964,
+          "finished_at": 1794465665.901852,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "614": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=614, stack_depth=3, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 4.521003833040595,
+          "queries": 70,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465661.80245,
+          "finished_at": 1794465666.533298,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "645": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=645, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((3, 224),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.3961591247934848,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465665.8278441,
+          "finished_at": 1794465667.4529002,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "652": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=652, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((3, 224),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.4199449170846492,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465665.90519,
+          "finished_at": 1794465667.531189,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "658": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=658, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 6.1381452907808125,
+          "queries": 98,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465666.5363379,
+          "finished_at": 1794465672.8649259,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=658, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 9.117097249953076,
+          "queries": 98,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466265.7594361,
+          "finished_at": 1794466275.146432,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "692": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=692, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.314176915911958,
+          "queries": 75,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465667.4543412,
+          "finished_at": 1794465676.007211,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=692, stack_depth=16, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 12.499746624846011,
+          "queries": 75,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466275.155251,
+          "finished_at": 1794466287.975777,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "731": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=731, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.7430748750921339,
+          "queries": 43,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465667.532608,
+          "finished_at": 1794465669.475917,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=731, stack_depth=16, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.396092292154208,
+          "queries": 43,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466258.779406,
+          "finished_at": 1794466262.456528,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "736": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=736, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.4914959999732673,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465669.477958,
+          "finished_at": 1794465671.189843,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=736, stack_depth=15, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.9601109160576016,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466262.459761,
+          "finished_at": 1794466265.7571719,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "739": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=739, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 9.989671624964103,
+          "queries": 95,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465671.1918259,
+          "finished_at": 1794465681.417142,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=739, stack_depth=15, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 15.218793666223064,
+          "queries": 95,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466287.981293,
+          "finished_at": 1794466303.597385,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "789": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=789, stack_depth=9, memory_size=224, free_memory_pointer=224, stack_constants=((7, 291),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 6.438471999950707,
+          "queries": 70,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465672.86735,
+          "finished_at": 1794465679.4968052,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=789, stack_depth=16, memory_size=224, free_memory_pointer=224, stack_constants=((7, 1434),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 11.327738958178088,
+          "queries": 70,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466284.0359511,
+          "finished_at": 1794466295.685497,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "863": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=863, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 5.699269332922995,
+          "queries": 98,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465676.010735,
+          "finished_at": 1794465681.907538,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "897": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=897, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.225966416997835,
+          "queries": 75,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465677.238676,
+          "finished_at": 1794465685.7063,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "936": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=936, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.3685925421305,
+          "queries": 43,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465679.498944,
+          "finished_at": 1794465681.073977,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "941": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=941, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.4555944169405848,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465681.078578,
+          "finished_at": 1794465682.767869,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "944": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=944, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=((4, 324),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 13.250491457991302,
+          "queries": 102,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465681.419223,
+          "finished_at": 1794465694.872745,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1070": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1070, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 5.8867546250112355,
+          "queries": 98,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465681.909905,
+          "finished_at": 1794465687.996408,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1104": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1104, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 7.939268917078152,
+          "queries": 75,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465682.7692668,
+          "finished_at": 1794465690.883389,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1143": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1143, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.431319500086829,
+          "queries": 43,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465685.7093189,
+          "finished_at": 1794465687.344047,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1148": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1148, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.351412249961868,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465687.345582,
+          "finished_at": 1794465688.896277,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1151": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1151, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=((4, 324),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 12.003021332900971,
+          "queries": 101,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465687.9985301,
+          "finished_at": 1794465700.250093,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1263": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1263, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 6.4221966250333935,
+          "queries": 98,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465688.89815,
+          "finished_at": 1794465695.561193,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1263, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 9.496668207924813,
+          "queries": 98,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466295.697694,
+          "finished_at": 1794466305.5350862,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1297": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1297, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.628584417048842,
+          "queries": 75,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465690.885418,
+          "finished_at": 1794465699.707359,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1297, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 13.561203499790281,
+          "queries": 75,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466308.5068648,
+          "finished_at": 1794466322.4055119,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1336": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1336, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.5140293331351131,
+          "queries": 43,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465694.876548,
+          "finished_at": 1794465696.590921,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1336, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.516983916051686,
+          "queries": 43,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466303.6123111,
+          "finished_at": 1794466307.487821,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1341": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1341, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.4422302080783993,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465695.564801,
+          "finished_at": 1794465697.2543628,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1341, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.5863949169870466,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466305.543307,
+          "finished_at": 1794466308.504564,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1344": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1344, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.6379477500449866,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465696.5938728,
+          "finished_at": 1794465698.547966,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1344, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.1202714170794934,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466307.4948192,
+          "finished_at": 1794466311.2618072,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1354": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1354, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=((4, 324),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 5.749397459207103,
+          "queries": 70,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465697.256344,
+          "finished_at": 1794465703.24864,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1354, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=((4, 1572),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 9.461837457958609,
+          "queries": 70,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466311.282202,
+          "finished_at": 1794466321.0717912,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1422": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1422, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.6163198330905288,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465698.5496142,
+          "finished_at": 1794465700.459509,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1434": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1434, stack_depth=9, memory_size=256, free_memory_pointer=224, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.3639783749822527,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465699.709481,
+          "finished_at": 1794465702.374238,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1447": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1447, stack_depth=8, memory_size=256, free_memory_pointer=224, stack_constants=((6, 324),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.19127916614525,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465700.255755,
+          "finished_at": 1794465702.725583,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1455": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1455, stack_depth=4, memory_size=96, free_memory_pointer=128, stack_constants=((2, 324),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 31.48372312495485,
+          "queries": 186,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465700.461683,
+          "finished_at": 1794465732.314728,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1562": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1562, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.7113142921589315,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465702.378473,
+          "finished_at": 1794465704.330472,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1572": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1572, stack_depth=6, memory_size=160, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.0992681661155075,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465702.730156,
+          "finished_at": 1794465705.339941,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1583": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1583, stack_depth=6, memory_size=160, free_memory_pointer=128, stack_constants=((4, 324),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.9274085001088679,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465703.263784,
+          "finished_at": 1794465705.489131,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1589": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1589, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=((2, 1354),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.158828250132501,
+          "queries": 24,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465704.3331661,
+          "finished_at": 1794465713.116837,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1589, stack_depth=12, memory_size=224, free_memory_pointer=224, stack_constants=((2, 789),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 9.026668375125155,
+          "queries": 24,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465705.342348,
+          "finished_at": 1794465714.7013462,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1589, stack_depth=14, memory_size=96, free_memory_pointer=128, stack_constants=((2, 1354),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 13.938948957948014,
+          "queries": 24,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466321.081276,
+          "finished_at": 1794466335.37661,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1589, stack_depth=19, memory_size=224, free_memory_pointer=224, stack_constants=((2, 789),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 16.41938287508674,
+          "queries": 24,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466322.414624,
+          "finished_at": 1794466339.214578,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1634": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1634, stack_depth=10, memory_size=160, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.268363334005699,
+          "queries": 98,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465705.494436,
+          "finished_at": 1794465714.063117,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1634, stack_depth=12, memory_size=256, free_memory_pointer=224, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.964878542115912,
+          "queries": 98,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465713.1395562,
+          "finished_at": 1794465722.433562,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1670": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1670, stack_depth=10, memory_size=160, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 13.750199165893719,
+          "queries": 82,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465714.07709,
+          "finished_at": 1794465728.1716769,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1670, stack_depth=12, memory_size=256, free_memory_pointer=224, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 14.22382004186511,
+          "queries": 82,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465714.704457,
+          "finished_at": 1794465729.23366,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1766": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1766, stack_depth=12, memory_size=256, free_memory_pointer=224, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 36.6216318749357,
+          "queries": 74,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465728.174884,
+          "finished_at": 1794465765.132007,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1766, stack_depth=10, memory_size=160, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 42.50937950005755,
+          "queries": 74,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465722.4464881,
+          "finished_at": 1794465765.278826,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1810": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1810, stack_depth=10, memory_size=160, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 15.874409917043522,
+          "queries": 85,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465729.242208,
+          "finished_at": 1794465745.4171479,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1810, stack_depth=12, memory_size=256, free_memory_pointer=224, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 16.954993874998763,
+          "queries": 85,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465732.319818,
+          "finished_at": 1794465749.6106272,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1920": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1920, stack_depth=10, memory_size=160, free_memory_pointer=128, stack_constants=((3, 1583),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.922911582980305,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465745.423677,
+          "finished_at": 1794465748.687197,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1920, stack_depth=12, memory_size=256, free_memory_pointer=224, stack_constants=((3, 1447),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.0070676249451935,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465748.692157,
+          "finished_at": 1794465751.980562,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1925": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1925, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 4,
+          "seconds": 5.205397417070344,
+          "queries": 55,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465749.614371,
+          "finished_at": 1794465755.193804,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1938": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1938, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 4,
+          "seconds": 2.6408491658512503,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465751.9897878,
+          "finished_at": 1794465754.927397,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1941": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1941, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=((1, 4), (3, 195)))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 448.68202254199423,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794465754.935966,
+          "finished_at": 1794466203.971628,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1941, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=((1, 4), (3, 340)))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 5.471805792069063,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466400.4068239,
+          "finished_at": 1794466406.4538171,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1941, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=((1, 4), (3, 267)))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 16.686238499823958,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466398.852833,
+          "finished_at": 1794466415.868216,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1941, stack_depth=6, memory_size=96, free_memory_pointer=128, stack_constants=((1, 4), (3, 586)))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 14.98308466700837,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466402.631744,
+          "finished_at": 1794466417.928925,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1948": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1948, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 2,
+          "seconds": 390.03813662496395,
+          "queries": 57,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794465755.208533,
+          "finished_at": 1794466145.673128,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1948, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=((0, 36),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 3,
+          "seconds": 12.320173708954826,
+          "queries": 57,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466369.007349,
+          "finished_at": 1794466381.77711,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1948, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=((0, 68),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.282586042070761,
+          "queries": 57,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466376.384528,
+          "finished_at": 1794466385.216064,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1948, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=((0, 36),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 7.862162500154227,
+          "queries": 57,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466377.7636821,
+          "finished_at": 1794466386.1004212,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1948, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=((0, 68),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.000438875053078,
+          "queries": 57,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466381.7956412,
+          "finished_at": 1794466390.484565,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1948, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=((0, 68),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 8.819203125080094,
+          "queries": 57,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466385.254137,
+          "finished_at": 1794466394.715591,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1948, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=((0, 100),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 9.369191666832194,
+          "queries": 57,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466386.108535,
+          "finished_at": 1794466395.90927,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1967": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1967, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 5,
+          "seconds": 3.4512120839208364,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465765.1554308,
+          "finished_at": 1794465768.875896,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1967, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.160136208869517,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466358.6042,
+          "finished_at": 1794466362.200598,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1967, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 2,
+          "seconds": 4.095778125105426,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466361.044683,
+          "finished_at": 1794466365.652372,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1967, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 2,
+          "seconds": 5.00231995806098,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466362.2049909,
+          "finished_at": 1794466367.646571,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1970": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2232),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.8592754998244345,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465765.285922,
+          "finished_at": 1794465768.436768,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2363),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.6437284590210766,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466335.38699,
+          "finished_at": 1794466339.640546,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2016),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.938568208133802,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466339.648324,
+          "finished_at": 1794466344.05818,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2081),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 4,
+          "seconds": 6.5591042090673,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466339.221288,
+          "finished_at": 1794466346.3834088,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2298),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.8562170828226954,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466344.100173,
+          "finished_at": 1794466348.34027,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2312),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.4689282500185072,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466346.387414,
+          "finished_at": 1794466350.238295,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2326),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.3924367919098586,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466348.345474,
+          "finished_at": 1794466352.029425,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2166),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.471225791843608,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466350.24376,
+          "finished_at": 1794466354.068407,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2180),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 6.109689832897857,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466352.033227,
+          "finished_at": 1794466358.56439,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=1970, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=((2, 2194),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 6.515895124990493,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466354.074934,
+          "finished_at": 1794466361.040704,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1975": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1975, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.0995933329686522,
+          "queries": 55,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465768.444984,
+          "finished_at": 1794465771.861504,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1990": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1990, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.179752832977101,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465768.8786712,
+          "finished_at": 1794465771.3620439,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "1993": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=1993, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=((3, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 512.3111943751574,
+          "queries": 1273,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794465771.37827,
+          "finished_at": 1794466283.993964,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2016": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2016, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=((6, 286),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.8916520420461893,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465771.865248,
+          "finished_at": 1794465775.030117,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2025": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2025, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=((0, 36),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 368.2594621661119,
+          "queries": 67,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794465775.0370848,
+          "finished_at": 1794466143.5726452,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=2025, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=((0, 100),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 9.877964125014842,
+          "queries": 67,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466365.6625988,
+          "finished_at": 1794466376.279357,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=2025, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=((0, 132),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 9.452693334082142,
+          "queries": 67,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466367.6705291,
+          "finished_at": 1794466377.7486951,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2045": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2045, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.8265697080641985,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466143.5964658,
+          "finished_at": 1794466147.842145,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=2045, stack_depth=12, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.8958693330641836,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466390.520905,
+          "finished_at": 1794466393.8523688,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=2045, stack_depth=13, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.875198374968022,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466393.89663,
+          "finished_at": 1794466398.423139,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2048": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2048, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 4.275116957956925,
+          "queries": 55,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466145.7115462,
+          "finished_at": 1794466150.7575092,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2062": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2062, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.5755197920370847,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466147.858371,
+          "finished_at": 1794466150.7591832,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2065": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2065, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=((2, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 5.824039041996002,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466150.7628648,
+          "finished_at": 1794466156.9813702,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2081": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2081, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=((5, 319),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.2297834169585258,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466150.765684,
+          "finished_at": 1794466154.57145,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=2081, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=((5, 416),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.7103797500021756,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53355,
+          "started_at": 1794466394.7343879,
+          "finished_at": 1794466398.850045,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=2081, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=((5, 435),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 4.062810208881274,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466395.91455,
+          "finished_at": 1794466400.403625,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=2081, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=((5, 511),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.8119948748499155,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466398.4330409,
+          "finished_at": 1794466402.6095948,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2090": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2090, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 2,
+          "seconds": 5.575122958980501,
+          "queries": 55,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466154.61618,
+          "finished_at": 1794466161.315943,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2104": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2104, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 2,
+          "seconds": 2.8115537089761347,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466157.031808,
+          "finished_at": 1794466160.3906,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2107": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2107, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=((2, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 2,
+          "seconds": 6.138248499948531,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466160.406465,
+          "finished_at": 1794466167.299882,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2123": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2123, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 4.283840209012851,
+          "queries": 55,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466161.333183,
+          "finished_at": 1794466166.085336,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2140": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2140, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.0440878339577466,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466166.110813,
+          "finished_at": 1794466169.459969,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2143": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2143, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=((5, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 201.30174333392642,
+          "queries": 1273,
+          "failed_obligations": [],
+          "pid": 53353,
+          "started_at": 1794466167.314197,
+          "finished_at": 1794466368.9671621,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2166": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2166, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=((6, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.7316962080076337,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466169.462328,
+          "finished_at": 1794466173.534507,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2180": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2180, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=((6, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.1602401251439005,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466173.539362,
+          "finished_at": 1794466176.9458408,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2194": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2194, stack_depth=11, memory_size=96, free_memory_pointer=128, stack_constants=((8, 454),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.429271334083751,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466176.949887,
+          "finished_at": 1794466180.703352,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2206": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2206, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.615446000127122,
+          "queries": 55,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466180.712074,
+          "finished_at": 1794466183.604366,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2220": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2220, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.2858722920063883,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466183.614141,
+          "finished_at": 1794466186.191981,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2223": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2223, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.4269952091854066,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466186.194571,
+          "finished_at": 1794466188.8831549,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2232": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2232, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=((3, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 379.86550270812586,
+          "queries": 91,
+          "failed_obligations": [],
+          "pid": 53352,
+          "started_at": 1794466188.8873532,
+          "finished_at": 1794466568.9867918,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2249": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2249, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.162550166947767,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466204.014068,
+          "finished_at": 1794466206.4905589,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2252": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2252, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=((5, 473),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.990600374992937,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466206.49496,
+          "finished_at": 1794466209.820161,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2263": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2263, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 4.43219062499702,
+          "queries": 55,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466209.826198,
+          "finished_at": 1794466214.639839,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2279": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2279, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.410020292038098,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466214.644484,
+          "finished_at": 1794466218.476074,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2282": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2282, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=((4, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 15.795604000100866,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466218.520227,
+          "finished_at": 1794466234.7210538,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2298": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2298, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=((5, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 4.558066041907296,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466234.73079,
+          "finished_at": 1794466239.643275,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2312": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2312, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=((5, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.3933126248884946,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466239.650809,
+          "finished_at": 1794466243.3297238,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2326": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2326, stack_depth=10, memory_size=96, free_memory_pointer=128, stack_constants=((7, 492),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.8931415409315377,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466243.33233,
+          "finished_at": 1794466246.4850938,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2337": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2337, stack_depth=5, memory_size=96, free_memory_pointer=128, stack_constants=((0, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.3949058749713004,
+          "queries": 55,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466246.4964921,
+          "finished_at": 1794466249.2004638,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2351": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2351, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.8074941250961274,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466249.2075388,
+          "finished_at": 1794466251.384117,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2354": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2354, stack_depth=7, memory_size=96, free_memory_pointer=128, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 2.092614750145003,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466251.386778,
+          "finished_at": 1794466253.731401,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "2363": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2363, stack_depth=8, memory_size=96, free_memory_pointer=128, stack_constants=((3, 4),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 3.1624202500097454,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 53354,
+          "started_at": 1794466253.737613,
+          "finished_at": 1794466257.223836,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    }
+  },
+  "closure_checks": [
+    {
+      "phase": "proof_instances",
+      "contexts": 199,
+      "proof_instances": 178,
+      "projection": "pi-v1-value-used"
+    }
+  ],
+  "timings": {
+    "analysis_and_setup": 0.6935734169092029,
+    "discovery": 9.875326666980982,
+    "entry_H0": 0.48853954183869064
+  },
+  "running": [],
+  "reasons": [],
+  "attempted_instances": 178,
+  "recorded_local_theorems": 178,
+  "local_statistics_basis": "Recorded diagnostics; only status=verified establishes a consumed program certificate.",
+  "started_at_utc": "2026-11-12T06:40:18.763056+00:00",
+  "stem": "/artifact/tmp/recorded-runs/r4/fixtures/ENSRegistry",
+  "configuration": {
+    "gas_check": "full",
+    "gas_budget": 1000000000,
+    "num_inputs": 0,
+    "timeout_ms": 30000,
+    "node_seconds": 28800.0,
+    "first_pass_node_seconds": 300.0,
+    "max_parameter_values": 32,
+    "max_depth": 400,
+    "max_instances": 8192,
+    "wall_seconds": 3600.0,
+    "hard_wall_seconds": 3900.0,
+    "summaries": true,
+    "fallback": "none",
+    "discover_first": true,
+    "node_workers": 4,
+    "pair_workers_per_node": 1,
+    "results_dir": "/artifact/tmp/v3exp/runs/mc-on-1/results",
+    "node_memory_mb": 3000.0,
+    "status_dir": "/artifact/tmp/v3exp/runs/mc-on-1/status",
+    "constant_insensitive": true,
+    "pushed_code_return_tags": false,
+    "terminal_constant_projection": false,
+    "context_constant_projection": false,
+    "instruction_hints": "/artifact/tmp/measurement-work/traces-1112/trace-ENSRegistry.json"
+  },
+  "host": "macOS-15.3.1-arm64-arm-64bit-Mach-O",
+  "python": "3.13.7",
+  "workers": 1,
+  "program_sha256": {
+    ".json": "2cb2f4e172ad7e5906fa772372685ca6aabbe17212f88c9538ef85ff1cf1ce2e",
+    ".hex": "a63b0ef8ed4075ac63ebc6374a621218f92c8b352ead69fc388c34948c93051b"
+  },
+  "revision": "c68c4dfc87515204e09a2d566554cd9b04c643d4",
+  "worktree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "total_source_blocks": 127,
+  "unvisited_policy": "Missing local statistics never establish unreachability or a program proof.",
+  "pair_workers": 1,
+  "proof_cache": "/artifact/tmp/v3exp/runs/mc-on-1/cache.sqlite",
+  "instruction_hints_sha256": "94730b30483f2ff99e1973b5f7be716b6515cc36e6a61b989cefad810eb73242",
+  "model_sources_sha256": "a6000cde69e33216c10f5572c93ce128be21c15953c1966217eac9e7d2da0b47"
+}

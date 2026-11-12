@@ -1,0 +1,2 @@
+{"event": "v3_install", "pid": 1313, "thread": 8617265216, "monotonic": 1109913.905737333, "argv": ["-m", "/artifact/tmp/recorded-runs/r4/fixtures/ENSRegistry", "--gas-check"], "snapshot": "/artifact/tmp/v3exp/snap"}
+{"event": "v3_counts", "pid": 1313, "thread": 8617265216, "monotonic": 1110716.791389166, "counts": {}, "maxrss_mb": 87.7}

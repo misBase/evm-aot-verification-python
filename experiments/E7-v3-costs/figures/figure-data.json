@@ -1,0 +1,343 @@
+{
+ "source": "results/2026-11-12-v3 (c68c4df); built by figures/build_figure_data.py",
+ "concentration": {
+  "ENSRegistry": {
+   "top10": 0.814,
+   "top1": 0.138,
+   "instances": 178
+  },
+  "CErc20": {
+   "top10": 0.853,
+   "top1": 0.391,
+   "instances": 2605
+  },
+  "Safe": {
+   "top10": 0.792,
+   "top1": 0.328,
+   "instances": 2066
+  },
+  "PoolManager": {
+   "top10": 0.858,
+   "top1": 0.4,
+   "instances": 3718
+  },
+  "Pool": {
+   "top10": 0.778,
+   "top1": 0.249,
+   "instances": 1283
+  }
+ },
+ "repetition": {
+  "ENSRegistry": {
+   "same_block": 0.094,
+   "depth_only": 0.032,
+   "msize_unknown": 0.0
+  },
+  "CErc20": {
+   "same_block": 0.73,
+   "depth_only": 0.463,
+   "msize_unknown": 0.861
+  },
+  "Safe": {
+   "same_block": 0.671,
+   "depth_only": 0.54,
+   "msize_unknown": 0.882
+  },
+  "PoolManager": {
+   "same_block": 0.724,
+   "depth_only": 0.418,
+   "msize_unknown": 0.61
+  },
+  "Pool": {
+   "same_block": 0.273,
+   "depth_only": 0.117,
+   "msize_unknown": 0.485
+  }
+ },
+ "where": {
+  "ENSRegistry": {
+   "Shared lemmas": 0.862,
+   "Local: construction": 0.114,
+   "H2": 0.014,
+   "Other": 0.006,
+   "Local: obligation solving": 0.003
+  },
+  "CErc20": {
+   "H2": 0.604,
+   "Local: obligation solving": 0.187,
+   "Local: construction": 0.206,
+   "Other": 0.002
+  },
+  "PoolManager": {
+   "H2": 0.506,
+   "Local: construction": 0.344,
+   "Instruction chain": 0.114,
+   "Other": 0.02,
+   "Local: obligation solving": 0.015
+  },
+  "Pool": {
+   "H2": 0.292,
+   "Instruction chain": 0.239,
+   "Local: construction": 0.234,
+   "Shared lemmas": 0.118,
+   "Local: obligation solving": 0.102,
+   "Other": 0.015
+  }
+ },
+ "sample_sizes": {
+  "ENSRegistry": 8,
+  "CErc20": 8,
+  "PoolManager": 8,
+  "Pool": 8
+ },
+ "ectx": [
+  {
+   "contexts": 1,
+   "h2": 17.0,
+   "local_solving": 76.3,
+   "instance": 217.4
+  },
+  {
+   "contexts": 2,
+   "h2": 38.8,
+   "local_solving": 79.2,
+   "instance": 204.6
+  },
+  {
+   "contexts": 4,
+   "h2": 70.1,
+   "local_solving": 84.7,
+   "instance": 209.4
+  },
+  {
+   "contexts": 8,
+   "h2": 124.4,
+   "local_solving": 86.8,
+   "instance": 296.1
+  }
+ ],
+ "edepth": [
+  {
+   "entry_depth": 3,
+   "h2": 13.0,
+   "instance": 166.5,
+   "local_solving": 76.0
+  },
+  {
+   "entry_depth": 11,
+   "h2": 12.2,
+   "instance": 155.8,
+   "local_solving": 76.8
+  },
+  {
+   "entry_depth": 19,
+   "h2": 15.9,
+   "instance": 157.2,
+   "local_solving": 82.1
+  },
+  {
+   "entry_depth": 35,
+   "h2": 17.5,
+   "instance": 164.5,
+   "local_solving": 81.5
+  },
+  {
+   "entry_depth": 67,
+   "h2": 22.0,
+   "instance": 186.6,
+   "local_solving": 75.2
+  }
+ ],
+ "emsize": [
+  {
+   "msize": "known",
+   "instance": 127.5,
+   "h2_quick": 11.8,
+   "h2_close_edge": 0,
+   "local_solving": 84.7
+  },
+  {
+   "msize": "symbolic",
+   "instance": 217.0,
+   "h2_quick": 21.7,
+   "h2_close_edge": 87.0,
+   "local_solving": 87.8
+  }
+ ],
+ "cerc20_14263": {
+  "per_context_known": 249,
+  "per_context_unknown": 851,
+  "contexts_known": 1.0,
+  "contexts_unknown": 3.2
+ },
+ "lemma": [
+  {
+   "workers": 1,
+   "built": 4,
+   "solved": 4,
+   "lemma_seconds": 671.6,
+   "wall": 1375.0,
+   "cpu": 1361.5
+  },
+  {
+   "workers": 2,
+   "built": 7,
+   "solved": 5,
+   "lemma_seconds": 843.8,
+   "wall": 808.0,
+   "cpu": 1522.0
+  },
+  {
+   "workers": 4,
+   "built": 11,
+   "solved": 8,
+   "lemma_seconds": 1608.3,
+   "wall": 700.0,
+   "cpu": 2297.0
+  },
+  {
+   "workers": 4,
+   "built": 11,
+   "solved": 8,
+   "lemma_seconds": 1646.4,
+   "wall": 705.2,
+   "cpu": 2279.8
+  },
+  {
+   "workers": 8,
+   "built": 15,
+   "solved": 11,
+   "lemma_seconds": 3428.4,
+   "wall": 603.0,
+   "cpu": 3426.2
+  }
+ ],
+ "routing": [
+  {
+   "obligation": "H2_c0_0_2_t0_live_stack_prefix_35",
+   "run": "PoolManager-22-21213_29_928_928",
+   "production": 369.65,
+   "production_answer": "unsat",
+   "best_route": "mul",
+   "best": 7.32
+  },
+  {
+   "obligation": "H2_c0_0_0_t0_live_stack_prefix_35",
+   "run": "PoolManager-22-21213_29_928_928",
+   "production": 333.958,
+   "production_answer": "unsat",
+   "best_route": "mul",
+   "best": 8.92
+  },
+  {
+   "obligation": "x86_coverage",
+   "run": "CErc20-10-8186_35_None_None",
+   "production": 327.708,
+   "production_answer": "unsat",
+   "best_route": "bvabs",
+   "best": 62.52
+  },
+  {
+   "obligation": "x86_maps_7_group",
+   "run": "CErc20-12-12930_5_160_None",
+   "production": 239.835,
+   "production_answer": "unknown",
+   "best_route": "blast",
+   "best": 266.78
+  },
+  {
+   "obligation": "pair_27_7",
+   "run": "CErc20-12-12930_5_160_None",
+   "production": 212.251,
+   "production_answer": "unsat",
+   "best_route": "potential",
+   "best": 36.05
+  },
+  {
+   "obligation": "pair_25_8",
+   "run": "CErc20-10-8186_35_None_None",
+   "production": 185.294,
+   "production_answer": "unsat",
+   "best_route": "blast",
+   "best": 89.41
+  },
+  {
+   "obligation": "H2_c0_0_0_t2_gas_0",
+   "run": "CErc20-09-4571_25_None_None",
+   "production": 169.944,
+   "production_answer": "unsat",
+   "best_route": "exact",
+   "best": 84.55
+  },
+  {
+   "obligation": "H2_c0_0_6_t9_gas_0",
+   "run": "CErc20-10-8186_35_None_None",
+   "production": 165.388,
+   "production_answer": "unsat",
+   "best_route": "exact",
+   "best": 22.82
+  },
+  {
+   "obligation": "H2_c0_0_2_t6_gas_0_shared",
+   "run": "CErc20-12-12930_5_160_None",
+   "production": 151.854,
+   "production_answer": "unsat",
+   "best_route": "potential",
+   "best": 10.42
+  },
+  {
+   "obligation": "H2_c0_0_0_t2_memory_gas_0",
+   "run": "CErc20-09-4571_25_None_None",
+   "production": 143.84,
+   "production_answer": "unsat",
+   "best_route": "mul",
+   "best": 24.74
+  },
+  {
+   "obligation": "H2_c0_0_0_t6_gas_0",
+   "run": "CErc20-12-12930_5_160_None",
+   "production": 125.53,
+   "production_answer": "unsat",
+   "best_route": "potential",
+   "best": 11.11
+  },
+  {
+   "obligation": "x86_coverage",
+   "run": "CErc20-12-12930_5_160_None",
+   "production": 125.035,
+   "production_answer": "unsat",
+   "best_route": "potential",
+   "best": 54.29
+  }
+ ],
+ "schedule": [
+  {
+   "contract": "ENSRegistry",
+   "workers": 5,
+   "production": 885,
+   "lpt_block": 789,
+   "lower_bound": 697
+  },
+  {
+   "contract": "CErc20",
+   "workers": 13,
+   "production": 30167,
+   "lpt_block": 24920,
+   "lower_bound": 24920
+  },
+  {
+   "contract": "PoolManager",
+   "workers": 13,
+   "production": 21792,
+   "lpt_block": 19882,
+   "lower_bound": 19881
+  },
+  {
+   "contract": "Pool",
+   "workers": 7,
+   "production": 13082,
+   "lpt_block": 11108,
+   "lower_bound": 11107
+  }
+ ]
+}

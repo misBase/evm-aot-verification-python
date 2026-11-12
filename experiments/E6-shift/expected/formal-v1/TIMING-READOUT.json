@@ -1,0 +1,423 @@
+{
+  "frozen_utc": "2026-11-05T16:40:31.918139+00:00",
+  "timing_subset_complete": true,
+  "original_combined_status": "STOPPED",
+  "original_diagnostic_ERR_preserved": true,
+  "registered_points": 48,
+  "actual_points": 36,
+  "verified": 30,
+  "timeouts": 6,
+  "protocol_skips": 12,
+  "prepared_sha256": "c37000a0a648aa970fcbfc763e571a4ed584621d8046bf93a6355d3ec42194d6",
+  "source_pin": {
+    "sha256": "d21332757dfd422a5fbf4972c17684705671b010a75dcc4532da3f500ece7709",
+    "files": 113
+  },
+  "compiler": "clean b3ddbdb native Go export; source/provenance archive in sibling compiler-provenance; no claim identical r4 compiler bytes",
+  "protocol": {
+    "maximum_timing_cells": 48,
+    "diagnostic_cells": 16,
+    "k_values": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "summary_arms": [
+      "shift-off",
+      "shift-fallback"
+    ],
+    "repetitions": 3,
+    "repeat_skip_if_r1_wall_strictly_gt_s": 300,
+    "repeat_basis": "only same k/arm R1 unrounded exit_observed_wall_seconds+cleanup_wall_seconds, missing fields fallback guard wall; exact>300 triggers predefined R2/R3 skips, no replacement",
+    "timing_owned_observer": false,
+    "diagnostic": "one fresh per k/arm, primary path scalars + partial current-PID Solver/Tactic expression DAG; excluded timing statistics",
+    "timeout_seconds": 600,
+    "memory_tree_mib": 6000,
+    "max_depth": 400,
+    "path_pair_workers": 1,
+    "gas": "off",
+    "gas_budget": 1000000000,
+    "calldata_size_bytes": 512,
+    "x86_base": 4096,
+    "query_cap_ms": 300000,
+    "reachability_timeout_ms": 250,
+    "summary_other_kinds": "all frozen non-shift fallback kinds remain enabled; prove-hit defaults retained",
+    "formal_extra_native_allocator_cap": null,
+    "cold_cache": "each point independent fresh interpreter/cache; no task reuse",
+    "math_outcomes": "TO/OOM/BOUND/UNK/N/A retained as censored/incomplete; unexpected ERR/CEX stops matrix; no budget increases"
+  },
+  "rows": [
+    {
+      "k": 1,
+      "shift_summary": "off",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 2.959484374965541,
+      "min_wall_s": 2.7075926659163088,
+      "max_wall_s": 2.9671958329854533,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r3.json"
+      ],
+      "raw_sha256": [
+        "1c4e391056371be24f429be8b0eb81b0fcd554402bb2d7950279113a9703155c",
+        "437fc03f4c5380e43caa457825e78930d9058381d2a03fb5bf2033f109e5307e",
+        "6c28e9220c5554feed48ed72dbc219f75876a59faf6dc2902071b26679da7075"
+      ]
+    },
+    {
+      "k": 1,
+      "shift_summary": "on",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 4.478975791018456,
+      "min_wall_s": 4.460596416029148,
+      "max_wall_s": 4.836761250044219,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r3.json"
+      ],
+      "raw_sha256": [
+        "668c7e13fd3a59f135da48243999bbbfc074f09cb4d56bfc5e5261c7ee5f5faf",
+        "534357afafb4cf965d4ef2602c70255cd09e36823927f6dd5c446b537600ce70",
+        "c8f2f2f4760f39a535f08620feedfff6d2def5f9e136619ec53d890f820272e3"
+      ]
+    },
+    {
+      "k": 2,
+      "shift_summary": "off",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 54.1003322500037,
+      "min_wall_s": 53.89367816701997,
+      "max_wall_s": 54.52279320801608,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r3.json"
+      ],
+      "raw_sha256": [
+        "71613061f8cd12a7a2ab23495291fe1345c28d4d8b4e0d4acdcae1ba29769aa3",
+        "e9dba6c3df0affa590d79310a570ab87f86c76fec87ebe75db38fbca0a66739b",
+        "4f39e7baf31942f036a47687a661e4548ff2cd4e7854778f51edfe45074c0a35"
+      ]
+    },
+    {
+      "k": 2,
+      "shift_summary": "on",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 5.4868346670409665,
+      "min_wall_s": 5.481656374991871,
+      "max_wall_s": 5.548242249991745,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r3.json"
+      ],
+      "raw_sha256": [
+        "a56ccd4f31ef71be6c3a336b07f99be1ed80f53a04a653a84a57a0f91fb755f3",
+        "059ed22b716db7baf1a779486c5f0558bc641123495c2e0415ba59a9da2e605c",
+        "565e814307a5303df822322e208adf432af5e4c43f729891ac6c91a8a9787cfc"
+      ]
+    },
+    {
+      "k": 3,
+      "shift_summary": "off",
+      "planned": 3,
+      "executed": 1,
+      "verified": 0,
+      "timeouts": 1,
+      "skipped": 2,
+      "status": "TO",
+      "median_wall_s": null,
+      "min_wall_s": null,
+      "max_wall_s": null,
+      "right_censor_seconds": 600,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-off-r1.json"
+      ],
+      "raw_sha256": [
+        "e8eeafcf20a18dc7fa3ad8fbbefb4e5ef3cb2a227036d0c060479058a9d99c74"
+      ]
+    },
+    {
+      "k": 3,
+      "shift_summary": "on",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 6.732888833037578,
+      "min_wall_s": 6.645887500024401,
+      "max_wall_s": 6.7936240419512615,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r3.json"
+      ],
+      "raw_sha256": [
+        "2164b65210558e58620f889e2a586a0641ff3366ae75357a5d1586138db281e3",
+        "22bf1d8ae6132a7fcfc74d4081ab8c37a2c59af2fb3b853cdd6dc0de103a4d0a",
+        "85a58d313e5f865070d76c582b0f90d52e90a9f6cebbc774731f37599da84304"
+      ]
+    },
+    {
+      "k": 4,
+      "shift_summary": "off",
+      "planned": 3,
+      "executed": 1,
+      "verified": 0,
+      "timeouts": 1,
+      "skipped": 2,
+      "status": "TO",
+      "median_wall_s": null,
+      "min_wall_s": null,
+      "max_wall_s": null,
+      "right_censor_seconds": 600,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-off-r1.json"
+      ],
+      "raw_sha256": [
+        "7623926a1aca5463be990b88f6bacec4cd3d15e76bca6ba6364bc271e43e70d2"
+      ]
+    },
+    {
+      "k": 4,
+      "shift_summary": "on",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 6.865639292052947,
+      "min_wall_s": 6.86402983404696,
+      "max_wall_s": 6.941884875064716,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r3.json"
+      ],
+      "raw_sha256": [
+        "288f8ea3df9ce24a0d6f6f654697dacca86938a75c5e995abe84f5fdcfc7cfb5",
+        "069eaff5c44fb0105fe7ef8d2a992b3d1cee58adec918da1997fd957bccbf4c0",
+        "3a7ca6e8f0d1319994ec9d7ffa7441867399f6b784de717daa8f31a14bffceaa"
+      ]
+    },
+    {
+      "k": 5,
+      "shift_summary": "off",
+      "planned": 3,
+      "executed": 1,
+      "verified": 0,
+      "timeouts": 1,
+      "skipped": 2,
+      "status": "TO",
+      "median_wall_s": null,
+      "min_wall_s": null,
+      "max_wall_s": null,
+      "right_censor_seconds": 600,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-off-r1.json"
+      ],
+      "raw_sha256": [
+        "1b0e3483aac37368000a8bdbba1877a7aae236c622cdd404bd0db2fa158e7240"
+      ]
+    },
+    {
+      "k": 5,
+      "shift_summary": "on",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 7.557523582945578,
+      "min_wall_s": 7.509139082976617,
+      "max_wall_s": 7.743542499956675,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r3.json"
+      ],
+      "raw_sha256": [
+        "74ea7d2a961797b04d732b43ef4615a424fb0fa698acdc5d0119eeec8a863059",
+        "a093a2004ef6c33f0c752b34bca7cb32da29edc834c5758f1a2f9709b8dbf0bc",
+        "a2565ca8a4addb8ba465e953cccf3141192c81bcf9f868ca049e03b18e1f87e9"
+      ]
+    },
+    {
+      "k": 6,
+      "shift_summary": "off",
+      "planned": 3,
+      "executed": 1,
+      "verified": 0,
+      "timeouts": 1,
+      "skipped": 2,
+      "status": "TO",
+      "median_wall_s": null,
+      "min_wall_s": null,
+      "max_wall_s": null,
+      "right_censor_seconds": 600,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-off-r1.json"
+      ],
+      "raw_sha256": [
+        "f205a54b6a03b26aafbfead024d57651c9cfe359941d98ee23e01b54635da7fa"
+      ]
+    },
+    {
+      "k": 6,
+      "shift_summary": "on",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 8.168709874968044,
+      "min_wall_s": 8.161425499944016,
+      "max_wall_s": 8.212751833023503,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r3.json"
+      ],
+      "raw_sha256": [
+        "fed6e17daf1e7b415f03dbc03df402476a9fdd132908eb62ca48b1550c08911f",
+        "a7fb0e9b9e1224b8e5df71d8e9a5b3de204fad90ea5f0451e70cf184308509a2",
+        "0f9701a4ca2432d3e9a747cf76d2814e73fb42217f528c1dcb2e8f237dfe44bf"
+      ]
+    },
+    {
+      "k": 7,
+      "shift_summary": "off",
+      "planned": 3,
+      "executed": 1,
+      "verified": 0,
+      "timeouts": 1,
+      "skipped": 2,
+      "status": "TO",
+      "median_wall_s": null,
+      "min_wall_s": null,
+      "max_wall_s": null,
+      "right_censor_seconds": 600,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-off-r1.json"
+      ],
+      "raw_sha256": [
+        "5a4d2ded76cd24cf2021dd9c71334bf477294b4a3c1339256dfaaf0f6e3da025"
+      ]
+    },
+    {
+      "k": 7,
+      "shift_summary": "on",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 9.095688249915838,
+      "min_wall_s": 8.986976166954264,
+      "max_wall_s": 9.213980333064683,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r3.json"
+      ],
+      "raw_sha256": [
+        "1fa7ae579865316f8fc91a27acbc612051d84af5af513a59cd9886c89677d03c",
+        "e0bf3b5a841f43de703a89a0ca9d994fa6155cb71f38c8082abd0ea0c2ef0f22",
+        "ec9485f3bf12fc9a6f0ece0f2b2fa8bfbb08b7577d21afa379d29464a9d159a5"
+      ]
+    },
+    {
+      "k": 8,
+      "shift_summary": "off",
+      "planned": 3,
+      "executed": 1,
+      "verified": 0,
+      "timeouts": 1,
+      "skipped": 2,
+      "status": "TO",
+      "median_wall_s": null,
+      "min_wall_s": null,
+      "max_wall_s": null,
+      "right_censor_seconds": 600,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-off-r1.json"
+      ],
+      "raw_sha256": [
+        "a51d5fed93b7f292503c1b842173673812777804da57ac82a9e2398139f38d44"
+      ]
+    },
+    {
+      "k": 8,
+      "shift_summary": "on",
+      "planned": 3,
+      "executed": 3,
+      "verified": 3,
+      "timeouts": 0,
+      "skipped": 0,
+      "status": "VERIFIED",
+      "median_wall_s": 10.38385304203257,
+      "min_wall_s": 10.177126125083305,
+      "max_wall_s": 10.76058954198379,
+      "right_censor_seconds": null,
+      "raw_files": [
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r1.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r2.json",
+        "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r3.json"
+      ],
+      "raw_sha256": [
+        "14b92f79b9a03b79b4bfd72a5694010366ba9644177c7bd8ea3f4bce18038f8e",
+        "475efc4305684936e1f61b4c960ae06f6ffce2cec1875af34fb32bfe46ab4e6b",
+        "6b8dd40dedcc5d360199f830bf03204c0a56f0e8d86f3ef6eabfb6b453d5a742"
+      ]
+    }
+  ],
+  "limits": [
+    "Main timings install no owned observer/shape hooks; they still include normal adapter/source-check/import/guard overhead.",
+    "TO rows are right-censored at600s, not completed solves; TO CPU is a lower bound.",
+    "R2/R3 skips are caused only by same cell R1 exact guard wall>300, with raw R1 hash preserved.",
+    "This is fixed variable-SHR synthetic family/calldata512/gasOFF1e9; no arbitrary-contract or universal exponential-rate claim.",
+    "Separate diagnostic runs provide executor/path/query shapes and are excluded from these timing statistics."
+  ]
+}

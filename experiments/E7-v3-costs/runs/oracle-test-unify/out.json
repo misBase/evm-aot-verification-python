@@ -1,0 +1,1 @@
+{"smt2": "36748-1.smt2", "name": "x86_maps_group_1", "route": "unify", "budget": 120.0, "wall": 86.75, "proved": false, "answer": "sat", "routes": {"unify": [0, 58.53119058301672]}}

@@ -1,0 +1,172 @@
+{
+  "kind": "progress",
+  "status": "inconclusive",
+  "diagnostics": {
+    "0": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=0, stack_depth=0, memory_size=0, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 13.821426208131015,
+          "queries": 88,
+          "failed_obligations": [],
+          "pid": 52919,
+          "started_at": 1794468293.3767838,
+          "finished_at": 1794468307.234881,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "18": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=18, stack_depth=3, memory_size=32, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.6867142079863697,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 52919,
+          "started_at": 1794468307.2515059,
+          "finished_at": 1794468307.958574,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "23": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=23, stack_depth=3, memory_size=32, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 127.48762525012717,
+          "queries": 148,
+          "failed_obligations": [],
+          "pid": 52919,
+          "started_at": 1794468307.9600189,
+          "finished_at": 1794468435.4922,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "39": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=39, stack_depth=4, memory_size=32, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2497103749774396,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 52919,
+          "started_at": 1794468435.4965491,
+          "finished_at": 1794468436.764575,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    },
+    "43": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=43, stack_depth=4, memory_size=32, free_memory_pointer=0, stack_constants=((3, 18),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.2344376659020782,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 52919,
+          "started_at": 1794468436.766227,
+          "finished_at": 1794468438.0190568,
+          "start_rss_mb": 0.0,
+          "peak_rss_mb": 0.0,
+          "end_rss_mb": 0.0,
+          "memory_budget_mb": 3000.0
+        }
+      ]
+    }
+  },
+  "closure_checks": [
+    {
+      "phase": "proof_instances",
+      "contexts": 5,
+      "proof_instances": 5,
+      "projection": "pi-v1-value-used"
+    }
+  ],
+  "timings": {
+    "analysis_and_setup": 0.028697875095531344,
+    "discovery": 0.155992791056633,
+    "entry_H0": 0.496043625054881
+  },
+  "running": [],
+  "reasons": [],
+  "attempted_instances": 5,
+  "recorded_local_theorems": 5,
+  "local_statistics_basis": "Recorded diagnostics; only status=verified establishes a consumed program certificate.",
+  "started_at_utc": "2026-11-12T07:24:52.007841+00:00",
+  "stem": "/artifact/tmp/v3exp/synth/msize_const",
+  "configuration": {
+    "gas_check": "full",
+    "gas_budget": 1000000000,
+    "num_inputs": 0,
+    "timeout_ms": 30000,
+    "node_seconds": 28800.0,
+    "first_pass_node_seconds": 300.0,
+    "max_parameter_values": 32,
+    "max_depth": 400,
+    "max_instances": 8192,
+    "wall_seconds": 7200.0,
+    "hard_wall_seconds": 7500.0,
+    "summaries": true,
+    "fallback": "none",
+    "discover_first": true,
+    "node_workers": 1,
+    "pair_workers_per_node": 1,
+    "results_dir": "/artifact/tmp/v3exp/runs/emsize-msize_const/results",
+    "node_memory_mb": 3000.0,
+    "status_dir": "/artifact/tmp/v3exp/runs/emsize-msize_const/status",
+    "constant_insensitive": true,
+    "pushed_code_return_tags": false,
+    "terminal_constant_projection": false,
+    "context_constant_projection": false,
+    "instruction_hints": "/artifact/tmp/v3exp/synth/trace-msize_const.json"
+  },
+  "host": "macOS-15.3.1-arm64-arm-64bit-Mach-O",
+  "python": "3.13.7",
+  "workers": 1,
+  "program_sha256": {
+    ".json": "780a17f0ed39d08ca25d4fcbd856ac2b3ef0003fad5afcb7ff84bba2132de812",
+    ".hex": "e745d8e3ffea3adfdd35598e47454f317d56ba5d9da9b49b3c8e0077486452cc"
+  },
+  "revision": "c68c4dfc87515204e09a2d566554cd9b04c643d4",
+  "worktree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "total_source_blocks": 5,
+  "unvisited_policy": "Missing local statistics never establish unreachability or a program proof.",
+  "pair_workers": 1,
+  "proof_cache": "/artifact/tmp/v3exp/runs/emsize-msize_const/cache.sqlite",
+  "instruction_hints_sha256": "4768e0b52d59fb29e8278569a2038f9d7220127cd64db6b5df6980061579b618",
+  "model_sources_sha256": "a6000cde69e33216c10f5572c93ce128be21c15953c1966217eac9e7d2da0b47"
+}

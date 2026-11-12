@@ -1,0 +1,24 @@
+{
+ "stem": "/artifact/tmp/recorded-runs/r4/fixtures/CErc20",
+ "discovery_s": 547.7517617079429,
+ "load_s": 7.233214749954641,
+ "ordered": 4708,
+ "groups": 2605,
+ "rows": [
+  {
+   "pick": "14263:15:None:None",
+   "spec": "BlockSpecialization(pc=14263, stack_depth=15, memory_size=None, free_memory_pointer=None, stack_constants=())",
+   "contexts": 2,
+   "chain": false,
+   "wall": 1184.25,
+   "proved": true,
+   "closed": true,
+   "proof_kind": null,
+   "chain_attempt": null,
+   "seconds": 1181.7857674590778,
+   "queries": 148,
+   "reasons": [],
+   "failed": []
+  }
+ ]
+}

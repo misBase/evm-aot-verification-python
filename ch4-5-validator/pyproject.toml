@@ -1,0 +1,56 @@
+[tool.poetry]
+name = "evm-aot-verification"
+version = "0.1.0"
+description = "Program-level translation verification for EVM AOT compilation to x86-64 machine code using Z3 SMT solver"
+authors = ["Anonymous"]
+readme = "README.md"
+license = "MIT"
+packages = [
+    { include = "common" },
+    { include = "evm_ir" },
+    { include = "state" },
+    { include = "utils" },
+    { include = "verification" },
+    { include = "x86_64" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+z3-solver = ">=4.12.0"
+capstone = ">=5.0.0"
+graphviz = ">=0.20.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0.0"
+pytest-xdist = "^3.8.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "-s",
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+    # 默认串行(单进程、零启动开销,便于看 print 调试)。
+    # 并行:已装 pytest-xdist(进程级,Z3 Context 进程内不线程安全故用进程非线程)。
+    #   poetry run pytest -n auto --dist=loadscope             # 全量,≈5.5min
+    #   poetry run pytest -n auto --dist=loadscope -m "not slow"  # 日常,≈2min
+    #   poetry run pytest -n 4 --dist=loadscope                # 固定 4 进程
+    # 单 case 调试看 print:poetry run pytest -n0 -s ...
+    # 别改成 --dist=load:逐用例分发会把几个重用例同时挤到 t=0,而它们内部各自还开
+    # path_pair_workers=4,8 核上超订反而更慢(实测 342s vs loadscope 329s)。
+]
+markers = [
+    # 全量跑的墙钟几乎全被 slow 用例一条占掉(≈258s 独占机器 vs 其余 1117 条合计
+    # ≈128s),故单独拎出来:改代码时用 -m "not slow" 快速回归,提交/CI 前跑全量。
+    "slow: 单条数分钟级的整合约验证,默认跑,可用 -m \"not slow\" 跳过",
+]
+

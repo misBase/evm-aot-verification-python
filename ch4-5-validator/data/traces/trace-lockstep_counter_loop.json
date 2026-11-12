@@ -1,0 +1,543 @@
+{
+ "hex": "4d8b75384d0375304d8b7d10498b45704883f80372234883e80349894570498b45304883f8007222483de17f0000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c349c7060000000049c746080000000049c746100000000049c746180000000048c7c12000000049014d30eb00498b45700f1f40004883f812722b4883e81249894570498b45304883f820722a0f1f840000000000483de17f0000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c3498b46e04883c001498b4ee84883d100498b56f04883d200498b5ef84883d300498946e049894ee8498956f049895ef848c7c10000000049014d3090e953ffffff41c685e00000000249c7452800000000c3",
+ "note": "code is generated only; never executed",
+ "rows": [
+  {
+   "block": 0,
+   "pc": 0,
+   "opcode": "TAG",
+   "before": null,
+   "after": null,
+   "start": 4108,
+   "end": 4204
+  },
+  {
+   "block": 0,
+   "pc": 0,
+   "opcode": "PUSH",
+   "before": null,
+   "after": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "start": 4204,
+   "end": 4204
+  },
+  {
+   "block": 0,
+   "pc": 2,
+   "opcode": "BLOCKEND",
+   "before": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": 0,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "start": 4204,
+   "end": 4235,
+   "aux": [
+    {
+     "end": 4211,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 0,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4204
+    },
+    {
+     "end": 4219,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 1,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4211
+    },
+    {
+     "end": 4227,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 2,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4219
+    },
+    {
+     "end": 4235,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 3,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4227
+    }
+   ]
+  },
+  {
+   "block": 0,
+   "pc": 2,
+   "opcode": "JUMP",
+   "before": [
+    {
+     "index": 0,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": 0,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "start": 4235,
+   "end": 4248
+  },
+  {
+   "block": 2,
+   "pc": 2,
+   "opcode": "TAG",
+   "before": null,
+   "after": null,
+   "start": 4248,
+   "end": 4356
+  },
+  {
+   "block": 2,
+   "pc": 3,
+   "opcode": "PUSH",
+   "before": null,
+   "after": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "value": 1,
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "start": 4356,
+   "end": 4356
+  },
+  {
+   "block": 2,
+   "pc": 5,
+   "opcode": "ADD",
+   "before": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "value": 1,
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": -4,
+     "kind": "register",
+     "register": "AX",
+     "condition": 0
+    },
+    {
+     "index": -3,
+     "kind": "register",
+     "register": "CX",
+     "condition": 0
+    },
+    {
+     "index": -2,
+     "kind": "register",
+     "register": "DX",
+     "condition": 0
+    },
+    {
+     "index": -1,
+     "kind": "register",
+     "register": "BX",
+     "condition": 0
+    }
+   ],
+   "start": 4356,
+   "end": 4388,
+   "limb_pairs": [
+    {
+     "kind": "binary",
+     "x": {
+      "index": 0,
+      "kind": "constant",
+      "value": 1,
+      "condition": 0
+     },
+     "y": {
+      "index": -4,
+      "kind": "stack",
+      "condition": 0
+     }
+    },
+    {
+     "kind": "binary",
+     "x": {
+      "index": 1,
+      "kind": "constant",
+      "condition": 0
+     },
+     "y": {
+      "index": -3,
+      "kind": "stack",
+      "condition": 0
+     }
+    },
+    {
+     "kind": "binary",
+     "x": {
+      "index": 2,
+      "kind": "constant",
+      "condition": 0
+     },
+     "y": {
+      "index": -2,
+      "kind": "stack",
+      "condition": 0
+     }
+    },
+    {
+     "kind": "binary",
+     "x": {
+      "index": 3,
+      "kind": "constant",
+      "condition": 0
+     },
+     "y": {
+      "index": -1,
+      "kind": "stack",
+      "condition": 0
+     }
+    }
+   ]
+  },
+  {
+   "block": 2,
+   "pc": 8,
+   "opcode": "BLOCKEND",
+   "before": [
+    {
+     "index": -4,
+     "kind": "register",
+     "register": "AX",
+     "condition": 0
+    },
+    {
+     "index": -3,
+     "kind": "register",
+     "register": "CX",
+     "condition": 0
+    },
+    {
+     "index": -2,
+     "kind": "register",
+     "register": "DX",
+     "condition": 0
+    },
+    {
+     "index": -1,
+     "kind": "register",
+     "register": "BX",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": -4,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -3,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -1,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "start": 4388,
+   "end": 4404,
+   "aux": [
+    {
+     "end": 4392,
+     "kind": "spill",
+     "location": {
+      "index": -4,
+      "kind": "register",
+      "register": "AX",
+      "condition": 0
+     },
+     "start": 4388
+    },
+    {
+     "end": 4396,
+     "kind": "spill",
+     "location": {
+      "index": -3,
+      "kind": "register",
+      "register": "CX",
+      "condition": 0
+     },
+     "start": 4392
+    },
+    {
+     "end": 4400,
+     "kind": "spill",
+     "location": {
+      "index": -2,
+      "kind": "register",
+      "register": "DX",
+      "condition": 0
+     },
+     "start": 4396
+    },
+    {
+     "end": 4404,
+     "kind": "spill",
+     "location": {
+      "index": -1,
+      "kind": "register",
+      "register": "BX",
+      "condition": 0
+     },
+     "start": 4400
+    }
+   ]
+  },
+  {
+   "block": 2,
+   "pc": 8,
+   "opcode": "JUMP",
+   "before": [
+    {
+     "index": -4,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -3,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -1,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": -4,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -3,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -1,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "start": 4404,
+   "end": 4421
+  },
+  {
+   "block": 2,
+   "pc": 9,
+   "opcode": "STOP",
+   "before": [
+    {
+     "index": -4,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -3,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -1,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": -4,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -3,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": -1,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "start": 4421,
+   "end": 4438
+  }
+ ]
+}

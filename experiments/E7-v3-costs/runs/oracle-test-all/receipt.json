@@ -1,0 +1,36 @@
+{
+ "cmd": [
+  "/artifact/.venv/bin/python",
+  "-B",
+  "/artifact/tests/paper/newlab/v3_cost/oracle.py",
+  "/artifact/tmp/recorded-runs/r4/fixtures/CErc20",
+  "/artifact/tmp/v3exp/runs/c-14263-d15/obligations/36748-1.smt2",
+  "x86_maps_group_1",
+  "all",
+  "120",
+  "/artifact/tmp/v3exp/runs/oracle-test-all/out.json"
+ ],
+ "cwd": "/artifact/tmp/v3exp/snap",
+ "host": "host-B",
+ "platform": "macOS-15.3.1-arm64-arm-64bit-Mach-O",
+ "observe": false,
+ "wall_limit": 600.0,
+ "rss_limit_mb": null,
+ "cpus": null,
+ "env": {
+  "PYTHONSTARTUP": "/artifact/user-home/Library/Application Support/Code/User/workspaceStorage/9d0d5cdd61c00d819638be471a0b925a/ms-python.python/pythonrc.py",
+  "PYTHONHASHSEED": "0",
+  "BLOCK_SUMMARY_LEMMAS": "1",
+  "BLOCK_PROOF_CACHE": "/artifact/tmp/v3exp/runs/oracle-test-all/cache.sqlite",
+  "PYTHONDONTWRITEBYTECODE": "1",
+  "PYTHONPATH": "/artifact/tmp/v3exp/snap"
+ },
+ "revision": "c68c4dfc87515204e09a2d566554cd9b04c643d4",
+ "started": 1794466028.232728,
+ "wall_s": 116.9,
+ "exit": 0,
+ "killed": null,
+ "peak_tree_rss_mb": 617.0,
+ "live_cpu_peak_s": 90.5,
+ "children_cpu_s": 91.8
+}

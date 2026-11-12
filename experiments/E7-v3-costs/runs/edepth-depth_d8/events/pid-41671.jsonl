@@ -1,0 +1,2 @@
+{"event": "v3_install", "pid": 41671, "thread": 8617265216, "monotonic": 1108272.161311166, "argv": ["-m", "/artifact/tmp/v3exp/synth/depth_d8", "--gas-check"], "snapshot": "/artifact/tmp/v3exp/snap"}
+{"event": "v3_counts", "pid": 41671, "thread": 8617265216, "monotonic": 1108449.558468208, "counts": {}, "maxrss_mb": 87.8}

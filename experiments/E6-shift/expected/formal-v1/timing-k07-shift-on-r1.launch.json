@@ -1,0 +1,27 @@
+{
+  "command": [
+    "/artifact/.venv/bin/python",
+    "/artifact/tests/paper/harness/run_one.py",
+    "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r1.json",
+    "600",
+    "6000",
+    "--",
+    "/artifact/.venv/bin/python",
+    "/artifact/tests/paper/micro/v2/e22_formal_worker.py",
+    "timing-k07-shift-on-r1"
+  ],
+  "load": {
+    "observed_utc": "2026-11-05T16:15:33.013455+00:00",
+    "load": [
+      4.7353515625,
+      4.7509765625,
+      5.02587890625
+    ],
+    "project_rows": [
+      "60548     1 60548   1.2  22816 /artifact/user-home/.nvm/versions/node/v22.19.0/lib/node_modules/@tool-vendor/analysis-tool/node_modules/@tool-vendor/analysis-tool-darwin-arm64/node --liftoff-only /artifact/user-home/.nvm/versions/node/v22.19.0/lib/node_modules/@tool-vendor/analysis-tool/node_modules/@tool-vendor/analysis-tool-darwin-arm64/lib/dist/bin/analysis-tool.js serve --mcp --path /artifact",
+      "82901     1 82901   4.6  16032 /opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python /artifact/tests/paper/micro/v2/e22_formal_run.py --run --phase all --wait-local-idle"
+    ],
+    "known_other_math_rows": [],
+    "pcpu_scope": "lifetime average, not interval usage"
+  }
+}

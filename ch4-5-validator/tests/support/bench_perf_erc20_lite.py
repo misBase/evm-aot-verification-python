@@ -1,0 +1,231 @@
+"""test_verify_perf_erc20_lite_program_pair 的基准辅助脚本。
+
+运行全符号验证（calldatasize 保持符号化），并显式打印各阶段耗时。
+用于性能排查，不作为 pytest 用例的一部分。
+
+用法:
+    poetry run python -m tests.support.bench_perf_erc20_lite \
+        --timeout-ms 600000 [--path-observations] [--workers N]
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import time
+
+from evm_ir.program import EVMProgram
+from evm_ir.json_parser import load_ir_from_json
+from state.smt_state import SMTState
+from verification.program_verifier import ProgramEquivalenceChecker
+from x86_64.program import X86Program
+from x86_64.summaries import TRUSTED_SUMMARY_CONFIG
+
+
+def _flush_print(*args, **kwargs):
+    print(*args, **kwargs)
+    sys.stdout.flush()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--timeout-ms", type=int, default=600_000)
+    parser.add_argument("--path-observations", action="store_true")
+    parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--calldata-size", type=int, default=None,
+                        help="fix calldatasize to this many bytes; default = symbolic")
+    parser.add_argument("--no-verbose", action="store_true",
+                        help="suppress phase prints and z3 verbose")
+    parser.add_argument("--no-reachability", action="store_true",
+                        help="disable x86 reachability check (faster build, more paths)")
+    parser.add_argument("--reach-timeout-ms", type=int, default=50,
+                        help="reachability check per-call timeout (default 50)")
+    parser.add_argument("--calldatasize-max", type=lambda x: int(x, 0), default=None,
+                        help="add precondition calldatasize <= N (e.g. 0xFFFFFFFF)")
+    parser.add_argument("--enable-merge", action="store_true",
+                        help="enable x86 confluence-point state merging (CFG path explosion)")
+    parser.add_argument("--skip-feasibility", action="store_true",
+                        help="skip path-pair feasibility precheck (sound, equivalence check fast-fails on infeasible pairs)")
+    parser.add_argument("--profile-subchecks", action="store_true",
+                        help="enable verbose subcheck timing on the equivalence checker")
+    args = parser.parse_args()
+
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    ir_path = os.path.join(repo_root, "tests/data/perf_erc20_lite.json")
+    x86_path = os.path.join(repo_root, "tests/data/perf_erc20_lite.hex")
+
+    compiler_result = load_ir_from_json(ir_path)
+    evm_program = EVMProgram(compiler_result)
+
+    with open(x86_path, "r", encoding="utf-8") as f:
+        x86_hex_sequence = f.read().strip()
+    x86_program = X86Program.from_hex(x86_hex_sequence, base_addr=0)
+
+    # 注意：ProgramEquivalenceChecker(verbose=True) 会设置 z3.set_option(verbose=10)，
+    # 导致 Z3 tactic 日志刷屏并淹没阶段耗时。这里保持 verbose=False，
+    # 只用下面的 helper 打印我们自己的计时标记。
+    checker = ProgramEquivalenceChecker(
+        timeout_ms=args.timeout_ms, verbose=args.profile_subchecks,
+    )
+    summary_config = TRUSTED_SUMMARY_CONFIG
+    initial_state = SMTState.create_initial_state(
+        calldata_size_bytes=args.calldata_size,
+    )
+
+    # 可选全局前置条件：约束符号 calldatasize。放在 initial_state 上，
+    # 让后续求解器（可达性检查 + 最终等价性检查）都能看到这条断言。
+    if args.calldatasize_max is not None:
+        from z3 import BitVecVal, ULE
+        bound = BitVecVal(args.calldatasize_max, 64)
+        initial_state.assumptions = list(initial_state.assumptions or []) + [
+            ULE(initial_state.calldatasize, bound)
+        ]
+        _flush_print(f"[bench] added precondition: calldatasize <= {hex(args.calldatasize_max)}")
+
+    _flush_print(
+        f"--- bench start: timeout_ms={args.timeout_ms} "
+        f"path_observations={args.path_observations} workers={args.workers} "
+        f"calldata_size={args.calldata_size}"
+    )
+
+    # 手动执行两个构造阶段，这样即使不启用 path_observations 也能记录墙钟时间。
+    from verification.call_site_mapping import build_call_site_mapping
+
+    t0 = time.time()
+    evm_state, evm_result = evm_program.to_z3(initial_state)
+    t_evm = time.time() - t0
+    _flush_print(f"[phase] EVM to_z3 build wall: {t_evm:.3f}s")
+
+    t1 = time.time()
+    call_site_mapping = build_call_site_mapping(evm_program, x86_program)
+    # 临时接入统计：monkey-patch executor 以捕获累计指标。
+    import x86_64.cfg_executor as _ce
+    stats_holder = {}
+    orig_execute = _ce.X86SymbolicExecutor.execute
+    def _wrapped_execute(self, *a, **kw):
+        out = orig_execute(self, *a, **kw)
+        stats_holder["reachability_call_count"] = self.reachability_call_count
+        stats_holder["reachability_total_wall"] = self.reachability_total_wall
+        stats_holder["reachability_pruned_count"] = self.reachability_pruned_count
+        stats_holder["total_states"] = self.total_states
+        stats_holder["final_state_count"] = len(self.final_states)
+        return out
+    _ce.X86SymbolicExecutor.execute = _wrapped_execute
+    try:
+        x86_state, x86_result = x86_program.to_z3(
+            initial_state,
+            call_site_mapping=call_site_mapping,
+            use_reachability_check=not args.no_reachability,
+            reachability_timeout_ms=args.reach_timeout_ms,
+            enable_merge=args.enable_merge,
+            summary_config=summary_config,
+        )
+    finally:
+        _ce.X86SymbolicExecutor.execute = orig_execute
+    t_x86 = time.time() - t1
+    _flush_print(
+        f"[phase] x86 to_z3 build wall: {t_x86:.3f}s  (call_site={len(call_site_mapping)})"
+    )
+    if stats_holder:
+        _flush_print(
+            "[phase]   reachability stats: "
+            f"calls={stats_holder.get('reachability_call_count', 0)} "
+            f"total_wall={stats_holder.get('reachability_total_wall', 0.0):.3f}s "
+            f"pruned={stats_holder.get('reachability_pruned_count', 0)} "
+            f"total_states={stats_holder.get('total_states', 0)} "
+            f"finals={stats_holder.get('final_state_count', 0)}"
+        )
+
+    if args.path_observations:
+        # path_observations 模式：通过 to_z3_paths 重建，得到逐路径观测。
+        # 前面的 to_z3 只用于统计；enable_merge=True 时这里大约再花 16s。
+        t2_pre = time.time()
+        evm_paths = evm_program.to_z3_paths(initial_state)
+        x86_paths = x86_program.to_z3_paths(
+            initial_state,
+            call_site_mapping=call_site_mapping,
+            use_reachability_check=not args.no_reachability,
+            reachability_timeout_ms=args.reach_timeout_ms,
+            enable_merge=args.enable_merge,
+            summary_config=summary_config,
+        )
+        _flush_print(
+            f"[phase] path_obs build wall: {time.time()-t2_pre:.3f}s "
+            f"(evm finals={len(evm_paths.observations)}, x86 finals={len(x86_paths.observations)})"
+        )
+        # 把全局 assumption 注入每个 observation 的路径条件。
+        from dataclasses import replace as _dc_replace
+        from z3 import And as _And
+        assumptions_list = list(initial_state.assumptions or [])
+        for paths in (evm_paths, x86_paths):
+            for gs in getattr(paths, 'global_states', None) or []:
+                for a in getattr(gs.mstate, 'assumptions', None) or []:
+                    assumptions_list.append(a)
+        # 去重，避免重复 assumption 放大公式。
+        seen = set()
+        dedup = []
+        for a in assumptions_list:
+            k = a.hash()
+            if k in seen:
+                continue
+            seen.add(k)
+            dedup.append(a)
+        evm_obs = evm_paths.observations
+        x86_obs = x86_paths.observations
+        if dedup:
+            evm_obs = [_dc_replace(o, condition=_And(o.condition, *dedup)) for o in evm_obs]
+            x86_obs = [_dc_replace(o, condition=_And(o.condition, *dedup)) for o in x86_obs]
+        t2 = time.time()
+        if args.workers == 1:
+            verified, msg = checker.equivalence_checker.check_equivalence_paths(
+                evm_obs, x86_obs,
+                skip_feasibility=args.skip_feasibility,
+            )
+        else:
+            verified, msg = checker.equivalence_checker.check_equivalence_paths(
+                evm_obs, x86_obs,
+                path_pair_workers=args.workers,
+                skip_feasibility=args.skip_feasibility,
+            )
+        t_check = time.time() - t2
+        _flush_print(
+            f"[phase] equivalence_paths check wall: {t_check:.3f}s "
+            f"(workers={args.workers})"
+        )
+    else:
+        t2 = time.time()
+        assumptions_list = initial_state.assumptions or []
+        # 也把 final state 上累积的 assumption（CALLDATALOAD 处追加的）取出来一并加进
+        # 顶层 precondition；evm_state/x86_state.assumptions 在各自 program.to_z3
+        # 结尾被合并到 merged_state.assumptions。
+        for st in (evm_state, x86_state):
+            for a in getattr(st, 'assumptions', None) or []:
+                assumptions_list.append(a)
+        # 去重，避免重复 assumption 放大公式。
+        seen = set()
+        dedup = []
+        for a in assumptions_list:
+            k = a.hash()
+            if k in seen:
+                continue
+            seen.add(k)
+            dedup.append(a)
+        if dedup:
+            from z3 import And, BoolVal
+            precondition = And(BoolVal(True), *dedup)
+        else:
+            precondition = None
+        verified, msg = checker.equivalence_checker.check_equivalence(
+            evm_result, x86_result, assumptions=precondition,
+        )
+        t_check = time.time() - t2
+        _flush_print(f"[phase] equivalence check wall: {t_check:.3f}s")
+
+    total = t_evm + t_x86 + t_check
+    _flush_print(f"--- bench done: verified={verified} total={total:.3f}s")
+    _flush_print(f"--- message: {msg}")
+    return 0 if verified else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,27 @@
+{
+  "fixture_json_sha256": "043dc1695117d6082d11172091a775f0641e430943968cacd506f5849628de51",
+  "fixture_hex_sha256": "1f1853fa8b043d4ab5e10474575e2dc46d514309b8e5e6b12a4e2bd207073553",
+  "tag_pc": 19,
+  "tag_entry_gas": 12,
+  "tag_static_gas": 9,
+  "tag_entry_stack_depth": 0,
+  "native_go_remaining_gas": 3,
+  "raw_amd64_remaining_gas": 3,
+  "status": "STACK_UNDERFLOW",
+  "native_go": {
+    "bytecode_hex": "6050602852600160295260003560001a6019576001602701f35b60016029f300",
+    "bytes": 32,
+    "error": "stack underflow (1 <=> 2)",
+    "error_type": "*common.ErrStackUnderflow",
+    "initial_gas": 64,
+    "interpreter_remaining_gas": 3,
+    "return_hex": "",
+    "scope": "native Go interpreter only; not native amd64 AOT and not EVM.Call host cleanup"
+  },
+  "evidence": {
+    "tmp/recorded-runs/measurement-work/paper-framework-review/D/go-run-1/worker-result.json": "c7f8bc61a388b382fd6a09fafae94c345aabbf030f2bba8ca5e66a69addf9b6f",
+    "tmp/recorded-runs/measurement-work/paper-framework-review/D/run-2/worker-result.json": "1770b3daad6bbfc504280b908be573c072d22b672bb70f167c6997f4621b9e05",
+    "tmp/recorded-runs/measurement-work/paper-framework-review/D/go-run-1/go.stdout.log": "fc99b5428935450ef140356998cbcbd9e704a5737aa62998fde356d3c08a5cb9"
+  },
+  "boundary": "Archived native Go interpreter and raw AMD64-model observations; this reference is not a new Go/native AOT run and does not include EVM.Call host cleanup."
+}

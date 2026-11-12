@@ -1,0 +1,618 @@
+{
+  "excluded": [
+    "stack effects",
+    "gas",
+    "exceptions",
+    "CFG",
+    "EXP",
+    "unregistered UF operators"
+  ],
+  "format_version": 1,
+  "normalization": "structural lowering only: n-ary Bool and/or to binary folds, binary Distinct to negated equality",
+  "operations": {
+    "ADD": {
+      "hol_root": "exported_add",
+      "method": "evm_ir.semantics.EVMOperationSemantics.add_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 40,
+      "raw_expression_sha256": "e437c4c87dd78007c2a051b33c21443195d8eb0392b2e198ffef76c3c600c9ed",
+      "result_width": 256,
+      "root": 39,
+      "smt_file": "generated/add.smt2",
+      "smt_sha256": "a96cc21062c0bf98b90501af48d3212fb981abf2e425ab5edcdf1cd1527b0a27",
+      "uf_symbols": []
+    },
+    "ADDMOD": {
+      "hol_root": "exported_addmod",
+      "method": "evm_ir.semantics.EVMOperationSemantics.addmod_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        },
+        {
+          "index": 2,
+          "name": "c",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 74,
+      "raw_expression_sha256": "007e52030f83da12ea636aa57cad210b48bbe14ed0c733e7baea1138ddae9e7f",
+      "result_width": 256,
+      "root": 73,
+      "smt_file": "generated/addmod.smt2",
+      "smt_sha256": "62d4aba45bd4449ffd9efdc57cb57b2bf20e3fea2db4e93b7348c68e1599435c",
+      "uf_symbols": [
+        "holiman_udivrem"
+      ]
+    },
+    "AND": {
+      "hol_root": "exported_and",
+      "method": "evm_ir.semantics.EVMOperationSemantics.and_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 17,
+      "raw_expression_sha256": "badfd3530dd5c13dbc65ddf09383389556587d1a7681758d7ea3270f49e0837d",
+      "result_width": 256,
+      "root": 16,
+      "smt_file": "generated/and.smt2",
+      "smt_sha256": "368d5eb37f37b47113343b5a8f36e6865d828c47330be587f7606d14e1b81180",
+      "uf_symbols": []
+    },
+    "BYTE": {
+      "hol_root": "exported_byte",
+      "method": "evm_ir.semantics.EVMOperationSemantics.byte_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 165,
+      "raw_expression_sha256": "9b6ed83820fd995f986ec73192b0d2b5919a5dffdea97b0244673b1182517ec0",
+      "result_width": 256,
+      "root": 164,
+      "smt_file": "generated/byte.smt2",
+      "smt_sha256": "55135562736c0ab892b8cb74367c7c3e945bde0c6ba6941b34dca995739e6670",
+      "uf_symbols": []
+    },
+    "DIV": {
+      "hol_root": "exported_div",
+      "method": "evm_ir.semantics.EVMOperationSemantics.div_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 62,
+      "raw_expression_sha256": "02af0a09ea7795498d924fcbee0f93a2aad31a9b49797a18f84004f0b69d943a",
+      "result_width": 256,
+      "root": 61,
+      "smt_file": "generated/div.smt2",
+      "smt_sha256": "24363e1f5c857d2c4e79c43a568bfe0d7890ba72b302c9feebfdd05dafea73f7",
+      "uf_symbols": [
+        "holiman_udiv"
+      ]
+    },
+    "EQ": {
+      "hol_root": "exported_eq",
+      "method": "evm_ir.semantics.EVMOperationSemantics.eq_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 18,
+      "raw_expression_sha256": "3c6ae503f3a5cd0b1061f7295561371a7c11d4cc9acb41b1b14452041ae2d771",
+      "result_width": 256,
+      "root": 17,
+      "smt_file": "generated/eq.smt2",
+      "smt_sha256": "f692e34aa3b22db8583a0ad62316612918def7a621d57fde53b7b4b3f1cf31ed",
+      "uf_symbols": []
+    },
+    "GT": {
+      "hol_root": "exported_gt",
+      "method": "evm_ir.semantics.EVMOperationSemantics.gt_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 40,
+      "raw_expression_sha256": "e66bf677eb247c9e0c2b7541f650da52e946248ca350370b839fa0f4117f5702",
+      "result_width": 256,
+      "root": 39,
+      "smt_file": "generated/gt.smt2",
+      "smt_sha256": "88e5439ea4a31d6dd9fad2d09650d84d20fff8c204c9e0a9dff991540c947bc0",
+      "uf_symbols": []
+    },
+    "ISZERO": {
+      "hol_root": "exported_iszero",
+      "method": "evm_ir.semantics.EVMOperationSemantics.iszero_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 14,
+      "raw_expression_sha256": "f5ef6722d0d8d403c7e19f191b71282acd43dd23cde0e4dcd52e561e98161e73",
+      "result_width": 256,
+      "root": 13,
+      "smt_file": "generated/iszero.smt2",
+      "smt_sha256": "abdc7f36366d76f5c9ae2212b62967b7d5e8601886a7b70d97d534691548297e",
+      "uf_symbols": []
+    },
+    "LT": {
+      "hol_root": "exported_lt",
+      "method": "evm_ir.semantics.EVMOperationSemantics.lt_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 40,
+      "raw_expression_sha256": "86bfde32770f5c3aa78874befbba77d36b93bfa06e7475a861affa4372db7e61",
+      "result_width": 256,
+      "root": 39,
+      "smt_file": "generated/lt.smt2",
+      "smt_sha256": "1cc65622118b11d3dafd801d6d8a1177cf0546a0547166d5cac47b07100e2d59",
+      "uf_symbols": []
+    },
+    "MOD": {
+      "hol_root": "exported_mod",
+      "method": "evm_ir.semantics.EVMOperationSemantics.mod_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 61,
+      "raw_expression_sha256": "2fb3ca669d7d685209e0829c6489dbde8a17065fbac6c657b90ad6b6b1a33407",
+      "result_width": 256,
+      "root": 60,
+      "smt_file": "generated/mod.smt2",
+      "smt_sha256": "171954db2dd69bb5af7fb7a5f47b4c88af492fff9bfee893e57729386e71f956",
+      "uf_symbols": [
+        "holiman_udivrem"
+      ]
+    },
+    "MUL": {
+      "hol_root": "exported_mul",
+      "method": "evm_ir.semantics.EVMOperationSemantics.mul_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 117,
+      "raw_expression_sha256": "d41417548ad43f8f8b0101c269e156f10d520f38df0a8b2662dba82859125926",
+      "result_width": 256,
+      "root": 116,
+      "smt_file": "generated/mul.smt2",
+      "smt_sha256": "f007328b9830b19e9194a917a0477aef0e91233f79d5e861d7b4827f28c8636c",
+      "uf_symbols": []
+    },
+    "MULMOD": {
+      "hol_root": "exported_mulmod",
+      "method": "evm_ir.semantics.EVMOperationSemantics.mulmod_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        },
+        {
+          "index": 2,
+          "name": "c",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 12,
+      "raw_expression_sha256": "8fa75e4a2fd24da9a2a9a8850300498213f9338a41dcd91dd683cb2fbce555a2",
+      "result_width": 256,
+      "root": 11,
+      "smt_file": "generated/mulmod.smt2",
+      "smt_sha256": "d36412a8be5b2568923134812c2a4240272694a48acef2d62ce4e0fdd93a8bda",
+      "uf_symbols": []
+    },
+    "NOT": {
+      "hol_root": "exported_not",
+      "method": "evm_ir.semantics.EVMOperationSemantics.not_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 13,
+      "raw_expression_sha256": "279522d5f55557986ca2c37e7a45da6a4a206735c94e2a21218318627d430485",
+      "result_width": 256,
+      "root": 12,
+      "smt_file": "generated/not.smt2",
+      "smt_sha256": "eea2d34bf6d3f55ab3a8c4e18f7cc6dee999b4bd3145f2da637176cb384d2ab3",
+      "uf_symbols": []
+    },
+    "OR": {
+      "hol_root": "exported_or",
+      "method": "evm_ir.semantics.EVMOperationSemantics.or_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 17,
+      "raw_expression_sha256": "28be395fa3f0c680f1fcd756541b33786397788c9af34fa18cb8c9c72e88c5ac",
+      "result_width": 256,
+      "root": 16,
+      "smt_file": "generated/or.smt2",
+      "smt_sha256": "f76ef60b9c407583e6818acfa7205011500975f6947d739889c699485d1449cb",
+      "uf_symbols": []
+    },
+    "SAR": {
+      "hol_root": "exported_sar",
+      "method": "evm_ir.semantics.EVMOperationSemantics.sar_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 12,
+      "raw_expression_sha256": "d183a9527f45b793f520a902d93acc0622b5a0772413473ed70ab7de7d659361",
+      "result_width": 256,
+      "root": 11,
+      "smt_file": "generated/sar.smt2",
+      "smt_sha256": "1da2dc36f724ae165e81dcadb11aba0500c02035086552f27e1d50aba28a8b6e",
+      "uf_symbols": []
+    },
+    "SDIV": {
+      "hol_root": "exported_sdiv",
+      "method": "evm_ir.semantics.EVMOperationSemantics.sdiv_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 137,
+      "raw_expression_sha256": "fa6696366b37aadc9f851a80213c60ddcb768a51420008ef4cbdf62e26ffa81e",
+      "result_width": 256,
+      "root": 136,
+      "smt_file": "generated/sdiv.smt2",
+      "smt_sha256": "efd1f12e5027468c2c07c3fc6ed0ab853d8b855cfeb70848e6b7646028c9996c",
+      "uf_symbols": [
+        "holiman_udiv"
+      ]
+    },
+    "SGT": {
+      "hol_root": "exported_sgt",
+      "method": "evm_ir.semantics.EVMOperationSemantics.sgt_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 50,
+      "raw_expression_sha256": "586ac3bcd13c699f184d546fe5585da1519317e98c053825277d55d7fb207a1e",
+      "result_width": 256,
+      "root": 49,
+      "smt_file": "generated/sgt.smt2",
+      "smt_sha256": "4ec1e4671136a4b7476493118d27894360922ae96f5d6e4045e1904531ca5ddf",
+      "uf_symbols": []
+    },
+    "SHL": {
+      "hol_root": "exported_shl",
+      "method": "evm_ir.semantics.EVMOperationSemantics.shl_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 7,
+      "raw_expression_sha256": "63e0d50b747d3a419182fc865a97d6779a3512c5bd4e22d6595af31cc6c549c6",
+      "result_width": 256,
+      "root": 6,
+      "smt_file": "generated/shl.smt2",
+      "smt_sha256": "2924520d386c06e2a77b4bddd453cd6b91fe2317faf88483b5e8950db7a8a749",
+      "uf_symbols": []
+    },
+    "SHR": {
+      "hol_root": "exported_shr",
+      "method": "evm_ir.semantics.EVMOperationSemantics.shr_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 7,
+      "raw_expression_sha256": "40bab12f76338c3019400629c1f0c832d3c8b5860e33438ddf26b7760a09a0d8",
+      "result_width": 256,
+      "root": 6,
+      "smt_file": "generated/shr.smt2",
+      "smt_sha256": "cdd33636efcecacaa5f2e0a712aa19639e1f315a1402fa64a43b1e9653e98a3e",
+      "uf_symbols": []
+    },
+    "SIGNEXTEND": {
+      "hol_root": "exported_signextend",
+      "method": "evm_ir.semantics.EVMOperationSemantics.signextend_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 326,
+      "raw_expression_sha256": "d963807950f5e300c9895f36fed1c39754828b4a7579e26c9568d75e695b999b",
+      "result_width": 256,
+      "root": 325,
+      "smt_file": "generated/signextend.smt2",
+      "smt_sha256": "43abe287724ce2a39f7d66935c5adb4ad82f363e0f59daefaf75eb2509e1b9e0",
+      "uf_symbols": []
+    },
+    "SLT": {
+      "hol_root": "exported_slt",
+      "method": "evm_ir.semantics.EVMOperationSemantics.slt_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 50,
+      "raw_expression_sha256": "f92dd5097c40c62a2083796e96d96c67bef689291475db45cd804a421bc933f7",
+      "result_width": 256,
+      "root": 49,
+      "smt_file": "generated/slt.smt2",
+      "smt_sha256": "5375e54ef23fe5b1426a6969684ecd72b31d05569b9fdaee057f07e72609bd80",
+      "uf_symbols": []
+    },
+    "SMOD": {
+      "hol_root": "exported_smod",
+      "method": "evm_ir.semantics.EVMOperationSemantics.smod_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 135,
+      "raw_expression_sha256": "cfd6972a3def09eed830d1453acad12ad1b554cdad94e49451bfb7489985cde0",
+      "result_width": 256,
+      "root": 134,
+      "smt_file": "generated/smod.smt2",
+      "smt_sha256": "dfc5eafd10ed767676cbb91fcd45de20c3db16f7d42f0eb5cc1a9a67c09cd851",
+      "uf_symbols": [
+        "holiman_udivrem"
+      ]
+    },
+    "SUB": {
+      "hol_root": "exported_sub",
+      "method": "evm_ir.semantics.EVMOperationSemantics.sub_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 42,
+      "raw_expression_sha256": "a6fd84c95de7c6652ea5aaa480dd4a7d95ed08945a2bf5e07917f3ced2770c51",
+      "result_width": 256,
+      "root": 41,
+      "smt_file": "generated/sub.smt2",
+      "smt_sha256": "3a12e18fc73c3436a6bd38faef0096c75db574c216e71c0bcf8121b9f6265300",
+      "uf_symbols": []
+    },
+    "XOR": {
+      "hol_root": "exported_xor",
+      "method": "evm_ir.semantics.EVMOperationSemantics.xor_semantics",
+      "operands": [
+        {
+          "index": 0,
+          "name": "a",
+          "width": 256
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "width": 256
+        }
+      ],
+      "raw_dag_nodes": 17,
+      "raw_expression_sha256": "006e6cbeeb99cdcab965dd5960d154f3dab7f930ac46fe4f1a591351a91f78bf",
+      "result_width": 256,
+      "root": 16,
+      "smt_file": "generated/xor.smt2",
+      "smt_sha256": "cb27a4e6028d2ecc8358fc00871862271a64322868e704351839c8087d5b74f4",
+      "uf_symbols": []
+    }
+  },
+  "python_version": "3.10.12",
+  "scope": "pure EVMOperationSemantics arithmetic results, symbolic BV256 inputs",
+  "source_files": {
+    "common/__init__.py": "fdd05d62a9e8bd6ff2771aab7cca0fb2a4457b8e8ebb488a86e9b69eb3bc4aa1",
+    "common/arithmetic.py": "67d41d89db06ee29e8bdd65f583440d632558419c4d25108c9babfcc36bc4563",
+    "common/calldata.py": "7df01dfbf9fead6511c0fa257aba724883017dc0734afd352ebb82fb73928766",
+    "common/evm_stack.py": "834477d9f05898264fc6827cc0fb9d5ebc40f10a4dfe27d1bd4a686f82ff1681",
+    "common/path_observation.py": "19aa4cfff43c3a9a56d00d5d74d255189d5ad2b03d230f9350590ca3dd9a22d6",
+    "common/u64.py": "d036b5d39e796641036560961c74c61588c59cff768387ef86c34d1d481e8c07",
+    "common/uint256.py": "6ddc7994ca6efa537e077be90c348a946ecac35eb12d60a6473ce760a10ac057",
+    "common/uninterpreted.py": "6d4b4c714e4124c43eb438752bf7925365aa80398ad83e5dbd6e5558d7bdfa28",
+    "evm_ir/__init__.py": "45041faa8d1b5071ac531027d3ad6eab690b28048f0b044fe41cd49b9a954f1b",
+    "evm_ir/cfg.py": "2cef44ebf0d5a65c55a24ab8126071d2e955542e015364f2cd556ad2b94de946",
+    "evm_ir/cfg_annotations.py": "0d4f698e329d6d76b468964722ad83947c8344a89484010f113e95a4ccf2806f",
+    "evm_ir/cfg_executor.py": "eca16e71eb577230cfb63c9b530f41a30f15aa740dcc6e1d2be3c6deb23d5a6b",
+    "evm_ir/cfg_state.py": "5ff544fba2d7fcb1190cb8d3ef26799ca8c74770b304a65a36ff3925e49fa635",
+    "evm_ir/cfg_strategies.py": "a9428df69eed6ef2b9fc8e3b0820a0768be06938406f31b2e56fa53199144f05",
+    "evm_ir/cfg_structures.py": "793c125fac734ef040a0005ade3d1723a966ca7096bcbd238def46e0b99fe585",
+    "evm_ir/json_parser.py": "4840e97f133762a5d71ade644b2a23d6c88443f73659c7d657e12c1376b76c07",
+    "evm_ir/models.py": "0ae2167520ecb7b3fe5af9923d129bbea8f1fd4635de2772b3caa35fd9badfd4",
+    "evm_ir/program.py": "6e941e2f6eec4773d2ab64dfca9c598349e93f72609aef32bd73885d7bd74bb4",
+    "evm_ir/semantics.py": "016d10a78aabae7bea635c0c76900cd3e3bd857a26c2be9b673d7241f8cdb09b",
+    "evm_ir/semantics_gas.py": "59306349248b7bcca6cc40a33233ed0245e6b8c495cb4985bd5ba1e9a37a0cb3",
+    "evm_ir/status_code.py": "b5945acc756972eaf02d4191c84a43ead873317c9f0fd481fe5c491686a2eb78",
+    "state/__init__.py": "c0aa0799687f216fe30bc99c152c6e1e9193dcd2f5e8e8fcde3e17c730b26f48",
+    "state/evm_gas_state.py": "5d53f6865e461a0ccd92b5f30692e7fd07d9a382688ab9d31c64f3361119fd8f",
+    "state/evm_memory_state.py": "ca65aa9233bef84c851f97ba24cd5c28d585d325638bd5b405b6a009e2386d67",
+    "state/evm_stack_state.py": "4e4bbb551b02f4c672b9907abc76a432f9a50988f7d0ebd5384733448a292db2",
+    "state/evm_storage_state.py": "e2232e9b8af6a5ab39ae171362e5db9a626040748c2ca6fa3791bfdeb6c597d4",
+    "state/evm_transient_storage_state.py": "b980970065be2110ce455bbd936f971e71ab8037f837f1c6b165c5ee870f5d41",
+    "state/smt_state.py": "b7bcb741a5c01f65e9361da40456f5ee942cda4970a4a71ce31324d092f21265",
+    "state/x86_state.py": "0d20a16f8fe4267fd1449a6f0a3699d5bd11bc7369698db21d04be83d4903530"
+  },
+  "source_git_commit": "18bb17741da25777c502746a08a1f719ba340dc2",
+  "theory_sha256": "088b09e3f65d46424ea76b4aa9b5031f0f203e7383b8e1ef3e97360968a4b5d8",
+  "trust_boundary": "Python AST capture and HOL serialization are not formally verified",
+  "uf_contract": {
+    "holiman_udiv": "unsigned mathematical quotient on the guarded long-division branch",
+    "holiman_udivrem": "unsigned mathematical remainder on the guarded long-division branch",
+    "status": "explicit HOL interpretation, not axioms asserted by the production solver"
+  },
+  "z3_version": "4.15.3"
+}

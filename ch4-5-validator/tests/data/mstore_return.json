@@ -1,0 +1,56 @@
+{
+    "control_frames": [
+        {
+            "is_jump_target": false,
+            "is_stop": true,
+            "max_depth": 1022,
+            "min_depth": 0,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 1,
+                    "pc": 0
+                },
+                {
+                    "immediate": "9",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 0
+                },
+                {
+                    "immediate": "0",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 2
+                },
+                {
+                    "kind": "MSTORE",
+                    "pc": 4
+                },
+                {
+                    "immediate": "32",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 5
+                },
+                {
+                    "immediate": "0",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 7
+                },
+                {
+                    "kind": "RETURN",
+                    "pc": 9
+                },
+                {
+                    "kind": "STOP",
+                    "pc": 10
+                }
+            ],
+            "pc": 0,
+            "stack_depth": 0,
+            "static_gas": 15
+        }
+    ]
+}

@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""
+EVM AOT翻译验证工具
+
+此脚本验证EVM IR（来自JSON）和AOT编译的x86-64机器码（来自十六进制字符串）
+之间的语义等价性。
+
+用法：
+    python main.py <ir_json_path> <x86_hex> [--base-addr ADDR] [--timeout MS] [--verbose]
+                   [--gas-check {off,fixed-budget,full}] [--gas-budget N]
+"""
+
+import argparse
+import sys
+from evm_ir.program import EVMProgram
+from evm_ir.json_parser import load_ir_from_json
+from x86_64.program import X86Program
+from verification.program_verifier import GasCheck, ProgramEquivalenceChecker
+from state.smt_state import SMTState
+
+
+def parse_args():
+    """解析命令行参数。"""
+    parser = argparse.ArgumentParser(
+        description="验证EVM IR和x86-64机器码之间的语义等价性",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例：
+  python main.py tests/data/example_ir.json 498b46c0490346e0...
+  python main.py contract.ir.json 498b46c0... --base-addr 0x6c
+  python main.py contract.ir.json 498b46c0... --timeout 30000 --verbose
+  python main.py contract.ir.json 498b46c0... --gas-check fixed-budget
+  python main.py contract.ir.json 498b46c0... --gas-check full
+        """
+    )
+    
+    parser.add_argument(
+        'ir_json_path',
+        help='Path to EVM IR JSON file'
+    )
+    
+    parser.add_argument(
+        'x86_hex',
+        help='x86-64 machine code as hex string'
+    )
+    
+    parser.add_argument(
+        '--base-addr',
+        type=lambda x: int(x, 0),  # 接受十六进制或十进制
+        default=0,
+        metavar='ADDR',
+        help='Base address for x86 code (default: 0)'
+    )
+    
+    parser.add_argument(
+        '--timeout', '-t',
+        type=int,
+        default=60000,
+        metavar='MS',
+        help='Z3 solver timeout in milliseconds (default: 60000)'
+    )
+    
+    parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose output'
+    )
+
+    parser.add_argument(
+        '--gas-check',
+        choices=[m.value.replace('_', '-') for m in GasCheck],
+        default=GasCheck.OFF.value,
+        help=(
+            'Gas equivalence check mode. "off" (default) skips gas comparison; '
+            '"fixed-budget" compares gas from one concrete budget; '
+            '"full" uses symbolic gas and verifies OOG paths over all budgets.'
+        ),
+    )
+
+    parser.add_argument(
+        '--gas-budget',
+        type=int,
+        default=None,
+        help=(
+            'Concrete initial gas budget for --gas-check fixed-budget (and off). '
+            'Ignored for "full", which requires symbolic gas.'
+        ),
+    )
+    
+    parser.add_argument('--proof-mode', choices=('paths', 'block-lockstep'), default='paths',
+                        help='Use a closed block theorem graph or the existing whole-program path verifier')
+    parser.add_argument('--num-inputs', type=int, default=None,
+                        help='Initial stack depth (block mode default: 0; legacy paths default: 2)')
+    parser.add_argument('--block-fallback', choices=('none', 'full-program'), default='none',
+                        help='Optional independent full-program rerun after an incomplete block graph')
+    return parser.parse_args()
+
+
+def verify_programs(
+    ir_json_path: str,
+    x86_hex: str,
+    base_addr: int,
+    timeout_ms: int,
+    verbose: bool,
+    gas_check: 'GasCheck | str' = GasCheck.OFF,
+    gas_budget: int = None,
+    proof_mode: str = "paths",
+    num_inputs: int = None,
+    block_fallback: str = "none",
+):
+    """验证EVM和x86程序之间的等价性。
+    
+    Args:
+        ir_json_path: EVM IR JSON文件路径
+        x86_hex: 十六进制编码的x86机器码
+        base_addr: x86代码的基址
+        timeout_ms: 求解器超时（毫秒）
+        verbose: 启用详细输出
+        gas_check: gas 检查模式（GasCheck，或其字符串值）
+        gas_budget: 具体 gas 预算；仅非 FULL 模式有效
+        
+    Returns:
+        (verified, message)，如果程序等价则verified为True
+    """
+    if verbose:
+        print(f"Loading EVM IR from: {ir_json_path}")
+        print(f"Loading x86 code from hex: {x86_hex[:64]}..." if len(x86_hex) > 64 else f"Loading x86 code from hex: {x86_hex}")
+        print(f"Base address: 0x{base_addr:x}")
+        print(f"Timeout: {timeout_ms}ms")
+        print(f"Gas check: {GasCheck(gas_check).value}")
+        print()
+    
+    # 从JSON加载EVM程序
+    try:
+        compiler_result = load_ir_from_json(ir_json_path)
+        evm_program = EVMProgram(compiler_result)
+    except FileNotFoundError:
+        return False, f"Error: File not found: {ir_json_path}"
+    except Exception as e:
+        return False, f"Error loading EVM IR: {e}"
+    
+    # 从十六进制创建x86程序
+    try:
+        x86_program = X86Program.from_hex(x86_hex, base_addr=base_addr)
+    except Exception as e:
+        return False, f"Error parsing x86 hex: {e}"
+    
+    # 使用ProgramEquivalenceChecker验证
+    mode = GasCheck(gas_check)
+    checker = ProgramEquivalenceChecker(
+        timeout_ms=timeout_ms,
+        verbose=verbose,
+        gas_check=mode,
+    )
+    if num_inputs is None:
+        num_inputs = 0 if proof_mode == "block-lockstep" else 2
+    # 初始 gas 配置必须与模式匹配，否则 verify_program_pair 会 fail-closed 拒绝。
+    if mode is GasCheck.FULL:
+        initial_state = SMTState.create_initial_state(num_inputs, symbolic_gas=True)
+    else:
+        initial_state = SMTState.create_initial_state(num_inputs, gas_budget=gas_budget)
+    if block_fallback != "none" and proof_mode != "block-lockstep":
+        return False, "INCONCLUSIVE: --block-fallback requires --proof-mode block-lockstep"
+    return checker.verify_program_pair(evm_program, x86_program, initial_state,
+        **({"proof_mode": proof_mode, "block_options": {"fallback": block_fallback}}
+           if proof_mode != "paths" else {}))
+
+
+def main():
+    """主入口点。"""
+    args = parse_args()
+    
+    if args.verbose:
+        print("=" * 70)
+        print("EVM AOT TRANSLATION VERIFICATION")
+        print("=" * 70)
+        print()
+    
+    # 验证程序
+    verified, message = verify_programs(
+        args.ir_json_path,
+        args.x86_hex,
+        args.base_addr,
+        args.timeout,
+        args.verbose,
+        args.gas_check.replace('-', '_'),
+        args.gas_budget,
+        args.proof_mode,
+        args.num_inputs,
+        args.block_fallback,
+    )
+    
+    # 输出结果
+    if verified:
+        # 无条件原样打印 verifier 的消息：结论的适用范围与强度边界由 _annotate_gas_scope
+        # 附在里面。这里一度自己拼结论文案、且只在 --verbose 下打印 message，默认输出因此
+        # 不带任何前提。别再加本地拼装的结论文案。
+        #
+        # verified 却没有 message 时 fail-closed：那意味着某条成功路径绕过了范围标注，
+        # 唯一"安全"的补救是打印一句无前提的 VERIFIED——正是要避免的东西。当前生产路径
+        # 都带 message，所以这条不可达；留着是防回归。
+        if not message:
+            print("✗ VERIFICATION INCONCLUSIVE: verifier reported success without a "
+                  "scope-annotated message; refusing to print an unqualified verdict")
+            return 1
+        print(message)
+        return 0
+    else:
+        print("✗ VERIFICATION FAILED")
+        if message:
+            print(f"  {message}")
+        return 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user", file=sys.stderr)
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n\nError: {e}", file=sys.stderr)
+        if '--verbose' in sys.argv or '-v' in sys.argv:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)

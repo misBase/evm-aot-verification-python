@@ -1,0 +1,52 @@
+{
+  "control_frames": [
+    {
+      "is_jump_target": false,
+      "is_stop": true,
+      "max_depth": 1021,
+      "min_depth": 0,
+      "operations": [
+        {
+          "kind": "TAG",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "17",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "32",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 2
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 4
+        },
+        {
+          "immediate": "1",
+          "kind": "LOG",
+          "param": 17,
+          "pc": 6
+        },
+        {
+          "kind": "STOP",
+          "pc": 7
+        },
+        {
+          "kind": "STOP",
+          "pc": 8
+        }
+      ],
+      "pc": 0,
+      "stack_depth": 0,
+      "static_gas": 9
+    }
+  ]
+}

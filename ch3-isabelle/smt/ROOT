@@ -1,0 +1,12 @@
+session EVM_SMT_Base in "base" = HOL +
+  options [document = false, timeout = 1800]
+  sessions "HOL-Library"
+  theories Exp
+
+session EVM_SMT = EVM_SMT_Base +
+  options [document = false, timeout = 1800]
+  theories
+    SMT_BV
+    Generated_EVM_Arithmetic
+    EVM_SMT_Representation
+    EVM_SMT_Certificates

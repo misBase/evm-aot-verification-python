@@ -1,93 +1,101 @@
-# paper-pldi2027
+# Artifact: Translation Validation of an EVM Ahead-of-Time Compiler to x86-64
 
+This artifact accompanies the paper. It contains the mechanized development of Chapter 3, the validator of
+Chapters 4–5, the inputs used in the evaluation, and scripts that reproduce the tables and figures of the evaluation
+section.
 
+| Directory | Paper | Contents |
+|---|---|---|
+| `ch3-isabelle/` | Chapter 3 | Isabelle/HOL semantics of EVM with the 4×64-bit U256 model, the SMT deep embedding (`smt2Isabelle`) and its consistency certificates, and the Z3 scripts of the U256 algorithms (see `ch3-isabelle/README.md`) |
+| `ch4-5-validator/` | Chapters 4–5 | The validator (Python, Z3, Capstone): EVM IR and x86-64 semantics, path-based validation, block-level and instruction-level lockstep, program certificates; unit and integration tests; evaluation inputs in `data/` |
+| `experiments/` | Section 6 | One directory per experiment (E1–E7), each with a README, `run.sh` and the recorded results in `expected/` |
+| `Makefile` | | Entry points: `make install`, `make smoke`, `make isabelle`, `make e1` … `make e7` |
+| `Dockerfile` | | Pinned Linux environment for Chapters 4–5 and the experiments |
 
-## Getting started
+## Requirements
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.bcds.org.cn/heqi/paper-pldi2027.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://gitlab.bcds.org.cn/heqi/paper-pldi2027/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+- **Chapters 4–5 and experiments:** Linux x86-64 (the harness pins jobs with `taskset` and reads `/proc`),
+  Python 3.13 and the pinned packages of `ch4-5-validator/requirements.txt` (Z3 4.15.4.0, Capstone 5.0.6).
+  Results depend on the Z3 version. The smoke test, E6 and E7 also run on macOS.
+- **Chapter 3:** Isabelle2024 with HOL-Library and HOL-Data_Structures (see `ch3-isabelle/README.md`).
+- **Hardware:** the smoke test needs 4 cores and 8 GB. The paper's complete-contract runs used a 16-core / 31 GB
+  host; cores, small programs and function slices used an 8-core / 16 GB host. Per-experiment times are listed in
+  `experiments/README.md`.
+- **Disk:** about 1 GB including the Python environment.
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+With Docker (recommended for Chapters 4–5):
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```sh
+docker build -t evm-aot-artifact .
+docker run --rm -it evm-aot-artifact make smoke
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Or locally:
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```sh
+make install          # creates ch4-5-validator/.venv from requirements.txt (PYTHON=python3.13 by default)
+make smoke            # about 5 minutes
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+`make install` also snapshots the validator into `.validator-git/` (the certification CLI records the validator's
+git revision) and writes the validator's source pin to `experiments/common/harness/SOURCE_PIN.json`. Every
+experiment job checks that pin before and after it runs.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Kick-the-tires (about 5 minutes)
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```sh
+make smoke            # 10 jobs: instruction core ADD (V1, V2), program two_block (V1, V2, V2-O1, V2-O2, V3),
+                      # ENSRegistry.owner slice (V2, V2-O1, V2-O2); all should be VERIFIED (about 1 minute)
+make tables           # the paper's recorded results as summary tables
+make e7               # re-runs the RQ3 ledger and figure data from recorded data; prints "matches expected"
+```
 
-## License
-For open source projects, say how it is licensed.
+## Reproducing the paper
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+| Command | Paper | Time on the paper's hosts |
+|---|---|---|
+| `make isabelle` | Chapter 3: semantics session and SMT consistency certificates | see `ch3-isabelle/README.md` |
+| `make e1` | Table 3 (cores), Table 5, core-ablation figure | ~1 h |
+| `make e2` | Table 3 (small programs), program figure, Table 6 | ~2 h |
+| `make e3` | function-ablation figure | ~0.5 h |
+| `make e4` | Table 4, whole-contract figure | ~9 h |
+| `make e5` | extended-budget V3 results (all six contracts certified) | hours per contract |
+| `make e6` | shift-summary figure (from recorded measurements) | minutes |
+| `make e7` | Tables 7–8, V3 cost figures (from recorded data) | minutes |
+
+Each `run.sh` accepts `CPUS` (taskset list) and `MEM` (sum of the concurrent jobs' memory caps, MiB); per-job
+limits are fixed by the experiment. Results are written to `experiments/<E>/results/` and summarized with
+`python experiments/common/summarize.py experiments/<E>/results`; compare with `expected/`. Outcome classes
+should agree; wall times depend on the host and on co-located jobs.
+
+## Configurations
+
+V1 is the whole-program baseline (merged terminal states, bounded path depth). V2 adds the O1 optimizations
+(terminal-path comparison and path-pair parallelism) and the O2 optimizations (instruction summaries and
+compiler-shaped arithmetic encoding); the ablations remove O1 or O2. V3 is block-level lockstep in mixed mode:
+block-level proofs first, instruction-level lockstep for blocks whose first pass fails. V1/V2 run with gas checking
+OFF; V3 checks gas in FULL mode. See `experiments/README.md`.
+
+## Inputs
+
+`ch4-5-validator/data/contracts/` holds the six complete contracts (ENSRegistry, Permit2, Safe, CErc20, Uniswap V4
+PoolManager, Aave Pool) as exported EVM IR (`.json`) and x86-64 machine code (`.hex`) produced by the AOT compiler; `ch4-5-validator/tests/data/` holds the instruction cores' and small programs' inputs. The compiler itself is
+not part of this artifact; validation needs only its outputs.
+
+`ch4-5-validator/data/traces/` holds per-instruction codegen traces (x86 intervals and value locations of each IR
+instruction) recorded from an instrumented build of the compiler. They are untrusted hints for instruction-level
+lockstep: they only choose which per-instruction lemmas are stated, every lemma is proved, and the chain of lemmas
+is checked to start at the real block entry and to be contiguous. A wrong trace makes a proof fail, never succeed.
+A trace is used only if its machine code is byte-identical to the input (`data/SHA256SUMS`).
+
+## Using the validator directly
+
+```sh
+cd ch4-5-validator
+.venv/bin/python main.py tests/data/two_block.json "$(cat tests/data/two_block.hex)"   # one program, path-based
+PYTHONPATH=. .venv/bin/python -m tools.verify_block_lockstep --help                   # block-level lockstep CLI
+```
+
+See `ch4-5-validator/README.md`.

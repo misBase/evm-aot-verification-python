@@ -1,0 +1,11 @@
+(set-logic QF_BV)
+(declare-fun a () (_ BitVec 256))
+(declare-fun b () (_ BitVec 256))
+(declare-fun result () (_ BitVec 256))
+(assert (= result (ite (and (= ((_ extract 63 0) a) ((_ extract 63 0) b))
+          (= ((_ extract 127 64) a) ((_ extract 127 64) b))
+          (= ((_ extract 191 128) a) ((_ extract 191 128) b))
+          (= ((_ extract 255 192) a) ((_ extract 255 192) b)))
+     #x0000000000000000000000000000000000000000000000000000000000000001
+     #x0000000000000000000000000000000000000000000000000000000000000000)))
+(check-sat)

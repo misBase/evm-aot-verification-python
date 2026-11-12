@@ -1,0 +1,83 @@
+; Disassembly of sstore_load.hex (base_addr=0x0000)
+; EVM program: PUSH 199, PUSH 10, SSTORE, PUSH 10, SLOAD, STOP
+;
+; Instruction types used: add, cmp, jae, jb, jmp, lea, mov, ret, sub
+
+; --- Prologue: restore R14/R15, check gas and stack bounds ---
+0x0000: mov r14, qword ptr [r13 + 0x38]
+0x0004: add r14, qword ptr [r13 + 0x30]
+0x0008: mov r15, qword ptr [r13 + 0x10]
+0x000c: mov rax, qword ptr [r13 + 0x70]
+0x0010: cmp rax, 9
+0x0014: jb 0x39                              ; gas underflow -> out-of-gas
+0x0016: sub rax, 9
+0x001a: mov qword ptr [r13 + 0x70], rax
+0x001e: mov rax, qword ptr [r13 + 0x30]
+0x0022: cmp rax, 0
+0x0026: jb 0x4a                              ; stack underflow
+0x0028: cmp rax, 0x7fc1
+0x002e: jae 0x5b                             ; stack overflow
+0x0030: mov r14, qword ptr [r13 + 0x38]
+0x0034: add r14, rax
+0x0037: jmp 0x6c
+
+; --- Error exits ---
+0x0039: mov byte ptr [r13 + 0xe0], 0xc       ; status = out-of-gas
+0x0041: mov qword ptr [r13 + 0x28], 0
+0x0049: ret
+0x004a: mov byte ptr [r13 + 0xe0], 0xe       ; status = stack underflow
+0x0052: mov qword ptr [r13 + 0x28], 0
+0x005a: ret
+0x005b: mov byte ptr [r13 + 0xe0], 0xf       ; status = stack overflow
+0x0063: mov qword ptr [r13 + 0x28], 0
+0x006b: ret
+
+; --- PUSH 199, PUSH 10, SSTORE: invoke SSTORE builtin (func_index=10) ---
+; Stack layout: value=[R14], key=[R14+0x20]; both are uint256 (4 limbs each)
+0x006c: mov dword ptr [r13 + 0xe8], 0xa      ; host_func_index = 10 (SSTORE)
+0x0077: mov qword ptr [r14], 0xc7            ; z0 = 199 (value, low limb)
+0x007e: mov qword ptr [r14 + 8], 0           ; z1 = 0
+0x0086: mov qword ptr [r14 + 0x10], 0        ; z2 = 0
+0x008e: mov qword ptr [r14 + 0x18], 0        ; z3 = 0
+0x0096: mov qword ptr [r14 + 0x20], 0xa      ; z0 = 10  (key/slot, low limb)
+0x009e: mov qword ptr [r14 + 0x28], 0        ; z1 = 0
+0x00a6: mov qword ptr [r14 + 0x30], 0        ; z2 = 0
+0x00ae: mov qword ptr [r14 + 0x38], 0        ; z3 = 0
+; Suspend: set return address, status = call host func (4), sp = 8 (2 items on stack)
+0x00b6: lea rax, [rip + 0x18]               ; return address after host call
+0x00bd: mov qword ptr [r13 + 0xf0], rax
+0x00c4: mov byte ptr [r13 + 0xe0], 4        ; status = call host func
+0x00cc: mov qword ptr [r13 + 0x28], 8       ; sp = 8 (2 stack items: value + key)
+0x00d4: ret
+
+; --- Resume after SSTORE: restore R14/R15 ---
+0x00d5: mov r14, qword ptr [r13 + 0x38]
+0x00d9: add r14, qword ptr [r13 + 0x30]
+0x00dd: mov r15, qword ptr [r13 + 0x10]
+
+; --- PUSH 10, SLOAD: invoke SLOAD builtin (func_index=9) ---
+; Stack layout: key=[R14]; result will be written back by host before resume
+0x00e1: mov dword ptr [r13 + 0xe8], 9       ; host_func_index = 9 (SLOAD)
+0x00ec: mov qword ptr [r14], 0xa            ; z0 = 10  (key/slot, low limb)
+0x00f3: mov qword ptr [r14 + 8], 0          ; z1 = 0
+0x00fb: mov qword ptr [r14 + 0x10], 0       ; z2 = 0
+0x0103: mov qword ptr [r14 + 0x18], 0       ; z3 = 0
+; Suspend: set return address, status = call host func (4), sp = 4 (1 item on stack)
+0x010b: lea rax, [rip + 0x18]              ; return address after host call
+0x0112: mov qword ptr [r13 + 0xf0], rax
+0x0119: mov byte ptr [r13 + 0xe0], 4       ; status = call host func
+0x0121: mov qword ptr [r13 + 0x28], 4      ; sp = 4 (1 stack item: key)
+0x0129: ret
+
+; --- Resume after SLOAD, then STOP ---
+0x012a: mov r14, qword ptr [r13 + 0x38]
+0x012e: add r14, qword ptr [r13 + 0x30]
+0x0132: mov r15, qword ptr [r13 + 0x10]
+0x0136: mov byte ptr [r13 + 0xe0], 2       ; status = 2 (STOPPED)
+0x013e: mov qword ptr [r13 + 0x28], 4      ; sp = 4 (SLOAD result still on stack)
+0x0146: ret
+
+; --- STOP path (second, unreachable in normal flow) ---
+0x0147: mov byte ptr [r13 + 0xe0], 2       ; status = 2 (STOPPED)
+0x014f: mov qword ptr [r13 + 0x28], 4
+0x0157: ret

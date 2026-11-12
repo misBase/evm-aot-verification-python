@@ -1,0 +1,195 @@
+{
+ "ENSRegistry": {
+  "wall": 906,
+  "workers": 5,
+  "hints": true,
+  "blocks": 127,
+  "instances": 178,
+  "contexts": 199,
+  "node_sum": 3484,
+  "top10": 0.814,
+  "top1": 0.138,
+  "same_block": 0.094,
+  "depth_only": 0.032,
+  "mnone": 0.0,
+  "producers": {
+   "legacy": 178
+  },
+  "discovery": 13.9,
+  "cap_final": 0.786,
+  "cap_hidden": 0.0,
+  "cap_tail": 0.203,
+  "cap_lead": 0.005,
+  "sim": {
+   "contract": "ENSRegistry",
+   "workers": 5,
+   "production": 885,
+   "lpt_oracle": 698,
+   "lpt_block": 789,
+   "lower_bound": 697,
+   "longest": 480,
+   "hidden": 1,
+   "loss_vs_lpt_oracle": 0.212
+  },
+  "spearman": {
+   "n": 178,
+   "spearman_ops": 0.753,
+   "spearman_x86": 0.788
+  }
+ },
+ "CErc20": {
+  "wall": 30760,
+  "workers": 13,
+  "hints": false,
+  "blocks": 723,
+  "instances": 2605,
+  "contexts": 4708,
+  "node_sum": 309085,
+  "top10": 0.853,
+  "top1": 0.391,
+  "same_block": 0.73,
+  "depth_only": 0.463,
+  "mnone": 0.861,
+  "producers": {
+   "legacy": 2605
+  },
+  "discovery": 549.9,
+  "cap_final": 0.788,
+  "cap_hidden": 0.038,
+  "cap_tail": 0.163,
+  "cap_lead": 0.0,
+  "sim": {
+   "contract": "CErc20",
+   "workers": 13,
+   "production": 30167,
+   "lpt_oracle": 24921,
+   "lpt_block": 24920,
+   "lower_bound": 24920,
+   "longest": 9328,
+   "hidden": 14877,
+   "loss_vs_lpt_oracle": 0.174
+  },
+  "spearman": {
+   "n": 2605,
+   "spearman_ops": 0.49,
+   "spearman_x86": 0.467
+  }
+ },
+ "Safe": {
+  "wall": 13030,
+  "workers": 13,
+  "hints": true,
+  "blocks": 742,
+  "instances": 2066,
+  "contexts": 3240,
+  "node_sum": 115379,
+  "top10": 0.792,
+  "top1": 0.328,
+  "same_block": 0.671,
+  "depth_only": 0.54,
+  "mnone": 0.882,
+  "producers": {
+   "legacy": 2005,
+   "instruction-chain/1": 61
+  },
+  "discovery": 370.5,
+  "cap_final": 0.702,
+  "cap_hidden": 0.191,
+  "cap_tail": 0.621,
+  "cap_lead": 0.003,
+  "sim": {
+   "contract": "Safe",
+   "workers": 13,
+   "production": 17536,
+   "lpt_oracle": 11295,
+   "lpt_block": 11526,
+   "lower_bound": 11295,
+   "longest": 3945,
+   "hidden": 31451,
+   "loss_vs_lpt_oracle": 0.356
+  },
+  "spearman": {
+   "n": 2005,
+   "spearman_ops": 0.482,
+   "spearman_x86": 0.468
+  }
+ },
+ "PoolManager": {
+  "wall": 22422,
+  "workers": 13,
+  "hints": true,
+  "blocks": 913,
+  "instances": 3718,
+  "contexts": 5052,
+  "node_sum": 210130,
+  "top10": 0.858,
+  "top1": 0.4,
+  "same_block": 0.724,
+  "depth_only": 0.418,
+  "mnone": 0.61,
+  "producers": {
+   "legacy": 3633,
+   "instruction-chain/1": 85
+  },
+  "discovery": 578.8,
+  "cap_final": 0.742,
+  "cap_hidden": 0.171,
+  "cap_tail": 0.062,
+  "cap_lead": 0.001,
+  "sim": {
+   "contract": "PoolManager",
+   "workers": 13,
+   "production": 21792,
+   "lpt_oracle": 19881,
+   "lpt_block": 19882,
+   "lower_bound": 19881,
+   "longest": 6829,
+   "hidden": 48320,
+   "loss_vs_lpt_oracle": 0.088
+  },
+  "spearman": {
+   "n": 3633,
+   "spearman_ops": 0.437,
+   "spearman_x86": 0.306
+  }
+ },
+ "Pool": {
+  "wall": 5011,
+  "workers": 1,
+  "hints": true,
+  "blocks": 736,
+  "instances": 1283,
+  "contexts": 1676,
+  "node_sum": 62505,
+  "top10": 0.778,
+  "top1": 0.249,
+  "same_block": 0.273,
+  "depth_only": 0.117,
+  "mnone": 0.485,
+  "producers": {
+   "legacy": 1248,
+   "instruction-chain/1": 35
+  },
+  "discovery": 191.0,
+  "cap_final": 0.667,
+  "cap_hidden": 0.143,
+  "cap_tail": 0.195,
+  "cap_lead": 0.068,
+  "sim": {
+   "contract": "Pool (inconclusive)",
+   "workers": 7,
+   "production": 13082,
+   "lpt_oracle": 11108,
+   "lpt_block": 11108,
+   "lower_bound": 11107,
+   "longest": 3493,
+   "hidden": 13082,
+   "loss_vs_lpt_oracle": 0.151
+  },
+  "spearman": {
+   "n": 1248,
+   "spearman_ops": 0.616,
+   "spearman_x86": 0.634
+  }
+ }
+}

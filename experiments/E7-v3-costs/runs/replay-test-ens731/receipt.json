@@ -1,0 +1,43 @@
+{
+ "cmd": [
+  "/artifact/.venv/bin/python",
+  "-B",
+  "/artifact/tests/paper/newlab/v3_cost/replay.py",
+  "/artifact/tmp/recorded-runs/r4/fixtures/ENSRegistry",
+  "/artifact/tmp/v3exp/runs/replay-test-ens731/out.json",
+  "--pick",
+  "731:9:96:128",
+  "--pick",
+  "731:16:96:128",
+  "--trace",
+  "/artifact/tmp/measurement-work/traces-1112/trace-ENSRegistry.json",
+  "--node-seconds",
+  "600",
+  "--ordered",
+  "/artifact/tmp/v3exp/ordered/ENSRegistry.pkl"
+ ],
+ "cwd": "/artifact/tmp/v3exp/snap",
+ "host": "host-B",
+ "platform": "macOS-15.3.1-arm64-arm-64bit-Mach-O",
+ "observe": true,
+ "wall_limit": 900.0,
+ "rss_limit_mb": 6000.0,
+ "cpus": null,
+ "env": {
+  "PYTHONSTARTUP": "/artifact/user-home/Library/Application Support/Code/User/workspaceStorage/9d0d5cdd61c00d819638be471a0b925a/ms-python.python/pythonrc.py",
+  "PYTHONHASHSEED": "0",
+  "BLOCK_SUMMARY_LEMMAS": "1",
+  "BLOCK_PROOF_CACHE": "/artifact/tmp/v3exp/runs/replay-test-ens731/cache.sqlite",
+  "PYTHONDONTWRITEBYTECODE": "1",
+  "PYTHONPATH": "/artifact/tests/paper/newlab/v3_cost:/artifact/tmp/v3exp/snap",
+  "V3_COST_DIR": "/artifact/tmp/v3exp/runs/replay-test-ens731"
+ },
+ "revision": "c68c4dfc87515204e09a2d566554cd9b04c643d4",
+ "started": 1794465118.664112,
+ "wall_s": 20.1,
+ "exit": 0,
+ "killed": null,
+ "peak_tree_rss_mb": 282.1,
+ "live_cpu_peak_s": 14.6,
+ "children_cpu_s": 18.4
+}

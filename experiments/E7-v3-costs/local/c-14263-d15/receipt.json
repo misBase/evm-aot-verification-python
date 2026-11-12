@@ -1,0 +1,41 @@
+{
+ "cmd": [
+  "/artifact/.venv/bin/python",
+  "-B",
+  "/artifact/tests/paper/newlab/v3_cost/replay.py",
+  "/artifact/tmp/recorded-runs/r4/fixtures/CErc20",
+  "/artifact/tmp/v3exp/runs/c-14263-d15/out.json",
+  "--node-seconds",
+  "7200",
+  "--ordered",
+  "/artifact/tmp/v3exp/ordered/CErc20.pkl",
+  "--pick",
+  "14263:15:None:None"
+ ],
+ "cwd": "/artifact/tmp/v3exp/snap",
+ "host": "host-B",
+ "platform": "macOS-15.3.1-arm64-arm-64bit-Mach-O",
+ "observe": true,
+ "wall_limit": 15600.0,
+ "rss_limit_mb": 8000.0,
+ "cpus": null,
+ "env": {
+  "PYTHONSTARTUP": "/artifact/user-home/Library/Application Support/Code/User/workspaceStorage/9d0d5cdd61c00d819638be471a0b925a/ms-python.python/pythonrc.py",
+  "PYTHONHASHSEED": "0",
+  "BLOCK_SUMMARY_LEMMAS": "1",
+  "BLOCK_PROOF_CACHE": "/artifact/tmp/v3exp/runs/c-14263-d15/cache.sqlite",
+  "PYTHONDONTWRITEBYTECODE": "1",
+  "PYTHONPATH": "/artifact/tests/paper/newlab/v3_cost:/artifact/tmp/v3exp/snap",
+  "V3_COST_DIR": "/artifact/tmp/v3exp/runs/c-14263-d15",
+  "V3_EXPORT_MIN_S": "60",
+  "V3_EXPORT_CAP": "12"
+ },
+ "revision": "c68c4dfc87515204e09a2d566554cd9b04c643d4",
+ "started": 1794465224.6836202,
+ "wall_s": 1741.8,
+ "exit": 0,
+ "killed": null,
+ "peak_tree_rss_mb": 760.8,
+ "live_cpu_peak_s": 1465.1,
+ "children_cpu_s": 1472.4
+}

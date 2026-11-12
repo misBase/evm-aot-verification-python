@@ -1,0 +1,5 @@
+{"contract": "ENSRegistry", "workers": 5, "production": 885, "lpt_oracle": 698, "lpt_block": 789, "lower_bound": 697, "longest": 480, "hidden": 1, "loss_vs_lpt_oracle": 0.212}
+{"contract": "CErc20", "workers": 13, "production": 30167, "lpt_oracle": 24921, "lpt_block": 24920, "lower_bound": 24920, "longest": 9328, "hidden": 14877, "loss_vs_lpt_oracle": 0.174}
+{"contract": "PoolManager", "workers": 13, "production": 21792, "lpt_oracle": 19881, "lpt_block": 19882, "lower_bound": 19881, "longest": 6829, "hidden": 48320, "loss_vs_lpt_oracle": 0.088}
+{"contract": "Pool (inconclusive)", "workers": 7, "production": 13082, "lpt_oracle": 11108, "lpt_block": 11108, "lower_bound": 11107, "longest": 3493, "hidden": 13082, "loss_vs_lpt_oracle": 0.151}
+{"contract": "Safe", "workers": 13, "production": 17536, "lpt_oracle": 11295, "lpt_block": 11526, "lower_bound": 11295, "longest": 3945, "hidden": 31451, "loss_vs_lpt_oracle": 0.356}

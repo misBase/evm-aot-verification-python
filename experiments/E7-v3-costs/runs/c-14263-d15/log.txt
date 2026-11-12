@@ -1,0 +1,1 @@
+{"pick": "14263:15:None:None", "spec": "BlockSpecialization(pc=14263, stack_depth=15, memory_size=None, free_memory_pointer=None, stack_constants=())", "contexts": 2, "chain": false, "wall": 1184.25, "proved": true, "closed": true, "proof_kind": null, "chain_attempt": null, "seconds": 1181.7857674590778, "queries": 148, "reasons": [], "failed": []}

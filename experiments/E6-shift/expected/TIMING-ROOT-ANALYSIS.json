@@ -1,0 +1,692 @@
+{
+  "experiment": "E2.2",
+  "phase": "timing",
+  "native_analysis_calls": 0,
+  "protocol": {
+    "maximum_timing_cells": 48,
+    "diagnostic_cells": 16,
+    "k_values": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "summary_arms": [
+      "shift-off",
+      "shift-fallback"
+    ],
+    "repetitions": 3,
+    "repeat_skip_if_r1_wall_strictly_gt_s": 300,
+    "repeat_basis": "only same k/arm R1 unrounded exit_observed_wall_seconds+cleanup_wall_seconds, missing fields fallback guard wall; exact>300 triggers predefined R2/R3 skips, no replacement",
+    "timing_owned_observer": false,
+    "diagnostic": "one fresh per k/arm, primary path scalars + partial current-PID Solver/Tactic expression DAG; excluded timing statistics",
+    "timeout_seconds": 600,
+    "memory_tree_mib": 6000,
+    "max_depth": 400,
+    "path_pair_workers": 1,
+    "gas": "off",
+    "gas_budget": 1000000000,
+    "calldata_size_bytes": 512,
+    "x86_base": 4096,
+    "query_cap_ms": 300000,
+    "reachability_timeout_ms": 250,
+    "summary_other_kinds": "all frozen non-shift fallback kinds remain enabled; prove-hit defaults retained",
+    "formal_extra_native_allocator_cap": null,
+    "cold_cache": "each point independent fresh interpreter/cache; no task reuse",
+    "math_outcomes": "TO/OOM/BOUND/UNK/N/A retained as censored/incomplete; unexpected ERR/CEX stops matrix; no budget increases"
+  },
+  "source": {
+    "sha256": "d21332757dfd422a5fbf4972c17684705671b010a75dcc4532da3f500ece7709",
+    "files": 113
+  },
+  "executed": 36,
+  "skipped": 12,
+  "outcomes": {
+    "VERIFIED": 30,
+    "TO": 6
+  },
+  "groups": [
+    {
+      "k": 1,
+      "shift_summary": false,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 2.743875,
+          "wall_s": 2.959484374965541,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 109.1,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r1.json",
+          "raw_sha256": "1c4e391056371be24f429be8b0eb81b0fcd554402bb2d7950279113a9703155c"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 2.678375,
+          "wall_s": 2.7075926659163088,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 107.2,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r2.json",
+          "raw_sha256": "437fc03f4c5380e43caa457825e78930d9058381d2a03fb5bf2033f109e5307e"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 2.868871,
+          "wall_s": 2.9671958329854533,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 112.1,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r3.json",
+          "raw_sha256": "6c28e9220c5554feed48ed72dbc219f75876a59faf6dc2902071b26679da7075"
+        }
+      ],
+      "completion_median_cpu_s": 2.743875,
+      "completion_cpu_range_s": [
+        2.678375,
+        2.868871
+      ],
+      "completion_median_wall_s": 2.959484374965541,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 1,
+      "shift_summary": true,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 4.655506,
+          "wall_s": 4.836761250044219,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 98.5,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r1.json",
+          "raw_sha256": "668c7e13fd3a59f135da48243999bbbfc074f09cb4d56bfc5e5261c7ee5f5faf"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 4.380344,
+          "wall_s": 4.478975791018456,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 114.6,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r2.json",
+          "raw_sha256": "534357afafb4cf965d4ef2602c70255cd09e36823927f6dd5c446b537600ce70"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 4.322114999999999,
+          "wall_s": 4.460596416029148,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 108.1,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r3.json",
+          "raw_sha256": "c8f2f2f4760f39a535f08620feedfff6d2def5f9e136619ec53d890f820272e3"
+        }
+      ],
+      "completion_median_cpu_s": 4.380344,
+      "completion_cpu_range_s": [
+        4.322114999999999,
+        4.655506
+      ],
+      "completion_median_wall_s": 4.478975791018456,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 2,
+      "shift_summary": false,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 54.242995,
+          "wall_s": 54.52279320801608,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 155.1,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r1.json",
+          "raw_sha256": "71613061f8cd12a7a2ab23495291fe1345c28d4d8b4e0d4acdcae1ba29769aa3"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 53.773388,
+          "wall_s": 53.89367816701997,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 165.0,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r2.json",
+          "raw_sha256": "e9dba6c3df0affa590d79310a570ab87f86c76fec87ebe75db38fbca0a66739b"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 53.902566,
+          "wall_s": 54.1003322500037,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 174.4,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r3.json",
+          "raw_sha256": "4f39e7baf31942f036a47687a661e4548ff2cd4e7854778f51edfe45074c0a35"
+        }
+      ],
+      "completion_median_cpu_s": 53.902566,
+      "completion_cpu_range_s": [
+        53.773388,
+        54.242995
+      ],
+      "completion_median_wall_s": 54.1003322500037,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 2,
+      "shift_summary": true,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 5.46011,
+          "wall_s": 5.548242249991745,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 118.3,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r1.json",
+          "raw_sha256": "a56ccd4f31ef71be6c3a336b07f99be1ed80f53a04a653a84a57a0f91fb755f3"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 5.421863,
+          "wall_s": 5.4868346670409665,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 114.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r2.json",
+          "raw_sha256": "059ed22b716db7baf1a779486c5f0558bc641123495c2e0415ba59a9da2e605c"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 5.4190700000000005,
+          "wall_s": 5.481656374991871,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 114.3,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r3.json",
+          "raw_sha256": "565e814307a5303df822322e208adf432af5e4c43f729891ac6c91a8a9787cfc"
+        }
+      ],
+      "completion_median_cpu_s": 5.421863,
+      "completion_cpu_range_s": [
+        5.4190700000000005,
+        5.46011
+      ],
+      "completion_median_wall_s": 5.4868346670409665,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 3,
+      "shift_summary": false,
+      "required_repeats": 1,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "TO",
+          "cpu_s": 595.894782,
+          "wall_s": 600.0363806659589,
+          "cpu_lower_bound": true,
+          "peak_rss_mib": 929.3,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-off-r1.json",
+          "raw_sha256": "e8eeafcf20a18dc7fa3ad8fbbefb4e5ef3cb2a227036d0c060479058a9d99c74"
+        }
+      ],
+      "completion_median_cpu_s": null,
+      "completion_cpu_range_s": null,
+      "completion_median_wall_s": null,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 3,
+      "shift_summary": true,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 6.628581,
+          "wall_s": 6.732888833037578,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 116.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r1.json",
+          "raw_sha256": "2164b65210558e58620f889e2a586a0641ff3366ae75357a5d1586138db281e3"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 6.62975,
+          "wall_s": 6.7936240419512615,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 113.6,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r2.json",
+          "raw_sha256": "22bf1d8ae6132a7fcfc74d4081ab8c37a2c59af2fb3b853cdd6dc0de103a4d0a"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 6.559759,
+          "wall_s": 6.645887500024401,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 114.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r3.json",
+          "raw_sha256": "85a58d313e5f865070d76c582b0f90d52e90a9f6cebbc774731f37599da84304"
+        }
+      ],
+      "completion_median_cpu_s": 6.628581,
+      "completion_cpu_range_s": [
+        6.559759,
+        6.62975
+      ],
+      "completion_median_wall_s": 6.732888833037578,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 4,
+      "shift_summary": false,
+      "required_repeats": 1,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "TO",
+          "cpu_s": 591.391558,
+          "wall_s": 600.1633940420579,
+          "cpu_lower_bound": true,
+          "peak_rss_mib": 2108.1,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-off-r1.json",
+          "raw_sha256": "7623926a1aca5463be990b88f6bacec4cd3d15e76bca6ba6364bc271e43e70d2"
+        }
+      ],
+      "completion_median_cpu_s": null,
+      "completion_cpu_range_s": null,
+      "completion_median_wall_s": null,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 4,
+      "shift_summary": true,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 6.844485,
+          "wall_s": 6.941884875064716,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 116.1,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r1.json",
+          "raw_sha256": "288f8ea3df9ce24a0d6f6f654697dacca86938a75c5e995abe84f5fdcfc7cfb5"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 6.814267,
+          "wall_s": 6.865639292052947,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 123.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r2.json",
+          "raw_sha256": "069eaff5c44fb0105fe7ef8d2a992b3d1cee58adec918da1997fd957bccbf4c0"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 6.802896,
+          "wall_s": 6.86402983404696,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 123.7,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r3.json",
+          "raw_sha256": "3a7ca6e8f0d1319994ec9d7ffa7441867399f6b784de717daa8f31a14bffceaa"
+        }
+      ],
+      "completion_median_cpu_s": 6.814267,
+      "completion_cpu_range_s": [
+        6.802896,
+        6.844485
+      ],
+      "completion_median_wall_s": 6.865639292052947,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 5,
+      "shift_summary": false,
+      "required_repeats": 1,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "TO",
+          "cpu_s": 595.619249,
+          "wall_s": 600.1130318330834,
+          "cpu_lower_bound": true,
+          "peak_rss_mib": 2153.5,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-off-r1.json",
+          "raw_sha256": "1b0e3483aac37368000a8bdbba1877a7aae236c622cdd404bd0db2fa158e7240"
+        }
+      ],
+      "completion_median_cpu_s": null,
+      "completion_cpu_range_s": null,
+      "completion_median_wall_s": null,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 5,
+      "shift_summary": true,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 7.610475,
+          "wall_s": 7.743542499956675,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 121.4,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r1.json",
+          "raw_sha256": "74ea7d2a961797b04d732b43ef4615a424fb0fa698acdc5d0119eeec8a863059"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 7.46402,
+          "wall_s": 7.509139082976617,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 123.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r2.json",
+          "raw_sha256": "a093a2004ef6c33f0c752b34bca7cb32da29edc834c5758f1a2f9709b8dbf0bc"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 7.509603,
+          "wall_s": 7.557523582945578,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 121.9,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r3.json",
+          "raw_sha256": "a2565ca8a4addb8ba465e953cccf3141192c81bcf9f868ca049e03b18e1f87e9"
+        }
+      ],
+      "completion_median_cpu_s": 7.509603,
+      "completion_cpu_range_s": [
+        7.46402,
+        7.610475
+      ],
+      "completion_median_wall_s": 7.557523582945578,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 6,
+      "shift_summary": false,
+      "required_repeats": 1,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "TO",
+          "cpu_s": 596.726263,
+          "wall_s": 600.1245034999447,
+          "cpu_lower_bound": true,
+          "peak_rss_mib": 2125.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-off-r1.json",
+          "raw_sha256": "f205a54b6a03b26aafbfead024d57651c9cfe359941d98ee23e01b54635da7fa"
+        }
+      ],
+      "completion_median_cpu_s": null,
+      "completion_cpu_range_s": null,
+      "completion_median_wall_s": null,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 6,
+      "shift_summary": true,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 8.026526,
+          "wall_s": 8.212751833023503,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 122.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r1.json",
+          "raw_sha256": "fed6e17daf1e7b415f03dbc03df402476a9fdd132908eb62ca48b1550c08911f"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 8.010113,
+          "wall_s": 8.168709874968044,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 122.0,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r2.json",
+          "raw_sha256": "a7fb0e9b9e1224b8e5df71d8e9a5b3de204fad90ea5f0451e70cf184308509a2"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 8.000161,
+          "wall_s": 8.161425499944016,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 116.2,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r3.json",
+          "raw_sha256": "0f9701a4ca2432d3e9a747cf76d2814e73fb42217f528c1dcb2e8f237dfe44bf"
+        }
+      ],
+      "completion_median_cpu_s": 8.010113,
+      "completion_cpu_range_s": [
+        8.000161,
+        8.026526
+      ],
+      "completion_median_wall_s": 8.168709874968044,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 7,
+      "shift_summary": false,
+      "required_repeats": 1,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "TO",
+          "cpu_s": 596.3441479999999,
+          "wall_s": 600.1137211250607,
+          "cpu_lower_bound": true,
+          "peak_rss_mib": 2136.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-off-r1.json",
+          "raw_sha256": "5a4d2ded76cd24cf2021dd9c71334bf477294b4a3c1339256dfaaf0f6e3da025"
+        }
+      ],
+      "completion_median_cpu_s": null,
+      "completion_cpu_range_s": null,
+      "completion_median_wall_s": null,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 7,
+      "shift_summary": true,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 9.049478,
+          "wall_s": 9.213980333064683,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 124.1,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r1.json",
+          "raw_sha256": "1fa7ae579865316f8fc91a27acbc612051d84af5af513a59cd9886c89677d03c"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 8.923306,
+          "wall_s": 8.986976166954264,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 122.8,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r2.json",
+          "raw_sha256": "e0bf3b5a841f43de703a89a0ca9d994fa6155cb71f38c8082abd0ea0c2ef0f22"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 8.970782999999999,
+          "wall_s": 9.095688249915838,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 130.7,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r3.json",
+          "raw_sha256": "ec9485f3bf12fc9a6f0ece0f2b2fa8bfbb08b7577d21afa379d29464a9d159a5"
+        }
+      ],
+      "completion_median_cpu_s": 8.970782999999999,
+      "completion_cpu_range_s": [
+        8.923306,
+        9.049478
+      ],
+      "completion_median_wall_s": 9.095688249915838,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 8,
+      "shift_summary": false,
+      "required_repeats": 1,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "TO",
+          "cpu_s": 597.271059,
+          "wall_s": 600.1053105829051,
+          "cpu_lower_bound": true,
+          "peak_rss_mib": 1775.6,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-off-r1.json",
+          "raw_sha256": "a51d5fed93b7f292503c1b842173673812777804da57ac82a9e2398139f38d44"
+        }
+      ],
+      "completion_median_cpu_s": null,
+      "completion_cpu_range_s": null,
+      "completion_median_wall_s": null,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    },
+    {
+      "k": 8,
+      "shift_summary": true,
+      "required_repeats": 3,
+      "trials": [
+        {
+          "repeat": 1,
+          "result": "VERIFIED",
+          "cpu_s": 10.094781000000001,
+          "wall_s": 10.177126125083305,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 133.1,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r1.json",
+          "raw_sha256": "14b92f79b9a03b79b4bfd72a5694010366ba9644177c7bd8ea3f4bce18038f8e"
+        },
+        {
+          "repeat": 2,
+          "result": "VERIFIED",
+          "cpu_s": 10.582819,
+          "wall_s": 10.76058954198379,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 123.3,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r2.json",
+          "raw_sha256": "475efc4305684936e1f61b4c960ae06f6ffce2cec1875af34fb32bfe46ab4e6b"
+        },
+        {
+          "repeat": 3,
+          "result": "VERIFIED",
+          "cpu_s": 10.196110000000001,
+          "wall_s": 10.38385304203257,
+          "cpu_lower_bound": false,
+          "peak_rss_mib": 132.9,
+          "raw_path": "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r3.json",
+          "raw_sha256": "6b8dd40dedcc5d360199f830bf03204c0a56f0e8d86f3ef6eabfb6b453d5a742"
+        }
+      ],
+      "completion_median_cpu_s": 10.196110000000001,
+      "completion_cpu_range_s": [
+        10.094781000000001,
+        10.582819
+      ],
+      "completion_median_wall_s": 10.38385304203257,
+      "interpretation": "completed-proof time only when every prescribed trial completes; failures retain resource consumption"
+    }
+  ],
+  "skipped_names": [
+    "timing-k03-shift-off-r2",
+    "timing-k03-shift-off-r3",
+    "timing-k04-shift-off-r2",
+    "timing-k04-shift-off-r3",
+    "timing-k05-shift-off-r2",
+    "timing-k05-shift-off-r3",
+    "timing-k06-shift-off-r2",
+    "timing-k06-shift-off-r3",
+    "timing-k07-shift-off-r2",
+    "timing-k07-shift-off-r3",
+    "timing-k08-shift-off-r2",
+    "timing-k08-shift-off-r3"
+  ],
+  "prepared_sha256": "c37000a0a648aa970fcbfc763e571a4ed584621d8046bf93a6355d3ec42194d6",
+  "summary_sha256": "cad13f95f4afba2ee0594254543e20e5e6fa257db8c49451e869218ca7e8280a",
+  "guard_receipts_sha256": {
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r1.json": "1c4e391056371be24f429be8b0eb81b0fcd554402bb2d7950279113a9703155c",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r2.json": "437fc03f4c5380e43caa457825e78930d9058381d2a03fb5bf2033f109e5307e",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-off-r3.json": "6c28e9220c5554feed48ed72dbc219f75876a59faf6dc2902071b26679da7075",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r1.json": "668c7e13fd3a59f135da48243999bbbfc074f09cb4d56bfc5e5261c7ee5f5faf",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r2.json": "534357afafb4cf965d4ef2602c70255cd09e36823927f6dd5c446b537600ce70",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k01-shift-on-r3.json": "c8f2f2f4760f39a535f08620feedfff6d2def5f9e136619ec53d890f820272e3",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r1.json": "71613061f8cd12a7a2ab23495291fe1345c28d4d8b4e0d4acdcae1ba29769aa3",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r2.json": "e9dba6c3df0affa590d79310a570ab87f86c76fec87ebe75db38fbca0a66739b",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-off-r3.json": "4f39e7baf31942f036a47687a661e4548ff2cd4e7854778f51edfe45074c0a35",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r1.json": "a56ccd4f31ef71be6c3a336b07f99be1ed80f53a04a653a84a57a0f91fb755f3",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r2.json": "059ed22b716db7baf1a779486c5f0558bc641123495c2e0415ba59a9da2e605c",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k02-shift-on-r3.json": "565e814307a5303df822322e208adf432af5e4c43f729891ac6c91a8a9787cfc",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-off-r1.json": "e8eeafcf20a18dc7fa3ad8fbbefb4e5ef3cb2a227036d0c060479058a9d99c74",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r1.json": "2164b65210558e58620f889e2a586a0641ff3366ae75357a5d1586138db281e3",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r2.json": "22bf1d8ae6132a7fcfc74d4081ab8c37a2c59af2fb3b853cdd6dc0de103a4d0a",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-on-r3.json": "85a58d313e5f865070d76c582b0f90d52e90a9f6cebbc774731f37599da84304",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-off-r1.json": "7623926a1aca5463be990b88f6bacec4cd3d15e76bca6ba6364bc271e43e70d2",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r1.json": "288f8ea3df9ce24a0d6f6f654697dacca86938a75c5e995abe84f5fdcfc7cfb5",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r2.json": "069eaff5c44fb0105fe7ef8d2a992b3d1cee58adec918da1997fd957bccbf4c0",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-on-r3.json": "3a7ca6e8f0d1319994ec9d7ffa7441867399f6b784de717daa8f31a14bffceaa",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-off-r1.json": "1b0e3483aac37368000a8bdbba1877a7aae236c622cdd404bd0db2fa158e7240",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r1.json": "74ea7d2a961797b04d732b43ef4615a424fb0fa698acdc5d0119eeec8a863059",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r2.json": "a093a2004ef6c33f0c752b34bca7cb32da29edc834c5758f1a2f9709b8dbf0bc",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-on-r3.json": "a2565ca8a4addb8ba465e953cccf3141192c81bcf9f868ca049e03b18e1f87e9",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-off-r1.json": "f205a54b6a03b26aafbfead024d57651c9cfe359941d98ee23e01b54635da7fa",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r1.json": "fed6e17daf1e7b415f03dbc03df402476a9fdd132908eb62ca48b1550c08911f",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r2.json": "a7fb0e9b9e1224b8e5df71d8e9a5b3de204fad90ea5f0451e70cf184308509a2",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-on-r3.json": "0f9701a4ca2432d3e9a747cf76d2814e73fb42217f528c1dcb2e8f237dfe44bf",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-off-r1.json": "5a4d2ded76cd24cf2021dd9c71334bf477294b4a3c1339256dfaaf0f6e3da025",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r1.json": "1fa7ae579865316f8fc91a27acbc612051d84af5af513a59cd9886c89677d03c",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r2.json": "e0bf3b5a841f43de703a89a0ca9d994fa6155cb71f38c8082abd0ea0c2ef0f22",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-on-r3.json": "ec9485f3bf12fc9a6f0ece0f2b2fa8bfbb08b7577d21afa379d29464a9d159a5",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-off-r1.json": "a51d5fed93b7f292503c1b842173673812777804da57ac82a9e2398139f38d44",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r1.json": "14b92f79b9a03b79b4bfd72a5694010366ba9644177c7bd8ea3f4bce18038f8e",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r2.json": "475efc4305684936e1f61b4c960ae06f6ffce2cec1875af34fb32bfe46ab4e6b",
+    "tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-on-r3.json": "6b8dd40dedcc5d360199f830bf03204c0a56f0e8d86f3ef6eabfb6b453d5a742"
+  },
+  "analysis_source_sha256": "ed35d1f4a84fe123d084ed645bf2b1071fb11721b38367621b1c1b45821f9bb6",
+  "excluded_diagnostic_attempts": [
+    {
+      "name": "diagnostic-k01-shift-off-r1",
+      "executed": true,
+      "result": "ERR",
+      "pgid": 75085,
+      "supervisor_returncode": 0,
+      "stdout": "ERR 3.378 3.465 110.9\n",
+      "stderr": ""
+    }
+  ],
+  "limitations": [
+    "Timing phase is audited separately from the failed first diagnostic parser attempt",
+    "TO resource CPU is not a completed proof time; no speedup ratio from censored trials",
+    "Branch/path/formula explanations require the independent diagnostic cohort",
+    "Only the shift summary changes; all operands are the declared fixed512-byte calldata domain"
+  ]
+}

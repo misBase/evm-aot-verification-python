@@ -1,0 +1,802 @@
+{
+ "run": "tmp/v3exp/runs/ectx-ctx_same_k8/",
+ "program": {
+  "program.setup": 0.0,
+  "program.discovery": 1.6,
+  "program.groups": 0.0,
+  "program.proofs_H2": 338.8,
+  "program.consumer": 0.1,
+  "program.verify": 341.2
+ },
+ "tasks": 19,
+ "task_wall": 338.1,
+ "buckets": {
+  "h2.quick": {
+   "n": 33,
+   "s": 120.7,
+   "share": 0.357
+  },
+  "check@local.prove": {
+   "n": 155,
+   "s": 89.1,
+   "share": 0.2635
+  },
+  "local.x86_segment": {
+   "n": 19,
+   "s": 36.7,
+   "share": 0.1085
+  },
+  "summary.apply_div": {
+   "n": 3,
+   "s": 29.0,
+   "share": 0.0856
+  },
+  "local.prove": {
+   "n": 19,
+   "s": 25.1,
+   "share": 0.0741
+  },
+  "task": {
+   "n": 19,
+   "s": 15.4,
+   "share": 0.0455
+  },
+  "lemma.prove": {
+   "n": 2,
+   "s": 10.7,
+   "share": 0.0316
+  },
+  "check@other": {
+   "n": 16,
+   "s": 6.2,
+   "share": 0.0185
+  },
+  "lemma.discharge": {
+   "n": 2,
+   "s": 5.2,
+   "share": 0.0155
+  },
+  "local.evm_segment": {
+   "n": 19,
+   "s": 0.1,
+   "share": 0.0002
+  },
+  "summary.apply_lemma": {
+   "n": 2,
+   "s": 0.0,
+   "share": 0.0001
+  },
+  "lemma.cache_lookup": {
+   "n": 2,
+   "s": 0.0,
+   "share": 0.0
+  }
+ },
+ "counters": {
+  "z3.check": {
+   "n": 1563,
+   "s": 260.3,
+   "share": 0.77
+  },
+  "cache.query_key": {
+   "n": 620,
+   "s": 3.4,
+   "share": 0.0101
+  },
+  "expr.forward_selects": {
+   "n": 121,
+   "s": 1.7,
+   "share": 0.0049
+  },
+  "z3.isolated_child": {
+   "n": 2,
+   "s": 1.3,
+   "share": 0.0038
+  },
+  "worker.reset_caches": {
+   "n": 38,
+   "s": 0.3,
+   "share": 0.0009
+  },
+  "cache.statement_key": {
+   "n": 2,
+   "s": 0.1,
+   "share": 0.0003
+  },
+  "expr.normalize": {
+   "n": 1,
+   "s": 0.0,
+   "share": 0.0001
+  }
+ },
+ "routes": {
+  "local.prove": {
+   "unify": {
+    "runs": 1,
+    "wins": 0,
+    "s": 18.3,
+    "lost_s": 18.3
+   },
+   "divrem": {
+    "runs": 4,
+    "wins": 3,
+    "s": 6.2,
+    "lost_s": 3.2
+   },
+   "blast+n": {
+    "runs": 1,
+    "wins": 0,
+    "s": 4.1,
+    "lost_s": 4.1
+   },
+   "lia": {
+    "runs": 1,
+    "wins": 0,
+    "s": 3.9,
+    "lost_s": 3.9
+   },
+   "mul": {
+    "runs": 1,
+    "wins": 0,
+    "s": 3.1,
+    "lost_s": 3.1
+   },
+   "bvabs": {
+    "runs": 1,
+    "wins": 0,
+    "s": 1.7,
+    "lost_s": 1.7
+   },
+   "shift": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "potential+n": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "guards": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "stores": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "alias+n": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   }
+  }
+ },
+ "slow_checks": [
+  {
+   "wall": 57.7,
+   "name": "x86_maps_group_0",
+   "phase": "local.prove",
+   "proved": false,
+   "answer": "unknown",
+   "routes": {
+    "divrem": [
+     0,
+     3.244
+    ],
+    "lia": [
+     0,
+     3.857
+    ],
+    "stores": [
+     0,
+     0.005
+    ],
+    "shift": [
+     0,
+     0.012
+    ],
+    "blast+n": [
+     0,
+     4.084
+    ],
+    "alias+n": [
+     0,
+     0.005
+    ],
+    "potential+n": [
+     0,
+     0.006
+    ],
+    "bvabs": [
+     0,
+     1.747
+    ],
+    "mul": [
+     0,
+     3.057
+    ],
+    "guards": [
+     0,
+     0.006
+    ],
+    "unify": [
+     0,
+     18.267
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 4.8,
+   "name": "x86_maps_5_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {
+    "divrem": [
+     1,
+     1.385
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 4.3,
+   "name": "x86_maps_9_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {
+    "divrem": [
+     1,
+     0.875
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 3.9,
+   "name": "x86_maps_7_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {
+    "divrem": [
+     1,
+     0.647
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 3.1,
+   "name": "x86_maps_6_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 2.7,
+   "name": "x86_maps_8_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 2.6,
+   "name": "x86_maps_0_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 2.1,
+   "name": "x86_maps_4_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.9,
+   "name": "x86_maps_3_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.2,
+   "name": "x86_maps_1_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.0,
+   "name": "x86_maps_2_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.9,
+   "name": "context_nonempty_c2_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.7,
+   "name": "context_nonempty_c4_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.7,
+   "name": "context_nonempty_c3_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.7,
+   "name": "context_nonempty_c1_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  }
+ ],
+ "task_rows": [
+  {
+   "spec": {
+    "pc": 0,
+    "d": 0,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 17.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 15.907,
+   "z3": [
+    1163,
+    3.1857
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 15,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0156
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 28,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0211
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 41,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.001
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 54,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0087
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 67,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0006
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 80,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0008
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 93,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0005
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 106,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0184
+   ],
+   "rss": 223.4
+  },
+  {
+   "spec": {
+    "pc": 111,
+    "d": 5,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 8,
+   "wall": 296.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    320,
+    256.6796
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 127,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 8,
+   "wall": 2.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    27,
+    0.3236
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 131,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      15
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0203
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 131,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      28
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0015
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 131,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      41
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0033
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 131,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      54
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0018
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 131,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      67
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0079
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 131,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      80
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0055
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 131,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      93
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0034
+   ],
+   "rss": 1108.9
+  },
+  {
+   "spec": {
+    "pc": 131,
+    "d": 6,
+    "m": 0,
+    "f": 0,
+    "k": [
+     [
+      3,
+      106
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0039
+   ],
+   "rss": 1108.9
+  }
+ ],
+ "unfinished": []
+}

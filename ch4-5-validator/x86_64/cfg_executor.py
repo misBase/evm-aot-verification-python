@@ -1,0 +1,1845 @@
+"""
+x86-64 符号执行引擎（参考 evm_ir）。
+
+定义 X86SymbolicExecutor 类，实现 worklist 驱动的符号执行。
+"""
+
+import logging
+from time import monotonic
+from typing import List, Dict, Optional, Tuple, Set, TYPE_CHECKING
+import copy as _copy
+from enum import Enum
+
+from z3 import (AstRef, BitVec, BitVecVal, Context, Not, And, Or, If, Solver, simplify, unsat, is_false, is_not,
+                is_true)
+
+logger = logging.getLogger(__name__)
+
+# Diamond merge (X86SymbolicExecutor._merge_diamond). ponytail: the join within 4 static blocks of
+# each side, at most 8 states executed per side.
+_DIAMOND_BLOCKS = 4
+_DIAMOND_STEPS = 8
+
+from .aot_profile import AOT_COMPILER_PROFILE, X86AOTProfile
+from .models import Register, X86Block, X86Instruction
+from .cfg_structures import X86DynamicCFG, X86EdgeType
+from .cfg_state import PrefixSolver, X86GlobalState, X86WorldState
+from .cfg_strategies import X86DFSStrategy, X86TopologicalStrategy
+from .disassembler import parse_operands
+from .summaries.base import (
+    SummaryPreconditionError,
+    X86Summary,
+    X86SummaryRuntime,
+)
+from common.node_monitor import check_abort
+from common.path_observation import PathCoverageCertificate
+from state.smt_state import SMTState, PointerTag
+
+if TYPE_CHECKING:
+    from verification.call_site_mapping import CallSiteMapping
+
+
+class X86SymbolicExecutor:
+    """基于 worklist 的 x86-64 符号执行引擎。
+
+    完全参考 evm_ir 的设计：
+    - work_list 管理待执行状态
+    - 动态构建 CFG
+    - 策略模式控制搜索顺序
+    - 可达性检查剪枝不可达状态
+    """
+
+    GO_HOST_NODE_BASE_ADDR = 0x7FFFFFFFFFFF0000
+    # 兼容旧测试/调用方：第一个 GO_HOST 节点地址
+    GO_HOST_NODE_ADDR = GO_HOST_NODE_BASE_ADDR
+
+    def __init__(self,
+                 blocks: List[X86Block],
+                 strategy_cls: type = X86DFSStrategy,
+                 max_depth: int = 1000,
+                 use_reachability_check: bool = True,
+                 enable_go_bridge: bool = True,
+                 enable_merge: bool = True,
+                 reachability_timeout_ms: Optional[int] = 50,
+                 call_site_mapping: Optional["CallSiteMapping"] = None,
+                 aot_profile: Optional[X86AOTProfile] = None,
+                 summary_runtime: Optional[X86SummaryRuntime] = None,
+                 stop_addrs: Optional[set] = None,
+                 deadline: Optional[float] = None,
+                 merge_diamonds: Optional[int] = None):
+        """初始化符号执行引擎。
+
+        Args:
+            blocks: 所有 x86-64 块列表
+            strategy_cls: 搜索策略类
+            max_depth: 最大执行深度；见 X86SearchStrategy.__init__ 的说明，
+                这是当前唯一的终止兜底（循环检测尚未实现）
+            use_reachability_check: 是否使用可达性检查
+            enable_go_bridge: 是否启用 ret -> GO_HOST -> returnAddress 建模
+            enable_merge: 是否启用合流点合并优化
+            reachability_timeout_ms: 单次可达性 SMT 检查预算；超时按可能可达处理
+            summary_runtime: 预构建的 x86 summary runtime；None 表示不启用任何
+                summary，调用方负责注册插件（见 build_x86_summary_runtime）
+            merge_diamonds: None 不合并；整数 N：本次执行已有 N 条路径（终止 + 截断 + 待执行）
+                之后，两侧只改寄存器/标志、很快汇合的条件分支在汇合点合并成一个
+                状态（_merge_diamond，精确合并）；0 即始终合并
+        """
+        self.blocks = blocks
+        self.blocks_by_addr: Dict[int, X86Block] = {block.start_addr: block for block in blocks}
+        self.block_index: Dict[int, int] = {block.start_addr: i for i, block in enumerate(blocks)}
+        self.max_depth = max_depth
+        self.deadline = deadline
+        self.use_reachability_check = use_reachability_check
+        self.enable_go_bridge = enable_go_bridge
+        self.enable_merge = enable_merge
+        self.merge_diamonds = merge_diamonds
+        self.merged_diamonds = 0
+        self.reachability_timeout_ms = reachability_timeout_ms
+        self.call_site_mapping = call_site_mapping
+        self.aot_profile = aot_profile or AOT_COMPILER_PROFILE
+
+        # 创建动态 CFG
+        self.cfg = X86DynamicCFG(blocks)
+
+        # work_list：待执行的全局状态列表
+        self.work_list: List[X86GlobalState] = []
+
+        # 合流点合并优化
+        if enable_merge:
+            topo_order = self._compute_topological_order()
+            self.merge_points: Dict[int, int] = self._compute_static_merge_points(topo_order)
+            self.merge_buffers: Dict[int, List[X86GlobalState]] = {}
+            self.strategy = X86TopologicalStrategy(self.work_list, max_depth, topo_order)
+        else:
+            self.merge_points = {}
+            self.merge_buffers = {}
+            # 创建搜索策略
+            self.strategy = strategy_cls(self.work_list, max_depth)
+
+        self.summary_runtime = summary_runtime or X86SummaryRuntime(blocks, ())
+        for summary in self.summary_runtime.summaries:
+            self.merge_points.pop(summary.continuation.block_addr, None)
+
+        # 统计信息
+        self.total_states = 0
+        self.pruned_states = 0
+        self.flush_depth_pruned_count = 0
+        self.coverage_incomplete_reasons: List[str] = []
+        # 可达性检查的累计耗时与调用次数，便于 perf 实验诊断 build 慢的来源。
+        self.reachability_call_count = 0
+        self.reachability_total_wall = 0.0
+        self.reachability_pruned_count = 0
+        # One incremental solver for all reachability checks of this run (see
+        # PrefixSolver): DFS order makes consecutive path conditions share
+        # long prefixes.
+        self._prefix_solver = PrefixSolver()
+
+        # 终止状态列表
+        self.final_states: List[X86GlobalState] = []
+
+        # cutpoint 截断：到达这些地址的非入口状态不再执行，收进
+        # cut_states——供循环归纳引擎在 cutpoint 处截断段执行。
+        self.stop_addrs = stop_addrs or set()
+        self.cut_states: List[X86GlobalState] = []
+
+        # 每个 CallGoFunction-ret 站点对应一个独立 GO_HOST 外部节点
+        self._go_host_addr_by_ret_block: Dict[int, int] = {}
+
+    def _mark_coverage_incomplete(self, reason: str) -> None:
+        if reason not in self.coverage_incomplete_reasons:
+            self.coverage_incomplete_reasons.append(reason)
+
+    def path_coverage_certificate(self) -> PathCoverageCertificate:
+        """返回终止路径覆盖性的 fail-closed 证书。
+
+        该证书只声明 executor 已探索所有未被证明不可达的建模控制流后继；
+        它不证明指令语义或 host-call summary 的语义正确性。
+        """
+        strategy_depth_pruned = getattr(self.strategy, "depth_pruned_count", 0)
+        depth_pruned = strategy_depth_pruned + self.flush_depth_pruned_count
+        reasons = list(self.coverage_incomplete_reasons)
+        if depth_pruned:
+            reasons.append(f"depth-pruned state count: {depth_pruned}")
+        if self.work_list:
+            reasons.append(f"work-list not drained: {len(self.work_list)} state(s)")
+        if self.merge_buffers:
+            buffered = sum(len(buf) for buf in self.merge_buffers.values())
+            reasons.append(f"merge buffers not drained: {buffered} state(s)")
+
+        details = (
+            ("terminal_paths", len(self.final_states)),
+            ("total_states", self.total_states),
+            ("unsat_pruned_states", self.pruned_states),
+            ("reachability_calls", self.reachability_call_count),
+            ("depth_pruned_states", depth_pruned),
+        )
+        if reasons:
+            return PathCoverageCertificate(
+                complete=False,
+                reason="; ".join(reasons),
+                source="x86-symbolic-executor",
+                details=details,
+            )
+        return PathCoverageCertificate.by_construction(
+            "x86 CFG executor explored all modeled successors",
+            source="x86-symbolic-executor",
+            details=details,
+        )
+
+    def _is_state_reachable(self, state: X86GlobalState) -> bool:
+        """Check path feasibility."""
+        import time as _t
+        self.reachability_call_count += 1
+        t0 = _t.time()
+        try:
+            result = state.get_constraints().is_possible(
+                solver_timeout=self.reachability_timeout_ms,
+                prefix_solver=self._prefix_solver,
+            )
+        finally:
+            self.reachability_total_wall += _t.time() - t0
+        if not result:
+            self.reachability_pruned_count += 1
+        return result
+
+    def _get_static_successors(self, block_idx: int, block: X86Block) -> List[int]:
+        """解析 block 末尾指令，返回后继 block 地址列表（静态分析）。
+
+        Args:
+            block_idx: block 在 self.blocks 中的索引
+            block: 当前 block
+
+        Returns:
+            后继 block 地址列表
+        """
+        successors = []
+        if not block.instructions:
+            # 空块 fallthrough
+            if block_idx + 1 < len(self.blocks):
+                successors.append(self.blocks[block_idx + 1].start_addr)
+            return successors
+
+        last_insn = block.instructions[-1]
+        mnemonic = last_insn.mnemonic.lower()
+
+        if mnemonic == 'jmp':
+            operands = parse_operands(last_insn)
+            target_addr = operands.get('jump_target')
+            if target_addr is not None and target_addr in self.blocks_by_addr:
+                successors.append(target_addr)
+
+        elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+            # Jcc: 跳转目标 + fallthrough
+            operands = parse_operands(last_insn)
+            target_addr = operands.get('jump_target')
+            if target_addr is not None and target_addr in self.blocks_by_addr:
+                successors.append(target_addr)
+            if block_idx + 1 < len(self.blocks):
+                successors.append(self.blocks[block_idx + 1].start_addr)
+
+        elif mnemonic == 'ret':
+            # ret: 对于 go bridge 情况，后继在运行时确定，静态无法判断
+            # 保守处理：不添加后继
+            pass
+
+        else:
+            # fallthrough
+            if block_idx + 1 < len(self.blocks):
+                successors.append(self.blocks[block_idx + 1].start_addr)
+
+        return successors
+
+    def _compute_static_merge_points(self, topo_order: Dict[int, int] = None) -> Dict[int, int]:
+        """计算静态合流点：入边数 >= 2 的 block（排除回边）。
+
+        Args:
+            topo_order: 拓扑序映射，若提供则跳过回边（src_order >= dst_order 的边）
+
+        Returns:
+            {block_addr: incoming_count}，仅包含前向入边 >= 2 的 block
+        """
+        incoming: Dict[int, int] = {}
+        for i, block in enumerate(self.blocks):
+            src_addr = block.start_addr
+            for succ_addr in self._get_static_successors(i, block):
+                if topo_order is not None:
+                    src_order = topo_order.get(src_addr, float('inf'))
+                    dst_order = topo_order.get(succ_addr, float('inf'))
+                    if src_order >= dst_order:
+                        continue  # 跳过回边
+                incoming[succ_addr] = incoming.get(succ_addr, 0) + 1
+        return {addr: cnt for addr, cnt in incoming.items() if cnt >= 2}
+
+    def _compute_topological_order(self) -> Dict[int, int]:
+        """使用 Kahn 算法计算拓扑序。
+
+        Returns:
+            {block_addr: 拓扑序号} 映射
+        """
+        # 构建邻接表和入度
+        adj: Dict[int, List[int]] = {block.start_addr: [] for block in self.blocks}
+        in_degree: Dict[int, int] = {block.start_addr: 0 for block in self.blocks}
+
+        for i, block in enumerate(self.blocks):
+            for succ_addr in self._get_static_successors(i, block):
+                if succ_addr in adj:
+                    adj[block.start_addr].append(succ_addr)
+                    in_degree[succ_addr] = in_degree.get(succ_addr, 0) + 1
+
+        # Kahn 算法
+        from collections import deque
+        queue = deque()
+        for addr, deg in in_degree.items():
+            if deg == 0:
+                queue.append(addr)
+
+        topo_order: Dict[int, int] = {}
+        order = 0
+        while queue:
+            addr = queue.popleft()
+            topo_order[addr] = order
+            order += 1
+            for succ_addr in adj.get(addr, []):
+                in_degree[succ_addr] -= 1
+                if in_degree[succ_addr] == 0:
+                    queue.append(succ_addr)
+
+        # 未被排序的节点（循环中的）赋予最大序号
+        for block in self.blocks:
+            if block.start_addr not in topo_order:
+                topo_order[block.start_addr] = order
+                order += 1
+
+        return topo_order
+
+    def _merge_at_confluence(self, addr: int, states: List[X86GlobalState]) -> X86GlobalState:
+        """在合流点合并多条路径的状态。
+
+        使用 If(path_condition, val_from_A, val_from_B) 合并每个字段。
+
+        Args:
+            addr: 合流点 block 地址
+            states: 到达此合流点的所有状态
+
+        Returns:
+            合并后的 X86GlobalState
+        """
+        if len(states) == 1:
+            return states[0]
+
+        # 创建合并后的 mstate
+        merged_mstate = SMTState._create_empty()
+
+        # 合并寄存器
+        all_regs: Set[str] = set()
+        for s in states:
+            all_regs.update(s.mstate.x86_registers._registers.keys())
+            all_regs.update(s.mstate.x86_registers._pointer_tags.keys())
+
+        from state.smt_state import X86RegisterState
+        merged_regs = X86RegisterState()
+        for reg in all_regs:
+            # 从最后一个状态开始作为默认值，逆序用 If 叠加
+            expr = states[-1].mstate.x86_registers._registers.get(reg, BitVecVal(0, 64))
+            for s in reversed(states[:-1]):
+                cond = s.get_constraints().as_bool()
+                s_val = s.mstate.x86_registers._registers.get(reg, BitVecVal(0, 64))
+                expr = If(cond, s_val, expr)
+            merged_regs._registers[reg] = expr
+            reg_tags = [s.mstate.x86_registers.get_pointer_tag(reg) for s in states]
+            merged_regs._pointer_tags[reg] = (
+                reg_tags[0] if all(tag == reg_tags[0] for tag in reg_tags) else PointerTag.NONE
+            )
+        merged_mstate.x86_registers = merged_regs
+
+        # 合并标志位
+        all_flags: Set[str] = set()
+        for s in states:
+            all_flags.update(s.mstate.x86_registers._flags.keys())
+        for flag in all_flags:
+            expr = states[-1].mstate.x86_registers.get_flag(flag)
+            for s in reversed(states[:-1]):
+                cond = s.get_constraints().as_bool()
+                expr = If(cond, s.mstate.x86_registers.get_flag(flag), expr)
+            merged_regs._flags[flag] = expr
+
+        # 合并 x86 内存（按 domain 分别合并三个 Z3 Array）
+        from state.smt_state import X86MemoryState
+
+        def _merge_array(get_array):
+            expr = get_array(states[-1])
+            for s in reversed(states[:-1]):
+                cond = s.get_constraints().as_bool()
+                expr = If(cond, get_array(s), expr)
+            return expr
+
+        merged_mstate.x86_memory = X86MemoryState.from_arrays(
+            _merge_array(lambda s: s.mstate.x86_memory.call_engine_mem),
+            _merge_array(lambda s: s.mstate.x86_memory.stack_mem),
+            _merge_array(lambda s: s.mstate.x86_memory.evm_mem),
+        )
+
+        # 合并 return_offset, return_length
+        offset_expr = states[-1].mstate.return_offset
+        length_expr = states[-1].mstate.return_length
+        for s in reversed(states[:-1]):
+            cond = s.get_constraints().as_bool()
+            offset_expr = If(cond, s.mstate.return_offset, offset_expr)
+            length_expr = If(cond, s.mstate.return_length, length_expr)
+        merged_mstate.return_offset = offset_expr
+        merged_mstate.return_length = length_expr
+
+        # 合并 callEngine side-channel 字段（与 return_offset/length 同模式）
+        callengine_states = [state.mstate for state in states]
+        callengine_conditions = [state.get_constraints().as_bool() for state in states]
+        SMTState.merge_callengine_side_channels(
+            merged_mstate,
+            callengine_states,
+            callengine_conditions,
+            default_from_end=True,
+        )
+
+        # 这三个是 EVM 侧字段，x86 侧从不读（对应物是 x86_memory 的 stack_mem /
+        # evm_mem 域，已在上面按 domain 合并），取哪条路径都不影响验证。
+        # **x86 真正的 gas 是 callengine_gas_remaining**，已随 side-channel 逐字段
+        # If 合并——别被下面这行 evm_gas 误导成"合并把 gas 丢了"。
+        merged_mstate.evm_stack = states[0].mstate.evm_stack
+        merged_mstate.evm_memory = states[0].mstate.evm_memory
+        merged_mstate.evm_gas = states[0].mstate.evm_gas
+        merged_mstate.pc = states[0].mstate.pc  # 合流点同一地址，各路径 pc 相等
+
+        # 合并 EVM storage：Go host 函数会读写它（_handle_sload/_handle_sstore），必须 If 合并
+        from state.smt_state import EVMStorageState, EVMTransientStorageState
+        storage_expr = states[-1].mstate.evm_storage.Storage
+        for s in reversed(states[:-1]):
+            cond = s.get_constraints().as_bool()
+            storage_expr = If(cond, s.mstate.evm_storage.Storage, storage_expr)
+        merged_mstate.evm_storage = EVMStorageState(storage_array=storage_expr)
+
+        # 合并 host-gas 调用序号（If-chain，同上）：各路径调用次数不同时必须如实保留成
+        # If(cond, 1, 0)，否则后续 UF 的序号对某条路径是错的。
+        # simplify 不能省——Z3 不会自动把 If(c, 1, 1) 折成 1，而绝大多数合流点属于这种。
+        merged_seq = {}
+        zero = BitVecVal(0, 256)
+        for op in {k for s in states for k in s.mstate.host_gas_seq}:
+            expr = states[-1].mstate.host_gas_seq.get(op, zero)
+            for s in reversed(states[:-1]):
+                cond = s.get_constraints().as_bool()
+                s_seq = s.mstate.host_gas_seq.get(op, zero)
+                expr = If(cond, s_seq, expr)
+            merged_seq[op] = simplify(expr)
+        merged_mstate.host_gas_seq = merged_seq
+
+        # 合并 EVM transient storage
+        ts_expr = states[-1].mstate.evm_transient_storage.TransientStorage
+        for s in reversed(states[:-1]):
+            cond = s.get_constraints().as_bool()
+            ts_expr = If(cond, s.mstate.evm_transient_storage.TransientStorage, ts_expr)
+        merged_mstate.evm_transient_storage = EVMTransientStorageState(storage_array=ts_expr)
+
+        # 环境信息在 x86 CFG 分支间共享；return_data 可能被 host-call 路径更新，单独合并。
+        states[0].mstate.copy_environment_to(merged_mstate)
+        merged_mstate.return_data = _merge_array(lambda s: s.mstate.return_data)
+        merged_mstate.stack_base = states[0].mstate.stack_base
+        merged_mstate.stack_num_inputs = states[0].mstate.stack_num_inputs
+        states[0].mstate.copy_verification_options_to(merged_mstate)
+        guarded_assumptions = []
+        seen_assumptions = set()
+        for s in states:
+            cond = s.get_constraints().as_bool()
+            for assumption in getattr(s.mstate, 'assumptions', None) or []:
+                guarded = simplify(Or(Not(cond), assumption))
+                try:
+                    key = guarded.hash()
+                except Exception:
+                    key = None
+                if key is not None and key in seen_assumptions:
+                    continue
+                if key is not None:
+                    seen_assumptions.add(key)
+                guarded_assumptions.append(guarded)
+        merged_mstate.assumptions = (
+            guarded_assumptions if guarded_assumptions else None
+        )
+        # 保留所有路径共享的 unrouted_memory_domain（生产路径都是 None）
+        merged_mstate.unrouted_memory_domain = getattr(
+            states[0].mstate, 'unrouted_memory_domain', None
+        )
+
+        # 合并约束 = Or(所有原路径条件)
+        merged_world = X86WorldState()
+        conditions = [s.get_constraints().as_bool() for s in states]
+        merged_world.constraints.add(Or(*conditions))
+
+        merged_node = self.cfg.get_or_create_node(addr)
+        result = X86GlobalState(mstate=merged_mstate, world_state=merged_world, node=merged_node)
+        result.depth = max(s.depth for s in states)
+        return result
+
+    def manage_cfg(self, insn: X86Instruction, new_states: List[X86GlobalState],
+                   from_addr: int) -> None:
+        """管理 CFG 构建。
+
+        在执行过程中动态添加边。
+
+        Args:
+            insn: 当前执行的指令
+            new_states: 新生成的状态列表
+            from_addr: 前驱节点地址（当前块地址）
+        """
+        if not new_states:
+            return
+
+        mnemonic = insn.mnemonic.lower()
+
+        if mnemonic == 'jmp':
+            # 无条件跳转：添加单条边
+            if len(new_states) == 1 and new_states[0].node:
+                to_addr = new_states[0].node.address
+                self.cfg.add_edge(from_addr, to_addr, X86EdgeType.UNCONDITIONAL,
+                                source_instruction=insn)
+
+        elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+            # 条件跳转：优先按真实跳转目标判定边类型，避免剪枝后仅剩一支时类型错标
+            target_addr = parse_operands(insn).get('jump_target')
+            for i, state in enumerate(new_states):
+                if not state.node:
+                    continue
+                to_addr = state.node.address
+
+                if target_addr is not None and to_addr == target_addr:
+                    edge_type = X86EdgeType.CONDITIONAL_TRUE
+                    condition = self._extract_jcc_condition(state)
+                else:
+                    # 兜底：无法解析目标时退回顺序约定（第一个为 true）
+                    if target_addr is None and i == 0:
+                        edge_type = X86EdgeType.CONDITIONAL_TRUE
+                        condition = self._extract_jcc_condition(state)
+                    else:
+                        edge_type = X86EdgeType.CONDITIONAL_FALSE
+                        condition = None  # fallthrough 条件是跳转条件的否定，在边类型中体现
+
+                self.cfg.add_edge(from_addr, to_addr, edge_type, condition,
+                                source_instruction=insn)
+        elif mnemonic == 'ret':
+            # ret 的 GO 往返边在 _handle_ret_with_go_bridge 中按实际执行动态添加
+            return
+
+        else:
+            # Fallthrough：添加顺序执行边
+            if len(new_states) == 1 and new_states[0].node:
+                to_addr = new_states[0].node.address
+                self.cfg.add_edge(from_addr, to_addr, X86EdgeType.FALLTHROUGH,
+                                source_instruction=insn)
+
+    def execute(self, initial_state: SMTState, entry_addr: Optional[int] = None) -> List[X86GlobalState]:
+        """执行符号执行。
+
+        Args:
+            initial_state: 初始机器状态
+            entry_addr: 入口块地址（默认为第一个块）
+
+        Returns:
+            所有终止状态列表
+        """
+        # 确定入口点
+        if entry_addr is None:
+            if not self.blocks:
+                raise ValueError("No blocks to execute")
+            entry_addr = self.blocks[0].start_addr
+
+        entry_block = self.blocks_by_addr.get(entry_addr)
+        if entry_block is None:
+            raise ValueError(f"Entry block not found: addr=0x{entry_addr:x}")
+
+        # 创建初始全局状态
+        entry_node = self.cfg.get_or_create_node(entry_addr)
+        initial_global_state = X86GlobalState(
+            mstate=initial_state,
+            node=entry_node
+        )
+        initial_global_state.depth = 0
+
+        # 注入 caller 设定的全局先验（precondition assumptions）。
+        # 这些约束在每条路径的 X86Constraints 中作为初始合取项出现，
+        # 既让 reachability check 在分支处可以快速剪枝，也保证最终
+        # path_condition 中 carry 这些先验，无需 equivalence_checker 重复加。
+        for assumption in getattr(initial_state, 'assumptions', None) or []:
+            initial_global_state.world_state.constraints.add(assumption)
+
+        # 添加到 work_list
+        self.work_list.append(initial_global_state)
+
+        # 主执行循环
+        for global_state in self.strategy:
+            # cutpoint 截断（在 merge 处理之前：cut 状态不应滞留 merge buffer）。
+            # 判别"非入口状态对象"而非 depth>0——fallthrough/go-bridge 恢复
+            # 不增 depth，直落进 cutpoint 的状态会漏过截断、穿透继续执行。
+            if (self.stop_addrs and global_state is not initial_global_state
+                    and global_state.node
+                    and global_state.node.address in self.stop_addrs):
+                self.cut_states.append(global_state)
+                continue
+
+            # 合流点合并检测
+            if self.enable_merge:
+                addr = global_state.node.address if global_state.node else None
+                if addr is not None and addr in self.merge_points:
+                    buf = self.merge_buffers.setdefault(addr, [])
+                    buf.append(global_state)
+                    if len(buf) < self.merge_points[addr]:
+                        continue  # 等待其他路径到达
+                    # 所有路径已到达，合并
+                    global_state = self._merge_at_confluence(addr, buf)
+                    del self.merge_buffers[addr]
+
+            new_states = self._advance(global_state)
+            if len(new_states) == 2 and self._merging():
+                new_states = self._merge_diamond(new_states)
+            # 添加新状态到 work_list
+            self.work_list.extend(new_states)
+
+        # flush 残余 merge buffer（某些路径被剪枝导致入边不齐）
+        if self.enable_merge:
+            self._flush_merge_buffers()
+
+        return self.final_states
+
+    def _merging(self) -> bool:
+        """Diamonds are merged once this run has merge_diamonds paths (finished,
+        cut or pending): only exploding segments change shape."""
+        return (self.merge_diamonds is not None
+                and len(self.final_states) + len(self.cut_states) + len(self.work_list) >= self.merge_diamonds)
+
+    def _advance(self, global_state: X86GlobalState) -> List[X86GlobalState]:
+        """Execute one state as the main loop does: its successors after the
+        reachability pruning of a fork, with the CFG edges added; a terminal
+        state is recorded in final_states."""
+        # 循环检测调用点（TODO: 实现检测逻辑）
+        self._detect_and_handle_loops(global_state)
+
+        # 执行单个状态
+        new_states = self.execute_state(global_state)
+
+        if new_states:
+            # 可达性检查和剪枝
+            if self.use_reachability_check and len(new_states) > 1:
+                old_count = len(new_states)
+                new_states = [
+                    state for state in new_states
+                    if self._is_state_reachable(state)
+                ]
+                pruned = old_count - len(new_states)
+                self.pruned_states += pruned
+
+            # 更新 CFG；summary entry 已经把整个 slice 折叠成
+            # entry -> exit 的压缩边，不能再按原 entry 末尾 JNE 建普通条件边。
+            if (not global_state.summary_control_flow_managed
+                    and global_state.node
+                    and global_state.node.block.instructions):
+                last_insn = global_state.node.block.instructions[-1]
+                from_addr = global_state.node.address
+                self.manage_cfg(last_insn, new_states, from_addr)
+
+            self.total_states += len(new_states)
+
+        # 如果是终止状态，保存
+        if self._is_terminal_state(global_state):
+            self.final_states.append(global_state)
+        return new_states
+
+    def _diamond_join(self, a: int, b: int):
+        """(join address, region) of the two successors of a fork: the address
+        both reach first along static successors (within _DIAMOND_BLOCKS
+        blocks each; least total distance), and every address either side
+        passes before it. None when they do not meet that soon."""
+        def reach(start):
+            dist, frontier = {start: 0}, [start]
+            for d in range(1, _DIAMOND_BLOCKS + 1):
+                nxt = []
+                for addr in frontier:
+                    block = self.blocks_by_addr.get(addr)
+                    if block is None:
+                        continue
+                    for succ in self._get_static_successors(self.block_index[addr], block):
+                        if succ not in dist:
+                            dist[succ] = d
+                            nxt.append(succ)
+                frontier = nxt
+            return dist
+        da, db = reach(a), reach(b)
+        common = [addr for addr in da if addr in db]
+        if not common:
+            return None
+        join = min(common, key=lambda addr: (da[addr] + db[addr], addr))
+        region = {addr for addr, d in da.items() if d < da[join]} | {addr for addr, d in db.items() if d < db[join]}
+        return join, region - {join}
+
+    def _merge_diamond(self, forks: List[X86GlobalState]) -> List[X86GlobalState]:
+        """Run both sides of a fork ahead to their join (_diamond_join) and
+        return one merged state there when nothing but registers and flags
+        differ (_merged); otherwise every state reached, unchanged.
+
+        Each side is executed exactly as the main loop would (_advance: forks
+        pruned, CFG edges, terminals recorded); a state that leaves the region,
+        reaches a cutpoint or the depth limit, or exceeds _DIAMOND_STEPS is
+        handed back unexecuted. Only the bookkeeping of which states continue
+        changes: the AOT compiler memory-expansion prologue forks twice per
+        access into short register-only diamonds (toWordSize's overflow clamp,
+        the words == 0 skip of SafeMul) that the executor kept apart, so live
+        paths doubled per access (PoolManager 4418: 876 x86 paths, 90% of the
+        segment in reachability checks)."""
+        a, b = forks
+        if a.node is None or b.node is None:
+            return forks
+        found = self._diamond_join(a.node.address, b.node.address)
+        if found is None:
+            return forks
+        join, region = found
+        arrived, out = ([], []), []
+        for side, start in enumerate(forks):
+            queue, steps = [start], 0
+            while queue:
+                state = queue.pop()
+                addr = state.node.address if state.node else None
+                if addr == join:
+                    arrived[side].append(state)
+                elif (addr not in region or addr in self.stop_addrs or state.depth >= self.max_depth
+                      or steps >= _DIAMOND_STEPS):
+                    out.append(state)
+                else:
+                    steps += 1
+                    queue.extend(self._advance(state))
+        if len(arrived[0]) == len(arrived[1]) == 1:
+            merged = _merged(arrived[0][0], arrived[1][0])
+            if merged is not None:
+                self.merged_diamonds += 1
+                return out + [merged]
+        return out + arrived[0] + arrived[1]
+
+    def _flush_merge_buffers(self) -> None:
+        """处理残余的合流 buffer（某些路径被可达性剪枝导致入边不齐）。"""
+        while self.merge_buffers:
+            for addr in list(self.merge_buffers.keys()):
+                buf = self.merge_buffers.pop(addr)
+                if not buf:
+                    continue
+                merged = self._merge_at_confluence(addr, buf)
+
+                self._detect_and_handle_loops(merged)
+                new_states = self.execute_state(merged)
+
+                if new_states:
+                    if self.use_reachability_check and len(new_states) > 1:
+                        new_states = [
+                            state for state in new_states
+                            if self._is_state_reachable(state)
+                        ]
+                    # 同主循环：summary entry 的 CFG 边已由 summary 自己补好。
+                    if (not merged.summary_control_flow_managed
+                            and merged.node
+                            and merged.node.block.instructions):
+                        last_insn = merged.node.block.instructions[-1]
+                        self.manage_cfg(last_insn, new_states, merged.node.address)
+
+                    # 新状态可能又到达合流点，或需要继续执行。
+                    # 注意：ret 结尾块也必须先执行一次，才能让 GO bridge
+                    # 有机会建立 ret -> GO_HOST -> returnAddress 边。
+                    for ns in new_states:
+                        ns_addr = ns.node.address if ns.node else None
+                        if ns_addr is not None and ns_addr in self.merge_points:
+                            buf2 = self.merge_buffers.setdefault(ns_addr, [])
+                            buf2.append(ns)
+                        else:
+                            # 非合流点：继续执行，结果重新派发
+                            self._flush_execute_state(ns)
+
+                if self._is_terminal_state(merged):
+                    self.final_states.append(merged)
+
+    def _flush_execute_state(self, state: X86GlobalState) -> None:
+        """在 flush 阶段继续执行单个非终止、非合流点状态，并将结果正确派发。
+
+        递归执行直到状态到达合流点（加入 merge_buffers）或终止（加入 final_states）。
+        depth >= max_depth 时停止递归，防止无限循环。
+        """
+        if state.depth >= self.max_depth:
+            self.flush_depth_pruned_count += 1
+            self._mark_coverage_incomplete(
+                f"flush depth limit reached at depth {state.depth}"
+            )
+            node_addr = f"0x{state.node.address:x}" if state.node else "None"
+            logger.debug(
+                "[CFG] flush 剪枝：depth=%d >= max_depth=%d，停止递归 node=%s",
+                state.depth, self.max_depth, node_addr
+            )
+            return
+
+        self._detect_and_handle_loops(state)
+        new_states = self.execute_state(state)
+
+        if new_states:
+            if self.use_reachability_check and len(new_states) > 1:
+                new_states = [
+                    ns for ns in new_states
+                    if self._is_state_reachable(ns)
+                ]
+            # 同主循环：summary entry 的 CFG 边已由 summary 自己补好。
+            if (not state.summary_control_flow_managed
+                    and state.node
+                    and state.node.block.instructions):
+                last_insn = state.node.block.instructions[-1]
+                self.manage_cfg(last_insn, new_states, state.node.address)
+
+            for ns in new_states:
+                ns_addr = ns.node.address if ns.node else None
+                if ns_addr is not None and ns_addr in self.merge_points:
+                    buf2 = self.merge_buffers.setdefault(ns_addr, [])
+                    buf2.append(ns)
+                else:
+                    # ret 子块也必须先执行一次，才能正确建立 GO bridge
+                    # 或确认它真的是终止态。
+                    self._flush_execute_state(ns)
+
+        if self._is_terminal_state(state):
+            self.final_states.append(state)
+
+    def execute_state(self, global_state: X86GlobalState,
+                      skip_summary_at: Optional[Tuple[int, int]] = None) -> List[X86GlobalState]:
+        """执行单个全局状态。
+
+        Args:
+            global_state: 要执行的全局状态
+            skip_summary_at: 本次调用内不套用该 (block, index) 上的 summary
+                （出口守卫分裂的 G 分支：只作用于这一次命中，后续再到达照常套用）
+
+        Returns:
+            新生成的全局状态列表
+        """
+        node = global_state.node
+        if self.deadline is not None and monotonic() >= self.deadline:
+            raise TimeoutError("x86 segment execution deadline exhausted")
+        check_abort()
+        if node is None:
+            self._mark_coverage_incomplete("encountered state without CFG node")
+            return []
+
+        # 将当前状态添加到节点的状态列表（用于追踪和调试）
+        node.states.append(global_state)
+
+        block = node.block
+        mstate = global_state.mstate
+
+        # 执行块中的所有指令。summary 命中点使用 (block_addr, instruction_index)
+        # 精确定位：命中点之前的 prefix 指令由这个主循环正常执行，summary
+        # 本身不再重复执行 prefix。这样 block-middle summary 也能保持
+        # prefix 语义等价，并为未来同 block summary 留出正确的后缀继续路径。
+        new_mstate = mstate.copy()
+
+        instruction_index = 0
+        while instruction_index < len(block.instructions):
+            summary = self.summary_runtime.get(block.start_addr, instruction_index)
+            if summary is not None and summary.start_key == skip_summary_at:
+                summary = None
+            if summary is not None and summary.is_cross_block:
+                guard = self.summary_runtime.exit_guard(summary, new_mstate)
+                if guard is not None:
+                    return self._split_on_exit_guard(global_state, summary, new_mstate, guard)
+            if summary is not None:
+                # prove-or-reject：summary 的适用前提必须由当前 path condition
+                # 证明。被拒时按策略要么整体失败，要么**原样逐指令执行本循环**
+                # ——后者语义与不启用 summary 完全一致，因此是健全的降级。
+                try:
+                    new_mstate = self.summary_runtime.apply(
+                        summary,
+                        new_mstate,
+                        path_condition=global_state.get_constraints().as_bool(),
+                        witness=global_state.get_constraints()._witness,
+                    )
+                    self._adopt_entry_model(global_state)
+                except SummaryPreconditionError as error:
+                    self.summary_runtime.record_precondition_failure(error)
+                    if not self.summary_runtime.should_fallback_on_precondition(
+                        summary.kind
+                    ):
+                        raise
+                    # 不推进 instruction_index、不改 new_mstate，落到下面的
+                    # insn.to_z3 逐条执行原指令。
+                    insn = block.instructions[instruction_index]
+                    new_mstate = insn.to_z3(new_mstate)
+                    instruction_index += 1
+                    continue
+
+                if summary.is_cross_block:
+                    return self._continue_after_cross_block_summary(
+                        global_state,
+                        summary,
+                        new_mstate,
+                    )
+
+                instruction_index = summary.continuation.instruction_index
+                continue
+
+            insn = block.instructions[instruction_index]
+            new_mstate = insn.to_z3(new_mstate)
+            instruction_index += 1
+
+        # 持久化块执行后的机器状态，供终止判定与结果合并使用
+        global_state.mstate = new_mstate
+
+        # 获取最后一条指令来确定控制流
+        if not block.instructions:
+            # 空块，顺序执行到下一个块
+            return self._handle_fallthrough(global_state, new_mstate, block)
+
+        last_insn = block.instructions[-1]
+        mnemonic = last_insn.mnemonic.lower()
+
+        if mnemonic == 'jmp':
+            return self._handle_jmp(global_state, new_mstate, block, last_insn)
+        elif mnemonic in ['jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+            return self._handle_jcc(global_state, new_mstate, block, last_insn)
+        elif mnemonic == 'ret':
+            return self._handle_ret_with_go_bridge(global_state, new_mstate, block, last_insn)
+        else:
+            # 顺序执行到下一个块
+            return self._handle_fallthrough(global_state, new_mstate, block)
+
+    def _split_on_exit_guard(self, global_state: X86GlobalState, summary: X86Summary,
+                             new_mstate: SMTState, guard) -> List[X86GlobalState]:
+        """Summary with an exit guard G (an exit it does not model): fork.
+
+        * G: the block is re-run from its start with this ONE hit skipped
+          (`skip_summary_at`), so the raw slice runs and leaves through its
+          real exit; later arrivals at the entry are summarized again.
+        * not G: the summary is applied (its lemma holds exactly there) and
+          execution jumps to the continuation.
+
+        G and not G partition the hit's path condition, so the two forks
+        together are complete; infeasible forks are pruned.
+        """
+        import copy as copy_module
+        from z3 import is_true
+
+        guard = simplify(guard)
+        # Forks copy the PRE-block state: a raw fork re-runs the block prefix.
+        raw, fast = copy_module.copy(global_state), copy_module.copy(global_state)
+        raw.add_constraint(guard)
+        fast.add_constraint(Not(guard))
+        global_state.mstate = new_mstate
+        global_state.summary_control_flow_managed = True
+
+        def feasible(state):
+            return not self.use_reachability_check or self._is_state_reachable(state)
+
+        def run_raw(state):
+            states = self.execute_state(state, skip_summary_at=summary.start_key)
+            if states and not state.summary_control_flow_managed and state.node.block.instructions:
+                self.manage_cfg(state.node.block.instructions[-1], states, state.node.address)
+            if self._is_terminal_state(state):
+                self.final_states.append(state)
+            return states
+
+        out: List[X86GlobalState] = []
+        if not is_false(guard) and feasible(raw):
+            out.extend(run_raw(raw))
+        if not is_true(guard) and feasible(fast):
+            try:
+                applied = self.summary_runtime.apply(
+                    summary, new_mstate, path_condition=fast.get_constraints().as_bool(),
+                    witness=fast.get_constraints()._witness)
+                self._adopt_entry_model(fast)
+            except SummaryPreconditionError as error:
+                self.summary_runtime.record_precondition_failure(error)
+                if not self.summary_runtime.should_fallback_on_precondition(summary.kind):
+                    raise
+                return out + run_raw(fast)
+            out.extend(self._continue_after_cross_block_summary(fast, summary, applied))
+        return out
+
+    def _adopt_entry_model(self, global_state: X86GlobalState) -> None:
+        """After a summary hit, the runtime's last entry model (a model of the hit
+        premise, which conjoins this path condition) becomes the path's witness
+        when the current one no longer satisfies the path condition. A hint only:
+        is_possible uses a witness only if it makes the whole path condition
+        literally true, and otherwise solves as before."""
+        model = getattr(self.summary_runtime, "entry_model", None)
+        constraints = global_state.get_constraints()
+        if model is None or model is constraints._witness:
+            return
+        current = constraints._witness
+        if current is None or not is_true(current.eval(constraints.as_bool(), model_completion=True)):
+            constraints._witness = model
+
+    def _continue_after_cross_block_summary(
+        self,
+        global_state: X86GlobalState,
+        summary: X86Summary,
+        new_mstate: SMTState,
+    ) -> List[X86GlobalState]:
+        """Jump from a cross-block summary entry to its continuation block."""
+        import copy as copy_module
+
+        global_state.mstate = new_mstate
+
+        # 只有跨 block summary 自己补压缩边并接管 entry 块原始控制流。
+        # 同 block summary 会继续执行后缀，块末尾真实控制流仍必须由外层
+        # manage_cfg / terminal check 正常处理。
+        global_state.summary_control_flow_managed = True
+
+        # 跳过整个 summary slice，直接从 continuation block 继续执行。
+        # world_state 只复制路径约束，不新增 summary 内部的分支约束。
+        target_node = self.cfg.get_or_create_node(summary.continuation.block_addr)
+        new_state = X86GlobalState(
+            mstate=new_mstate,
+            world_state=copy_module.copy(global_state.world_state),
+            node=target_node,
+        )
+        new_state.depth = global_state.depth + 1
+
+        # 动态 CFG 中保留一条 entry -> exit 的压缩边，方便后续调试和统计；
+        # 真实的内部路径已经由 summary 语义覆盖。
+        source_instruction = (
+            global_state.node.block.instructions[-1]
+            if global_state.node and global_state.node.block.instructions
+            else None
+        )
+        if global_state.node is not None:
+            self.cfg.add_edge(
+                global_state.node.address,
+                summary.continuation.block_addr,
+                X86EdgeType.FALLTHROUGH,
+                source_instruction=source_instruction,
+            )
+        logger.debug(
+            "[CFG] %s summary hit: from=0x%x to=0x%x",
+            summary.kind,
+            summary.entry_addr,
+            summary.continuation.block_addr,
+        )
+        return [new_state]
+
+    def _handle_jmp(self, global_state: X86GlobalState, mstate: SMTState,
+                    block: X86Block, insn: X86Instruction) -> List[X86GlobalState]:
+        """处理 JMP 指令。
+
+        Args:
+            global_state: 当前全局状态
+            mstate: 执行后的机器状态
+            block: 当前块
+            insn: JMP 指令
+
+        Returns:
+            新全局状态列表
+
+        Note:
+            根据编译器实现，机器码中没有间接跳转，
+            所有跳转目标都是静态确定的。
+        """
+        import copy as copy_module
+
+        # 解析跳转目标
+        operands = parse_operands(insn)
+
+        target_addr = operands.get('jump_target')
+        
+        if target_addr is None:
+            # 无法解析目标，可能是间接跳转或解析错误
+            # 检查是否是明确的间接跳转（寄存器/内存跳转）
+            if operands.get('is_indirect'):
+                from utils.exceptions import UnsupportedJumpError
+                raise UnsupportedJumpError(
+                    "indirect_jump",
+                    f"Indirect JMP at address 0x{insn.addr:x}",
+                    "x86 indirect jumps are not supported by the compiler"
+                )
+            # 否则返回空列表（可能是解析失败或外部目标）
+            self._mark_coverage_incomplete(
+                f"unresolved jmp target at 0x{insn.addr:x}"
+            )
+            return []
+
+        # 直接跳转（静态目标）
+        target_block = self.blocks_by_addr.get(target_addr)
+
+        if target_block is None:
+            # 目标块不存在，可能是外部跳转或超出范围
+            self._mark_coverage_incomplete(
+                f"jmp target 0x{target_addr:x} is outside the local CFG"
+            )
+            return []
+
+        target_node = self.cfg.get_or_create_node(target_addr)
+        new_state = X86GlobalState(
+            mstate=mstate,
+            world_state=copy_module.copy(global_state.world_state),  # 单路径使用 copy（参考 mythril）
+            node=target_node
+        )
+        new_state.depth = global_state.depth + 1
+        logger.debug(
+            "[CFG] jmp depth: %d -> %d，from=0x%x to=0x%x",
+            global_state.depth, new_state.depth,
+            global_state.node.address if global_state.node else 0,
+            target_addr
+        )
+        return [new_state]
+
+    def _handle_jcc(self, global_state: X86GlobalState, mstate: SMTState,
+                    block: X86Block, insn: X86Instruction) -> List[X86GlobalState]:
+        """处理条件跳转指令（Jcc）。
+
+        支持的条件跳转指令：
+        - JE/JNE: 等于/不等于
+        - JB/JAE: 无符号小于/大于等于
+        - JA/JBE: 无符号大于/小于等于
+        - JL/JGE: 有符号小于/大于等于
+        - JLE/JG: 有符号小于等于/大于
+
+        Args:
+            global_state: 当前全局状态
+            mstate: 执行后的机器状态
+            block: 当前块
+            insn: Jcc 指令
+
+        Returns:
+            新全局状态列表（两个分支）
+
+        Note:
+            根据编译器实现：
+            - 所有跳转目标都是静态确定的
+            - 没有间接跳转
+        """
+        import copy as copy_module
+
+        # 解析跳转目标
+        operands = parse_operands(insn)
+        target_addr = operands.get('jump_target')
+        
+        # 检测间接跳转（真正的间接寻址）
+        if target_addr is None:
+            # 检查是否是明确的间接跳转
+            if operands.get('is_indirect'):
+                from utils.exceptions import UnsupportedJumpError
+                raise UnsupportedJumpError(
+                    "indirect_conditional_jump",
+                    f"Indirect conditional jump at address 0x{insn.addr:x}",
+                    "x86 indirect conditional jumps are not supported by the compiler"
+                )
+            # 如果只是解析失败，目标块设为 None（后续处理会跳过该分支）
+        
+        target_block = self.blocks_by_addr.get(target_addr) if target_addr is not None else None
+
+        mnemonic = insn.mnemonic.lower()
+
+        # 根据 CPU 标志寄存器（CF, ZF, SF, OF）构建跳转条件
+        jump_condition = simplify(self._build_jump_condition(mnemonic, mstate))
+        fallthrough_condition = simplify(Not(jump_condition))
+
+        def _keep_branch(cond) -> bool:
+            return (not self.use_reachability_check) or not is_false(cond)
+
+        new_states = []
+
+        if target_block is None and _keep_branch(jump_condition):
+            if target_addr is None:
+                self._mark_coverage_incomplete(
+                    f"unresolved conditional target at 0x{insn.addr:x}"
+                )
+            else:
+                self._mark_coverage_incomplete(
+                    f"conditional target 0x{target_addr:x} is outside the local CFG"
+                )
+
+        # 分支 1：跳转到目标（条件为真）
+        if target_block is not None and _keep_branch(jump_condition):
+            target_node = self.cfg.get_or_create_node(target_addr)
+
+            # 浅拷贝状态（X86WorldState.__copy__ 已正确实现）
+            jump_world_state = copy_module.copy(global_state.world_state)
+            jump_world_state.constraints.add(jump_condition)
+
+            jump_state = X86GlobalState(
+                mstate=mstate.copy(),
+                world_state=jump_world_state,
+                node=target_node
+            )
+            jump_state.depth = global_state.depth + 1
+            logger.debug(
+                "[CFG] jcc(taken) depth: %d -> %d，from=0x%x to=0x%x",
+                global_state.depth, jump_state.depth,
+                global_state.node.address if global_state.node else 0,
+                target_addr
+            )
+            new_states.append(jump_state)
+
+        # 分支 2：顺序执行（条件为假）
+        current_idx = self.block_index[block.start_addr]
+        if current_idx + 1 < len(self.blocks) and _keep_branch(fallthrough_condition):
+            fallthrough_addr = self.blocks[current_idx + 1].start_addr
+            fallthrough_node = self.cfg.get_or_create_node(fallthrough_addr)
+
+            # 浅拷贝状态（X86WorldState.__copy__ 已正确实现）
+            fallthrough_world_state = copy_module.copy(global_state.world_state)
+            fallthrough_world_state.constraints.add(fallthrough_condition)
+
+            fallthrough_state = X86GlobalState(
+                mstate=mstate.copy(),
+                world_state=fallthrough_world_state,
+                node=fallthrough_node
+            )
+            fallthrough_state.depth = global_state.depth + 1
+            logger.debug(
+                "[CFG] jcc(fallthrough) depth: %d -> %d，from=0x%x to=0x%x",
+                global_state.depth, fallthrough_state.depth,
+                global_state.node.address if global_state.node else 0,
+                fallthrough_addr
+            )
+            new_states.append(fallthrough_state)
+        elif current_idx + 1 >= len(self.blocks) and _keep_branch(fallthrough_condition):
+            self._mark_coverage_incomplete(
+                f"conditional fallthrough at 0x{insn.addr:x} leaves the local CFG"
+            )
+
+        return new_states
+
+    def _is_call_go_function_pattern(self, block: X86Block) -> bool:
+        """识别 ret 块是否匹配 CallGoFunction 模式。
+
+        根据 AOT 编译器 编译器的 compileCallGoFunction 函数，序列为：
+          1. ... (可选：lea/ mov 准备返回地址到寄存器)
+          2. mov [r13+0xf0], reg/imm   ; 写 return_address
+          3. mov [r13+0xe0], imm       ; 写 status_code
+          4. mov [r13+0x28], imm       ; 写 stack_pointer (可能省略)
+          5. ret                       ; 返回 Go runtime
+
+        支持两种模式：
+        - 完整模式（5条）：ret 前有 stack_pointer 写入
+        - 简化模式（3-4条）：ret 前无 stack_pointer 写入（用于测试）
+        """
+        if not self.enable_go_bridge:
+            return False
+
+        insns = block.instructions
+        if len(insns) < 3:
+            return False
+
+        # 检查末尾必须是 ret
+        if insns[-1].mnemonic.lower() != 'ret':
+            return False
+
+        profile_offsets = self.aot_profile.offsets
+        ret_addr_offset = profile_offsets["return_address"]
+        status_offset = profile_offsets["status_code"]
+        stack_ptr_offset = profile_offsets["stack_pointer"]
+
+        # 从 ret 往前检查，找关键指令
+        # 倒数第1条是 ret，从倒数第2条开始找
+        status_insn = None
+        ret_addr_insn = None
+        sp_insn = None
+
+        # 从倒数第2条开始往前找
+        for i in range(len(insns) - 2, -1, -1):
+            insn = insns[i]
+            if not insn.mnemonic.lower().startswith("mov"):
+                continue
+            if not self._is_mov_to_r13_offset(insn, ret_addr_offset):
+                continue
+
+            # 找到了写 return_address 的指令
+            ret_addr_insn = insn
+            ret_addr_idx = i
+
+            # 检查它后面是否有写 status_code 和 stack_pointer
+            for j in range(i + 1, len(insns) - 1):  # 不包括最后的 ret
+                next_insn = insns[j]
+                if not next_insn.mnemonic.lower().startswith("mov"):
+                    continue
+                if status_insn is None and self._is_mov_to_r13_offset(next_insn, status_offset):
+                    status_insn = next_insn
+                elif sp_insn is None and self._is_mov_to_r13_offset(next_insn, stack_ptr_offset):
+                    sp_insn = next_insn
+            break
+
+        if ret_addr_insn is None:
+            return False
+
+        # 必须有 status_code 写入
+        if status_insn is None:
+            return False
+
+        # 检查 status_code 是否属于可恢复集合
+        status_immediate = self._get_immediate_from_mov(status_insn)
+        if status_immediate is not None:
+            if status_immediate not in self.aot_profile.resumable_statuses:
+                return False
+
+        # 检查指令顺序：return_address 必须在 status_code 之前
+        # （而且它们都应该在 ret 之前）
+        insns_list = list(insns)
+        try:
+            ret_addr_pos = insns_list.index(ret_addr_insn)
+            status_pos = insns_list.index(status_insn)
+            if ret_addr_pos >= status_pos:
+                return False
+        except ValueError:
+            return False
+
+        return True
+
+    def _is_mov_to_r13_offset(self, insn: X86Instruction, expected_offset: int) -> bool:
+        """检查指令是否为 MOV 到 [R13 + expected_offset]。"""
+        if not insn.mnemonic.lower().startswith("mov"):
+            return False
+        operands = parse_operands(insn)
+        if not operands.get("is_memory"):
+            return False
+        base_reg = operands.get("base_reg")
+        if base_reg != Register.R13:
+            return False
+        offset = operands.get("offset")
+        return offset == expected_offset
+
+    def _get_immediate_from_mov(self, insn: X86Instruction) -> Optional[int]:
+        """从 MOV 指令中提取立即数操作数，如果不是立即数则返回 None。"""
+        operands = parse_operands(insn)
+        return operands.get("immediate")
+
+    def _extract_status_code(self, block: X86Block) -> Optional[int]:
+        """从block中提取status_code立即数。
+
+        匹配: mov byte [r13+0xE0], <imm>
+
+        逆序遍历取**最后一次**写入，与真实指令语义一致。当前 codegen 每个 exit
+        block 只写一次（compileExitFromNativeCode 写完立刻 RET），所以顺序无关；
+        逆序只是让静态解析与执行语义对齐，避免将来多次写入时静默取错。
+        """
+        status_offset = self.aot_profile.offsets["status_code"]
+        for insn in reversed(block.instructions):
+            if self._is_mov_to_r13_offset(insn, status_offset):
+                return self._get_immediate_from_mov(insn)
+        return None
+
+    def _extract_function_index(self, block: X86Block, status_code: int) -> Optional[int]:
+        """从block中提取函数索引立即数。
+
+        statusCode=4: 从 mov dword [r13+0xE8], <imm> 提取 go_function_index
+        statusCode=5: 从 mov dword [r13+0xE4], <imm> 提取 builtin_function_index
+        """
+        if status_code == self.aot_profile.status_codes.get("call_go_host_function"):
+            offset = self.aot_profile.offsets["go_function_index"]
+        elif status_code == self.aot_profile.status_codes.get("call_builtin_function"):
+            offset = self.aot_profile.offsets["builtin_function_index"]
+        else:
+            return None
+
+        for insn in block.instructions:
+            if self._is_mov_to_r13_offset(insn, offset):
+                return self._get_immediate_from_mov(insn)
+        return None
+
+    def _extract_stack_pointer(self, block: X86Block) -> Optional[int]:
+        """从block中提取stack_pointer立即数。
+
+        匹配: mov qword [r13+0x28], <imm>
+        如果block中没有立即数，则尝试从x86_memory读取[R13+stack_pointer]。
+        """
+        sp_offset = self.aot_profile.offsets["stack_pointer"]
+        for insn in block.instructions:
+            if self._is_mov_to_r13_offset(insn, sp_offset):
+                return self._get_immediate_from_mov(insn)
+        return None
+
+    def _read_sp_from_memory(self, mstate: SMTState) -> Optional[int]:
+        """从x86_memory读取当前stack_pointer值。
+
+        当block中没有立即数时使用（跨block或寄存器间接赋值场景）。
+
+        Returns:
+            stack_pointer值（如果是常量），否则None
+        """
+        from utils.z3_helpers import get_bv_const_value
+        sp_bv = mstate.callengine_stack_pointer_limbs
+        return get_bv_const_value(simplify(sp_bv))
+
+    def _get_or_create_go_host_node_for_ret(self, ret_block_addr: int) -> int:
+        """为每个 ret 站点分配独立 GO_HOST 外部节点。"""
+        go_addr = self._go_host_addr_by_ret_block.get(ret_block_addr)
+        if go_addr is None:
+            go_index = len(self._go_host_addr_by_ret_block)
+            go_addr = self.GO_HOST_NODE_BASE_ADDR + go_index
+            self._go_host_addr_by_ret_block[ret_block_addr] = go_addr
+            self.cfg.get_or_create_external_node(go_addr, f"GO_HOST_{go_index}")
+        else:
+            self.cfg.get_or_create_external_node(go_addr, f"GO_HOST_{go_addr - self.GO_HOST_NODE_BASE_ADDR}")
+        return go_addr
+
+    def _load_exit_return_address(self, mstate: SMTState):
+        """读取 callEngine.exitContext.returnAddress（64-bit）。"""
+        return mstate.callengine_return_address
+
+    def _handle_ret_with_go_bridge(self, global_state: X86GlobalState, mstate: SMTState,
+                                   block: X86Block, insn: X86Instruction) -> List[X86GlobalState]:
+        """处理 ret：支持 ret -> GO_HOST -> returnAddress 的动态建模。
+
+        Raises:
+            LogicError: 当func_index已知但映射到未知函数时（配置错误）
+        """
+        import copy as copy_module
+        from utils.z3_helpers import analyze_jump_target
+
+        # 默认行为：ret 终止（仅在识别到 CallGoFunction 模式时建模 GO 往返）
+        if not self._is_call_go_function_pattern(block):
+            setattr(global_state, "_ret_terminal_branch", True)
+            return []
+
+        # 先提取返回地址（在应用Go函数效果之前，避免内存Store干扰）
+        return_addr_expr = self._load_exit_return_address(mstate)
+
+        # ---- 提取元数据并应用Go函数语义效果 ----
+        status_code = self._extract_status_code(block)
+        sp = self._extract_stack_pointer(block)
+
+        # 如果sp在当前block中没有立即数，尝试从内存读取
+        if sp is None:
+            sp = self._read_sp_from_memory(mstate)
+
+        # host/builtin调用如果有sp则应用Go函数语义
+        if status_code is not None and status_code in self.aot_profile.resumable_statuses:
+            func_index = self._extract_function_index(block, status_code)
+            # sp必须已知才能应用Go函数语义（_pop_uint256等需要int类型的sp）
+            if sp is not None:
+                from .go_function_semantics import GoFunctionSemantics, GoFunctionSemanticsError
+                # 与 EVM 侧 _execute_op_with_outcome 对称的入口守卫：带着未 drain 的约束
+                # 进来说明下面那个 drain 漏了。丢约束只是少剪枝（安全方向），不会有可见
+                # 症状，只能靠这里暴露。
+                if mstate.pending_constraints:
+                    from utils.exceptions import LogicError
+                    raise LogicError(
+                        "unconsumed_pending_constraints",
+                        f"host bridge at 0x{block.start_addr:x} received a state with "
+                        f"{len(mstate.pending_constraints)} undrained path constraint(s)",
+                    )
+                go_sem = GoFunctionSemantics(self.aot_profile)
+                try:
+                    evm_pc = None
+                    evm_immediate = None
+                    host_status = self.aot_profile.status_codes["call_go_host_function"]
+                    if status_code == host_status and self.call_site_mapping is not None:
+                        evm_site = self.call_site_mapping.get_evm_site(block.start_addr)
+                        evm_pc = evm_site.pc
+                        evm_immediate = evm_site.immediate
+                    mstate = go_sem.apply(
+                        status_code,
+                        func_index,
+                        sp,
+                        mstate,
+                        evm_pc=evm_pc,
+                        evm_immediate=evm_immediate,
+                    )
+                    # 更新 global_state 的 mstate，确保后续恢复分支使用更新后的状态
+                    global_state.mstate = mstate
+                    # drain host-gas 协议上界：semantics 层拿不到 world_state，只能挂在
+                    # state 上由这里并入当前路径（与 EVM 侧 _execute_op_with_outcome 对称，
+                    # 两侧都加才能让 OOG 剪枝对称，见 host_gas.emit_host_gas_bound）。
+                    for constraint in mstate.pending_constraints:
+                        global_state.world_state.constraints.add(constraint)
+                    mstate.pending_constraints = []
+                except GoFunctionSemanticsError as e:
+                    # func_index已知但映射到未知函数 - 这是配置错误，应该报告
+                    from utils.exceptions import LogicError
+                    raise LogicError(
+                        "go_function_semantics_error",
+                        f"GO function semantics error at 0x{block.start_addr:x}: {e}",
+                        str(e)
+                    )
+            else:
+                logger.warning(
+                    "GO host/builtin call at 0x%x has status_code=%d but sp is unknown, skipping semantics",
+                    block.start_addr, status_code
+                )
+
+        # 每个 CallGoFunction 站点拥有自己的 GO_HOST 节点
+        go_host_addr = self._get_or_create_go_host_node_for_ret(block.start_addr)
+        self.cfg.add_edge(
+            block.start_addr,
+            go_host_addr,
+            X86EdgeType.CALL,
+            source_instruction=insn,
+        )
+
+        # 以当前状态为模板构建恢复分支
+        resumed_states: List[X86GlobalState] = []
+        return_addr_analysis = analyze_jump_target(simplify(return_addr_expr))
+
+        # GO 返回地址必须是静态常量（RIP 相对寻址）
+        if not return_addr_analysis.is_static:
+            from utils.exceptions import LogicError
+            raise LogicError(
+                "dynamic_return_address",
+                f"GO return address at 0x{block.start_addr:x} must be static constant",
+                "GO compileCallGoFunction always uses static return addresses"
+            )
+
+        if not return_addr_analysis.targets:
+            self._mark_coverage_incomplete(
+                f"GO bridge ret at 0x{block.start_addr:x} has no static return target"
+            )
+
+        for target_addr, _ in return_addr_analysis.targets:
+            target_block = self.blocks_by_addr.get(target_addr)
+            if target_block is None:
+                self._mark_coverage_incomplete(
+                    f"GO bridge return target 0x{target_addr:x} is outside the local CFG"
+                )
+                continue
+
+            resume_world_state = copy_module.copy(global_state.world_state)
+            target_node = self.cfg.get_or_create_node(target_addr)
+
+            resumed_state = X86GlobalState(
+                mstate=mstate.copy(),
+                world_state=resume_world_state,
+                node=target_node,
+            )
+            # GO 往返不增加 depth，因为它是线性的而非分支
+            resumed_state.depth = global_state.depth
+            resumed_states.append(resumed_state)
+
+            self.cfg.add_edge(
+                go_host_addr,
+                target_addr,
+                X86EdgeType.RETURN,
+            )
+
+        # 仅动态结果决定是否终止：有恢复后继则非终止，否则终止。
+        setattr(global_state, "_ret_terminal_branch", len(resumed_states) == 0)
+
+        return resumed_states
+
+    def _build_jump_condition(self, mnemonic: str, mstate: SMTState):
+        """为条件跳转构建符号条件。
+
+        Args:
+            mnemonic: 指令助记符（jb、jae等）
+            mstate: 机器状态
+
+        Returns:
+            符号条件（BoolRef）
+
+        Note:
+            从 CPU 标志寄存器（CF, ZF, SF, OF）中提取实际条件。
+            标志位是 1 位 BitVec，使用 == 运算符比较得到 BoolRef。
+        """
+        # 获取 CPU 标志位（1 位 BitVec）
+        cf = mstate.x86_registers.get_flag('CF')
+        zf = mstate.x86_registers.get_flag('ZF')
+        sf = mstate.x86_registers.get_flag('SF')
+        of = mstate.x86_registers.get_flag('OF')
+
+        # 将 1 位 BitVec 转换为 BoolRef
+        # (flag == BitVecVal(1, 1)) 返回 BoolRef
+        cf_true = (cf == BitVecVal(1, 1))
+        cf_false = (cf == BitVecVal(0, 1))
+        zf_true = (zf == BitVecVal(1, 1))
+        zf_false = (zf == BitVecVal(0, 1))
+        sf_eq_of = (sf == of)
+        sf_ne_of = Not(sf == of)
+
+        # 根据助记符构建条件
+        # jl/jle/jg/jge 涉及 SF 和 OF 的关系
+        conditions = {
+            'jb': cf_true,           # CF == 1 (无符号小于)
+            'jae': cf_false,         # CF == 0 (无符号大于等于)
+            'ja': And(cf_false, zf_false),   # CF == 0 and ZF == 0 (无符号大于)
+            'jbe': Or(cf_true, zf_true),     # CF == 1 or ZF == 1 (无符号小于等于)
+            'je': zf_true,           # ZF == 1 (等于)
+            'jne': zf_false,         # ZF == 0 (不等于)
+            'jl': sf_ne_of,          # SF != OF (有符号小于)
+            'jle': Or(zf_true, sf_ne_of),  # ZF == 1 or SF != OF (有符号小于等于)
+            'jg': And(zf_false, sf_eq_of),  # ZF == 0 and SF == OF (有符号大于)
+            'jge': sf_eq_of,         # SF == OF (有符号大于等于)
+        }
+
+        condition = conditions.get(mnemonic)
+        if condition is None:
+            raise ValueError(f"Unsupported Jcc mnemonic: {mnemonic}")
+        return condition
+
+    def _extract_jcc_condition(self, state: X86GlobalState):
+        """从状态中提取 Jcc 条件（用于 CFG 边）。
+
+        Args:
+            state: 全局状态
+
+        Returns:
+            条件 BoolRef 或 None
+        """
+        from z3 import BoolVal, eq, And
+        
+        constraints = state.get_constraints()
+        
+        # 过滤掉初始的 True 约束，只获取实际添加的约束
+        real_constraints = [
+            c for c in constraints 
+            if not (isinstance(c, type(BoolVal(True))) and eq(c, BoolVal(True)))
+        ]
+        
+        if real_constraints:
+            # 返回最后一个添加的约束（即跳转条件）
+            return real_constraints[-1]
+        
+        # 如果没有实际约束，检查 flag_constraints
+        if hasattr(constraints, 'flag_constraints'):
+            flag_constraints = constraints.flag_constraints
+            if flag_constraints:
+                # 返回合并的标志约束
+                return And(*flag_constraints.values())
+        
+        # 如果没有任何约束，返回最后一个约束（可能是初始的 True）
+        if len(constraints) > 0:
+            return list(constraints)[-1]
+        
+        return None
+
+    def _handle_fallthrough(self, global_state: X86GlobalState, mstate: SMTState,
+                           block: X86Block) -> List[X86GlobalState]:
+        """处理顺序执行（fallthrough）。
+
+        Args:
+            global_state: 当前全局状态
+            mstate: 执行后的机器状态
+            block: 当前块
+
+        Returns:
+            新全局状态列表
+        """
+        import copy as copy_module
+
+        # 找到下一个块
+        current_idx = self.block_index[block.start_addr]
+        if current_idx + 1 >= len(self.blocks):
+            # 没有下一个块，返回空列表
+            return []
+
+        next_addr = self.blocks[current_idx + 1].start_addr
+        next_node = self.cfg.get_or_create_node(next_addr)
+
+        new_state = X86GlobalState(
+            mstate=mstate,
+            world_state=copy_module.copy(global_state.world_state),
+            node=next_node
+        )
+        # fallthrough 不增加 depth，因为它是顺序执行而非分支
+        new_state.depth = global_state.depth
+
+        return [new_state]
+
+    def _is_terminal_state(self, global_state: X86GlobalState) -> bool:
+        """检查是否是终止状态。
+
+        Args:
+            global_state: 全局状态
+
+        Returns:
+            如果是终止状态则返回 True
+        """
+        # 跨 block summary 已经把这个 entry state 跳到 continuation block，
+        # 它原始末尾控制流（含 ret）由 summary 接管，不应再被判为终止态，
+        # 否则一个 ret 结尾的 summary entry 块会产生额外的幽灵 final state。
+        if global_state.summary_control_flow_managed:
+            return False
+
+        node = global_state.node
+        if node is None or not node.block.instructions:
+            return False
+
+        last_insn = node.block.instructions[-1]
+        mnemonic = last_insn.mnemonic.lower()
+        if mnemonic == 'ret':
+            if not self.enable_go_bridge:
+                return True
+
+            # execute_state 已经为 ret 分流写入了标记，优先使用。
+            marked_terminal = getattr(global_state, "_ret_terminal_branch", None)
+            if marked_terminal is not None:
+                if not self.use_reachability_check:
+                    return bool(marked_terminal)
+                return bool(marked_terminal) and self._is_state_reachable(global_state)
+
+            # 兜底：若未经过 execute_state，ret 默认按终止处理。
+            return True
+
+        # 非显式跳转/返回指令：若当前块已是最后一个块，则自然终止
+        if mnemonic not in ['jmp', 'jb', 'jae', 'ja', 'jbe', 'je', 'jne', 'jl', 'jle', 'jg', 'jge']:
+            idx = self.block_index.get(node.block.start_addr)
+            return idx is not None and idx == len(self.blocks) - 1
+
+        return False
+
+    def _detect_and_handle_loops(self, global_state: X86GlobalState) -> None:
+        """检测当前状态是否形成循环，并根据类型分类处理。
+
+        TODO: 实现循环检测逻辑
+        - 地址重复检测
+        - 循环分类（静态/动态/无界）
+        - 静态有界循环展开
+        - 其他循环类型抛出 UnsupportedLoopError
+
+        Args:
+            global_state: 当前全局状态
+
+        Raises:
+            UnsupportedLoopError: 检测到不支持的循环类型时抛出
+        """
+        # TODO: 实现循环检测
+        pass
+
+    def _classify_loop(self, loop_addr: int, path_context: Dict) -> str:
+        """判断循环类型。
+
+        TODO: 实现循环分类逻辑
+        - 静态有界：检查循环条件是否为常量比较
+        - 动态有界：条件与符号变量比较
+        - 无界：无法确定循环边界
+
+        Args:
+            loop_addr: 循环头的地址
+            path_context: 执行路径上下文信息
+
+        Returns:
+            "static_bounded" | "dynamic_bounded" | "unbounded"
+        """
+        # TODO: 实现循环分类
+        return "dynamic_bounded"  # 默认返回
+
+
+def build_x86_dynamic_cfg(blocks: List[X86Block],
+                          initial_state: SMTState,
+                          strategy_cls: type = X86DFSStrategy,
+                          max_depth: int = 100,
+                          use_reachability_check: bool = True,
+                          enable_go_bridge: bool = True,
+                          enable_merge: bool = False,
+                          reachability_timeout_ms: Optional[int] = 50) -> Tuple[List[X86GlobalState], X86DynamicCFG]:
+    """构建动态 CFG 并执行符号执行。
+
+    Args:
+        blocks: x86-64 块列表
+        initial_state: 初始机器状态
+        strategy_cls: 搜索策略类
+        max_depth: 最大执行深度
+        use_reachability_check: 是否启用可达性检查
+        enable_go_bridge: 是否启用 ret->GO_HOST->returnAddress 建模
+        enable_merge: 是否启用合流点合并优化
+        reachability_timeout_ms: 单次可达性 SMT 检查预算；None 表示使用默认全局预算
+
+    Returns:
+        (final_states, cfg) 元组
+    """
+    executor = X86SymbolicExecutor(
+        blocks,
+        strategy_cls=strategy_cls,
+        max_depth=max_depth,
+        use_reachability_check=use_reachability_check,
+        enable_go_bridge=enable_go_bridge,
+        enable_merge=enable_merge,
+        reachability_timeout_ms=reachability_timeout_ms,
+    )
+    final_states = executor.execute(initial_state)
+    return final_states, executor.cfg
+
+
+def _state_leaves(obj, prefix="", out=None):
+    """{attribute path: leaf} of a machine state; Z3 terms by AST id."""
+    out = {} if out is None else out
+    if isinstance(obj, AstRef):
+        out[prefix] = ("ast", obj.get_id())
+    elif obj is None or isinstance(obj, (str, int, float, bool, bytes, Enum)):
+        out[prefix] = obj
+    elif isinstance(obj, Context):
+        out[prefix] = "ctx"
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            _state_leaves(v, f"{prefix}[{k!r}]", out)
+        out[prefix + "#keys"] = tuple(sorted(map(repr, obj)))
+    elif isinstance(obj, (list, tuple)):
+        for k, v in enumerate(obj):
+            _state_leaves(v, f"{prefix}[{k}]", out)
+        out[prefix + "#len"] = len(obj)
+    elif isinstance(obj, (set, frozenset)):
+        out[prefix] = tuple(sorted(map(repr, obj)))
+    elif hasattr(obj, "__dict__") or hasattr(type(obj), "__slots__"):
+        items = vars(obj).items() if hasattr(obj, "__dict__") else (
+            (k, getattr(obj, k)) for k in type(obj).__slots__ if hasattr(obj, k))
+        out[prefix + "#type"] = type(obj).__qualname__
+        for k, v in items:
+            _state_leaves(v, f"{prefix}.{k}", out)
+    else:
+        out[prefix] = ("opaque", id(obj))  # equal only to itself
+    return out
+
+
+_REGISTER_LEAVES = (".x86_registers._registers", ".x86_registers._flags", ".x86_registers._pointer_tags")
+
+
+def _exclusive(x, y):
+    """x ∧ y is unsatisfiable: syntactic complements, or refuted (200 ms)."""
+    if (is_not(x) and x.arg(0).eq(y)) or (is_not(y) and y.arg(0).eq(x)) or is_false(simplify(And(x, y))):
+        return True
+    solver = Solver()
+    solver.set(timeout=200)
+    solver.add(x, y)
+    return solver.check() == unsat
+
+
+def _merged(a: X86GlobalState, b: X86GlobalState) -> Optional[X86GlobalState]:
+    """One state for two states at the same address, or None.
+
+    Merged only when everything but registers and flags is identical (every
+    other leaf of the machine state, the flag constraints, the pointer tags)
+    and the path conditions are P ∧ T_a and P ∧ T_b for a common prefix P
+    with T_a ∧ T_b unsatisfiable (their first constraints are the two sides
+    of one branch). The merged state has path condition P ∧ (T_a ∨ T_b) and
+    each differing register / flag ite(T_a, value_a, value_b): under T_a it
+    is state a, under T_b state b, so its executions are exactly those of a
+    and of b (an exact merge: no execution added or lost)."""
+    if a.node is not b.node or a.summary_control_flow_managed != b.summary_control_flow_managed:
+        return None
+    ca, cb = a.get_constraints(), b.get_constraints()
+    if (a.world_state.annotations or b.world_state.annotations
+            or ca.flag_constraints.keys() != cb.flag_constraints.keys()
+            or any(not v.eq(cb.flag_constraints[k]) for k, v in ca.flag_constraints.items())):
+        return None
+    la, lb = list(ca._constraints), list(cb._constraints)
+    common = 0
+    while common < min(len(la), len(lb)) and la[common].eq(lb[common]):
+        common += 1
+    ta, tb = la[common:], lb[common:]
+    if not ta or not tb or not _exclusive(ta[0], tb[0]):
+        return None
+    ra, rb = a.mstate.x86_registers, b.mstate.x86_registers
+    regs = set(ra._registers) | set(rb._registers) | set(ra._pointer_tags) | set(rb._pointer_tags)
+    if any(ra.get_pointer_tag(k) != rb.get_pointer_tag(k) for k in regs):
+        return None
+    leaves_a, leaves_b = _state_leaves(a.mstate), _state_leaves(b.mstate)
+    if ({k: v for k, v in leaves_a.items() if not k.startswith(_REGISTER_LEAVES)}
+            != {k: v for k, v in leaves_b.items() if not k.startswith(_REGISTER_LEAVES)}):
+        return None
+    guard = And(*ta) if len(ta) > 1 else ta[0]
+    mstate = a.mstate.copy()
+    out = mstate.x86_registers
+    for k in set(ra._registers) | set(rb._registers):
+        va = ra._registers.get(k, BitVec(f"{k}_init", 64))
+        vb = rb._registers.get(k, BitVec(f"{k}_init", 64))
+        out._registers[k] = va if va.eq(vb) else If(guard, va, vb)
+    for k in set(ra._flags) | set(rb._flags):
+        va, vb = ra._flags.get(k, BitVecVal(0, 1)), rb._flags.get(k, BitVecVal(0, 1))
+        out._flags[k] = va if va.eq(vb) else If(guard, va, vb)
+    world = _copy.copy(a.world_state)
+    world.constraints._constraints = la[:common] + [Or(guard, And(*tb) if len(tb) > 1 else tb[0])]
+    world.constraints._witness = ca._witness if ca._witness is not None else cb._witness
+    merged = X86GlobalState(mstate=mstate, world_state=world, node=a.node)
+    merged.depth = max(a.depth, b.depth)
+    merged.summary_control_flow_managed = a.summary_control_flow_managed
+    return merged

@@ -1,0 +1,484 @@
+{
+ "hex": "4d8b75384d0375304d8b7d10498b45704883f80972234883e80949894570498b45304883f8007222483dc17f0000732b4d8b75384901c6eb3341c685e00000000c49c7452800000000c341c685e00000000e49c7452800000000c341c685e00000000f49c7452800000000c341c785e80000000a00000049c706c700000049c746080000000049c746100000000049c746180000000049c746200a00000049c746280000000049c746300000000049c7463800000000488d0518000000498985f000000041c685e00000000449c7452808000000c34d8b75384d0375304d8b7d1041c785e80000000900000049c7060a00000049c746080000000049c746100000000049c7461800000000488d0518000000498985f000000041c685e00000000449c7452804000000c34d8b75384d0375304d8b7d1041c685e00000000249c7452804000000c341c685e00000000249c7452804000000c3",
+ "note": "code is generated only; never executed",
+ "rows": [
+  {
+   "block": 0,
+   "pc": 0,
+   "opcode": "TAG",
+   "before": null,
+   "after": null,
+   "start": 4108,
+   "end": 4204
+  },
+  {
+   "block": 0,
+   "pc": 0,
+   "opcode": "PUSH",
+   "before": null,
+   "after": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "value": 199,
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "start": 4204,
+   "end": 4204
+  },
+  {
+   "block": 0,
+   "pc": 2,
+   "opcode": "PUSH",
+   "before": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "value": 199,
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "value": 199,
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 4,
+     "kind": "constant",
+     "value": 10,
+     "condition": 0
+    },
+    {
+     "index": 5,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 6,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 7,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "start": 4204,
+   "end": 4204
+  },
+  {
+   "block": 0,
+   "pc": 4,
+   "opcode": "SSTORE",
+   "before": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "value": 199,
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 4,
+     "kind": "constant",
+     "value": 10,
+     "condition": 0
+    },
+    {
+     "index": 5,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 6,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 7,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "after": null,
+   "start": 4204,
+   "end": 4321,
+   "aux": [
+    {
+     "end": 4222,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 0,
+      "kind": "constant",
+      "value": 199,
+      "condition": 0
+     },
+     "start": 4215
+    },
+    {
+     "end": 4230,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 1,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4222
+    },
+    {
+     "end": 4238,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 2,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4230
+    },
+    {
+     "end": 4246,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 3,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4238
+    },
+    {
+     "end": 4254,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 4,
+      "kind": "constant",
+      "value": 10,
+      "condition": 0
+     },
+     "start": 4246
+    },
+    {
+     "end": 4262,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 5,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4254
+    },
+    {
+     "end": 4270,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 6,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4262
+    },
+    {
+     "end": 4278,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 7,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4270
+    }
+   ]
+  },
+  {
+   "block": 0,
+   "pc": 5,
+   "opcode": "PUSH",
+   "before": null,
+   "after": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "value": 10,
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "start": 4321,
+   "end": 4321
+  },
+  {
+   "block": 0,
+   "pc": 7,
+   "opcode": "SLOAD",
+   "before": [
+    {
+     "index": 0,
+     "kind": "constant",
+     "value": 10,
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "constant",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "constant",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": 0,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "start": 4321,
+   "end": 4406,
+   "aux": [
+    {
+     "end": 4339,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 0,
+      "kind": "constant",
+      "value": 10,
+      "condition": 0
+     },
+     "start": 4332
+    },
+    {
+     "end": 4347,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 1,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4339
+    },
+    {
+     "end": 4355,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 2,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4347
+    },
+    {
+     "end": 4363,
+     "kind": "constant_to_stack",
+     "location": {
+      "index": 3,
+      "kind": "constant",
+      "condition": 0
+     },
+     "start": 4355
+    }
+   ]
+  },
+  {
+   "block": 0,
+   "pc": 8,
+   "opcode": "STOP",
+   "before": [
+    {
+     "index": 0,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": 0,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "start": 4406,
+   "end": 4423
+  },
+  {
+   "block": 0,
+   "pc": 9,
+   "opcode": "STOP",
+   "before": [
+    {
+     "index": 0,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "after": [
+    {
+     "index": 0,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 1,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 2,
+     "kind": "stack",
+     "condition": 0
+    },
+    {
+     "index": 3,
+     "kind": "stack",
+     "condition": 0
+    }
+   ],
+   "start": 4423,
+   "end": 4440
+  }
+ ]
+}

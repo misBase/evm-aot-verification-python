@@ -1,0 +1,31 @@
+{
+ "out": "/artifact/recorded-runs/v3exp/a2s",
+ "snap": "/artifact/recorded-runs/snap-final-c68c4df",
+ "python": "/artifact/.venv/bin/python",
+ "fixtures": "/artifact/recorded-runs/r4/fixtures",
+ "traces": {
+  "ENSRegistry": "/artifact/recorded-runs/final1/trace-ENSRegistry.json",
+  "CErc20": "/artifact/recorded-runs/final1/trace-CErc20.json",
+  "PoolManager": "/artifact/recorded-runs/final1/trace-PoolManager.json",
+  "Pool": "/artifact/recorded-runs/final1/trace-Pool.json",
+  "Safe": "/artifact/recorded-runs/final1/trace-Safe.json",
+  "Permit2": "/artifact/recorded-runs/final1/trace-Permit2.json"
+ },
+ "ordered": "/artifact/recorded-runs/v3exp/ordered",
+ "cpus": [
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13
+ ],
+ "min_avail_mb": 5000,
+ "rss_mb": 7000,
+ "export_min_s": 120,
+ "env": [
+  "V3_FINE=1"
+ ]
+}

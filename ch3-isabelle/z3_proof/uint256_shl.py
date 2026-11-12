@@ -1,0 +1,88 @@
+from z3 import *
+
+P = 2 ** 256
+
+
+def prove_uint256_shl():
+    x0, x1, x2, x3 = BitVecs('x0 x1 x2 x3', 64)
+    y0, y1, y2, y3 = BitVecs('y0 y1 y2 y3', 64)
+
+    x_bv = Concat(x3, x2, x1, x0)
+    shift = y0
+    high_nonzero = Or(y1 != 0, y2 != 0, y3 != 0)
+    normal = And(Not(high_nonzero), ULT(shift, BitVecVal(256, 64)))
+    overflow = Or(high_nonzero, UGE(shift, BitVecVal(256, 64)))
+
+    z64 = BitVecVal(0, 64)
+    w64 = BitVecVal(64, 64)
+
+    def go_lsh(n):
+        k64 = n - BitVecVal(64, 64)
+        k128 = n - BitVecVal(128, 64)
+        k192 = n - BitVecVal(192, 64)
+        return If(n == 0, x_bv,
+               If(UGE(n, BitVecVal(192, 64)),
+                  Concat(x0 << k192, z64, z64, z64),
+               If(UGE(n, BitVecVal(128, 64)),
+                  Concat((x1 << k128) | LShR(x0, w64 - k128),
+                         x0 << k128,
+                         z64,
+                         z64),
+               If(UGE(n, BitVecVal(64, 64)),
+                  Concat((x2 << k64) | LShR(x1, w64 - k64),
+                         (x1 << k64) | LShR(x0, w64 - k64),
+                         x0 << k64,
+                         z64),
+                  Concat((x3 << n) | LShR(x2, w64 - n),
+                         (x2 << n) | LShR(x1, w64 - n),
+                         (x1 << n) | LShR(x0, w64 - n),
+                         x0 << n)))))
+
+    lhs_normal = go_lsh(shift)
+    rhs_normal = x_bv << ZeroExt(192, shift)
+
+    cases = [
+        ('shift == 0', shift == 0),
+        ('1 <= shift < 64', And(UGE(shift, BitVecVal(1, 64)), ULT(shift, BitVecVal(64, 64)))),
+        ('shift == 64', shift == BitVecVal(64, 64)),
+        ('65 <= shift < 128', And(UGE(shift, BitVecVal(65, 64)), ULT(shift, BitVecVal(128, 64)))),
+        ('shift == 128', shift == BitVecVal(128, 64)),
+        ('129 <= shift < 192', And(UGE(shift, BitVecVal(129, 64)), ULT(shift, BitVecVal(192, 64)))),
+        ('shift == 192', shift == BitVecVal(192, 64)),
+        ('193 <= shift < 256', And(UGE(shift, BitVecVal(193, 64)), ULT(shift, BitVecVal(256, 64)))),
+    ]
+
+    all_ok = True
+
+    s = SolverFor('QF_BV')
+    s.set('timeout', 120000)
+    s.add(overflow, BitVecVal(0, 256) != BitVecVal(0, 256))
+    result = s.check()
+    print('case shift overflow: ' + str(result), flush=True)
+    if result != unsat:
+        all_ok = False
+
+    for name, cond in cases:
+        s = SolverFor('QF_BV')
+        s.set('timeout', 120000)
+        s.add(normal, cond, lhs_normal != rhs_normal)
+        result = s.check()
+        print('case ' + name + ': ' + str(result), flush=True)
+        if result == sat:
+            model = s.model()
+            print('  x =', [model.eval(v).as_long() for v in (x0, x1, x2, x3)])
+            print('  shift =', model.eval(shift).as_long())
+            print('  lhs =', model.eval(lhs_normal))
+            print('  rhs =', model.eval(rhs_normal))
+        if result != unsat:
+            all_ok = False
+
+    print('')
+    if all_ok:
+        print('Verification Passed: four-u64 Lsh matches EVM SHL')
+    else:
+        print('Verification incomplete')
+
+
+if __name__ == '__main__':
+    prove_uint256_shl()

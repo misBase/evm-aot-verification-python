@@ -1,0 +1,8 @@
+(set-logic QF_BV)
+(declare-fun a () (_ BitVec 256))
+(declare-fun result () (_ BitVec 256))
+(assert (= result (let ((a!1 (concat (concat (bvxor ((_ extract 255 192) a) #xffffffffffffffff)
+                           (bvxor ((_ extract 191 128) a) #xffffffffffffffff))
+                   (bvxor ((_ extract 127 64) a) #xffffffffffffffff))))
+  (concat a!1 (bvxor ((_ extract 63 0) a) #xffffffffffffffff)))))
+(check-sat)

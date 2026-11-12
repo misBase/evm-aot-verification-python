@@ -1,0 +1,12 @@
+(set-logic QF_BV)
+(declare-fun a () (_ BitVec 256))
+(declare-fun b () (_ BitVec 256))
+(declare-fun c () (_ BitVec 256))
+(declare-fun result () (_ BitVec 256))
+(assert (= result (let ((a!1 ((_ extract 255 0)
+             (bvurem (bvmul ((_ zero_extend 256) a) ((_ zero_extend 256) b))
+                     ((_ zero_extend 256) c)))))
+  (ite (= #x0000000000000000000000000000000000000000000000000000000000000000 c)
+       #x0000000000000000000000000000000000000000000000000000000000000000
+       a!1))))
+(check-sat)

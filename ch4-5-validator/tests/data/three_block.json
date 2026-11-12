@@ -1,0 +1,154 @@
+{
+    "control_frames": [
+        {
+            "is_jump_target": false,
+            "is_stop": false,
+            "max_depth": 1022,
+            "min_depth": 0,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 1,
+                    "pc": 0
+                },
+                {
+                    "immediate": "80",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 0
+                },
+                {
+                    "immediate": "40",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 2
+                },
+                {
+                    "kind": "MSTORE",
+                    "pc": 4
+                },
+                {
+                    "immediate": "1",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 5
+                },
+                {
+                    "immediate": "41",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 7
+                },
+                {
+                    "kind": "MSTORE",
+                    "pc": 9
+                },
+                {
+                    "immediate": "8",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 10
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 14
+                },
+                {
+                    "immediate": "21",
+                    "is_static": true,
+                    "kind": "JUMPI",
+                    "param": 1,
+                    "pc": 14
+                }
+            ],
+            "pc": 0,
+            "stack_depth": 0,
+            "static_gas": 34
+        },
+        {
+            "is_jump_target": false,
+            "is_stop": true,
+            "max_depth": 1022,
+            "min_depth": 1,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "pc": 14
+                },
+                {
+                    "immediate": "1",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 15
+                },
+                {
+                    "immediate": "39",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 17
+                },
+                {
+                    "kind": "ADD",
+                    "pc": 19
+                },
+                {
+                    "kind": "RETURN",
+                    "pc": 20
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 21
+                },
+                {
+                    "immediate": "21",
+                    "is_static": true,
+                    "kind": "JUMP",
+                    "pc": 21
+                }
+            ],
+            "pc": 15,
+            "stack_depth": -1,
+            "static_gas": 9
+        },
+        {
+            "is_jump_target": true,
+            "is_stop": true,
+            "max_depth": 1022,
+            "min_depth": 0,
+            "operations": [
+                {
+                    "kind": "TAG",
+                    "param": 3,
+                    "pc": 21
+                },
+                {
+                    "immediate": "1",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 22
+                },
+                {
+                    "immediate": "41",
+                    "kind": "PUSH",
+                    "param": 1,
+                    "pc": 24
+                },
+                {
+                    "kind": "RETURN",
+                    "pc": 26
+                },
+                {
+                    "kind": "BLOCKEND",
+                    "pc": 26
+                },
+                {
+                    "kind": "STOP",
+                    "pc": 27
+                }
+            ],
+            "pc": 21,
+            "stack_depth": 0,
+            "static_gas": 7
+        }
+    ]
+}

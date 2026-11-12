@@ -1,0 +1,11 @@
+# created by `make install`
+.validator-git/
+ch4-5-validator/.venv/
+# created by running experiments
+experiments/smoke-results/
+experiments/*/results/
+experiments/E6-shift/figures/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store

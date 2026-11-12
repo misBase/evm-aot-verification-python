@@ -1,0 +1,1106 @@
+[
+ {
+  "id": "b2-00",
+  "run": "PoolManager-22-21213_29_928_928",
+  "name": "H2_c0_0_2_t0_live_stack_prefix_35",
+  "phase": "h2.close_edge",
+  "production_wall": 369.65,
+  "production_answer": "unsat",
+  "all_wall": 346.15,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "mul",
+   7.32
+  ],
+  "arms": {
+   "unify": [
+    434.52,
+    "unknown",
+    false
+   ],
+   "guards": [
+    35.69,
+    "unknown",
+    false
+   ],
+   "potential": [
+    34.37,
+    "unknown",
+    false
+   ],
+   "alias": [
+    35.67,
+    "unknown",
+    false
+   ],
+   "divrem": [
+    53.67,
+    "unknown",
+    false
+   ],
+   "all": [
+    346.15,
+    "unsat",
+    true
+   ],
+   "quick": [
+    37.52,
+    "unknown",
+    false
+   ],
+   "lia": [
+    56.46,
+    "unknown",
+    false
+   ],
+   "mul": [
+    7.32,
+    "unsat",
+    true
+   ],
+   "shift": [
+    228.9,
+    "unknown",
+    false
+   ],
+   "conditional_ites": [
+    66.77,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    54.05,
+    "unsat",
+    true
+   ],
+   "stores": [
+    34.69,
+    "unknown",
+    false
+   ],
+   "blast": [
+    64.54,
+    "unknown",
+    false
+   ],
+   "exact": [
+    94.54,
+    "unknown",
+    false
+   ]
+  }
+ },
+ {
+  "id": "b2-01",
+  "run": "PoolManager-22-21213_29_928_928",
+  "name": "H2_c0_0_0_t0_live_stack_prefix_35",
+  "phase": "h2.close_edge",
+  "production_wall": 333.958,
+  "production_answer": "unsat",
+  "all_wall": 412.14,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "mul",
+   8.92
+  ],
+  "arms": {
+   "quick": [
+    37.54,
+    "unknown",
+    false
+   ],
+   "stores": [
+    34.73,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    74.35,
+    "unsat",
+    true
+   ],
+   "all": [
+    412.14,
+    "unsat",
+    true
+   ],
+   "shift": [
+    227.09,
+    "unknown",
+    false
+   ],
+   "conditional_ites": [
+    64.16,
+    "unknown",
+    false
+   ],
+   "unify": [
+    433.23,
+    "unknown",
+    false
+   ],
+   "potential": [
+    34.42,
+    "unknown",
+    false
+   ],
+   "mul": [
+    8.92,
+    "unsat",
+    true
+   ],
+   "lia": [
+    56.39,
+    "unknown",
+    false
+   ],
+   "alias": [
+    35.74,
+    "unknown",
+    false
+   ],
+   "guards": [
+    34.49,
+    "unknown",
+    false
+   ],
+   "exact": [
+    94.67,
+    "unknown",
+    false
+   ],
+   "divrem": [
+    54.0,
+    "unknown",
+    false
+   ],
+   "blast": [
+    64.56,
+    "unknown",
+    false
+   ]
+  }
+ },
+ {
+  "id": "b2-02",
+  "run": "CErc20-10-8186_35_None_None",
+  "name": "x86_coverage",
+  "phase": "local.prove",
+  "production_wall": 327.708,
+  "production_answer": "unsat",
+  "all_wall": 571.23,
+  "all_answer": "unknown",
+  "all_proved": false,
+  "best": [
+   "bvabs",
+   62.52
+  ],
+  "arms": {
+   "divrem": [
+    33.64,
+    "unknown",
+    false
+   ],
+   "unify": [
+    437.15,
+    "unknown",
+    false
+   ],
+   "all": [
+    571.23,
+    "unknown",
+    false
+   ],
+   "guards": [
+    33.64,
+    "unknown",
+    false
+   ],
+   "alias": [
+    45.67,
+    "unknown",
+    false
+   ],
+   "quick": [
+    51.79,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    62.52,
+    "unsat",
+    true
+   ],
+   "shift": [
+    33.59,
+    "unknown",
+    false
+   ],
+   "mul": [
+    108.63,
+    "unknown",
+    false
+   ],
+   "lia": [
+    68.49,
+    "unknown",
+    false
+   ],
+   "potential": [
+    104.74,
+    "unknown",
+    false
+   ],
+   "blast": [
+    207.7,
+    "unknown",
+    false
+   ],
+   "stores": [
+    34.01,
+    "unknown",
+    false
+   ],
+   "exact": [
+    106.23,
+    "unknown",
+    false
+   ],
+   "conditional_ites": [
+    33.54,
+    "unknown",
+    false
+   ]
+  }
+ },
+ {
+  "id": "b2-03",
+  "run": "CErc20-12-12930_5_160_None",
+  "name": "x86_maps_7_group",
+  "phase": "local.prove",
+  "production_wall": 239.835,
+  "production_answer": "unknown",
+  "all_wall": 605.23,
+  "all_answer": "budget",
+  "all_proved": false,
+  "best": [
+   "blast",
+   266.78
+  ],
+  "arms": {
+   "quick": [
+    45.87,
+    "unknown",
+    false
+   ],
+   "shift": [
+    36.56,
+    "unknown",
+    false
+   ],
+   "all": [
+    605.23,
+    "budget",
+    false
+   ],
+   "stores": [
+    36.7,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    42.61,
+    "unknown",
+    false
+   ],
+   "unify": [
+    436.85,
+    "unknown",
+    false
+   ],
+   "alias": [
+    392.55,
+    "unknown",
+    false
+   ],
+   "lia": [
+    63.46,
+    "unknown",
+    false
+   ],
+   "mul": [
+    102.94,
+    "unknown",
+    false
+   ],
+   "divrem": [
+    36.65,
+    "unknown",
+    false
+   ],
+   "conditional_ites": [
+    36.74,
+    "unknown",
+    false
+   ],
+   "guards": [
+    36.73,
+    "unknown",
+    false
+   ],
+   "exact": [
+    100.8,
+    "unknown",
+    false
+   ],
+   "blast": [
+    266.78,
+    "unsat",
+    true
+   ],
+   "potential": [
+    600.33,
+    "unknown",
+    false
+   ]
+  }
+ },
+ {
+  "id": "b2-04",
+  "run": "CErc20-12-12930_5_160_None",
+  "name": "pair_27_7",
+  "phase": "local.prove",
+  "production_wall": 212.251,
+  "production_answer": "unsat",
+  "all_wall": 240.06,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "potential",
+   36.05
+  ],
+  "arms": {
+   "all": [
+    240.06,
+    "unsat",
+    true
+   ],
+   "alias": [
+    44.27,
+    "unknown",
+    false
+   ],
+   "unify": [
+    450.93,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    196.32,
+    "unknown",
+    false
+   ],
+   "conditional_ites": [
+    38.17,
+    "unknown",
+    false
+   ],
+   "divrem": [
+    38.31,
+    "unknown",
+    false
+   ],
+   "shift": [
+    38.06,
+    "unknown",
+    false
+   ],
+   "mul": [
+    105.09,
+    "unknown",
+    false
+   ],
+   "lia": [
+    81.69,
+    "unknown",
+    false
+   ],
+   "quick": [
+    48.08,
+    "unknown",
+    false
+   ],
+   "guards": [
+    37.78,
+    "unknown",
+    false
+   ],
+   "blast": [
+    147.0,
+    "unsat",
+    true
+   ],
+   "potential": [
+    36.05,
+    "unsat",
+    true
+   ],
+   "exact": [
+    114.69,
+    "unknown",
+    false
+   ],
+   "stores": [
+    93.87,
+    "unknown",
+    false
+   ]
+  }
+ },
+ {
+  "id": "b2-05",
+  "run": "CErc20-10-8186_35_None_None",
+  "name": "pair_25_8",
+  "phase": "local.prove",
+  "production_wall": 185.294,
+  "production_answer": "unsat",
+  "all_wall": 209.78,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "blast",
+   89.41
+  ],
+  "arms": {
+   "shift": [
+    101.82,
+    "unknown",
+    false
+   ],
+   "conditional_ites": [
+    101.52,
+    "unknown",
+    false
+   ],
+   "all": [
+    209.78,
+    "unsat",
+    true
+   ],
+   "bvabs": [
+    112.1,
+    "unknown",
+    false
+   ],
+   "quick": [
+    115.43,
+    "unknown",
+    false
+   ],
+   "alias": [
+    108.96,
+    "unknown",
+    false
+   ],
+   "lia": [
+    137.31,
+    "unknown",
+    false
+   ],
+   "mul": [
+    162.2,
+    "unsat",
+    true
+   ],
+   "unify": [
+    162.06,
+    "unsat",
+    true
+   ],
+   "stores": [
+    134.35,
+    "unknown",
+    false
+   ],
+   "exact": [
+    91.04,
+    "unsat",
+    true
+   ],
+   "divrem": [
+    101.62,
+    "unknown",
+    false
+   ],
+   "blast": [
+    89.41,
+    "unsat",
+    true
+   ],
+   "guards": [
+    101.52,
+    "unknown",
+    false
+   ],
+   "potential": [
+    107.45,
+    "unsat",
+    true
+   ]
+  }
+ },
+ {
+  "id": "b2-06",
+  "run": "CErc20-09-4571_25_None_None",
+  "name": "H2_c0_0_0_t2_gas_0",
+  "phase": "h2.close_edge",
+  "production_wall": 169.944,
+  "production_answer": "unsat",
+  "all_wall": 183.09,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "exact",
+   84.55
+  ],
+  "arms": {
+   "alias": [
+    114.94,
+    "unknown",
+    false
+   ],
+   "all": [
+    183.09,
+    "unsat",
+    true
+   ],
+   "unify": [
+    468.05,
+    "unknown",
+    false
+   ],
+   "potential": [
+    89.68,
+    "unsat",
+    true
+   ],
+   "guards": [
+    191.31,
+    "unknown",
+    false
+   ],
+   "lia": [
+    137.78,
+    "unknown",
+    false
+   ],
+   "mul": [
+    126.89,
+    "unsat",
+    true
+   ],
+   "shift": [
+    96.67,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    86.77,
+    "unsat",
+    true
+   ],
+   "divrem": [
+    127.95,
+    "unknown",
+    false
+   ],
+   "quick": [
+    88.91,
+    "unsat",
+    true
+   ],
+   "blast": [
+    86.75,
+    "unsat",
+    true
+   ],
+   "exact": [
+    84.55,
+    "unsat",
+    true
+   ],
+   "conditional_ites": [
+    96.08,
+    "unknown",
+    false
+   ],
+   "stores": [
+    126.62,
+    "unknown",
+    false
+   ]
+  }
+ },
+ {
+  "id": "b2-07",
+  "run": "CErc20-10-8186_35_None_None",
+  "name": "H2_c0_0_6_t9_gas_0",
+  "phase": "h2.close_edge",
+  "production_wall": 165.388,
+  "production_answer": "unsat",
+  "all_wall": 172.29,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "exact",
+   22.82
+  ],
+  "arms": {
+   "bvabs": [
+    136.52,
+    "unknown",
+    false
+   ],
+   "all": [
+    172.29,
+    "unsat",
+    true
+   ],
+   "shift": [
+    95.92,
+    "unknown",
+    false
+   ],
+   "quick": [
+    73.98,
+    "unsat",
+    true
+   ],
+   "stores": [
+    126.14,
+    "unknown",
+    false
+   ],
+   "mul": [
+    103.54,
+    "unsat",
+    true
+   ],
+   "lia": [
+    133.27,
+    "unknown",
+    false
+   ],
+   "alias": [
+    102.26,
+    "unknown",
+    false
+   ],
+   "unify": [
+    120.84,
+    "unsat",
+    true
+   ],
+   "potential": [
+    74.34,
+    "unsat",
+    true
+   ],
+   "exact": [
+    22.82,
+    "unsat",
+    true
+   ],
+   "conditional_ites": [
+    95.6,
+    "unknown",
+    false
+   ],
+   "guards": [
+    45.22,
+    "unknown",
+    false
+   ],
+   "divrem": [
+    127.57,
+    "unknown",
+    false
+   ],
+   "blast": [
+    26.56,
+    "unsat",
+    true
+   ]
+  }
+ },
+ {
+  "id": "b2-08",
+  "run": "CErc20-12-12930_5_160_None",
+  "name": "H2_c0_0_2_t6_gas_0_shared",
+  "phase": "h2.close_edge",
+  "production_wall": 151.854,
+  "production_answer": "unsat",
+  "all_wall": 172.85,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "potential",
+   10.42
+  ],
+  "arms": {
+   "exact": [
+    99.15,
+    "unknown",
+    false
+   ],
+   "blast": [
+    66.97,
+    "unsat",
+    true
+   ],
+   "divrem": [
+    64.41,
+    "unknown",
+    false
+   ],
+   "guards": [
+    33.94,
+    "unknown",
+    false
+   ],
+   "quick": [
+    42.12,
+    "unknown",
+    false
+   ],
+   "mul": [
+    100.87,
+    "unknown",
+    false
+   ],
+   "shift": [
+    33.94,
+    "unknown",
+    false
+   ],
+   "lia": [
+    78.36,
+    "unknown",
+    false
+   ],
+   "conditional_ites": [
+    33.83,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    87.39,
+    "unknown",
+    false
+   ],
+   "unify": [
+    440.28,
+    "unknown",
+    false
+   ],
+   "potential": [
+    10.42,
+    "unsat",
+    true
+   ],
+   "stores": [
+    63.62,
+    "unknown",
+    false
+   ],
+   "alias": [
+    334.92,
+    "unknown",
+    false
+   ],
+   "all": [
+    172.85,
+    "unsat",
+    true
+   ]
+  }
+ },
+ {
+  "id": "b2-09",
+  "run": "CErc20-09-4571_25_None_None",
+  "name": "H2_c0_0_0_t2_memory_gas_0",
+  "phase": "h2.close_edge",
+  "production_wall": 143.84,
+  "production_answer": "unsat",
+  "all_wall": 150.26,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "mul",
+   24.74
+  ],
+  "arms": {
+   "blast": [
+    63.45,
+    "unsat",
+    true
+   ],
+   "exact": [
+    117.39,
+    "unknown",
+    false
+   ],
+   "stores": [
+    49.36,
+    "unknown",
+    false
+   ],
+   "unify": [
+    451.01,
+    "unknown",
+    false
+   ],
+   "lia": [
+    81.03,
+    "unknown",
+    false
+   ],
+   "mul": [
+    24.74,
+    "unsat",
+    true
+   ],
+   "potential": [
+    32.44,
+    "unsat",
+    true
+   ],
+   "alias": [
+    57.19,
+    "unknown",
+    false
+   ],
+   "divrem": [
+    71.74,
+    "unknown",
+    false
+   ],
+   "quick": [
+    63.74,
+    "unknown",
+    false
+   ],
+   "guards": [
+    142.96,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    31.62,
+    "unsat",
+    true
+   ],
+   "conditional_ites": [
+    39.94,
+    "unknown",
+    false
+   ],
+   "all": [
+    150.26,
+    "unsat",
+    true
+   ],
+   "shift": [
+    41.42,
+    "unknown",
+    false
+   ]
+  }
+ },
+ {
+  "id": "b2-10",
+  "run": "CErc20-12-12930_5_160_None",
+  "name": "H2_c0_0_0_t6_gas_0",
+  "phase": "h2.close_edge",
+  "production_wall": 125.53,
+  "production_answer": "unsat",
+  "all_wall": 167.99,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "potential",
+   11.11
+  ],
+  "arms": {
+   "all": [
+    167.99,
+    "unsat",
+    true
+   ],
+   "divrem": [
+    64.33,
+    "unknown",
+    false
+   ],
+   "blast": [
+    53.72,
+    "unsat",
+    true
+   ],
+   "guards": [
+    33.95,
+    "unknown",
+    false
+   ],
+   "conditional_ites": [
+    33.85,
+    "unknown",
+    false
+   ],
+   "mul": [
+    101.1,
+    "unknown",
+    false
+   ],
+   "lia": [
+    76.84,
+    "unknown",
+    false
+   ],
+   "exact": [
+    99.45,
+    "unknown",
+    false
+   ],
+   "unify": [
+    437.81,
+    "unknown",
+    false
+   ],
+   "stores": [
+    64.2,
+    "unknown",
+    false
+   ],
+   "alias": [
+    335.34,
+    "unknown",
+    false
+   ],
+   "potential": [
+    11.11,
+    "unsat",
+    true
+   ],
+   "quick": [
+    42.71,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    88.11,
+    "unknown",
+    false
+   ],
+   "shift": [
+    33.97,
+    "unknown",
+    false
+   ]
+  }
+ },
+ {
+  "id": "b2-11",
+  "run": "CErc20-12-12930_5_160_None",
+  "name": "x86_coverage",
+  "phase": "local.prove",
+  "production_wall": 125.035,
+  "production_answer": "unsat",
+  "all_wall": 137.06,
+  "all_answer": "unsat",
+  "all_proved": true,
+  "best": [
+   "potential",
+   54.29
+  ],
+  "arms": {
+   "all": [
+    137.06,
+    "unsat",
+    true
+   ],
+   "conditional_ites": [
+    33.43,
+    "unknown",
+    false
+   ],
+   "stores": [
+    33.71,
+    "unknown",
+    false
+   ],
+   "exact": [
+    108.0,
+    "unknown",
+    false
+   ],
+   "blast": [
+    80.14,
+    "unsat",
+    true
+   ],
+   "lia": [
+    79.36,
+    "unknown",
+    false
+   ],
+   "mul": [
+    76.18,
+    "unknown",
+    false
+   ],
+   "divrem": [
+    33.47,
+    "unknown",
+    false
+   ],
+   "quick": [
+    52.91,
+    "unknown",
+    false
+   ],
+   "shift": [
+    33.5,
+    "unknown",
+    false
+   ],
+   "bvabs": [
+    199.7,
+    "unknown",
+    false
+   ],
+   "guards": [
+    33.52,
+    "unknown",
+    false
+   ],
+   "unify": [
+    436.83,
+    "unknown",
+    false
+   ],
+   "alias": [
+    260.18,
+    "unknown",
+    false
+   ],
+   "potential": [
+    54.29,
+    "unsat",
+    true
+   ]
+  }
+ }
+]

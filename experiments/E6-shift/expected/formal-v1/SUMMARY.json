@@ -1,0 +1,513 @@
+{
+  "status": "STOPPED",
+  "protocol": {
+    "maximum_timing_cells": 48,
+    "diagnostic_cells": 16,
+    "k_values": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "summary_arms": [
+      "shift-off",
+      "shift-fallback"
+    ],
+    "repetitions": 3,
+    "repeat_skip_if_r1_wall_strictly_gt_s": 300,
+    "repeat_basis": "only same k/arm R1 unrounded exit_observed_wall_seconds+cleanup_wall_seconds, missing fields fallback guard wall; exact>300 triggers predefined R2/R3 skips, no replacement",
+    "timing_owned_observer": false,
+    "diagnostic": "one fresh per k/arm, primary path scalars + partial current-PID Solver/Tactic expression DAG; excluded timing statistics",
+    "timeout_seconds": 600,
+    "memory_tree_mib": 6000,
+    "max_depth": 400,
+    "path_pair_workers": 1,
+    "gas": "off",
+    "gas_budget": 1000000000,
+    "calldata_size_bytes": 512,
+    "x86_base": 4096,
+    "query_cap_ms": 300000,
+    "reachability_timeout_ms": 250,
+    "summary_other_kinds": "all frozen non-shift fallback kinds remain enabled; prove-hit defaults retained",
+    "formal_extra_native_allocator_cap": null,
+    "cold_cache": "each point independent fresh interpreter/cache; no task reuse",
+    "math_outcomes": "TO/OOM/BOUND/UNK/N/A retained as censored/incomplete; unexpected ERR/CEX stops matrix; no budget increases"
+  },
+  "planned_cells": 64,
+  "maximum_timing_cells": 48,
+  "diagnostic_cells": 16,
+  "rows": [
+    {
+      "name": "timing-k01-shift-off-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 82905,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 2.744 2.959 109.1\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k01-shift-on-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 83095,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 4.656 4.837 98.5\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k02-shift-off-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 83334,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 54.243 54.523 155.1\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k02-shift-on-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 85974,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 5.46 5.548 118.3\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k03-shift-off-r1",
+      "executed": true,
+      "result": "TO",
+      "pgid": 86263,
+      "supervisor_returncode": 0,
+      "stdout": "TO 595.895 600.036 929.3\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k03-shift-on-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 15666,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 6.629 6.733 116.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k04-shift-off-r1",
+      "executed": true,
+      "result": "TO",
+      "pgid": 15976,
+      "supervisor_returncode": 0,
+      "stdout": "TO 591.392 600.163 2108.1\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k04-shift-on-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 45111,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 6.844 6.942 116.1\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k05-shift-off-r1",
+      "executed": true,
+      "result": "TO",
+      "pgid": 45495,
+      "supervisor_returncode": 0,
+      "stdout": "TO 595.619 600.113 2153.5\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k05-shift-on-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 74600,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 7.61 7.744 121.4\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k06-shift-off-r1",
+      "executed": true,
+      "result": "TO",
+      "pgid": 74998,
+      "supervisor_returncode": 0,
+      "stdout": "TO 596.726 600.125 2125.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k06-shift-on-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 4382,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 8.027 8.213 122.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k07-shift-off-r1",
+      "executed": true,
+      "result": "TO",
+      "pgid": 4839,
+      "supervisor_returncode": 0,
+      "stdout": "TO 596.344 600.114 2136.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k07-shift-on-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 33876,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 9.049 9.214 124.1\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k08-shift-off-r1",
+      "executed": true,
+      "result": "TO",
+      "pgid": 34361,
+      "supervisor_returncode": 0,
+      "stdout": "TO 597.271 600.105 1775.6\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k08-shift-on-r1",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 63137,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 10.095 10.177 133.1\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k01-shift-off-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 63634,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 2.678 2.708 107.2\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k01-shift-on-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 63816,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 4.38 4.479 114.6\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k02-shift-off-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 64025,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 53.773 53.894 165.0\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k02-shift-on-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 66631,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 5.422 5.487 114.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k03-shift-off-r2",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.036,
+      "r1_wall_exact_seconds": 600.0363806659589,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-off-r1.json",
+      "r1_sha256": "e8eeafcf20a18dc7fa3ad8fbbefb4e5ef3cb2a227036d0c060479058a9d99c74"
+    },
+    {
+      "name": "timing-k03-shift-on-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 66836,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 6.63 6.794 113.6\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k04-shift-off-r2",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.163,
+      "r1_wall_exact_seconds": 600.1633940420579,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-off-r1.json",
+      "r1_sha256": "7623926a1aca5463be990b88f6bacec4cd3d15e76bca6ba6364bc271e43e70d2"
+    },
+    {
+      "name": "timing-k04-shift-on-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 67251,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 6.814 6.866 123.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k05-shift-off-r2",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.113,
+      "r1_wall_exact_seconds": 600.1130318330834,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-off-r1.json",
+      "r1_sha256": "1b0e3483aac37368000a8bdbba1877a7aae236c622cdd404bd0db2fa158e7240"
+    },
+    {
+      "name": "timing-k05-shift-on-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 67554,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 7.464 7.509 123.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k06-shift-off-r2",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.125,
+      "r1_wall_exact_seconds": 600.1245034999447,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-off-r1.json",
+      "r1_sha256": "f205a54b6a03b26aafbfead024d57651c9cfe359941d98ee23e01b54635da7fa"
+    },
+    {
+      "name": "timing-k06-shift-on-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 67942,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 8.01 8.169 122.0\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k07-shift-off-r2",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.114,
+      "r1_wall_exact_seconds": 600.1137211250607,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-off-r1.json",
+      "r1_sha256": "5a4d2ded76cd24cf2021dd9c71334bf477294b4a3c1339256dfaaf0f6e3da025"
+    },
+    {
+      "name": "timing-k07-shift-on-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 68326,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 8.923 8.987 122.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k08-shift-off-r2",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.105,
+      "r1_wall_exact_seconds": 600.1053105829051,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-off-r1.json",
+      "r1_sha256": "a51d5fed93b7f292503c1b842173673812777804da57ac82a9e2398139f38d44"
+    },
+    {
+      "name": "timing-k08-shift-on-r2",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 68726,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 10.583 10.761 123.3\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k01-shift-off-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 69383,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 2.869 2.967 112.1\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k01-shift-on-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 69502,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 4.322 4.461 108.1\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k02-shift-off-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 69772,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 53.903 54.1 174.4\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k02-shift-on-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 72313,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 5.419 5.482 114.3\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k03-shift-off-r3",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.036,
+      "r1_wall_exact_seconds": 600.0363806659589,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k03-shift-off-r1.json",
+      "r1_sha256": "e8eeafcf20a18dc7fa3ad8fbbefb4e5ef3cb2a227036d0c060479058a9d99c74"
+    },
+    {
+      "name": "timing-k03-shift-on-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 72595,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 6.56 6.646 114.8\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k04-shift-off-r3",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.163,
+      "r1_wall_exact_seconds": 600.1633940420579,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k04-shift-off-r1.json",
+      "r1_sha256": "7623926a1aca5463be990b88f6bacec4cd3d15e76bca6ba6364bc271e43e70d2"
+    },
+    {
+      "name": "timing-k04-shift-on-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 72920,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 6.803 6.864 123.7\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k05-shift-off-r3",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.113,
+      "r1_wall_exact_seconds": 600.1130318330834,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k05-shift-off-r1.json",
+      "r1_sha256": "1b0e3483aac37368000a8bdbba1877a7aae236c622cdd404bd0db2fa158e7240"
+    },
+    {
+      "name": "timing-k05-shift-on-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 73296,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 7.51 7.558 121.9\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k06-shift-off-r3",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.125,
+      "r1_wall_exact_seconds": 600.1245034999447,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k06-shift-off-r1.json",
+      "r1_sha256": "f205a54b6a03b26aafbfead024d57651c9cfe359941d98ee23e01b54635da7fa"
+    },
+    {
+      "name": "timing-k06-shift-on-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 73693,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 8.0 8.161 116.2\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k07-shift-off-r3",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.114,
+      "r1_wall_exact_seconds": 600.1137211250607,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k07-shift-off-r1.json",
+      "r1_sha256": "5a4d2ded76cd24cf2021dd9c71334bf477294b4a3c1339256dfaaf0f6e3da025"
+    },
+    {
+      "name": "timing-k07-shift-on-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 74091,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 8.971 9.096 130.7\n",
+      "stderr": ""
+    },
+    {
+      "name": "timing-k08-shift-off-r3",
+      "executed": false,
+      "result": "SKIPPED_PROTOCOL",
+      "reason": "R1_GUARD_WALL_GT300",
+      "r1_wall_seconds": 600.105,
+      "r1_wall_exact_seconds": 600.1053105829051,
+      "r1_wall_basis": "exit_observed_wall_seconds+cleanup_wall_seconds",
+      "r1_path": "/artifact/tests/paper/results/2026-11-05-v2/micro/E2.2/formal-v1/timing-k08-shift-off-r1.json",
+      "r1_sha256": "a51d5fed93b7f292503c1b842173673812777804da57ac82a9e2398139f38d44"
+    },
+    {
+      "name": "timing-k08-shift-on-r3",
+      "executed": true,
+      "result": "VERIFIED",
+      "pgid": 74501,
+      "supervisor_returncode": 0,
+      "stdout": "VERIFIED 10.196 10.384 132.9\n",
+      "stderr": ""
+    },
+    {
+      "name": "diagnostic-k01-shift-off-r1",
+      "executed": true,
+      "result": "ERR",
+      "pgid": 75085,
+      "supervisor_returncode": 0,
+      "stdout": "ERR 3.378 3.465 110.9\n",
+      "stderr": ""
+    }
+  ],
+  "current": "diagnostic-k01-shift-off-r1",
+  "error_type": "AssertionError",
+  "error": "unexpected ERR/CEX stops fixed matrix"
+}

@@ -1,0 +1,65 @@
+{
+  "control_frames": [
+    {
+      "is_jump_target": false,
+      "is_stop": true,
+      "max_depth": 1020,
+      "min_depth": 0,
+      "operations": [
+        {
+          "kind": "TAG",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "immediate": "0",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 0
+        },
+        {
+          "kind": "CALLDATALOAD",
+          "pc": 2
+        },
+        {
+          "immediate": "7",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 3
+        },
+        {
+          "immediate": "32",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 5
+        },
+        {
+          "kind": "CALLDATALOAD",
+          "pc": 7
+        },
+        {
+          "immediate": "1",
+          "kind": "PUSH",
+          "param": 1,
+          "pc": 8
+        },
+        {
+          "kind": "EXTCODECOPY",
+          "param": 14,
+          "pc": 10
+        },
+        {
+          "kind": "STOP",
+          "pc": 11
+        },
+        {
+          "kind": "STOP",
+          "pc": 12
+        }
+      ],
+      "pc": 0,
+      "stack_depth": 0,
+      "static_gas": 118
+    }
+  ]
+}

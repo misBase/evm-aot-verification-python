@@ -1,0 +1,39 @@
+{
+ "stem": "/artifact/tmp/recorded-runs/r4/fixtures/ENSRegistry",
+ "discovery_s": 11.052838082890958,
+ "load_s": 0.9775974999647588,
+ "ordered": 199,
+ "groups": 178,
+ "rows": [
+  {
+   "pick": "731:9:96:128",
+   "spec": "BlockSpecialization(pc=731, stack_depth=9, memory_size=96, free_memory_pointer=128, stack_constants=())",
+   "contexts": 1,
+   "chain": false,
+   "wall": 3.58,
+   "proved": true,
+   "closed": true,
+   "proof_kind": null,
+   "chain_attempt": null,
+   "seconds": 3.2878979998640716,
+   "queries": 43,
+   "reasons": [],
+   "failed": []
+  },
+  {
+   "pick": "731:16:96:128",
+   "spec": "BlockSpecialization(pc=731, stack_depth=16, memory_size=96, free_memory_pointer=128, stack_constants=())",
+   "contexts": 1,
+   "chain": false,
+   "wall": 2.62,
+   "proved": true,
+   "closed": true,
+   "proof_kind": null,
+   "chain_attempt": null,
+   "seconds": 2.3225068747997284,
+   "queries": 43,
+   "reasons": [],
+   "failed": []
+  }
+ ]
+}

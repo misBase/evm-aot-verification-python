@@ -1,0 +1,4253 @@
+{
+ "run": "tmp/v3exp/runs/mc-on-2/",
+ "program": {
+  "program.setup": 0.2,
+  "program.discovery": 9.9,
+  "program.groups": 0.0,
+  "program.proofs_H2": 863.5,
+  "program.consumer": 0.1,
+  "program.verify": 875.0
+ },
+ "tasks": 178,
+ "task_wall": 3068.2,
+ "buckets": {
+  "lemma.discharge": {
+   "n": 11,
+   "s": 2042.4,
+   "share": 0.6657
+  },
+  "task": {
+   "n": 178,
+   "s": 295.9,
+   "share": 0.0964
+  },
+  "local.prove": {
+   "n": 183,
+   "s": 275.0,
+   "share": 0.0896
+  },
+  "summary.apply_div": {
+   "n": 284,
+   "s": 135.7,
+   "share": 0.0442
+  },
+  "h2.quick": {
+   "n": 199,
+   "s": 78.4,
+   "share": 0.0256
+  },
+  "check@local.prove": {
+   "n": 1620,
+   "s": 76.3,
+   "share": 0.0249
+  },
+  "lemma.prove": {
+   "n": 11,
+   "s": 73.8,
+   "share": 0.0241
+  },
+  "check@other": {
+   "n": 150,
+   "s": 53.9,
+   "share": 0.0176
+  },
+  "local.x86_segment": {
+   "n": 183,
+   "s": 30.3,
+   "share": 0.0099
+  },
+  "summary.apply_lemma": {
+   "n": 28,
+   "s": 4.1,
+   "share": 0.0013
+  },
+  "local.evm_segment": {
+   "n": 183,
+   "s": 2.3,
+   "share": 0.0007
+  },
+  "lemma.cache_lookup": {
+   "n": 11,
+   "s": 0.0,
+   "share": 0.0
+  }
+ },
+ "counters": {
+  "z3.check": {
+   "n": 12248,
+   "s": 1553.4,
+   "share": 0.5063
+  },
+  "cache.query_key": {
+   "n": 13056,
+   "s": 161.2,
+   "share": 0.0525
+  },
+  "expr.forward_selects": {
+   "n": 1359,
+   "s": 97.1,
+   "share": 0.0316
+  },
+  "worker.reset_caches": {
+   "n": 356,
+   "s": 39.7,
+   "share": 0.0129
+  },
+  "expr.normalize": {
+   "n": 22,
+   "s": 0.9,
+   "share": 0.0003
+  },
+  "cache.statement_key": {
+   "n": 11,
+   "s": 0.7,
+   "share": 0.0002
+  }
+ },
+ "routes": {
+  "local.prove": {
+   "lia": {
+    "runs": 1,
+    "wins": 0,
+    "s": 19.6,
+    "lost_s": 19.6
+   },
+   "divrem": {
+    "runs": 2,
+    "wins": 1,
+    "s": 0.9,
+    "lost_s": 0.0
+   },
+   "stores": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "conditional_ites": {
+    "runs": 1,
+    "wins": 0,
+    "s": 0.0,
+    "lost_s": 0.0
+   },
+   "quick+n": {
+    "runs": 2,
+    "wins": 2,
+    "s": 0.0,
+    "lost_s": 0.0
+   }
+  }
+ },
+ "slow_checks": [
+  {
+   "wall": 23.0,
+   "name": "x86_maps_0_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {
+    "divrem": [
+     0,
+     0.005
+    ],
+    "lia": [
+     0,
+     19.603
+    ],
+    "stores": [
+     0,
+     0.007
+    ],
+    "quick+n": [
+     1,
+     0.0
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 7.5,
+   "name": "pair_6_0",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {
+    "conditional_ites": [
+     0,
+     0.004
+    ],
+    "divrem": [
+     1,
+     0.931
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 3.3,
+   "name": "x86_maps_1_7",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {
+    "quick+n": [
+     1,
+     0.0
+    ]
+   },
+   "exported": null
+  },
+  {
+   "wall": 1.7,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.6,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 1.4,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.8,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.8,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.8,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.8,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.8,
+   "name": "havoc_relation",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.7,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.7,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.7,
+   "name": "havoc_relation",
+   "phase": "local.prove",
+   "proved": true,
+   "answer": "unsat",
+   "routes": {},
+   "exported": null
+  },
+  {
+   "wall": 0.7,
+   "name": "context_nonempty_c0_",
+   "phase": "other",
+   "proved": true,
+   "answer": "sat",
+   "routes": {},
+   "exported": null
+  }
+ ],
+ "task_rows": [
+  {
+   "spec": {
+    "pc": 0,
+    "d": 0,
+    "m": 0,
+    "f": 0,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 4.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    72,
+    1.3456
+   ],
+   "rss": 276.3
+  },
+  {
+   "spec": {
+    "pc": 63,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.0873
+   ],
+   "rss": 276.3
+  },
+  {
+   "spec": {
+    "pc": 96,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.0738
+   ],
+   "rss": 276.3
+  },
+  {
+   "spec": {
+    "pc": 122,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.029
+   ],
+   "rss": 276.3
+  },
+  {
+   "spec": {
+    "pc": 155,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.0902
+   ],
+   "rss": 276.3
+  },
+  {
+   "spec": {
+    "pc": 181,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.008
+   ],
+   "rss": 276.3
+  },
+  {
+   "spec": {
+    "pc": 244,
+    "d": 2,
+    "m": 256,
+    "f": 224,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 45.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    113,
+    39.4576
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 739,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 13.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    16,
+    0.1702
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1104,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 10.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    12,
+    0.1064
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1297,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 10.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0398
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1434,
+    "d": 9,
+    "m": 256,
+    "f": 224,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0695
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1562,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0012
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1589,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      1354
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 8.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    28,
+    0.1827
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1634,
+    "d": 12,
+    "m": 256,
+    "f": 224,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 7.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    35,
+    0.1453
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1766,
+    "d": 10,
+    "m": 160,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 37.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    87,
+    24.7039
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1993,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      3,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 492.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 488.309,
+   "z3": [
+    1947,
+    307.7052
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 739,
+    "d": 15,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 15.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    11,
+    0.079
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1344,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0071
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1354,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      4,
+      1572
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 10.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    11,
+    0.0823
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1589,
+    "d": 14,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      1354
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 10.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    11,
+    0.2528
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1967,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.024
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1967,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 2,
+   "wall": 4.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0349
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2363
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 4.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0283
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2016
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0481
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2312
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0098
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 13,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2166
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0234
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 13,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2194
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0101
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 2025,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      132
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    19,
+    0.053
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1948,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      68
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    15,
+    0.0441
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1948,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      68
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0271
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 2045,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.007
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 2081,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      5,
+      435
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0011
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 1941,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      1,
+      4
+     ],
+     [
+      3,
+      340
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 8.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 6.695,
+   "z3": [
+    537,
+    0.3068
+   ],
+   "rss": 340.8
+  },
+  {
+   "spec": {
+    "pc": 12,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 4.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    59,
+    1.3787
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 52,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.1326
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 85,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.0579
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 110,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    24,
+    0.0468
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 144,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.0393
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 177,
+    "d": 0,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0167
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 195,
+    "d": 3,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      1,
+      224
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    27,
+    0.1343
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 305,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0065
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 319,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.009
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 340,
+    "d": 3,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      1,
+      377
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 44.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    92,
+    32.0558
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 897,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 10.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    12,
+    0.0953
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1143,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0021
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1148,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0173
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1263,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 7.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    17,
+    0.1134
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1341,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0053
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1344,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0337
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1422,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0248
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1455,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      324
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 28.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    56,
+    1.0553
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1810,
+    "d": 12,
+    "m": 256,
+    "f": 224,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 15.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    30,
+    0.5008
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1941,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      1,
+      4
+     ],
+     [
+      3,
+      195
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 422.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 419.784,
+   "z3": [
+    1375,
+    280.5141
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2249,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0113
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2252,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      5,
+      473
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0175
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2263,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    18,
+    0.1272
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2279,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.012
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2282,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      4,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 9.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 5.871,
+   "z3": [
+    536,
+    0.7278
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2298,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      5,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 4.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0297
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2312,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      5,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0118
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2326,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      7,
+      492
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0188
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2337,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    10,
+    0.0279
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2351,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0048
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2354,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.003
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2363,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      3,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0136
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 177,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0114
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 658,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 10.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    14,
+    0.0786
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 731,
+    "d": 16,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0523
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 692,
+    "d": 16,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 12.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    14,
+    0.1167
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 736,
+    "d": 15,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0008
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 789,
+    "d": 16,
+    "m": 224,
+    "f": 224,
+    "k": [
+     [
+      7,
+      1434
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 10.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    14,
+    0.0564
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1263,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 9.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    12,
+    0.0945
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1341,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0332
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1336,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0298
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1297,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 13.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.057
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1589,
+    "d": 19,
+    "m": 224,
+    "f": 224,
+    "k": [
+     [
+      2,
+      789
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 12.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    15,
+    0.4049
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1967,
+    "d": 13,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 2,
+   "wall": 4.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0518
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2081
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 4,
+   "wall": 6.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    11,
+    0.0514
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2298
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0141
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2326
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0198
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 13,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2180
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0181
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2025,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      100
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    19,
+    0.0757
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1948,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      36
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 3,
+   "wall": 8.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    25,
+    0.0646
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1948,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      100
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 6.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    15,
+    0.0342
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 2081,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      5,
+      416
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.001
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 1941,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      1,
+      4
+     ],
+     [
+      3,
+      267
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0014
+   ],
+   "rss": 275.0
+  },
+  {
+   "spec": {
+    "pc": 15,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    59,
+    1.3224
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 41,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    24,
+    0.2366
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 74,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.0444
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 107,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0283
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 133,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.0526
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 166,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    22,
+    0.1468
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 244,
+    "d": 2,
+    "m": 160,
+    "f": 128,
+    "k": [
+     [
+      0,
+      160
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0363
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 253,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0068
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 272,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0005
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 291,
+    "d": 2,
+    "m": 256,
+    "f": 224,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.019
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 324,
+    "d": 1,
+    "m": 256,
+    "f": 224,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0051
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 377,
+    "d": 2,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    17,
+    0.0918
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 421,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.016
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 440,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0005
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 459,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0187
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 473,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0008
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 492,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0207
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 556,
+    "d": 2,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    17,
+    0.1288
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 572,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0006
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 586,
+    "d": 3,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      1,
+      556
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    29,
+    0.0606
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 645,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      3,
+      224
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0535
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 652,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      3,
+      224
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0181
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 658,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 8.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    30,
+    0.2374
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 731,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    13,
+    0.0646
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 736,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0066
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 863,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 8.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    17,
+    0.134
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 941,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0025
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1070,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 7.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    17,
+    0.1114
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1151,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      4,
+      324
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 15.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    33,
+    0.3067
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1447,
+    "d": 8,
+    "m": 256,
+    "f": 224,
+    "k": [
+     [
+      6,
+      324
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0148
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1572,
+    "d": 6,
+    "m": 160,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0289
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1634,
+    "d": 10,
+    "m": 160,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 7.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    36,
+    0.1509
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1670,
+    "d": 10,
+    "m": 160,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 12.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    31,
+    0.4365
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1766,
+    "d": 12,
+    "m": 256,
+    "f": 224,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 14.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    31,
+    5.7994
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1920,
+    "d": 10,
+    "m": 160,
+    "f": 128,
+    "k": [
+     [
+      3,
+      1583
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0123
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1925,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 4,
+   "wall": 4.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    30,
+    0.1096
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1948,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 2,
+   "wall": 360.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 353.896,
+   "z3": [
+    1247,
+    262.3685
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 2048,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    18,
+    0.0641
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 2065,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0373
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 2104,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 2,
+   "wall": 2.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0191
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 2107,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 2,
+   "wall": 7.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0919
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 2143,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      5,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 193.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 188.857,
+   "z3": [
+    728,
+    112.8988
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1948,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      36
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0228
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1948,
+    "d": 12,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      68
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 6.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0382
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 2045,
+    "d": 13,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0097
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 2081,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      5,
+      511
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0068
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 1941,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      1,
+      4
+     ],
+     [
+      3,
+      586
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 8.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 6.598,
+   "z3": [
+    537,
+    0.2927
+   ],
+   "rss": 299.9
+  },
+  {
+   "spec": {
+    "pc": 25,
+    "d": 0,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 12.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 8.195,
+   "z3": [
+    622,
+    2.8856
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 224,
+    "d": 2,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    27,
+    0.1458
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 267,
+    "d": 3,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0477
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 286,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0115
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 324,
+    "d": 1,
+    "m": 160,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0261
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 326,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0047
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 402,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0147
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 416,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0013
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 435,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0008
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 454,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0009
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 478,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0009
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 497,
+    "d": 1,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 1.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    2,
+    0.0026
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 511,
+    "d": 4,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      556
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 10.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    30,
+    0.1622
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 614,
+    "d": 3,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 7.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    27,
+    0.3503
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 692,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 11.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    26,
+    0.1332
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 789,
+    "d": 9,
+    "m": 224,
+    "f": 224,
+    "k": [
+     [
+      7,
+      291
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 8.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    23,
+    0.1343
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 936,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0095
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 944,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      4,
+      324
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 16.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    40,
+    0.9255
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1336,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0102
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1354,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      4,
+      324
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 6.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    13,
+    0.0558
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1583,
+    "d": 6,
+    "m": 160,
+    "f": 128,
+    "k": [
+     [
+      4,
+      324
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0119
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1589,
+    "d": 12,
+    "m": 224,
+    "f": 224,
+    "k": [
+     [
+      2,
+      789
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 8.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    16,
+    0.1982
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1670,
+    "d": 12,
+    "m": 256,
+    "f": 224,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 13.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    29,
+    0.4475
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1810,
+    "d": 10,
+    "m": 160,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 14.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    31,
+    0.4766
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1920,
+    "d": 12,
+    "m": 256,
+    "f": 224,
+    "k": [
+     [
+      3,
+      1447
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0058
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1938,
+    "d": 6,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 4,
+   "wall": 2.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0315
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1967,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 5,
+   "wall": 3.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0581
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1970,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      2,
+      2232
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0127
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1975,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    18,
+    0.1134
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 1990,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.1,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.015
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2016,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      6,
+      286
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.3,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    8,
+    0.0648
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2025,
+    "d": 9,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      36
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 343.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 339.018,
+   "z3": [
+    1098,
+    254.4056
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2045,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0191
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2062,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.6,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0195
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2081,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      5,
+      319
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 4.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    5,
+    0.0716
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2090,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 2,
+   "wall": 4.7,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    14,
+    0.1575
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2123,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.9,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    18,
+    0.2114
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2140,
+    "d": 10,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.8,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0357
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2166,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      6,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 8.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    6,
+    0.0629
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2180,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      6,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 7.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    4,
+    0.0427
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2194,
+    "d": 11,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      8,
+      454
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 9.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0668
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2206,
+    "d": 5,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      0,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 5.5,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    10,
+    0.0914
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2220,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 2.4,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    3,
+    0.0142
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2223,
+    "d": 7,
+    "m": 96,
+    "f": 128,
+    "k": []
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 3.0,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 0.0,
+   "z3": [
+    7,
+    0.0741
+   ],
+   "rss": 280.2
+  },
+  {
+   "spec": {
+    "pc": 2232,
+    "d": 8,
+    "m": 96,
+    "f": 128,
+    "k": [
+     [
+      3,
+      4
+     ]
+    ]
+   },
+   "chain": false,
+   "contexts": 1,
+   "wall": 304.2,
+   "closed": true,
+   "kind": null,
+   "lemma_s": 298.992,
+   "z3": [
+    1331,
+    212.4107
+   ],
+   "rss": 337.1
+  }
+ ],
+ "unfinished": []
+}
