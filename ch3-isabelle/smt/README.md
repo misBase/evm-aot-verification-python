@@ -57,6 +57,23 @@ expressions in the instruction semantics. `hol_sdiv_result` and
 `hol_smod_result` name those scalar expressions, without importing the full
 execution-state development.
 
+The MUL certificate follows `EVMOperationSemantics.mul_semantics`, which calls
+`Uint256.mul_codegen_order` with the second operand first. Its proof connects
+the compiler's partial-product and carry order to the existing `uint256_mul`
+definition, then uses the integer multiplication theorem to account for the
+operand exchange. Regeneration must capture this actual template. A certificate
+for the earlier `Uint256.mul_semantics` template does not cover a changed AST
+until the exported-expression proof has been checked again. The evaluation
+proof reuses kernel-checked equalities for the generated DAG nodes. It simplifies
+each node with fresh variables for its child values, then discharges the temporary
+hypotheses and instantiates the result with the already proved child equalities.
+Local weak congruence rules defer integer-payload normalization until after this
+traversal. The final phase restores the original congruences and checks the complete
+result against the HOL model. The concatenation proof also reuses the existing
+four-limb theorem instead of expanding nested integer remainders. These are proof-strategy
+optimizations. They preserve the exported AST, theorem statements, and oracle
+dependency checks.
+
 The BYTE and SIGNEXTEND certificates target the `Byte` and `extend_sign` library
 helpers. The separate `get_byte` and `signextend` dispatcher definitions still
 need a correspondence theorem before claiming a result about those complete

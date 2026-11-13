@@ -7,9 +7,9 @@ PY       ?= $(CURDIR)/../ch4-5-validator/.venv/bin/python
 export GIT_DIR      := $(CURDIR)/../.validator-git
 export GIT_WORK_TREE := $(CURDIR)/../ch4-5-validator
 
-.PHONY: all semantics smt z3 export-check open
+.PHONY: all semantics smt division z3 export-check open
 
-all: semantics smt z3 export-check
+all: semantics smt division z3 export-check
 
 # EVM semantics with the four-limb U256 model (session EVM_AOT; document output off, no LaTeX needed).
 semantics:
@@ -18,6 +18,10 @@ semantics:
 # SMT deep embedding (smt2Isabelle) and the encoding-consistency certificates (sessions EVM_SMT_Base, EVM_SMT).
 smt:
 	$(ISABELLE) build -v -D smt
+
+# Correctness of the four-limb uint256 DIV/MOD algorithm (session EVM_Div on top of EVM_SMT_Base).
+division:
+	$(ISABELLE) build -v -d smt -D division
 
 # Z3 scripts checking the four-uint64 U256 algorithms against 256-bit semantics (Table 1).
 z3:

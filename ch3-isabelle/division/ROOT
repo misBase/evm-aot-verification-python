@@ -1,0 +1,3 @@
+session EVM_Div in "sources" = EVM_SMT_Base +
+  options [document = false, timeout = 1800]
+  theories Div

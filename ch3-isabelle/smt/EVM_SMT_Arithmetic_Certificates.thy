@@ -34,15 +34,17 @@ lemma smt_sub64_normalized:
     (bv_norm 64 (a - b - c), bv_norm 1 (bv_norm 65 (a - b - c) div 2^64))"
   by (simp add: smt_sub64_def bv_norm_def)
 
+lemma bv_norm64_as_word:
+  "bv_norm 64 n = uint (word_of_int n :: u64)"
+  by (simp add: bv_norm_def uint_word_of_int)
+
 lemma four_normalized_concat:
   "bv_norm 256 (bv_norm 192 (bv_norm 128
       (bv_norm 64 d * 2^64 + bv_norm 64 c) * 2^64 + bv_norm 64 b)
       * 2^64 + bv_norm 64 a) =
     uint256_to_int \<lparr>z0 = word_of_int a, z1 = word_of_int b,
       z2 = word_of_int c, z3 = word_of_int d\<rparr>"
-  using four_limb_concat[where a = "word_of_int a" and b = "word_of_int b"
-    and c = "word_of_int c" and d = "word_of_int d"]
-  by (simp add: uint_word_of_int bv_norm_def)
+  by (simp only: bv_norm64_as_word) (rule four_limb_concat)
 
 lemmas four_normalized_concat_simp = four_normalized_concat[simplified]
 
