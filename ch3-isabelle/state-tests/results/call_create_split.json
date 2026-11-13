@@ -1,0 +1,50 @@
+{
+  "post_variants": {
+    "call": 4126,
+    "create": 11702
+  },
+  "records": {
+    "call": 732,
+    "create": 56
+  },
+  "records_by_top_level_directory": {
+    "Cancun/call": 17,
+    "Cancun/create": 1,
+    "Shanghai/call": 1,
+    "VMTests/call": 7,
+    "stArgsZeroOneBalance/call": 41,
+    "stBadOpcode/call": 1,
+    "stChainId/call": 2,
+    "stCreate2/create": 2,
+    "stCreateTest/create": 9,
+    "stEIP150singleCodeGasPrices/call": 3,
+    "stEIP1559/call": 10,
+    "stEIP158Specific/call": 3,
+    "stEIP2930/call": 1,
+    "stEIP3607/call": 3,
+    "stEIP3607/create": 2,
+    "stExample/call": 11,
+    "stExpectSection/call": 8,
+    "stExtCodeHash/call": 4,
+    "stMemoryStressTest/call": 19,
+    "stMemoryTest/call": 65,
+    "stRandom/call": 264,
+    "stRandom2/call": 184,
+    "stRefundTest/call": 10,
+    "stReturnDataTest/call": 5,
+    "stRevertTest/call": 2,
+    "stSLoadTest/call": 1,
+    "stSStoreTest/call": 1,
+    "stSStoreTest/create": 26,
+    "stSelfBalance/call": 3,
+    "stShift/call": 42,
+    "stSolidityTest/call": 8,
+    "stSpecialTest/call": 3,
+    "stStaticCall/create": 2,
+    "stSystemOperationsTest/call": 8,
+    "stTimeConsuming/create": 12,
+    "stTransactionTest/call": 4,
+    "stTransactionTest/create": 2,
+    "stWalletTest/call": 1
+  }
+}

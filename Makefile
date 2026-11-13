@@ -68,7 +68,8 @@ small: e1 e2 e3
 all: e1 e2 e3 e4 e5 e6 e7
 
 clean:      # results, generated figures and caches of local runs
-	rm -rf $(EXP)/smoke-results $(EXP)/*/results $(EXP)/E6-shift/figures ch3-isabelle/state-tests/*/target
+	rm -rf $(EXP)/smoke-results $(EXP)/*/results $(EXP)/E6-shift/figures ch3-isabelle/state-tests/*/target \
+	  ch3-isabelle/state-tests/out
 	find . -name __pycache__ -prune -exec rm -rf {} + ; find . -name .pytest_cache -prune -exec rm -rf {} +
 
 distclean: clean   # also the Python environment and the validator snapshot created by `make install`

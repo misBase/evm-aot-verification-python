@@ -10,6 +10,7 @@ experiments/*/expected/*/*.worker.lockstep/results/
 # Rust builds and the downloaded test vectors of ch3-isabelle/state-tests
 ch3-isabelle/state-tests/*/target/
 ch3-isabelle/state-tests/tests/
+ch3-isabelle/state-tests/out/
 __pycache__/
 *.pyc
 .pytest_cache/
