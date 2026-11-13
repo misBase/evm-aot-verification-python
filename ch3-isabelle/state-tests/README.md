@@ -14,7 +14,9 @@ vectors; mismatches caused by the semantics were fixed in the Isabelle rules and
 | `scripts/fetch_general_state_tests.sh` | Sparse checkout of `GeneralStateTests` from `ethereum/tests` into `tests/` |
 
 `../theory/` is the same semantics with 256-bit words represented as four 64-bit limbs, used for the U256 and
-SMT results of Chapter 3.
+SMT results of Chapter 3. It contains the same fixes; `../fixes/` restates the regression lemmas for that
+representation (session `EVM_AOT_Fixes`). SAR is the exception: the four-limb version implements it with `SRsh`,
+which the Z3 script `../z3_proof/uint256_sar.py` checks separately.
 
 The harness runs only records that `execute_evm_bytecode` covers: records that need message calls, contract
 creation from inside the code, or transaction-level processing are filtered (see `create_post_runnable` and

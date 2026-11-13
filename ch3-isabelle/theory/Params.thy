@@ -123,6 +123,27 @@ definition MaxWordSize :: "int" where
 definition WarmStorageReadCostEIP2929:: "int" where
 "WarmStorageReadCostEIP2929 = 100"
 
+definition ColdSloadCostEIP2929 :: "int" where
+"ColdSloadCostEIP2929 = 2100"
+definition ColdAccountAccessCostEIP2929 :: "int" where
+"ColdAccountAccessCostEIP2929 = 2600"
+
+
+definition SstoreClearsScheduleRefundEIP3529 :: "int" where
+"SstoreClearsScheduleRefundEIP3529 = 4800"
+
+definition SstoreSetGasEIP2200 :: "int" where
+"SstoreSetGasEIP2200 = Gsset"
+
+definition SstoreResetGasEIP2200 :: "int" where
+"SstoreResetGasEIP2200 = Gsreset"
+
+definition SstoreResetClearRefundEIP2929 :: "int" where
+"SstoreResetClearRefundEIP2929 = SstoreSetGasEIP2200 - WarmStorageReadCostEIP2929"
+
+definition SstoreResetRefundEIP2929 :: "int" where
+"SstoreResetRefundEIP2929 = SstoreResetGasEIP2200 - ColdSloadCostEIP2929 - WarmStorageReadCostEIP2929"
+
 definition Gtload :: "int" where
 "Gtload = WarmStorageReadCostEIP2929"
 

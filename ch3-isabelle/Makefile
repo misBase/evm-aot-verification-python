@@ -11,9 +11,10 @@ export GIT_WORK_TREE := $(CURDIR)/../ch4-5-validator
 
 all: semantics smt division z3 export-check
 
-# EVM semantics with the four-limb U256 model (session EVM_AOT; document output off, no LaTeX needed).
+# EVM semantics with the four-limb U256 model (session EVM_AOT; document output off, no LaTeX needed)
+# and the regression lemmas for state-tests/FIXES.md (session EVM_AOT_Fixes).
 semantics:
-	$(ISABELLE) build -v -o document=false -d . EVM_AOT
+	$(ISABELLE) build -v -o document=false -d . EVM_AOT EVM_AOT_Fixes
 
 # SMT deep embedding (smt2Isabelle) and the encoding-consistency certificates (sessions EVM_SMT_Base, EVM_SMT).
 smt:

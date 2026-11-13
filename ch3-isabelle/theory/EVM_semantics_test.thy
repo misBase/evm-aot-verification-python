@@ -77,11 +77,13 @@ definition example_var_ctx :: variable_ctx where
       block_difficulty = 0, 
       block_gaslimit = 0,
       block_basefee = 0,
-      block_blobbasefee = 0
-    \<rparr>, 
-    vctx_gas = 1000000, 
-    vctx_account_existence = (\<lambda>_. True), 
-    vctx_touched_storage_index = [], 
+      block_blobbasefee = 0,
+      block_prevrandao = 0
+    \<rparr>,
+    vctx_gas = 1000000,
+    vctx_account_existence = (\<lambda>_. True),
+    vctx_touched_storage_index = [],
+    vctx_warm_addresses = [],
     vctx_logs = [], 
     vctx_refund = 0, 
     vctx_gasprice = 0,

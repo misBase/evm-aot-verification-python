@@ -160,8 +160,9 @@ definition update_byte :: "u8 \<Rightarrow> nat \<Rightarrow> u64 list \<Rightar
 fun sha3_update :: "u8 list \<Rightarrow> nat \<Rightarrow> u64 list \<Rightarrow> nat * u64 list" where
   "sha3_update [] pos st = (pos, st)"
 | "sha3_update (c # rest) pos st = (
-    if pos \<le> rsiz then sha3_update rest (pos + 1) (update_byte c pos st)
-    else sha3_update rest 0 (keccakf (update_byte c pos st))
+    let st' = update_byte c pos st in
+    if pos + 1 < rsiz then sha3_update rest (pos + 1) st'
+    else sha3_update rest 0 (keccakf st')
   )"
 
 definition keccak_final :: "nat \<Rightarrow> u64 list \<Rightarrow> u8 list" where

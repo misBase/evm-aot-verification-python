@@ -14,6 +14,14 @@ fun at_least_eip150 :: "network \<Rightarrow> bool" where
   "at_least_eip150 Homestead = False" |
   "at_least_eip150 _ = True"
 
+fun at_least_berlin :: "network \<Rightarrow> bool" where
+  "at_least_berlin Berlin = True" |
+  "at_least_berlin London = True" |
+  "at_least_berlin Paris = True" |
+  "at_least_berlin Shanghai = True" |
+  "at_least_berlin Cancun = True" |
+  "at_least_berlin _ = False"
+
 fun before_homestead :: "network \<Rightarrow> bool" where 
   "before_homestead Frontier = True" |
   "before_homestead _ = False"
@@ -33,5 +41,11 @@ fun at_least_london :: "network \<Rightarrow> bool" where
   "at_least_london Shanghai = True" |
   "at_least_london Cancun = True" |
   "at_least_london _ = False"
+
+fun at_least_paris :: "network \<Rightarrow> bool" where
+  "at_least_paris Paris = True" |
+  "at_least_paris Shanghai = True" |
+  "at_least_paris Cancun = True" |
+  "at_least_paris _ = False"
 
 end

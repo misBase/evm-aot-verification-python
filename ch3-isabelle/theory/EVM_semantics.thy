@@ -44,8 +44,24 @@ definition stack_3_1_op :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarrow
   | _ \<Rightarrow> instruction_failure_result v [TooShortStack])"
 
 
-definition check_refund :: "uint256 \<Rightarrow> uint256 \<Rightarrow> int" where
-  "check_refund oldv newv = (if oldv \<noteq>\<^sub>u uint256_zero \<and> newv =\<^sub>u uint256_zero then 15000 else 0)"
+definition sstore_refund :: "network \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> int" where
+  "sstore_refund net original current new_value =
+    (if at_least_london net then
+       (if current =\<^sub>u new_value then 0
+        else if current =\<^sub>u original then
+          (if original =\<^sub>u uint256_zero then 0
+           else if new_value =\<^sub>u uint256_zero then SstoreClearsScheduleRefundEIP3529 else 0)
+        else
+          (if original \<noteq>\<^sub>u uint256_zero then
+             (if current =\<^sub>u uint256_zero then - SstoreClearsScheduleRefundEIP3529
+              else if new_value =\<^sub>u uint256_zero then SstoreClearsScheduleRefundEIP3529 else 0)
+           else 0)
+          + (if original =\<^sub>u new_value then
+               (if original =\<^sub>u uint256_zero then SstoreResetClearRefundEIP2929
+                else SstoreResetRefundEIP2929)
+             else 0))
+     else
+       (if original \<noteq>\<^sub>u uint256_zero \<and> new_value =\<^sub>u uint256_zero then 15000 else 0))"
 
 definition jump :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarrow> instruction_result" where
   "jump v c = (case vctx_stack v of
@@ -117,6 +133,7 @@ definition vctx_recipient :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarr
   | Misc CALL \<Rightarrow> uint256_to_word160 (vctx_stack_default 1 v)
   | Misc CALLCODE \<Rightarrow> cctx_this c
   | Misc DELEGATECALL \<Rightarrow> cctx_this c
+  | Misc STATICCALL \<Rightarrow> uint256_to_word160 (vctx_stack_default 1 v)
   | _ \<Rightarrow> 0)"
 
 definition calc_memu_extra :: "int \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> calculation_result" where
@@ -124,7 +141,7 @@ definition calc_memu_extra :: "int \<Rightarrow> uint256 \<Rightarrow> uint256 \
     (case new_memory_consumption (Misc CALL) orig_memory_usage s0 s1 s2 s3 s4 s5 s6 of
       CalcFailureReason reason \<Rightarrow> CalcFailureReason reason
     | CalculationSuccess new_size \<Rightarrow> 
-        let mem_expansion = Cmem new_size - Cmem orig_memory_usage
+        let mem_expansion = Cmem (max orig_memory_usage new_size) - Cmem orig_memory_usage
         in if mem_expansion < 0 
            then CalcFailureReason GasUintOverflow
            else CalculationSuccess mem_expansion)"
@@ -134,7 +151,7 @@ definition calc_memu_extra2 :: "variable_ctx \<Rightarrow> uint256 \<Rightarrow>
     (case new_memory_consumption (Misc DELEGATECALL) (vctx_memory_usage v) s0 s1 s2 s3 s4 s5 s6 of
       CalcFailureReason reason \<Rightarrow> CalcFailureReason reason
     | CalculationSuccess new_size \<Rightarrow> 
-        let mem_expansion = Cmem new_size - Cmem (vctx_memory_usage v)
+        let mem_expansion = Cmem (max (vctx_memory_usage v) new_size) - Cmem (vctx_memory_usage v)
         in if mem_expansion < 0 
            then CalcFailureReason GasUintOverflow
            else CalculationSuccess mem_expansion)"
@@ -145,7 +162,7 @@ definition call :: "network \<Rightarrow> variable_ctx \<Rightarrow> constant_ct
       (case calc_memu_extra (vctx_memory_usage v) g r value1 in_begin in_size out_begin out_size of
         CalcFailureReason reason \<Rightarrow> instruction_failure_result v [reason]
       | CalculationSuccess memu_extra \<Rightarrow>
-          (case Ccallgas g r value1 (\<not> (vctx_account_existence v (vctx_recipient v c))) (vctx_gas v) net 
+          (case Ccallgas v g r value1 (\<not> (vctx_account_existence v (vctx_recipient v c))) (vctx_gas v) net 
                 (CalculationSuccess memu_extra) of
             CalcFailureReason reason \<Rightarrow> instruction_failure_result v [reason]
           | CalculationSuccess call_gas \<Rightarrow>
@@ -171,7 +188,7 @@ definition delegatecall :: "network \<Rightarrow> variable_ctx \<Rightarrow> con
       (case calc_memu_extra2 v e0 e1 e3 e4 e5 e6 (vctx_stack_default 6 v) of
         CalcFailureReason reason \<Rightarrow> instruction_failure_result v [reason]
       | CalculationSuccess memu_extra \<Rightarrow>
-          (case Ccallgas e0 e1 uint256_zero (\<not> (vctx_account_existence v (vctx_recipient v c))) (vctx_gas v) net 
+          (case Ccallgas v e0 e1 uint256_zero (\<not> (vctx_account_existence v (vctx_recipient v c))) (vctx_gas v) net 
                 (CalculationSuccess memu_extra) of
             CalcFailureReason reason \<Rightarrow> instruction_failure_result v [reason]
           | CalculationSuccess call_gas \<Rightarrow>
@@ -194,7 +211,7 @@ definition callcode :: "network \<Rightarrow> variable_ctx \<Rightarrow> constan
       (case calc_memu_extra (vctx_memory_usage v) e0 e1 e2 e3 e4 e5 e6 of
         CalcFailureReason reason \<Rightarrow> instruction_failure_result v [reason]
       | CalculationSuccess memu_extra \<Rightarrow>
-          (case Ccallgas e0 e1 e2 (\<not> (vctx_account_existence v (vctx_recipient v c))) (vctx_gas v) net 
+          (case Ccallgas v e0 e1 e2 (\<not> (vctx_account_existence v (vctx_recipient v c))) (vctx_gas v) net 
                 (CalculationSuccess memu_extra) of
             CalcFailureReason reason \<Rightarrow> instruction_failure_result v [reason]
           | CalculationSuccess call_gas \<Rightarrow>
@@ -259,13 +276,21 @@ definition swap :: "nat \<Rightarrow> variable_ctx \<Rightarrow> constant_ctx \<
        None => instruction_failure_result v [TooShortStack]
      | Some new_stack => InstructionContinue (vctx_advance_pc c (v (| vctx_stack := new_stack |))))"
 
-definition sstore :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarrow> instruction_result" where
-  "sstore v c = (case vctx_stack v of
+definition sstore :: "network \<Rightarrow> variable_ctx \<Rightarrow> constant_ctx \<Rightarrow> instruction_result" where
+  "sstore net v c = (case vctx_stack v of
     addr # vl # stack_tail \<Rightarrow>
       let new_v = v (| vctx_stack := stack_tail,
                       vctx_touched_storage_index := addr # vctx_touched_storage_index v,
-                      vctx_refund := vctx_refund v + check_refund (vctx_storage v addr) vl |)
+                      vctx_refund := vctx_refund v + sstore_refund net (vctx_storage_at_call v addr) (vctx_storage v addr) vl |)
       in InstructionContinue (vctx_advance_pc c (vctx_update_storage addr vl new_v))
+  | _ \<Rightarrow> instruction_failure_result v [TooShortStack])"
+
+definition sload :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarrow> instruction_result" where
+  "sload v c = (case vctx_stack v of
+    addr # rest \<Rightarrow>
+      let new_v = v (| vctx_stack := vctx_storage v addr # rest,
+                       vctx_touched_storage_index := addr # vctx_touched_storage_index v |)
+      in InstructionContinue (vctx_advance_pc c new_v)
   | _ \<Rightarrow> instruction_failure_result v [TooShortStack])"
 
 definition mload :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarrow> instruction_result" where
@@ -488,7 +513,7 @@ definition staticcall :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarrow> 
     (case calc_memu_extra (vctx_memory_usage v) temp uint256_zero uint256_zero in_off in_size out_off out_size of
       CalcFailureReason reason \<Rightarrow> instruction_failure_result v [reason]
     | CalculationSuccess memu_extra \<Rightarrow>
-        (case Ccallgas temp uint256_zero uint256_zero (\<not> (vctx_account_existence v (uint256_to_word160 to))) (vctx_gas v) net 
+        (case Ccallgas v temp to uint256_zero (\<not> (vctx_account_existence v (uint256_to_word160 to))) (vctx_gas v) net 
               (CalculationSuccess memu_extra) of
           CalcFailureReason reason \<Rightarrow> instruction_failure_result v [reason]
         | CalculationSuccess call_gas \<Rightarrow>
@@ -526,6 +551,22 @@ definition selfdestruct :: "variable_ctx \<Rightarrow> constant_ctx \<Rightarrow
        else InstructionToEnvironment (ContractSuicide addr) v None
 | _ \<Rightarrow> instruction_failure_result v [TooShortStack])"
 
+definition account_access_gas :: "variable_ctx \<Rightarrow> address \<Rightarrow> int" where
+  "account_access_gas v addr = (if addr \<in> set (vctx_warm_addresses v) then WarmStorageReadCostEIP2929 else ColdAccountAccessCostEIP2929)"
+
+definition add_warm_address :: "variable_ctx \<Rightarrow> address \<Rightarrow> variable_ctx" where
+  "add_warm_address v addr = (if addr \<in> set (vctx_warm_addresses v) then v else v\<lparr>vctx_warm_addresses := addr # vctx_warm_addresses v\<rparr>)"
+
+definition mark_account_access :: "variable_ctx \<Rightarrow> address \<Rightarrow> instruction_result \<Rightarrow> instruction_result" where
+  "mark_account_access v addr r = (case r of
+      InstructionContinue v' => InstructionContinue (add_warm_address v' addr)
+    | _ => r)"
+
+definition mark_call_account_access :: "variable_ctx \<Rightarrow> address \<Rightarrow> instruction_result \<Rightarrow> instruction_result" where
+  "mark_call_account_access v addr r = (case r of
+      InstructionToEnvironment (ContractFail _) _ _ => r
+    | InstructionToEnvironment a v' e => InstructionToEnvironment a (add_warm_address v' addr) e
+    | InstructionContinue v' => InstructionContinue (add_warm_address v' addr))"
 
 definition thirdComponentOfC :: "inst \<Rightarrow> variable_ctx \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> bool \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> int \<Rightarrow> network \<Rightarrow> calculation_result \<Rightarrow> calculation_result" where
 "thirdComponentOfC i v s0 s1 s2 s3 recipient_empty orig_val new_val remaining_gas net memu_extra = (
@@ -537,15 +578,15 @@ definition thirdComponentOfC :: "inst \<Rightarrow> variable_ctx \<Rightarrow> u
   | Dup _ \<Rightarrow> CalculationSuccess Gfasteststep
   | Swap _ \<Rightarrow> CalculationSuccess Gfasteststep
 
-  | Storage SSTORE \<Rightarrow> CalculationSuccess (Csstore orig_val new_val)
-  | Storage SLOAD \<Rightarrow> CalculationSuccess (Gsload net)
+  | Storage SSTORE \<Rightarrow> CalculationSuccess (sstore_gas net s0 (vctx_storage_at_call v s0) orig_val new_val v)
+  | Storage SLOAD \<Rightarrow> CalculationSuccess (if s0 \<in> set (vctx_touched_storage_index v) then WarmStorageReadCostEIP2929 else ColdSloadCostEIP2929)
 
   | Memory MLOAD \<Rightarrow> handle_memory_expansion_gas v (Memory MLOAD) Gfasteststep
   | Memory MSTORE \<Rightarrow> handle_memory_expansion_gas v (Memory MSTORE) Gfasteststep
   | Memory MSTORE8 \<Rightarrow> handle_memory_expansion_gas v (Memory MSTORE8) Gfasteststep
   | Memory CALLDATACOPY \<Rightarrow> handle_memory_copy_gas v (Memory CALLDATACOPY) Gfasteststep uint256_two s2
   | Memory CODECOPY \<Rightarrow> handle_memory_copy_gas v (Memory CODECOPY) Gfasteststep uint256_two s2
-  | Memory EXTCODECOPY \<Rightarrow> handle_memory_copy_gas v (Memory EXTCODECOPY) WarmStorageReadCostEIP2929 uint256_three s3  \<comment> \<open> NOTE: not with EIP2929 \<close>
+  | Memory EXTCODECOPY \<Rightarrow> handle_memory_copy_gas v (Memory EXTCODECOPY) (account_access_gas v (uint256_to_word160 s0)) uint256_three s3  \<comment> \<open> NOTE: EIP2929 cold account access \<close>
   | Memory MCOPY \<Rightarrow> if at_least_cancun net then handle_memory_copy_gas v (Memory MCOPY) Gfasteststep uint256_two s2 else CalculationSuccess 0
   | Memory RETURNDATACOPY \<Rightarrow> handle_memory_copy_gas v (Memory RETURNDATACOPY) Gfasteststep uint256_two s2
   | Memory MSIZE \<Rightarrow> CalculationSuccess Gquickstep
@@ -566,7 +607,7 @@ definition thirdComponentOfC :: "inst \<Rightarrow> variable_ctx \<Rightarrow> u
   | Arith ADDMOD \<Rightarrow> CalculationSuccess Gmidstep
   | Arith MULMOD \<Rightarrow> CalculationSuccess Gmidstep
   | Arith EXP \<Rightarrow> (
-      let exp_bytes = (bit_length (uint256_to_word256 s1)) + 7 div 8;
+      let exp_bytes = (bit_length (uint256_to_word256 s1) + 7) div 8;
           exp_byte_gas = Gexpbyte net * exp_bytes
       in if Gexp + exp_byte_gas \<ge> 2^64 then CalcFailureReason GasUintOverflow
          else CalculationSuccess (Gexp + exp_byte_gas))
@@ -593,12 +634,12 @@ definition thirdComponentOfC :: "inst \<Rightarrow> variable_ctx \<Rightarrow> u
   | Info CALLDATASIZE \<Rightarrow> CalculationSuccess Gquickstep
   | Info CALLER \<Rightarrow> CalculationSuccess Gquickstep
   | Info ADDRESS \<Rightarrow> CalculationSuccess Gquickstep
-  | Info BALANCE \<Rightarrow> CalculationSuccess WarmStorageReadCostEIP2929
+  | Info BALANCE \<Rightarrow> CalculationSuccess (account_access_gas v (uint256_to_word160 s0))
   | Info ORIGIN \<Rightarrow> CalculationSuccess Gquickstep
   | Info CALLVALUE \<Rightarrow> CalculationSuccess Gquickstep
   | Info CODESIZE \<Rightarrow> CalculationSuccess Gquickstep
   | Info GASPRICE \<Rightarrow> CalculationSuccess Gquickstep
-  | Info EXTCODESIZE \<Rightarrow> CalculationSuccess WarmStorageReadCostEIP2929
+  | Info EXTCODESIZE \<Rightarrow> CalculationSuccess (account_access_gas v (uint256_to_word160 s0))
   | Info BLOCKHASH \<Rightarrow> CalculationSuccess Gextstep
   | Info COINBASE \<Rightarrow> CalculationSuccess Gquickstep
   | Info TIMESTAMP \<Rightarrow> CalculationSuccess Gquickstep
@@ -606,10 +647,10 @@ definition thirdComponentOfC :: "inst \<Rightarrow> variable_ctx \<Rightarrow> u
   | Info DIFFICULTY \<Rightarrow> CalculationSuccess Gquickstep
   | Info GASLIMIT \<Rightarrow> CalculationSuccess Gquickstep
   | Info GAS \<Rightarrow> CalculationSuccess Gquickstep
-  | Info EXTCODEHASH \<Rightarrow> CalculationSuccess WarmStorageReadCostEIP2929
+  | Info EXTCODEHASH \<Rightarrow> CalculationSuccess (account_access_gas v (uint256_to_word160 s0))
   | Info RETURNDATASIZE \<Rightarrow> CalculationSuccess Gquickstep
   | Info CHAINID \<Rightarrow> CalculationSuccess Gquickstep
-  | Info SELFBALANCE \<Rightarrow> CalculationSuccess Gquickstep
+  | Info SELFBALANCE \<Rightarrow> CalculationSuccess Gfaststep
   | Info BASEFEE \<Rightarrow> if at_least_london net then CalculationSuccess Gquickstep else CalculationSuccess 0
   | Info BLOBHASH \<Rightarrow> if at_least_cancun net then CalculationSuccess Gfasteststep else CalculationSuccess 0
   | Info BLOBBASEFEE \<Rightarrow> if at_least_cancun net then CalculationSuccess Gquickstep else CalculationSuccess 0
@@ -622,10 +663,10 @@ definition thirdComponentOfC :: "inst \<Rightarrow> variable_ctx \<Rightarrow> u
 
   | Misc CREATE \<Rightarrow> handle_create_gas v (Misc CREATE) Gcreate s2
   | Misc CREATE2 \<Rightarrow> handle_create2_gas v (Misc CREATE2) Gcreate2 s2
-  | Misc CALL \<Rightarrow> Ccall s0 s1 s2 recipient_empty remaining_gas net memu_extra
-  | Misc CALLCODE \<Rightarrow> Ccall s0 s1 s2 recipient_empty remaining_gas net memu_extra
-  | Misc DELEGATECALL \<Rightarrow> Ccall s0 s1 uint256_zero recipient_empty remaining_gas net memu_extra
-  | Misc STATICCALL \<Rightarrow> Ccall s0 s1 uint256_zero recipient_empty remaining_gas net memu_extra
+  | Misc CALL \<Rightarrow> Ccall v s0 s1 s2 recipient_empty remaining_gas net memu_extra
+  | Misc CALLCODE \<Rightarrow> Ccall v s0 s1 s2 recipient_empty remaining_gas net memu_extra
+  | Misc DELEGATECALL \<Rightarrow> Ccall v s0 s1 uint256_zero recipient_empty remaining_gas net memu_extra
+  | Misc STATICCALL \<Rightarrow> Ccall v s0 s1 uint256_zero recipient_empty remaining_gas net memu_extra
   | Misc RETURN \<Rightarrow> handle_memory_expansion_gas v (Misc RETURN) Gzero
   | Misc REVERT \<Rightarrow> handle_memory_expansion_gas v (Misc REVERT) Gzero
   | Misc INVALID \<Rightarrow> CalculationSuccess Gzero
@@ -636,7 +677,7 @@ definition thirdComponentOfC :: "inst \<Rightarrow> variable_ctx \<Rightarrow> u
 
 definition C :: "int \<Rightarrow> int \<Rightarrow> inst \<Rightarrow> variable_ctx \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> bool \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> int \<Rightarrow> network \<Rightarrow> calculation_result" where
 "C old_memory_consumption new_memory_consumption1 i v s0 s1 s2 s3 recipient_empty orig new_val remaining_gas net = (
-  let memu_extra = Cmem new_memory_consumption1 - Cmem old_memory_consumption
+  let memu_extra = Cmem (max old_memory_consumption new_memory_consumption1) - Cmem old_memory_consumption
   in if memu_extra < 0 then CalcFailureReason GasUintOverflow
      else thirdComponentOfC i v s0 s1 s2 s3 recipient_empty orig new_val remaining_gas net (CalculationSuccess memu_extra))"
 
@@ -695,7 +736,7 @@ definition instruction_sem :: "variable_ctx \<Rightarrow> constant_ctx \<Rightar
       bind_calc (meter_gas inst v c net) v
         (\<lambda>gas_consumption.
           if gas_consumption \<le> vctx_gas v then
-            subtract_gas gas_consumption new_mem_size
+            subtract_gas gas_consumption (toWordSize (max (vctx_memory_usage v) new_mem_size) * 32)
               (case inst of
                 Stack (PUSH_N lst) => stack_0_1_op v c (word256_to_uint256 (Word.word_rcat (constant_mark lst)))
               | Stack POP => pop v c
@@ -704,18 +745,18 @@ definition instruction_sem :: "variable_ctx \<Rightarrow> constant_ctx \<Rightar
               | Dup n => general_dup n v c
               | Swap n => swap (unat n) v c
 
-              | Storage SSTORE => sstore v c
-              | Storage SLOAD => stack_1_1_op v c (vctx_storage v)
+              | Storage SSTORE => sstore net v c
+              | Storage SLOAD => sload v c
 
               | Memory MLOAD => mload v c
               | Memory MSTORE => mstore v c
               | Memory MSTORE8 => mstore8 v c
               | Memory CALLDATACOPY => calldatacopy v c
               | Memory CODECOPY => codecopy v c
-              | Memory EXTCODECOPY => extcodecopy v c
+              | Memory EXTCODECOPY => mark_account_access v (uint256_to_word160 (vctx_stack_default 0 v)) (extcodecopy v c)
               | Memory MCOPY => if at_least_cancun net then mcopy v c else instruction_failure_result v [ShouldNotHappen]
               | Memory RETURNDATACOPY => returndatacopy v c
-              | Memory MSIZE => stack_0_1_op v c (int_to_uint256 (32 * (vctx_memory_usage v)))
+              | Memory MSIZE => stack_0_1_op v c (int_to_uint256 (vctx_memory_usage v))
               | Memory TLOAD => if at_least_cancun net then tload v c else instruction_failure_result v [ShouldNotHappen]
               | Memory TSTORE => if at_least_cancun net then tstore v c else instruction_failure_result v [ShouldNotHappen]
 
@@ -772,20 +813,20 @@ definition instruction_sem :: "variable_ctx \<Rightarrow> constant_ctx \<Rightar
               | Info CALLDATASIZE => stack_0_1_op v c (datasize v)
               | Info CALLER => stack_0_1_op v c (word160_to_uint256 (vctx_caller v))
               | Info ADDRESS => stack_0_1_op v c (word160_to_uint256 (cctx_this c))
-              | Info BALANCE => stack_1_1_op v c (\<lambda>addr. vctx_balance v (uint256_to_word160 addr))
+              | Info BALANCE => mark_account_access v (uint256_to_word160 (vctx_stack_default 0 v)) (stack_1_1_op v c (\<lambda>a. vctx_balance v (uint256_to_word160 a)))
               | Info ORIGIN => stack_0_1_op v c (word160_to_uint256 (vctx_origin v))
               | Info CALLVALUE => stack_0_1_op v c (vctx_value_sent v)
-              | Info CODESIZE => stack_0_1_op v c (int_to_uint256 (program_length (cctx_program c)))
+              | Info CODESIZE => stack_0_1_op v c (int_to_uint256 (int (length (program_byte_content (cctx_program c)))))
               | Info GASPRICE => stack_0_1_op v c (vctx_gasprice v)
-              | Info EXTCODESIZE => stack_1_1_op v c (\<lambda>arg1. int_to_uint256 (program_length (vctx_ext_program v (uint256_to_word160 arg1))))
+              | Info EXTCODESIZE => mark_account_access v (uint256_to_word160 (vctx_stack_default 0 v)) (stack_1_1_op v c (\<lambda>arg1. int_to_uint256 (int (length (program_byte_content (vctx_ext_program v (uint256_to_word160 arg1)))))))
               | Info BLOCKHASH => stack_1_1_op v c (block_blockhash (vctx_block v))
               | Info COINBASE => stack_0_1_op v c (word160_to_uint256 (block_coinbase (vctx_block v)))
               | Info TIMESTAMP => stack_0_1_op v c (block_timestamp (vctx_block v))
               | Info NUMBER => stack_0_1_op v c (block_number (vctx_block v))
-              | Info DIFFICULTY => stack_0_1_op v c (block_difficulty (vctx_block v))
+              | Info DIFFICULTY => if at_least_paris net then stack_0_1_op v c (block_prevrandao (vctx_block v)) else stack_0_1_op v c (block_difficulty (vctx_block v))
               | Info GASLIMIT => stack_0_1_op v c (block_gaslimit (vctx_block v))
               | Info GAS => stack_0_1_op v c (gas v -\<^sub>u uint256_two)
-              | Info EXTCODEHASH => extcodehash v c
+              | Info EXTCODEHASH => mark_account_access v (uint256_to_word160 (vctx_stack_default 0 v)) (extcodehash v c)
               | Info RETURNDATASIZE => returndatasize v c
               | Info CHAINID => chainid v c
               | Info SELFBALANCE => selfbalance v c
@@ -801,10 +842,10 @@ definition instruction_sem :: "variable_ctx \<Rightarrow> constant_ctx \<Rightar
 
               | Misc CREATE => create v c
               | Misc CREATE2 => if at_least_cancun net then create2 v c else instruction_failure_result v [ShouldNotHappen]
-              | Misc CALL => call net v c
-              | Misc CALLCODE => callcode net v c
-              | Misc DELEGATECALL => if before_homestead net then instruction_failure_result v [ShouldNotHappen] else delegatecall net v c
-              | Misc STATICCALL => if at_least_cancun net then staticcall v c net else instruction_failure_result v [ShouldNotHappen]
+              | Misc CALL => mark_call_account_access v (uint256_to_word160 (vctx_stack_default 1 v)) (call net v c)
+              | Misc CALLCODE => mark_call_account_access v (uint256_to_word160 (vctx_stack_default 1 v)) (callcode net v c)
+              | Misc DELEGATECALL => if before_homestead net then instruction_failure_result v [ShouldNotHappen] else mark_call_account_access v (uint256_to_word160 (vctx_stack_default 1 v)) (delegatecall net v c)
+              | Misc STATICCALL => if at_least_cancun net then mark_call_account_access v (uint256_to_word160 (vctx_stack_default 1 v)) (staticcall v c net) else instruction_failure_result v [ShouldNotHappen]
               | Misc RETURN => ret v c
               | Misc REVERT => revert v c
               | Misc INVALID => invalid v c
@@ -823,7 +864,7 @@ fun program_sem :: "constant_ctx \<Rightarrow> nat \<Rightarrow> network \<Right
       InstructionToEnvironment _ _ _ \<Rightarrow> pr1 |
       InstructionContinue v \<Rightarrow>
       (case vctx_next_instruction v c of
-        None \<Rightarrow> InstructionToEnvironment (ContractFail [ShouldNotHappen]) v None |
+        None \<Rightarrow> InstructionToEnvironment (ContractReturn []) v None |
         Some i \<Rightarrow>
         (case check_resources v c (vctx_stack v) i net of   \<comment> \<open>we need check before? or only need check stack? \<close>
           CheckSuccess ok \<Rightarrow> 

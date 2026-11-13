@@ -12,3 +12,10 @@ session EVM_AOT in "theory" = HOL +
     WordOld
     uint256
     Exp
+
+(* Regression lemmas, checked by evaluation, for the semantic errors that the GeneralStateTests
+   comparison found (state-tests/FIXES.md). *)
+session EVM_AOT_Fixes in "fixes" = EVM_AOT +
+  options [timeout = 600, document = false]
+  theories
+    EVM_semantics_fixes

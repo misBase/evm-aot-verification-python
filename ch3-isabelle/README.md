@@ -2,7 +2,8 @@
 
 | Path | Paper | Contents |
 |---|---|---|
-| `theory/` | U256 model, EVM semantics | EVM semantics in Isabelle/HOL with 256-bit words represented as four 64-bit limbs (`uint256.thy`), state, syntax and instruction semantics (`EVM_state.thy`, `EVM_syntax.thy`, `EVM_semantics.thy`), gas and parameters, Keccak; `Exp.thy` verifies EXP (excluded from Table 1). Session `EVM_AOT` (`ROOT`) |
+| `theory/` | U256 model, EVM semantics | EVM semantics in Isabelle/HOL with 256-bit words represented as four 64-bit limbs (`uint256.thy`), state, syntax and instruction semantics (`EVM_state.thy`, `EVM_syntax.thy`, `EVM_semantics.thy`), gas and parameters, Keccak; `Exp.thy` verifies EXP (excluded from Table 1). Includes the fixes of `state-tests/FIXES.md`. Session `EVM_AOT` (`ROOT`) |
+| `fixes/` | Validation against GeneralStateTests | `EVM_semantics_fixes.thy`: the regression lemmas for the fixes of `state-tests/FIXES.md`, restated for the four-limb representation and checked by evaluation. Session `EVM_AOT_Fixes` (`ROOT`) |
 | `z3_proof/` | U256 algorithm proofs, Table 1 | One Python/Z3 script per operation, encoding the Go `uint256` algorithm over four `uint64` limbs and checking it against 256-bit unsigned/signed semantics (`GOAL.md` states the conventions) |
 | `smt/` | Deep embedding, encoding-consistency theorem | The SMT deep embedding: SMT DSL and interpreter (`SMT_BV.thy`), the validator's operation encodings imported as Isabelle data (`generated/*.smt2`, `Generated_EVM_Arithmetic.thy`, `generated/manifest.json`), representation lemmas and per-category certificates (`EVM_SMT_*_Certificates.thy`); the consistency theorem is in `EVM_SMT_Certificates.thy`. Sessions `EVM_SMT_Base`, `EVM_SMT` (`smt/ROOT`) |
 | `division/` | U256 DIV/MOD | Correctness of the four-limb `uint256` division algorithm (64-bit fast path, division by one limb, Knuth long division with normalization and reciprocal), in `theory/Div*.thy`; `Div.thy` states the top-level DIV/MOD theorems. Session `EVM_Div` (`division/ROOT`, on top of `EVM_SMT_Base`) |
@@ -18,7 +19,7 @@ HOL-Library and HOL-Data_Structures. The Z3 scripts and the export check use the
 ## Check
 
 ```sh
-make semantics       # session EVM_AOT
+make semantics       # sessions EVM_AOT, EVM_AOT_Fixes (a few minutes)
 make smt             # sessions EVM_SMT_Base, EVM_SMT (a few minutes)
 make division        # session EVM_Div
 make z3              # Z3 scripts of Table 1

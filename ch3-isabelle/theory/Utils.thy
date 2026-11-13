@@ -40,26 +40,6 @@ lemma bit_length_two: "bit_length 2 = 2"
 lemma bit_length_three: "bit_length 3 = 2"
   by (simp add: bit_length_def find_msb.simps)
 
-lemma bit_length_power2:
-  assumes "n < 256"
-  shows "bit_length ((2::256 word)^n) = int (n + 1)"
-  using assms
-proof -
-  have "bit ((2::256 word)^n) n" 
-    using assms by (simp add: bit_exp_iff)
-  moreover have "\<forall>i>n. \<not>bit ((2::256 word)^n) i"
-    using assms by (simp add: bit_exp_iff)
-  ultimately show ?thesis
-    using assms
-    by (auto simp add: bit_length_def find_msb.simps)
-qed
-
-lemma bit_length_bounds:
-  assumes "w \<noteq> 0"
-  shows "1 \<le> bit_length w \<and> bit_length w \<le> 256"
-  using assms
-  by (auto simp add: bit_length_def)
-
 (* Examples that can be computed *)
 lemma "bit_length 0 = 0" by eval
 lemma "bit_length 1 = 1" by eval

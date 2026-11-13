@@ -14,6 +14,27 @@ definition Csstore :: "uint256 \<Rightarrow> uint256 \<Rightarrow> int" where
 definition Gsload :: "network \<Rightarrow> int" where 
   "Gsload n = (if at_least_eip150 n then 200 else 50)"
 
+definition ColdStorageAccessCost :: "variable_ctx \<Rightarrow> uint256 \<Rightarrow> int" where
+  "ColdStorageAccessCost v addr = (if addr \<in> set (vctx_touched_storage_index v) then 0 else ColdSloadCostEIP2929)"
+
+definition storage_is_cold :: "uint256 \<Rightarrow> variable_ctx \<Rightarrow> bool" where
+  "storage_is_cold key v = (key \<notin> set (vctx_touched_storage_index v))"
+
+definition sstore_gas_eip2929 :: "bool \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> int" where
+  "sstore_gas_eip2929 cold original current new_value =
+    (let reset_cost = Gsreset - ColdSloadCostEIP2929
+     in (if current =\<^sub>u new_value then WarmStorageReadCostEIP2929
+         else if current =\<^sub>u original then
+           (if original =\<^sub>u uint256_zero then Gsset else reset_cost)
+         else WarmStorageReadCostEIP2929) +
+        (if cold then ColdSloadCostEIP2929 else 0))"
+
+definition sstore_gas :: "network \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> variable_ctx \<Rightarrow> int" where
+  "sstore_gas net key original current new_value v =
+    (if at_least_berlin net
+     then sstore_gas_eip2929 (storage_is_cold key v) original current new_value
+     else Csstore current new_value)"
+
 definition Gsuicide :: "network \<Rightarrow> int" where 
   "Gsuicide n = (if at_least_eip150 n then 5000 else 0)"
 
@@ -90,45 +111,53 @@ fun new_memory_consumption :: "inst \<Rightarrow> int \<Rightarrow> uint256 \<Ri
   "new_memory_consumption _ orig_mem_usage _ _ _ _ _ _ _ = CalculationSuccess orig_mem_usage"
 
 definition Cnew :: "uint256 \<Rightarrow> bool \<Rightarrow> int" where
-  "Cnew value1 emp = (if emp then Gnewaccount else 0)"
+  "Cnew value1 emp = (if emp \<and> value1 \<noteq>\<^sub>u uint256_zero then Gnewaccount else 0)"
 
 definition Cxfer :: "uint256 \<Rightarrow> int" where
   "Cxfer value1 = (if value1 =\<^sub>u uint256_zero then 0 else Gcallvalue)"
 
-definition Cextra :: "uint256 \<Rightarrow> bool \<Rightarrow> network \<Rightarrow> int" where
-  "Cextra value1 emp net = (Gcall net + Cxfer value1 + Cnew value1 emp)"
+definition account_access_gas_for_call :: "variable_ctx \<Rightarrow> address \<Rightarrow> network \<Rightarrow> int" where
+  "account_access_gas_for_call v addr net =
+     (if at_least_berlin net then
+        (if addr \<in> set (vctx_warm_addresses v) then WarmStorageReadCostEIP2929
+         else ColdAccountAccessCostEIP2929)
+      else Gcall net)"
+
+definition Cextra :: "uint256 \<Rightarrow> bool \<Rightarrow> variable_ctx \<Rightarrow> address \<Rightarrow> network \<Rightarrow> int" where
+  "Cextra value1 emp v addr net =
+     (account_access_gas_for_call v addr net + Cxfer value1 + Cnew value1 emp)"
 
 definition L :: "int \<Rightarrow> int" where
   "L x = x - (x div 64)"
 
-definition Cgascap :: "uint256 \<Rightarrow> uint256 \<Rightarrow> bool \<Rightarrow> int \<Rightarrow> network \<Rightarrow> int \<Rightarrow> int" where
-  "Cgascap mu0 mu2 emp remaining_gas net memu_extra = (
-    if remaining_gas \<ge> (Cextra mu2 emp net + memu_extra) then
-      min (L (remaining_gas - Cextra mu2 emp net - memu_extra)) (uint256_to_int mu0)
+definition Cgascap :: "uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> bool \<Rightarrow> variable_ctx \<Rightarrow> int \<Rightarrow> network \<Rightarrow> int \<Rightarrow> int" where
+  "Cgascap mu0 mu1 mu2 emp v remaining_gas net memu_extra = (
+    if remaining_gas \<ge> (Cextra mu2 emp v (uint256_to_word160 mu1) net + memu_extra) then
+      min (L (remaining_gas - Cextra mu2 emp v (uint256_to_word160 mu1) net - memu_extra)) (uint256_to_int mu0)
     else uint256_to_int mu0)"
 
-definition Ccallgas :: "uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> bool \<Rightarrow> int \<Rightarrow> network \<Rightarrow> calculation_result \<Rightarrow> calculation_result" where
-  "Ccallgas mu0 mu1 mu2 emp remaining_gas net memu_extra = (
+definition Ccallgas :: "variable_ctx \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> bool \<Rightarrow> int \<Rightarrow> network \<Rightarrow> calculation_result \<Rightarrow> calculation_result" where
+  "Ccallgas v mu0 mu1 mu2 emp remaining_gas net memu_extra = (
     case memu_extra of
       CalcFailureReason reason \<Rightarrow> CalcFailureReason reason
     | CalculationSuccess extra \<Rightarrow>
-        let call_gas = (if at_least_eip150 net 
-                       then Cgascap mu0 mu2 emp remaining_gas net extra 
+        let call_gas = (if at_least_eip150 net
+                       then Cgascap mu0 mu1 mu2 emp v remaining_gas net extra
                        else uint256_to_int mu0) + 
                       (if mu2 =\<^sub>u uint256_zero then 0 else Gcallstipend)
         in if call_gas < 0 
            then CalcFailureReason GasUintOverflow
            else CalculationSuccess call_gas)"
 
-definition Ccall :: "uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> bool \<Rightarrow> int \<Rightarrow> network \<Rightarrow> calculation_result \<Rightarrow> calculation_result" where
-  "Ccall mu0 mu1 mu2 emp remaining_gas net memu_extra = (
+definition Ccall :: "variable_ctx \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> uint256 \<Rightarrow> bool \<Rightarrow> int \<Rightarrow> network \<Rightarrow> calculation_result \<Rightarrow> calculation_result" where
+  "Ccall v mu0 mu1 mu2 emp remaining_gas net memu_extra = (
     case memu_extra of
       CalcFailureReason reason \<Rightarrow> CalcFailureReason reason
     | CalculationSuccess extra \<Rightarrow>
-        let call_gas = (if at_least_eip150 net 
-                       then Cgascap mu0 mu2 emp remaining_gas net extra 
-                       else (uint256_to_int mu0)) + 
-                      Cextra mu2 emp net
+        let call_gas = (if at_least_eip150 net
+                       then Cgascap mu0 mu1 mu2 emp v remaining_gas net extra
+                       else (uint256_to_int mu0)) +
+                      Cextra mu2 emp v (uint256_to_word160 mu1) net + extra
         in if call_gas < 0 
            then CalcFailureReason GasUintOverflow
            else CalculationSuccess call_gas)"

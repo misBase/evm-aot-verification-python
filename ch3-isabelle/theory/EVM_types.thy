@@ -69,6 +69,7 @@ record block_info =
   block_gaslimit :: "uint256" 
   block_basefee :: "uint256"
   block_blobbasefee :: "uint256"
+  block_prevrandao :: "uint256"
 
 record log_entry = 
   log_addr   :: "address" 
