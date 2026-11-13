@@ -6,18 +6,33 @@ PY         := $(CURDIR)/$(VALIDATOR)/.venv/bin/python
 GITVAL     := git --git-dir=$(CURDIR)/.validator-git --work-tree=$(CURDIR)/$(VALIDATOR)
 EXP        := experiments
 
-.PHONY: help install pin smoke test isabelle e1 e2 e3 e4 e5 e6 e7 small all tables clean distclean
+.PHONY: help install pin smoke test isabelle e1 e2 e3 e4 e5 e6 e7 small paper extra all tables clean distclean
 
 help:
-	@echo "make install   create the Python environment ($(PYTHON), pinned requirements) and the validator snapshot"
-	@echo "make smoke     kick-the-tires check, a few minutes"
-	@echo "make isabelle  Chapter 3: Isabelle sessions, Z3 scripts, export consistency (needs Isabelle2024)"
-	@echo "make test      validator unit tests (about 12 minutes with all cores)"
-	@echo "make e1 .. e7  one experiment (see experiments/README.md for paper mapping, time and resources)"
-	@echo "make small     e1 e2 e3 (cores, small programs, function slices; about 3.5 hours)"
-	@echo "make all       every experiment (more than a day on a 16-core / 32 GB host)"
-	@echo "make tables    summary tables of the recorded results in experiments/*/expected"
-	@echo "make clean     remove local results and caches; make distclean also removes .venv and .validator-git"
+	@echo "Setup"
+	@echo "  make install   create the Python environment ($(PYTHON), pinned requirements) and the validator snapshot"
+	@echo "  make smoke     kick-the-tires check, a few minutes"
+	@echo "  make test      validator unit tests (about 12 minutes with all cores)"
+	@echo ""
+	@echo "Paper (mapping, time and resources: experiments/README.md)"
+	@echo "  make isabelle  Section 3, Appendix A: Isabelle sessions, Z3 scripts, export consistency (Isabelle2024)"
+	@echo "                 Section 3.5 (GeneralStateTests): make -C ch3-isabelle/state-tests, see its README"
+	@echo "  make e1        Table 1 microbenchmarks; Table 2 and Fig. 6 (O1/O2 ablation)          ~1 h"
+	@echo "  make e2        Table 1 small programs; Fig. 5; Table 2 small-program subset         ~2 h"
+	@echo "  make e4        Table 1 complete contracts under the 3600 s budget                   ~9 h"
+	@echo "  make e5        Table 1 complete contracts, extended budget (V3 certificates)        hours per contract"
+	@echo "  make e7        Fig. 7 and the RQ3 numbers, from recorded data                       minutes"
+	@echo "  make small     e1 e2 (about 3 hours)"
+	@echo "  make paper     e1 e2 e4 e5 e7 (more than a day on a 16-core / 32 GB host)"
+	@echo "  make tables    summary tables of the recorded results (experiments/*/expected)"
+	@echo ""
+	@echo "Supplementary (not reported in the paper; experiments/README.md)"
+	@echo "  make e3        O1/O2 ablation on four ENSRegistry function slices                   ~0.5 h"
+	@echo "  make e6        shift-summary cost vs. target expansion, figure from recorded runs  minutes"
+	@echo "  make extra     e3 e6"
+	@echo "  make all       paper and supplementary experiments"
+	@echo ""
+	@echo "  make clean     remove local results and caches; make distclean also removes .venv and .validator-git"
 
 install:
 	cd $(VALIDATOR) && $(PYTHON) -m venv .venv && .venv/bin/pip install -q --upgrade pip \
@@ -49,23 +64,28 @@ test:
 isabelle:
 	$(MAKE) -C ch3-isabelle all PY=$(PY)
 
+# Paper experiments
 e1:
 	bash $(EXP)/E1-cores/run.sh
 e2:
 	bash $(EXP)/E2-programs/run.sh
-e3:
-	bash $(EXP)/E3-functions/run.sh
 e4:
 	bash $(EXP)/E4-whole/run.sh
 e5:
 	bash $(EXP)/E5-extended-v3/run.sh
-e6:
-	bash $(EXP)/E6-shift/run.sh
 e7:
 	bash $(EXP)/E7-v3-costs/run.sh
 
-small: e1 e2 e3
-all: e1 e2 e3 e4 e5 e6 e7
+# Supplementary experiments (not reported in the paper)
+e3:
+	bash $(EXP)/E3-functions/run.sh
+e6:
+	bash $(EXP)/E6-shift/run.sh
+
+small: e1 e2
+paper: e1 e2 e4 e5 e7
+extra: e3 e6
+all: paper extra
 
 clean:      # results, generated figures and caches of local runs
 	rm -rf $(EXP)/smoke-results $(EXP)/*/results $(EXP)/E6-shift/figures ch3-isabelle/state-tests/*/target \
@@ -76,6 +96,15 @@ distclean: clean   # also the Python environment and the validator snapshot crea
 	rm -rf $(VALIDATOR)/.venv .validator-git ch3-isabelle/state-tests/tests
 
 tables:
-	@for e in E1-cores E2-programs E3-functions E4-whole; do \
-	  if [ -d $(EXP)/$$e/expected ]; then $(PY) $(EXP)/common/summarize.py $(EXP)/$$e/expected; echo; fi; done
-	@$(PY) $(EXP)/E5-extended-v3/table.py $(EXP)/E5-extended-v3/expected
+	@echo "# E1: Table 1 (microbenchmarks); Table 2 and Fig. 6 (V2-O1, V2-O2 on the 25-core cohort)"; echo
+	@$(PY) $(EXP)/common/summarize.py $(EXP)/E1-cores/expected; echo
+	@echo "# E2: Table 1 (small programs), Fig. 5, Table 2 (small-program subset)."
+	@echo "# The paper counts 14 inputs: the 3 N/A inputs and the alias jumpi_2block_err are not counted."; echo
+	@$(PY) $(EXP)/common/summarize.py $(EXP)/E2-programs/expected; echo
+	@echo "# E4: Table 1 (complete contracts, 3600 s; cells are round 1/round 2)"; echo
+	@$(PY) $(EXP)/common/summarize.py $(EXP)/E4-whole/expected; echo
+	@echo "# E5: Table 1 (complete contracts, extended budget). Safe and Pool were resumed once: their wall time is"
+	@echo "# the resumed segment's; the paper's cumulative times are in experiments/E5-extended-v3/README.md"; echo
+	@$(PY) $(EXP)/E5-extended-v3/table.py $(EXP)/E5-extended-v3/expected; echo
+	@echo "# Supplementary, not in the paper. E3: function slices"; echo
+	@$(PY) $(EXP)/common/summarize.py $(EXP)/E3-functions/expected

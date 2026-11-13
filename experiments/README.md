@@ -1,18 +1,36 @@
 # Experiments
 
-Each subdirectory reproduces one group of results of the evaluation section. Every experiment has a `README.md`
-(claim, command, expected time and resources), a `run.sh`, and an `expected/` directory with the measurements used
-in the paper, so results can be checked without re-running the long experiments.
+Each subdirectory reproduces one group of results. Every experiment has a `README.md` (claim, command, expected
+time and resources), a `run.sh`, and its recorded results (`expected/`, or `analysis/` for E7), so results can be
+checked without re-running the long experiments. Table and figure numbers refer to the submitted paper.
 
-| Dir | Paper | What it measures | Time (16 cores / 32 GB) |
-|---|---|---|---|
-| `E1-cores` | Table 3 (cores), Table 5, core-ablation figure | 93 instruction cores under V1/V2; the 25-core ablation cohort under V2, V2−O1, V2−O2 | ~1 h |
-| `E2-programs` | Table 3 (small programs), program figure, Table 6 | 18 small programs under V1, V2, V2−O1, V2−O2, V3 | ~2 h |
-| `E3-functions` | function-ablation figure | 4 admitted ENSRegistry function slices under V2, V2−O1, V2−O2 | ~0.5 h |
-| `E4-whole` | Table 4, whole-contract figure | 6 complete contracts × V1/V2/V3 × 2 rounds, 3600 s / 6000 MiB each | ~9 h |
-| `E5-extended-v3` | extended-budget V3 results | V3 on the 6 complete contracts until a program certificate is issued | hours per contract |
-| `E6-shift` | shift-summary figure | summary cost vs. target expansion on k = 1..8 independent SHR operations | minutes (figure) |
-| `E7-v3-costs` | Tables 7–8, V3 cost figures | where optimized V3 spends its proof time (read-only analyses) | minutes |
+## Paper experiments (Section 6)
+
+| Dir | `make` | Paper | What it measures | Time (16 cores / 32 GB) |
+|---|---|---|---|---|
+| `E1-cores` | `e1` | Table 1 (microbenchmarks, V1 and V2); Table 2 (microbenchmarks); Fig. 6 | 93 instruction cores under V1/V2; the 25-core ablation cohort under V2, V2−O1, V2−O2 (Fig. 6 shows its 13 arithmetic cores) | ~1 h |
+| `E2-programs` | `e2` | Table 1 (small programs); Fig. 5; Table 2 (small-program subset) | 18 small-program inputs (14 counted in the paper) under V1, V2, V2−O1, V2−O2, V3 | ~2 h |
+| `E4-whole` | `e4` | Table 1 (complete contracts, 3600 s); RQ1 ENSRegistry wall times and peak RSS | 6 complete contracts × V1/V2/V3 × 2 rounds, 3600 s / 6000 MiB each | ~9 h |
+| `E5-extended-v3` | `e5` | Table 1 (complete contracts, extended); RQ1 extended-budget wall times | V3 on the 6 complete contracts until a program certificate is issued | hours per contract |
+| `E7-v3-costs` | `e7` | Fig. 7 (a) and (b); the RQ3 numbers in Section 6.4 | where optimized V3 spends its proof time (read-only analyses of recorded data) | minutes |
+
+`make paper` runs all five; `make small` runs E1 and E2; `make tables` prints the recorded results. Two results in
+the paper are not produced by these experiments: V3's microbenchmark entry in Table 1 (marked † there; confirmed
+separately and not re-run here) and Section 3 (`ch3-isabelle/`, `make isabelle`; Section 3.5 is
+`ch3-isabelle/state-tests/`).
+
+## Supplementary experiments (not reported in the paper)
+
+These complement RQ2 and RQ3. They run with the same harness and validator snapshot, and their results are
+recorded in the same way, but the paper does not cite them.
+
+| Dir / output | `make` | Relation to the paper | What it measures | Time |
+|---|---|---|---|---|
+| `E3-functions` | `e3` | RQ2 ablation on a real contract | 4 admitted ENSRegistry function slices under V2, V2−O1, V2−O2 | ~0.5 h |
+| `E6-shift` | `e6` | cost of one O2 summary (RQ2) | summary cost vs. target expansion on k = 1..8 independent SHR operations; figure from recorded runs | minutes |
+| `E7-v3-costs`, supporting figures | `e7` | RQ3 | the figures `make e7` renders besides Fig. 7: repeated proofs, scheduling, the single-factor experiments, shared-lemma duplication, route cascades (see `E7-v3-costs/README.md`) | minutes |
+
+`make extra` runs E3 and E6; `make all` runs the paper and supplementary experiments.
 
 ## Configurations
 
@@ -46,4 +64,5 @@ Failed runs never contribute completion times.
 
 - Timings depend on the host and on co-located jobs. The paper's runs used a 16-core / 31 GB host for complete
   contracts and an 8-core / 16 GB host for cores, programs and functions, with the stated per-job limits.
-- `E5` reruns take hours per contract; `E6` and `E7` reproduce figures and analyses from recorded measurements.
+- `E5` reruns take hours per contract; `E7` (paper) and `E6` (supplementary) reproduce figures and analyses from
+  recorded measurements.

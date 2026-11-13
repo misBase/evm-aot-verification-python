@@ -1,16 +1,22 @@
 # E7: Remaining V3 costs (RQ3)
 
-**Paper:** Tables 7–8 and the V3 cost figures (cost concentration, repeated proofs, composition of node time,
-scheduling, single-factor mechanisms, shared-lemma duplication, route cascades).
+**Paper:** RQ3, Fig. 7: (a) cost concentration over the final instances of five contracts (`concentration` in
+`figure-data.json`; the paper renders this panel with its own layout); (b) composition of node proof time,
+`figures/v3-cost-where-4cat-5c.pdf` (H2 / Local / Shared lemmas including instruction-chain proofs / Other, five
+contracts). The SafeMath context and memory-size variants quoted in the text are `ectx` and `emsize`. The other
+figures (repeated proofs, scheduling, single-factor mechanisms, shared-lemma duplication, route cascades) are
+supporting analyses.
 
 **Data:**
 
 - the certification reports of E5 (`../E5-extended-v3/expected/`) and the block-level-only CErc20 report used by
   the ledger (`reports/CErc20.json`);
 - `analysis/`: the whole-run ledger (A1: `a1.json`, `a1-safe.json`, `master.json`), PPS-sampled instance replays
-  (`sample-a2s.json`, `a2s-weighted.json`), scheduling simulations (`sim.jsonl`) and route replays (`b2.json`);
+  (`sample-a2s.json`, `a2s-weighted.json`: 32 replays of ENSRegistry, CErc20, PoolManager and Pool;
+  `sample-a2s-with-safe.json`, `a2s-weighted-with-safe.json`: the same plus Safe's 8 replays), scheduling
+  simulations (`sim.jsonl`) and route replays (`b2.json`);
 - `runs/`: raw events of the local replays and synthetic single-factor experiments; `local/`, `synth/`, `host-A/`:
-  their receipts and summaries;
+  their receipts and summaries (`host-A/a2s-summary.tgz`, and `host-A/a2s-summary-safe.tgz` for Safe);
 - `figures/`: `build_figure_data.py` freezes every plotted number into `figure-data.json`;
   `render_v3_figures.py` renders the figures from that file only.
 
@@ -29,3 +35,8 @@ figures, and reports whether each result matches `expected` (the recorded analys
 
 Replaying instances (`tools/run.py ... tools/replay.py ...`) needs the discovery output of a certification run
 (E5) and takes from minutes to hours per instance; the recorded replays are in `runs/` and `analysis/`.
+
+**Safe's replays** were run after the first 32, with the same tools, snapshot and replay configuration.
+`tools/sample.py` seeds each contract separately (seed 20261112), so `sample.py OUT 8 Safe=<Safe report>` draws
+the same eight instances the joint run would have drawn. `build_figure_data.py` checks that adding Safe leaves
+the other four contracts' weighted shares unchanged.

@@ -69,6 +69,35 @@ def where():
     save(fig, "v3-cost-where")
 
 
+# Four-category view (paper Fig. 7b): the local sub-parts merged, instruction-chain proofs counted with the shared
+# lemmas. Blue/gold/pink pass the palette checks; grey is the neutral "Other". Values are labelled.
+CAT4 = [("H2", ("H2",), BLUE),
+        ("Local", ("Local: obligation solving", "Local: construction"), GOLD),
+        ("Shared lemmas", ("Shared lemmas", "Instruction chain"), PINK),  # caption: includes instruction-chain proofs
+        ("Other", ("Other",), GREY)]
+
+
+def where4(key="where_with_safe", sizes_key="sample_sizes_with_safe", name="v3-cost-where-4cat-5c"):
+    where, sizes = D[key], D[sizes_key]
+    order = [c for c in ORDER5 if c in where]
+    height = 1.0 + 0.28 * len(order)
+    fig, ax = plt.subplots(figsize=(5.5, height))
+    fig.subplots_adjust(left=.25, right=.97, bottom=.42 / height, top=1 - .5 / height)
+    for y, c in enumerate(order):
+        row = where[c]
+        parts = [(sum(row.get(k, 0) for k in keys), color, "") for _, keys, color in CAT4]
+        assert abs(sum(v for v, _, _ in parts) - sum(row.values())) < 1e-9, c  # nothing dropped by the merge
+        total = stacked_row(ax, y, parts)
+        assert abs(total - 1) < .02, (c, total)
+    ax.set(yticks=range(len(order)), yticklabels=[f"{c} (n={sizes[c]})" for c in order], xlim=(0, 1),
+           xlabel="Share of node proof time (PPS-weighted replays)")
+    ax.xaxis.set_major_formatter(PercentFormatter(1.0))
+    ax.invert_yaxis()
+    fig.legend(handles=[patch(color, label) for label, _, color in CAT4], loc="upper center", ncol=2, frameon=False,
+               bbox_to_anchor=(.55, 1), columnspacing=1)
+    save(fig, name)
+
+
 def repetition():
     fig, (ax, ms) = plt.subplots(1, 2, figsize=(5.5, 2.4), sharey=True, gridspec_kw={"width_ratios": [1.55, 1]})
     fig.subplots_adjust(left=.17, right=.95, bottom=.2, top=.7, wspace=.22)
@@ -234,6 +263,6 @@ def tail():
 
 
 if __name__ == "__main__":
-    for f in (tail, where, repetition, mechanisms, lemma, routing, schedule):
+    for f in (tail, where, where4, repetition, mechanisms, lemma, routing, schedule):
         f()
     print("rendered", sorted(p.name for p in HERE.glob("v3-cost-*.pdf")))

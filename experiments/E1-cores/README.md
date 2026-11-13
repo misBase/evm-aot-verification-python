@@ -1,6 +1,9 @@
 # E1: Instruction cores
 
-**Paper:** Table 3 (cores column), Table 5 (core ablation), core-ablation figure.
+**Paper:** RQ1, Table 1, row "Microbenchmarks" (V1 85/93, V2 93/93); RQ2, Table 2, column "Microbenchmarks"
+(V2 25/25, V2 w/o O1 20/25 with 5 TO, V2 w/o O2 20/25 with 1 TO and 4 OOM) and Fig. 6 (the 13 arithmetic cores of
+the cohort), with the SHL wall times quoted in Section 6.3. V3's entry in Table 1 (93/93, marked †) was confirmed
+separately and is not part of this experiment.
 
 **Inputs:** 93 instruction cores (the x86-64 code the compiler emits for one EVM instruction, with the operands and
 context declared by each case; `ch4-5-validator/tests/integration/test_single_ins_equivalence.py`). The ablation

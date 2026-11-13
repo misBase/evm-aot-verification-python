@@ -1,0 +1,977 @@
+{
+ "weighted": {
+  "ENSRegistry": {
+   "categories": {
+    "共享引理": 0.862,
+    "局部:建项/配对/摘要": 0.084,
+    "局部:符号执行与summary": 0.03,
+    "H2": 0.014,
+    "其他(任务框架)": 0.006,
+    "局部:义务求解": 0.003
+   },
+   "counters": {
+    "z3.check": 0.617,
+    "cache.query_key": 0.059,
+    "worker.reset_caches": 0.003,
+    "cache.statement_key": 0.0,
+    "expr.forward_selects": 0.024,
+    "expr.normalize": 0.001
+   }
+  },
+  "CErc20": {
+   "categories": {
+    "H2": 0.604,
+    "局部:义务求解": 0.187,
+    "局部:建项/配对/摘要": 0.182,
+    "局部:符号执行与summary": 0.024,
+    "其他(任务框架)": 0.002
+   },
+   "counters": {
+    "z3.check": 0.689,
+    "expr.forward_selects": 0.074,
+    "cache.query_key": 0.045,
+    "expr.normalize": 0.018,
+    "worker.reset_caches": 0.001,
+    "z3.isolated_child": 0.002
+   }
+  },
+  "PoolManager": {
+   "categories": {
+    "H2": 0.506,
+    "局部:建项/配对/摘要": 0.33,
+    "指令链": 0.114,
+    "其他(任务框架)": 0.02,
+    "局部:义务求解": 0.015,
+    "局部:符号执行与summary": 0.014
+   },
+   "counters": {
+    "z3.isolated_child": 0.305,
+    "expr.forward_selects": 0.046,
+    "cache.query_key": 0.029,
+    "z3.check": 0.289,
+    "worker.reset_caches": 0.01,
+    "expr.normalize": 0.0
+   }
+  },
+  "Pool": {
+   "categories": {
+    "H2": 0.292,
+    "指令链": 0.239,
+    "局部:建项/配对/摘要": 0.205,
+    "共享引理": 0.118,
+    "局部:义务求解": 0.102,
+    "局部:符号执行与summary": 0.029,
+    "其他(任务框架)": 0.015
+   },
+   "counters": {
+    "z3.check": 0.548,
+    "expr.forward_selects": 0.036,
+    "cache.query_key": 0.04,
+    "worker.reset_caches": 0.007,
+    "expr.normalize": 0.012,
+    "z3.isolated_child": 0.0,
+    "cache.statement_key": 0.0
+   }
+  },
+  "Safe": {
+   "categories": {
+    "H2": 0.563,
+    "局部:建项/配对/摘要": 0.223,
+    "指令链": 0.11,
+    "局部:义务求解": 0.07,
+    "其他(任务框架)": 0.021,
+    "局部:符号执行与summary": 0.013
+   },
+   "counters": {
+    "z3.check": 0.446,
+    "worker.reset_caches": 0.011,
+    "expr.forward_selects": 0.107,
+    "cache.query_key": 0.045,
+    "expr.normalize": 0.001,
+    "z3.isolated_child": 0.0
+   }
+  }
+ },
+ "rows": [
+  {
+   "contract": "ENSRegistry",
+   "pick": "1993:8:96:128",
+   "production_s": 480,
+   "replay_s": 497,
+   "kind": "legacy",
+   "w": 480,
+   "top": [
+    [
+     "共享引理",
+     99
+    ],
+    [
+     "局部:建项/配对/摘要",
+     1
+    ],
+    [
+     "H2",
+     0
+    ]
+   ]
+  },
+  {
+   "contract": "ENSRegistry",
+   "pick": "1941:6:96:128",
+   "production_s": 432,
+   "replay_s": 403,
+   "kind": "legacy",
+   "w": 432,
+   "top": [
+    [
+     "共享引理",
+     99
+    ],
+    [
+     "局部:建项/配对/摘要",
+     1
+    ],
+    [
+     "其他(任务框架)",
+     0
+    ]
+   ]
+  },
+  {
+   "contract": "ENSRegistry",
+   "pick": "2143:10:96:128",
+   "production_s": 180,
+   "replay_s": 472,
+   "kind": "legacy",
+   "w": 429,
+   "top": [
+    [
+     "共享引理",
+     99
+    ],
+    [
+     "局部:建项/配对/摘要",
+     1
+    ],
+    [
+     "H2",
+     0
+    ]
+   ]
+  },
+  {
+   "contract": "ENSRegistry",
+   "pick": "1810:12:256:224",
+   "production_s": 17,
+   "replay_s": 21,
+   "kind": "legacy",
+   "w": 429,
+   "top": [
+    [
+     "局部:建项/配对/摘要",
+     61
+    ],
+    [
+     "局部:符号执行与summary",
+     24
+    ],
+    [
+     "H2",
+     9
+    ]
+   ]
+  },
+  {
+   "contract": "ENSRegistry",
+   "pick": "2065:7:96:128",
+   "production_s": 342,
+   "replay_s": 393,
+   "kind": "legacy",
+   "w": 429,
+   "top": [
+    [
+     "共享引理",
+     99
+    ],
+    [
+     "局部:建项/配对/摘要",
+     1
+    ],
+    [
+     "其他(任务框架)",
+     0
+    ]
+   ]
+  },
+  {
+   "contract": "ENSRegistry",
+   "pick": "1948:9:96:128",
+   "production_s": 373,
+   "replay_s": 412,
+   "kind": "legacy",
+   "w": 429,
+   "top": [
+    [
+     "共享引理",
+     98
+    ],
+    [
+     "H2",
+     1
+    ],
+    [
+     "局部:建项/配对/摘要",
+     1
+    ]
+   ]
+  },
+  {
+   "contract": "ENSRegistry",
+   "pick": "2232:8:96:128",
+   "production_s": 381,
+   "replay_s": 383,
+   "kind": "legacy",
+   "w": 429,
+   "top": [
+    [
+     "共享引理",
+     98
+    ],
+    [
+     "局部:建项/配对/摘要",
+     1
+    ],
+    [
+     "H2",
+     1
+    ]
+   ]
+  },
+  {
+   "contract": "ENSRegistry",
+   "pick": "2025:9:96:128",
+   "production_s": 355,
+   "replay_s": 385,
+   "kind": "legacy",
+   "w": 429,
+   "top": [
+    [
+     "共享引理",
+     98
+    ],
+    [
+     "局部:建项/配对/摘要",
+     1
+    ],
+    [
+     "H2",
+     1
+    ]
+   ]
+  },
+  {
+   "contract": "CErc20",
+   "pick": "12767:20:None:None",
+   "production_s": 755,
+   "replay_s": 849,
+   "kind": "legacy",
+   "w": 38636,
+   "top": [
+    [
+     "H2",
+     86
+    ],
+    [
+     "局部:义务求解",
+     6
+    ],
+    [
+     "局部:建项/配对/摘要",
+     6
+    ]
+   ]
+  },
+  {
+   "contract": "CErc20",
+   "pick": "4571:25:None:None",
+   "production_s": 2609,
+   "replay_s": 2975,
+   "kind": "legacy",
+   "w": 38636,
+   "top": [
+    [
+     "局部:建项/配对/摘要",
+     38
+    ],
+    [
+     "H2",
+     33
+    ],
+    [
+     "局部:义务求解",
+     25
+    ]
+   ]
+  },
+  {
+   "contract": "CErc20",
+   "pick": "8186:35:None:None",
+   "production_s": 9328,
+   "replay_s": 8500,
+   "kind": "legacy",
+   "w": 38636,
+   "top": [
+    [
+     "H2",
+     60
+    ],
+    [
+     "局部:义务求解",
+     30
+    ],
+    [
+     "局部:建项/配对/摘要",
+     7
+    ]
+   ]
+  },
+  {
+   "contract": "CErc20",
+   "pick": "6619:22:None:None",
+   "production_s": 195,
+   "replay_s": 258,
+   "kind": "legacy",
+   "w": 38636,
+   "top": [
+    [
+     "局部:建项/配对/摘要",
+     70
+    ],
+    [
+     "局部:义务求解",
+     25
+    ],
+    [
+     "局部:符号执行与summary",
+     3
+    ]
+   ]
+  },
+  {
+   "contract": "CErc20",
+   "pick": "12930:5:160:None",
+   "production_s": 4246,
+   "replay_s": 4396,
+   "kind": "legacy",
+   "w": 38636,
+   "top": [
+    [
+     "局部:义务求解",
+     52
+    ],
+    [
+     "H2",
+     29
+    ],
+    [
+     "局部:建项/配对/摘要",
+     13
+    ]
+   ]
+  },
+  {
+   "contract": "CErc20",
+   "pick": "6554:36:None:None",
+   "production_s": 1013,
+   "replay_s": 1108,
+   "kind": "legacy",
+   "w": 38636,
+   "top": [
+    [
+     "H2",
+     91
+    ],
+    [
+     "局部:义务求解",
+     5
+    ],
+    [
+     "局部:建项/配对/摘要",
+     4
+    ]
+   ]
+  },
+  {
+   "contract": "CErc20",
+   "pick": "12441:20:288:None",
+   "production_s": 652,
+   "replay_s": 708,
+   "kind": "legacy",
+   "w": 38636,
+   "top": [
+    [
+     "H2",
+     89
+    ],
+    [
+     "局部:建项/配对/摘要",
+     6
+    ],
+    [
+     "局部:义务求解",
+     4
+    ]
+   ]
+  },
+  {
+   "contract": "CErc20",
+   "pick": "14263:37:None:None",
+   "production_s": 6162,
+   "replay_s": 5858,
+   "kind": "legacy",
+   "w": 38636,
+   "top": [
+    [
+     "H2",
+     95
+    ],
+    [
+     "局部:义务求解",
+     2
+    ],
+    [
+     "局部:符号执行与summary",
+     2
+    ]
+   ]
+  },
+  {
+   "contract": "PoolManager",
+   "pick": "22544:41:928:928",
+   "production_s": 1937,
+   "replay_s": 2016,
+   "kind": "legacy",
+   "w": 26266,
+   "top": [
+    [
+     "H2",
+     91
+    ],
+    [
+     "局部:建项/配对/摘要",
+     4
+    ],
+    [
+     "局部:义务求解",
+     3
+    ]
+   ]
+  },
+  {
+   "contract": "PoolManager",
+   "pick": "22851:42:928:928",
+   "production_s": 4034,
+   "replay_s": 4230,
+   "kind": "legacy",
+   "w": 26266,
+   "top": [
+    [
+     "H2",
+     96
+    ],
+    [
+     "局部:建项/配对/摘要",
+     2
+    ],
+    [
+     "局部:义务求解",
+     1
+    ]
+   ]
+  },
+  {
+   "contract": "PoolManager",
+   "pick": "16923:20:864:768",
+   "production_s": 12,
+   "replay_s": 52,
+   "kind": "legacy",
+   "w": 26266,
+   "top": [
+    [
+     "局部:建项/配对/摘要",
+     78
+    ],
+    [
+     "H2",
+     16
+    ],
+    [
+     "其他(任务框架)",
+     5
+    ]
+   ]
+  },
+  {
+   "contract": "PoolManager",
+   "pick": "135:1:96:160",
+   "production_s": 40,
+   "replay_s": 61,
+   "kind": "legacy",
+   "w": 26266,
+   "top": [
+    [
+     "局部:建项/配对/摘要",
+     92
+    ],
+    [
+     "其他(任务框架)",
+     7
+    ],
+    [
+     "H2",
+     1
+    ]
+   ]
+  },
+  {
+   "contract": "PoolManager",
+   "pick": "22544:17:None:768",
+   "production_s": 1038,
+   "replay_s": 1135,
+   "kind": "legacy",
+   "w": 26266,
+   "top": [
+    [
+     "H2",
+     84
+    ],
+    [
+     "局部:建项/配对/摘要",
+     6
+    ],
+    [
+     "局部:义务求解",
+     5
+    ]
+   ]
+  },
+  {
+   "contract": "PoolManager",
+   "pick": "18089:29:928:928",
+   "production_s": 832,
+   "replay_s": 895,
+   "kind": "instruction-chain/1",
+   "w": 26266,
+   "top": [
+    [
+     "指令链",
+     91
+    ],
+    [
+     "局部:建项/配对/摘要",
+     5
+    ],
+    [
+     "H2",
+     3
+    ]
+   ]
+  },
+  {
+   "contract": "PoolManager",
+   "pick": "21213:29:928:928",
+   "production_s": 3835,
+   "replay_s": 3955,
+   "kind": "legacy",
+   "w": 26266,
+   "top": [
+    [
+     "H2",
+     94
+    ],
+    [
+     "局部:符号执行与summary",
+     3
+    ],
+    [
+     "局部:义务求解",
+     1
+    ]
+   ]
+  },
+  {
+   "contract": "PoolManager",
+   "pick": "14213:20:928:928",
+   "production_s": 19,
+   "replay_s": 81,
+   "kind": "legacy",
+   "w": 26266,
+   "top": [
+    [
+     "局部:建项/配对/摘要",
+     76
+    ],
+    [
+     "H2",
+     20
+    ],
+    [
+     "其他(任务框架)",
+     4
+    ]
+   ]
+  },
+  {
+   "contract": "Pool",
+   "pick": "17091:15:None:None",
+   "production_s": 188,
+   "replay_s": 195,
+   "kind": "legacy",
+   "w": 7813,
+   "top": [
+    [
+     "H2",
+     54
+    ],
+    [
+     "局部:建项/配对/摘要",
+     22
+    ],
+    [
+     "局部:义务求解",
+     17
+    ]
+   ]
+  },
+  {
+   "contract": "Pool",
+   "pick": "13584:13:None:None",
+   "production_s": 894,
+   "replay_s": 1040,
+   "kind": "instruction-chain/1",
+   "w": 7813,
+   "top": [
+    [
+     "指令链",
+     98
+    ],
+    [
+     "局部:建项/配对/摘要",
+     1
+    ],
+    [
+     "H2",
+     0
+    ]
+   ]
+  },
+  {
+   "contract": "Pool",
+   "pick": "17306:30:96:128",
+   "production_s": 10,
+   "replay_s": 40,
+   "kind": "legacy",
+   "w": 7813,
+   "top": [
+    [
+     "局部:建项/配对/摘要",
+     80
+    ],
+    [
+     "H2",
+     11
+    ],
+    [
+     "其他(任务框架)",
+     7
+    ]
+   ]
+  },
+  {
+   "contract": "Pool",
+   "pick": "16623:26:None:None",
+   "production_s": 580,
+   "replay_s": 467,
+   "kind": "instruction-chain/1",
+   "w": 7813,
+   "top": [
+    [
+     "指令链",
+     93
+    ],
+    [
+     "局部:建项/配对/摘要",
+     5
+    ],
+    [
+     "H2",
+     1
+    ]
+   ]
+  },
+  {
+   "contract": "Pool",
+   "pick": "4730:14:160:None",
+   "production_s": 1293,
+   "replay_s": 1091,
+   "kind": "legacy",
+   "w": 7813,
+   "top": [
+    [
+     "局部:义务求解",
+     49
+    ],
+    [
+     "H2",
+     27
+    ],
+    [
+     "局部:建项/配对/摘要",
+     21
+    ]
+   ]
+  },
+  {
+   "contract": "Pool",
+   "pick": "7713:17:None:None",
+   "production_s": 395,
+   "replay_s": 433,
+   "kind": "legacy",
+   "w": 7813,
+   "top": [
+    [
+     "H2",
+     71
+    ],
+    [
+     "局部:建项/配对/摘要",
+     15
+    ],
+    [
+     "局部:义务求解",
+     12
+    ]
+   ]
+  },
+  {
+   "contract": "Pool",
+   "pick": "14956:12:96:128",
+   "production_s": 513,
+   "replay_s": 700,
+   "kind": "legacy",
+   "w": 7813,
+   "top": [
+    [
+     "共享引理",
+     94
+    ],
+    [
+     "局部:建项/配对/摘要",
+     5
+    ],
+    [
+     "其他(任务框架)",
+     0
+    ]
+   ]
+  },
+  {
+   "contract": "Pool",
+   "pick": "5158:5:96:128",
+   "production_s": 396,
+   "replay_s": 396,
+   "kind": "legacy",
+   "w": 7813,
+   "top": [
+    [
+     "H2",
+     68
+    ],
+    [
+     "局部:建项/配对/摘要",
+     15
+    ],
+    [
+     "局部:符号执行与summary",
+     14
+    ]
+   ]
+  },
+  {
+   "contract": "Safe",
+   "pick": "6840:23:None:None",
+   "production_s": 6,
+   "replay_s": 18,
+   "kind": "legacy",
+   "w": 14422,
+   "top": [
+    [
+     "局部:建项/配对/摘要",
+     76
+    ],
+    [
+     "H2",
+     13
+    ],
+    [
+     "其他(任务框架)",
+     9
+    ]
+   ]
+  },
+  {
+   "contract": "Safe",
+   "pick": "6971:27:None:None",
+   "production_s": 202,
+   "replay_s": 203,
+   "kind": "legacy",
+   "w": 14422,
+   "top": [
+    [
+     "H2",
+     83
+    ],
+    [
+     "局部:建项/配对/摘要",
+     10
+    ],
+    [
+     "局部:义务求解",
+     5
+    ]
+   ]
+  },
+  {
+   "contract": "Safe",
+   "pick": "6971:17:None:None",
+   "production_s": 143,
+   "replay_s": 140,
+   "kind": "legacy",
+   "w": 14422,
+   "top": [
+    [
+     "H2",
+     76
+    ],
+    [
+     "局部:建项/配对/摘要",
+     15
+    ],
+    [
+     "局部:义务求解",
+     7
+    ]
+   ]
+  },
+  {
+   "contract": "Safe",
+   "pick": "2569:20:None:None",
+   "production_s": 104,
+   "replay_s": 115,
+   "kind": "legacy",
+   "w": 14422,
+   "top": [
+    [
+     "H2",
+     72
+    ],
+    [
+     "局部:建项/配对/摘要",
+     19
+    ],
+    [
+     "局部:义务求解",
+     7
+    ]
+   ]
+  },
+  {
+   "contract": "Safe",
+   "pick": "7332:20:None:None",
+   "production_s": 79,
+   "replay_s": 86,
+   "kind": "legacy",
+   "w": 14422,
+   "top": [
+    [
+     "H2",
+     83
+    ],
+    [
+     "局部:建项/配对/摘要",
+     15
+    ],
+    [
+     "其他(任务框架)",
+     2
+    ]
+   ]
+  },
+  {
+   "contract": "Safe",
+   "pick": "7108:40:None:None",
+   "production_s": 231,
+   "replay_s": 232,
+   "kind": "instruction-chain/1",
+   "w": 14422,
+   "top": [
+    [
+     "指令链",
+     88
+    ],
+    [
+     "局部:建项/配对/摘要",
+     8
+    ],
+    [
+     "H2",
+     2
+    ]
+   ]
+  },
+  {
+   "contract": "Safe",
+   "pick": "11803:31:None:None",
+   "production_s": 2878,
+   "replay_s": 2756,
+   "kind": "legacy",
+   "w": 14422,
+   "top": [
+    [
+     "H2",
+     51
+    ],
+    [
+     "局部:义务求解",
+     33
+    ],
+    [
+     "局部:建项/配对/摘要",
+     11
+    ]
+   ]
+  },
+  {
+   "contract": "Safe",
+   "pick": "10234:13:None:None",
+   "production_s": 54,
+   "replay_s": 66,
+   "kind": "legacy",
+   "w": 14422,
+   "top": [
+    [
+     "H2",
+     69
+    ],
+    [
+     "局部:建项/配对/摘要",
+     25
+    ],
+    [
+     "其他(任务框架)",
+     2
+    ]
+   ]
+  }
+ ]
+}

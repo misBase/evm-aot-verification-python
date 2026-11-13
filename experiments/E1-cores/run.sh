@@ -1,5 +1,5 @@
 #!/bin/bash
-# E1: instruction cores. RQ1 cores column of Table 3; RQ2 Table 5 and the core-ablation figure.
+# E1: instruction cores. RQ1 Table 1 (microbenchmarks); RQ2 Table 2 (microbenchmarks) and Fig. 6.
 # Usage: bash run.sh            (env: OUT=results dir, CPUS=0-3, MEM=8000 MiB = sum of concurrent jobs' memory caps)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)

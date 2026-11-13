@@ -1,5 +1,5 @@
 #!/bin/bash
-# E2: small programs. RQ1 small-program column of Table 3 and the program figure; RQ2 Table 6.
+# E2: small programs. RQ1 Table 1 (small programs) and Fig. 5; RQ2 Table 2 (small-program subset).
 # Usage: bash run.sh            (env: OUT=results dir, CPUS=0-7, MEM=12000 MiB = sum of concurrent jobs' memory caps)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)

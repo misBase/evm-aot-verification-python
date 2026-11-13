@@ -90,6 +90,50 @@
   "PoolManager": 8,
   "Pool": 8
  },
+ "where_with_safe": {
+  "ENSRegistry": {
+   "Shared lemmas": 0.862,
+   "Local: construction": 0.114,
+   "H2": 0.014,
+   "Other": 0.006,
+   "Local: obligation solving": 0.003
+  },
+  "CErc20": {
+   "H2": 0.604,
+   "Local: obligation solving": 0.187,
+   "Local: construction": 0.206,
+   "Other": 0.002
+  },
+  "PoolManager": {
+   "H2": 0.506,
+   "Local: construction": 0.344,
+   "Instruction chain": 0.114,
+   "Other": 0.02,
+   "Local: obligation solving": 0.015
+  },
+  "Pool": {
+   "H2": 0.292,
+   "Instruction chain": 0.239,
+   "Local: construction": 0.234,
+   "Shared lemmas": 0.118,
+   "Local: obligation solving": 0.102,
+   "Other": 0.015
+  },
+  "Safe": {
+   "H2": 0.563,
+   "Local: construction": 0.236,
+   "Instruction chain": 0.11,
+   "Local: obligation solving": 0.07,
+   "Other": 0.021
+  }
+ },
+ "sample_sizes_with_safe": {
+  "ENSRegistry": 8,
+  "CErc20": 8,
+  "PoolManager": 8,
+  "Pool": 8,
+  "Safe": 8
+ },
  "ectx": [
   {
    "contexts": 1,
