@@ -1,0 +1,104 @@
+{
+  "status": "verified",
+  "diagnostics": {
+    "0": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=0, stack_depth=0, memory_size=0, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.02891361201182,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 17711,
+          "started_at": 1794508156.4706368,
+          "finished_at": 1794508157.5229182,
+          "start_rss_mb": 69.1,
+          "peak_rss_mb": 71.5,
+          "end_rss_mb": 60.8,
+          "memory_budget_mb": 2000.0
+        }
+      ]
+    }
+  },
+  "closure_checks": [
+    {
+      "phase": "proof_instances",
+      "contexts": 1,
+      "proof_instances": 1,
+      "projection": "pi-v1-value-used"
+    }
+  ],
+  "timings": {
+    "analysis_and_setup": 0.013104417826980352,
+    "discovery": 0.0338597830850631,
+    "entry_H0": 0.8114004440139979,
+    "proofs_and_H2": 1.5237737989518791
+  },
+  "running": [],
+  "reasons": [],
+  "attempted_instances": 1,
+  "recorded_local_theorems": 1,
+  "local_statistics_basis": "Recorded diagnostics; only status=verified establishes a consumed program certificate.",
+  "message": "VERIFIED: closed parallel block lockstep certificate (1 contexts). model=AOT_COMPILER_PROFILE, exact calldata, full jump-destination domain, summaries=per-hit raw proof; gas=full, symbolic initial gas; terminal status, return metadata/bytes, storage, transient storage, remaining gas; finite segment matching and termination correspondence within the model; host calls use bounded-cost atomic UFs where declared, and host-internal exhaustion/termination is outside the claim; platform premise: memory base (R15) < 2^47 and calldata/code lengths < 2^47 (canonical user space; the input and code are Go byte slices in it).",
+  "scope": "model=AOT_COMPILER_PROFILE, exact calldata, full jump-destination domain, summaries=per-hit raw proof; gas=full, symbolic initial gas; terminal status, return metadata/bytes, storage, transient storage, remaining gas; finite segment matching and termination correspondence within the model; host calls use bounded-cost atomic UFs where declared, and host-internal exhaustion/termination is outside the claim; platform premise: memory base (R15) < 2^47 and calldata/code lengths < 2^47 (canonical user space; the input and code are Go byte slices in it).",
+  "block_failure_reasons": [],
+  "evm_blocks": 1,
+  "complete_local_theorems": 1,
+  "entry_certificates": 1,
+  "edge_certificates": 0,
+  "queries": 0,
+  "elapsed_seconds": 2.511772360885516,
+  "summary_hits": 0,
+  "node_seconds": [
+    1.02891361201182
+  ],
+  "node_seconds_basis": "parallel proof-instance task wall (local proof, retry and context H2)",
+  "started_at_utc": "2026-11-12T18:29:14.619934+00:00",
+  "stem": "tests/data/sstore_load",
+  "configuration": {
+    "gas_check": "full",
+    "gas_budget": 1000000000,
+    "num_inputs": 0,
+    "timeout_ms": 30000,
+    "node_seconds": 14400.0,
+    "first_pass_node_seconds": 300.0,
+    "max_parameter_values": 32,
+    "max_depth": 400,
+    "max_instances": 8192,
+    "wall_seconds": 599.9272130262107,
+    "hard_wall_seconds": 599.9272130262107,
+    "summaries": true,
+    "fallback": "none",
+    "discover_first": true,
+    "node_workers": 4,
+    "pair_workers_per_node": 1,
+    "results_dir": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r2/prog__sstore_load__V3.worker.lockstep/results",
+    "node_memory_mb": 2000.0,
+    "status_dir": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r2/prog__sstore_load__V3.worker.lockstep/workers",
+    "constant_insensitive": true,
+    "pushed_code_return_tags": false,
+    "terminal_constant_projection": false,
+    "context_constant_projection": false,
+    "instruction_hints": "/artifact/recorded-runs/paper-v3-20261112/hints/trace-sstore_load.json"
+  },
+  "host": "Linux-3.10.0-1160.el7.x86_64-x86_64-with-glibc2.17",
+  "python": "3.13.7",
+  "workers": 1,
+  "program_sha256": {
+    ".json": "674fec357597353370be5dafc0114a1a5a520489afcf6a883494cd707b156b69",
+    ".hex": "dd5fcd81ebc5b7da0ede23e014ce312116b944f7e18f40baf50a3262a4a58275"
+  },
+  "revision": "c68c4dfc87515204e09a2d566554cd9b04c643d4",
+  "worktree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "total_source_blocks": 1,
+  "unvisited_policy": "Missing local statistics never establish unreachability or a program proof.",
+  "pair_workers": 1,
+  "proof_cache": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r2/prog__sstore_load__V3.worker.lockstep/cache.sqlite3",
+  "instruction_hints_sha256": "a6ce5a58187e53440d6285961256d61825280dfa430aa993fc08f4264789a88e",
+  "model_sources_sha256": "a6000cde69e33216c10f5572c93ce128be21c15953c1966217eac9e7d2da0b47",
+  "process_wall_seconds": 3.1237147729843855,
+  "ended_at_utc": "2026-11-12T18:29:17.743652+00:00"
+}

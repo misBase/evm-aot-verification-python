@@ -1,0 +1,45 @@
+{
+ "kind": "program",
+ "target": "tests/data/muti_block_08",
+ "config": "V2-O1",
+ "verified": false,
+ "result": "ERR",
+ "counterexample": false,
+ "snapshot": "/artifact/recorded-runs/snap-paper-c68c4df",
+ "source_before": {
+  "sha256": "b5d8d104183872c177336c7825e70b632f5c6e7e2e1c4f160432b4dafa6f3e7e",
+  "files": 114
+ },
+ "python_version": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
+ "z3_version": "4.15.4",
+ "harness_sha256": {
+  "worker.py": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+  "paper_modes.py": "2f6d835811096c95d6a20b98ef725b6eb23251205d87d9b1ddb907c52fc9e502",
+  "run_one.py": "098dcf5e9257d16ff1499deb38fb3f14c73f307c6bf4293e9cbb833eb49882cb",
+  "slices.py": "1c05def9530159afcd5c1ad61e213392a7f933c29082151538a3ea51b71a361b",
+  "single_cfg_merge.py": "5254f77b97b102a4fb4662c7a30aa0048a3639eb34502358fc33c42fac2097a6"
+ },
+ "input_missing_pair": [],
+ "input_pair_sha256": {
+  ".json": "fb6408d35875b0a771a6b4a78f3cecebc8bceea144d09400de1fa870603fe2eb",
+  ".hex": "e7405b4d19bf5e220072ad78e1cb80fbe8f3c93c0f1cf5e91d52bf9d833f8e2b"
+ },
+ "alias_of": null,
+ "message": "CallDataLoadSummaryMatchError: dynamic CALLDATALOAD summary offset did not simplify to a concrete value",
+ "exception_type": "CallDataLoadSummaryMatchError",
+ "inner_wall_seconds": 48.412839215947315,
+ "source_after": {
+  "sha256": "b5d8d104183872c177336c7825e70b632f5c6e7e2e1c4f160432b4dafa6f3e7e",
+  "files": 114
+ },
+ "proof_cache": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r1/prog__muti_block_08__V2-O1.worker.smt.sqlite3",
+ "python": "/artifact/.venv/bin/python",
+ "worker_sha256": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+ "harness_source_after": {
+  "worker.py": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+  "paper_modes.py": "2f6d835811096c95d6a20b98ef725b6eb23251205d87d9b1ddb907c52fc9e502",
+  "run_one.py": "098dcf5e9257d16ff1499deb38fb3f14c73f307c6bf4293e9cbb833eb49882cb",
+  "slices.py": "1c05def9530159afcd5c1ad61e213392a7f933c29082151538a3ea51b71a361b",
+  "single_cfg_merge.py": "5254f77b97b102a4fb4662c7a30aa0048a3639eb34502358fc33c42fac2097a6"
+ }
+}

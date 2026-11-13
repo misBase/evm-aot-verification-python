@@ -1,0 +1,1 @@
+{"pid": 19778, "started_at": 1794509973.164791, "finished_at": 1794509974.8593497, "start_rss_mb": 69.1, "peak_rss_mb": 79.8, "end_rss_mb": 62.6, "memory_budget_mb": 2000.0, "memory_exceeded": null, "node": "BlockSpecialization(pc=0, stack_depth=0, memory_size=0, free_memory_pointer=0, stack_constants=())", "state": "finished", "updated_at": 1794509974.8594, "rss_mb": 62.6}

@@ -1,0 +1,147 @@
+{
+  "status": "verified",
+  "diagnostics": {
+    "0": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=0, stack_depth=0, memory_size=0, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 15.172312622889876,
+          "queries": 100,
+          "failed_obligations": [],
+          "pid": 19905,
+          "started_at": 1794509993.4460003,
+          "finished_at": 1794510008.6620328,
+          "start_rss_mb": 69.1,
+          "peak_rss_mb": 93.0,
+          "end_rss_mb": 69.7,
+          "memory_budget_mb": 2000.0
+        }
+      ]
+    },
+    "19": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=19, stack_depth=0, memory_size=96, free_memory_pointer=24519928653854221733733552434404946937899825954937634816, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.599758432013914,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 19906,
+          "started_at": 1794509993.4829283,
+          "finished_at": 1794509994.10596,
+          "start_rss_mb": 69.2,
+          "peak_rss_mb": 69.2,
+          "end_rss_mb": 60.5,
+          "memory_budget_mb": 2000.0
+        }
+      ]
+    },
+    "25": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=25, stack_depth=0, memory_size=96, free_memory_pointer=24519928653854221733733552434404946937899825954937634816, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 1.1242352880071849,
+          "queries": 11,
+          "failed_obligations": [],
+          "pid": 19907,
+          "started_at": 1794509993.4366357,
+          "finished_at": 1794509994.5877876,
+          "start_rss_mb": 69.1,
+          "peak_rss_mb": 71.7,
+          "end_rss_mb": 63.1,
+          "memory_budget_mb": 2000.0
+        }
+      ]
+    }
+  },
+  "closure_checks": [
+    {
+      "phase": "proof_instances",
+      "contexts": 3,
+      "proof_instances": 3,
+      "projection": "pi-v1-value-used"
+    }
+  ],
+  "timings": {
+    "analysis_and_setup": 0.0337932959664613,
+    "discovery": 0.12462017894722521,
+    "entry_H0": 0.8818271839991212,
+    "proofs_and_H2": 15.73067370383069
+  },
+  "running": [],
+  "reasons": [],
+  "attempted_instances": 3,
+  "recorded_local_theorems": 3,
+  "local_statistics_basis": "Recorded diagnostics; only status=verified establishes a consumed program certificate.",
+  "message": "VERIFIED: closed parallel block lockstep certificate (3 contexts). model=AOT_COMPILER_PROFILE, exact calldata, full jump-destination domain, summaries=per-hit raw proof; gas=full, symbolic initial gas; terminal status, return metadata/bytes, storage, transient storage, remaining gas; finite segment matching and termination correspondence within the model; host calls use bounded-cost atomic UFs where declared, and host-internal exhaustion/termination is outside the claim; platform premise: memory base (R15) < 2^47 and calldata/code lengths < 2^47 (canonical user space; the input and code are Go byte slices in it).",
+  "scope": "model=AOT_COMPILER_PROFILE, exact calldata, full jump-destination domain, summaries=per-hit raw proof; gas=full, symbolic initial gas; terminal status, return metadata/bytes, storage, transient storage, remaining gas; finite segment matching and termination correspondence within the model; host calls use bounded-cost atomic UFs where declared, and host-internal exhaustion/termination is outside the claim; platform premise: memory base (R15) < 2^47 and calldata/code lengths < 2^47 (canonical user space; the input and code are Go byte slices in it).",
+  "block_failure_reasons": [],
+  "evm_blocks": 3,
+  "complete_local_theorems": 3,
+  "entry_certificates": 1,
+  "edge_certificates": 2,
+  "queries": 0,
+  "elapsed_seconds": 16.929282182827592,
+  "summary_hits": 4,
+  "node_seconds": [
+    15.172312622889876,
+    0.599758432013914,
+    1.1242352880071849
+  ],
+  "node_seconds_basis": "parallel proof-instance task wall (local proof, retry and context H2)",
+  "started_at_utc": "2026-11-12T18:59:51.327597+00:00",
+  "stem": "tests/data/jumpi_2block",
+  "configuration": {
+    "gas_check": "full",
+    "gas_budget": 1000000000,
+    "num_inputs": 0,
+    "timeout_ms": 30000,
+    "node_seconds": 14400.0,
+    "first_pass_node_seconds": 300.0,
+    "max_parameter_values": 32,
+    "max_depth": 400,
+    "max_instances": 8192,
+    "wall_seconds": 599.9242618889548,
+    "hard_wall_seconds": 599.9242618889548,
+    "summaries": true,
+    "fallback": "none",
+    "discover_first": true,
+    "node_workers": 4,
+    "pair_workers_per_node": 1,
+    "results_dir": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r3/prog__jumpi_2block__V3.worker.lockstep/results",
+    "node_memory_mb": 2000.0,
+    "status_dir": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r3/prog__jumpi_2block__V3.worker.lockstep/workers",
+    "constant_insensitive": true,
+    "pushed_code_return_tags": false,
+    "terminal_constant_projection": false,
+    "context_constant_projection": false,
+    "instruction_hints": null
+  },
+  "host": "Linux-3.10.0-1160.el7.x86_64-x86_64-with-glibc2.17",
+  "python": "3.13.7",
+  "workers": 1,
+  "program_sha256": {
+    ".json": "043dc1695117d6082d11172091a775f0641e430943968cacd506f5849628de51",
+    ".hex": "1f1853fa8b043d4ab5e10474575e2dc46d514309b8e5e6b12a4e2bd207073553"
+  },
+  "revision": "c68c4dfc87515204e09a2d566554cd9b04c643d4",
+  "worktree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "total_source_blocks": 3,
+  "unvisited_policy": "Missing local statistics never establish unreachability or a program proof.",
+  "pair_workers": 1,
+  "proof_cache": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r3/prog__jumpi_2block__V3.worker.lockstep/cache.sqlite3",
+  "model_sources_sha256": "a6000cde69e33216c10f5572c93ce128be21c15953c1966217eac9e7d2da0b47",
+  "process_wall_seconds": 17.59066018392332,
+  "ended_at_utc": "2026-11-12T19:00:08.918266+00:00"
+}

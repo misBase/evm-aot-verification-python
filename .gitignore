@@ -5,6 +5,8 @@ ch4-5-validator/.venv/
 experiments/smoke-results/
 experiments/*/results/
 experiments/E6-shift/figures/
+# pickled per-instance proof records of V3 runs; binary, read by no script here
+experiments/*/expected/*/*.worker.lockstep/results/
 __pycache__/
 *.pyc
 .pytest_cache/

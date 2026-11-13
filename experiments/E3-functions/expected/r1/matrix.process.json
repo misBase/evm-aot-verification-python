@@ -1,0 +1,1 @@
+{"pid": 16369, "state": "finished", "ended": 1794508054.0461466, "argv": ["harness/matrix.py", "--snap", "../snap-paper-c68c4df", "--fixtures", "../r4/fixtures", "--out", "172/fn-r1", "--cpus", "0-7", "--memory-budget", "12000", "--only", "fnx/"]}

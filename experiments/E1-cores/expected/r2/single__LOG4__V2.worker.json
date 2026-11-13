@@ -1,0 +1,474 @@
+{
+ "kind": "single",
+ "target": "LOG4",
+ "config": "V2",
+ "verified": true,
+ "result": "VERIFIED",
+ "counterexample": false,
+ "snapshot": "/artifact/recorded-runs/snap-paper-c68c4df",
+ "source_before": {
+  "sha256": "b5d8d104183872c177336c7825e70b632f5c6e7e2e1c4f160432b4dafa6f3e7e",
+  "files": 114
+ },
+ "python_version": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
+ "z3_version": "4.15.4",
+ "harness_sha256": {
+  "worker.py": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+  "paper_modes.py": "2f6d835811096c95d6a20b98ef725b6eb23251205d87d9b1ddb907c52fc9e502",
+  "run_one.py": "098dcf5e9257d16ff1499deb38fb3f14c73f307c6bf4293e9cbb833eb49882cb",
+  "slices.py": "1c05def9530159afcd5c1ad61e213392a7f933c29082151538a3ea51b71a361b",
+  "single_cfg_merge.py": "5254f77b97b102a4fb4662c7a30aa0048a3639eb34502358fc33c42fac2097a6"
+ },
+ "message": "unsat on every core mismatch",
+ "truncated": [],
+ "modes": [],
+ "config_epoch": "2026-11-12-v3-o1o2-mixed",
+ "single_solver_ms": 300000,
+ "requested": {
+  "max_depth": 400,
+  "gas_check": "off"
+ },
+ "effective": {
+  "max_depth": 400,
+  "gas_check": "off",
+  "case_execution_mode": "cfg",
+  "compare_gas": false,
+  "terminal_paths": false,
+  "base_addr": 0,
+  "path_pair_workers": 1,
+  "path_pair_parallelism_applicable": false,
+  "cfg_merge_actual": false,
+  "core_coverage_complete": true
+ },
+ "gas_scope_reason": "concrete seed 1e9 where the core harness constructs state; original core/GAS stack observations retained; final gas comparison disabled",
+ "state_contract": {
+  "symbolic_gas": false,
+  "gas_budget": 1000000000,
+  "host_gas_uf_enabled": false,
+  "evm_gas_state_scope": "stateful cases use the concrete seed; pure stack operation_semantics has no gas-state instance",
+  "gas_deduction_scope": "existing frozen core/state semantics; no new gas prelude"
+ },
+ "scope": "single-instruction core observables, not a full-program certificate",
+ "unknown_reasons": [],
+ "summary_config": null,
+ "summary_hits": null,
+ "summary_hits_scope": "instruction harness does not export hits; enabled configuration is not a hit",
+ "single_core": {
+  "merged_helper_installed": false,
+  "case_execution_mode": "cfg",
+  "terminal_paths": false,
+  "coverage_applicable": true,
+  "coverage_complete": true,
+  "cfg_merge_actual": false,
+  "core_calls": [
+   {
+    "enable_merge": false,
+    "merge_state": true,
+    "max_depth": 400,
+    "helper": "merged_state",
+    "coverage_complete": true,
+    "terminal_states": 1,
+    "coverage_reason": "x86 CFG executor explored all modeled successors",
+    "coverage_details": {
+     "terminal_paths": 1,
+     "total_states": 1,
+     "unsat_pruned_states": 0,
+     "reachability_calls": 1,
+     "depth_pruned_states": 0
+    },
+    "coverage_source": "x86-symbolic-executor"
+   }
+  ],
+  "scope": "only direct frozen single-core helper callers; linear is N/A; not a program certificate",
+  "coverage_status": "complete"
+ },
+ "runtime_sources": {
+  "tests": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/tests/__init__.py",
+   "sha256": "719c7720f7b5ffa577e9fc01c82ba0a57d4e961931da79bf73de5b182c495772"
+  },
+  "tests.integration": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/tests/integration/__init__.py",
+   "sha256": "2448ffef11a0696876f2b6ee84bccd8b6a78cc4db6d1e79e44f29acd9cd461f7"
+  },
+  "tests.support": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/tests/support/__init__.py",
+   "sha256": "0f77d33354788c9170913e15f7118748b7918a64dd52f86ff78fc275d2ef6341"
+  },
+  "common.uint256": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/uint256.py",
+   "sha256": "51ae66ca32ba1be9c9bd1f46c224aad12598f29f70438fd613757334e894a57d"
+  },
+  "common.evm_stack": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/evm_stack.py",
+   "sha256": "834477d9f05898264fc6827cc0fb9d5ebc40f10a4dfe27d1bd4a686f82ff1681"
+  },
+  "common": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/__init__.py",
+   "sha256": "fdd05d62a9e8bd6ff2771aab7cca0fb2a4457b8e8ebb488a86e9b69eb3bc4aa1"
+  },
+  "common.div_bridge": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/div_bridge.py",
+   "sha256": "18e87e6bd4ecc2cb2968dba254d4b1b468bde9afb7ed166057317c14888488b3"
+  },
+  "evm_ir.models": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/models.py",
+   "sha256": "0ae2167520ecb7b3fe5af9923d129bbea8f1fd4635de2772b3caa35fd9badfd4"
+  },
+  "evm_ir.json_parser": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/json_parser.py",
+   "sha256": "4840e97f133762a5d71ade644b2a23d6c88443f73659c7d657e12c1376b76c07"
+  },
+  "state.evm_stack_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/evm_stack_state.py",
+   "sha256": "4e4bbb551b02f4c672b9907abc76a432f9a50988f7d0ebd5384733448a292db2"
+  },
+  "state.evm_memory_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/evm_memory_state.py",
+   "sha256": "ca65aa9233bef84c851f97ba24cd5c28d585d325638bd5b405b6a009e2386d67"
+  },
+  "state.evm_storage_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/evm_storage_state.py",
+   "sha256": "e2232e9b8af6a5ab39ae171362e5db9a626040748c2ca6fa3791bfdeb6c597d4"
+  },
+  "state.evm_transient_storage_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/evm_transient_storage_state.py",
+   "sha256": "b980970065be2110ce455bbd936f971e71ab8037f837f1c6b165c5ee870f5d41"
+  },
+  "state.evm_gas_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/evm_gas_state.py",
+   "sha256": "ea0806d453acde0d705e4c3a65c876c069b423c54ce4f1e6a01b0b519c3de76d"
+  },
+  "state.x86_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/x86_state.py",
+   "sha256": "0d20a16f8fe4267fd1449a6f0a3699d5bd11bc7369698db21d04be83d4903530"
+  },
+  "state.smt_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/smt_state.py",
+   "sha256": "30a5fc3a28114a7d397456a6cbf781440af728e1ac16bc012470f4e60f82e3b1"
+  },
+  "state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/__init__.py",
+   "sha256": "c0aa0799687f216fe30bc99c152c6e1e9193dcd2f5e8e8fcde3e17c730b26f48"
+  },
+  "evm_ir.status_code": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/status_code.py",
+   "sha256": "b5945acc756972eaf02d4191c84a43ead873317c9f0fd481fe5c491686a2eb78"
+  },
+  "common.u64": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/u64.py",
+   "sha256": "d036b5d39e796641036560961c74c61588c59cff768387ef86c34d1d481e8c07"
+  },
+  "evm_ir.semantics_gas": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/semantics_gas.py",
+   "sha256": "59306349248b7bcca6cc40a33233ed0245e6b8c495cb4985bd5ba1e9a37a0cb3"
+  },
+  "common.uninterpreted": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/uninterpreted.py",
+   "sha256": "33b39c00e6daafc7af5cd1c7526eea670159351adcd1a5470efadeae913b6cf0"
+  },
+  "common.calldata": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/calldata.py",
+   "sha256": "7df01dfbf9fead6511c0fa257aba724883017dc0734afd352ebb82fb73928766"
+  },
+  "common.arithmetic": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/arithmetic.py",
+   "sha256": "67d41d89db06ee29e8bdd65f583440d632558419c4d25108c9babfcc36bc4563"
+  },
+  "evm_ir.semantics": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/semantics.py",
+   "sha256": "59258c243e099bb567bb8cd468117db678cca97013df6c1c625a994a20fd9e85"
+  },
+  "evm_ir.cfg_structures": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/cfg_structures.py",
+   "sha256": "793c125fac734ef040a0005ade3d1723a966ca7096bcbd238def46e0b99fe585"
+  },
+  "evm_ir.cfg_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/cfg_state.py",
+   "sha256": "5ff544fba2d7fcb1190cb8d3ef26799ca8c74770b304a65a36ff3925e49fa635"
+  },
+  "evm_ir.cfg_annotations": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/cfg_annotations.py",
+   "sha256": "0d4f698e329d6d76b468964722ad83947c8344a89484010f113e95a4ccf2806f"
+  },
+  "evm_ir.cfg_strategies": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/cfg_strategies.py",
+   "sha256": "a9428df69eed6ef2b9fc8e3b0820a0768be06938406f31b2e56fa53199144f05"
+  },
+  "common.path_observation": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/path_observation.py",
+   "sha256": "8bc266e33b073bfd659aa635bc02b0d131c0ffbc9d4c4ebc1fd1dc4ac097b91c"
+  },
+  "evm_ir.cfg_executor": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/cfg_executor.py",
+   "sha256": "870571aa719bbee6ce116a57b3f10a4af7fd0fa2610a8218d60ade4a8252ac83"
+  },
+  "evm_ir.cfg": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/cfg.py",
+   "sha256": "2cef44ebf0d5a65c55a24ab8126071d2e955542e015364f2cd556ad2b94de946"
+  },
+  "evm_ir.program": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/program.py",
+   "sha256": "e4edd586e63270782fe19b4467e21ab84ad3175a578dde65026f4dfe5b3c266d"
+  },
+  "evm_ir": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/evm_ir/__init__.py",
+   "sha256": "45041faa8d1b5071ac531027d3ad6eab690b28048f0b044fe41cd49b9a954f1b"
+  },
+  "x86_64.models": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/models.py",
+   "sha256": "c6fabcd1a24751235a48d2d347a3a0079e7cd242524d3c2ed40e3eb0e6dc3b89"
+  },
+  "x86_64.aot_profile": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/aot_profile.py",
+   "sha256": "c08e1de9e569d5560b10e6fcf894f357fa62661363abb9566bc959d6153949c7"
+  },
+  "x86_64.disassembler": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/disassembler.py",
+   "sha256": "e685a3e1a123a89ca2c0f4cca527ea71c9e9ca75b2761476faa35d2f2ce946fd"
+  },
+  "utils.config": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/utils/config.py",
+   "sha256": "60e06395d0424c888a136fba37ba72f6dd330b8751362b48937df55b7d454247"
+  },
+  "utils.exceptions": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/utils/exceptions.py",
+   "sha256": "f5520ac96a32a81c110ff1e9ab494ab55b82280b12eeffced49c9816d1ff8a78"
+  },
+  "utils": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/utils/__init__.py",
+   "sha256": "edbd610cc163a4eff0884a5781486932810413bc766e423a401bc5fedc0ae879"
+  },
+  "x86_64.semantics": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/semantics.py",
+   "sha256": "206096cd9e2c846b1a4a8436c3e0a98cbb68efaf4514b0c733197ec3bfa5b347"
+  },
+  "x86_64.cfg_structures": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/cfg_structures.py",
+   "sha256": "afaaecce5e32969d4d16dcaccc1bce5c534cf8b2c2fad5f7b4c85ebdd0b2f94e"
+  },
+  "x86_64.cfg_state": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/cfg_state.py",
+   "sha256": "481dc1a98675303512037d638654d55e229f8c6d8b8d59e7055da16389f620a0"
+  },
+  "x86_64.cfg_annotations": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/cfg_annotations.py",
+   "sha256": "82bb1237039e954f4ce0334ac288b3c30e876bd6ebb49baba6c5a1c6f2c55df8"
+  },
+  "x86_64.cfg_strategies": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/cfg_strategies.py",
+   "sha256": "1679a9ca99109fdc0e4fac9797c9559c20cea237bb64c1d2384bf318bcdadf81"
+  },
+  "common.store_forwarding": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/store_forwarding.py",
+   "sha256": "0c5a93f5e00f11f18eafffd0f2ad4a22a9c72628dc88ed2b13422e7b28acf73a"
+  },
+  "x86_64.summaries.base": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/base.py",
+   "sha256": "ea805ed61472f9c76b3075591bbf5a42d5b7702a7dae93d1b81a2654a83e54bf"
+  },
+  "x86_64.summaries.calldataload": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/calldataload.py",
+   "sha256": "fad696f4a066c9caea397babe8944d2c63401b132114326217ad574af64aa640"
+  },
+  "common.memory_copy": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/memory_copy.py",
+   "sha256": "883f5a02eeeadcb7bde1be86a6fe400ef5247d01c894d3059630aa48f0b7bb32"
+  },
+  "x86_64.loop_analysis": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/loop_analysis.py",
+   "sha256": "627044fdf534b993e7666b738dc7945bf9713c2d60d1b98ed359341e134f826d"
+  },
+  "x86_64.loop_templates": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/loop_templates.py",
+   "sha256": "9da5faa5837fc71eb12acf0e30c1852573ce012cb498f4fbd5b21b9da1590120"
+  },
+  "x86_64.tier2_semantics": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/tier2_semantics.py",
+   "sha256": "22fedbf3d07379e4a6c6a15b2128efd89ca89a10dc52837844ee40486267590a"
+  },
+  "x86_64.summaries.copy_loop": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/copy_loop.py",
+   "sha256": "274e024a4313fa89e94e02f3d205b148a401d569cebdb59749d36f4db1ef5ae7"
+  },
+  "x86_64.summaries.div": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/div.py",
+   "sha256": "841ba174ad9cf52d6637296061d7335e97128d430e5492a9693b8539b97678a0"
+  },
+  "x86_64.summaries.memgas": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/memgas.py",
+   "sha256": "cf3faa5c223606156f136434f8144ab6190f71953ac9dd902055a557d74f64e9"
+  },
+  "x86_64.summaries.mul": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/mul.py",
+   "sha256": "a47751b9f660c888cb33414da2abb2b6604c7625b39fab46742806663e2c0b71"
+  },
+  "x86_64.summaries.shift": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/shift.py",
+   "sha256": "c988dd1b15ec3575693aa83a297846c21271adccd906e0af1b78053d7a0fac83"
+  },
+  "common.fresh_symbols": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/fresh_symbols.py",
+   "sha256": "7ab54e5bd7ad37fa071beaa5546b8442343b0343971d8c32e8e74c98a6dc4e38"
+  },
+  "x86_64.summaries.sdiv": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/sdiv.py",
+   "sha256": "ca289839c421f4644efde8c81b3195b5548d9d31cf6f36b6583a3e903ed90aa6"
+  },
+  "x86_64.summaries.smod": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/smod.py",
+   "sha256": "ff73e82697677d80d1becaab8418263651ce9b0a744e74ad580501d69e94e6d7"
+  },
+  "x86_64.summaries.registry": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/registry.py",
+   "sha256": "04af473c0fbbcf8f615812a8d93a7a3b27778932534e5cef2c56519d3e2651a2"
+  },
+  "x86_64.summaries": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/summaries/__init__.py",
+   "sha256": "c0254a7ca09ee8c69552d1023587951f7121907ab8d39aef3fd239172ed30e90"
+  },
+  "common.node_monitor": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/node_monitor.py",
+   "sha256": "24e5e77d538a74971428a017823f4d4160b452c9c10e16469ffbfe44047d4e0c"
+  },
+  "x86_64.cfg_executor": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/cfg_executor.py",
+   "sha256": "1bc09fec7b8cb3469b9846f9afc6ad286379187143ef8b3f1ef5339178c460ec"
+  },
+  "x86_64.cfg": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/cfg.py",
+   "sha256": "5faf483044d2eb3f0699705d5f6f9b0752dbdbf14f9015c9340b04b5ec1911d5"
+  },
+  "x86_64.program": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/program.py",
+   "sha256": "6cb4874e7f29dfcf26c3968b9542d0617425fe4b64f694d30467cfc066f6370a"
+  },
+  "x86_64": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/__init__.py",
+   "sha256": "b984e3590818314616a8facd468c7818b78011cf37c1e886f0bd24cee0dd032a"
+  },
+  "tests.support.instruction_equivalence": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/tests/support/instruction_equivalence.py",
+   "sha256": "30c3122431274895fe160c2b9894c9bfab145c8bc0be39c8cae75f77e79309f0"
+  },
+  "tests.integration.test_single_ins_equivalence": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/tests/integration/test_single_ins_equivalence.py",
+   "sha256": "f2764231b8bd95d51451494bf70a80d0f9f103c34ee217f97c0250ddef29adf9"
+  },
+  "x86_64.go_function_semantics": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/x86_64/go_function_semantics.py",
+   "sha256": "d895b72c026a0b4cb366bf1e98aefd7b5d6e681c0b5e44d9458ef3b524d53b0c"
+  },
+  "verification.equivalence_tuning": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/equivalence_tuning.py",
+   "sha256": "e68c38672ba87742d9b9390be899628dbec0a162d94fc64847bca4fdb0cc51ab"
+  },
+  "verification.equivalence_context": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/equivalence_context.py",
+   "sha256": "6f1d33911bfcafdc2692f81ed8da6964297461baf9f151ec7ceee848639ca87b"
+  },
+  "verification.equivalence_gas": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/equivalence_gas.py",
+   "sha256": "fd509cc2ba24498ff20757dced9ab0b11355c81b12861e50099dedef4cf64481"
+  },
+  "utils.z3_helpers": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/utils/z3_helpers.py",
+   "sha256": "f4e8fd160db099ff583909be8708e19e800a6d7da8b5653b09c43098550a8f3e"
+  },
+  "verification.equivalence_memory": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/equivalence_memory.py",
+   "sha256": "90a4fe293a4fe16b8e4586fc7e92f3343f6d4f27f86f772804ceba59c2b85434"
+  },
+  "verification.equivalence_storage": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/equivalence_storage.py",
+   "sha256": "039b80dc3c341b3368bac2d03cd5b1843570883d07167f761b06378b67cca11f"
+  },
+  "verification.equivalence_outputs": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/equivalence_outputs.py",
+   "sha256": "ca09bd9fdcdf02bcbb53ec0c506039bfb77276eceb9ec63e8d0b0738e884073a"
+  },
+  "verification.equivalence_paths": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/equivalence_paths.py",
+   "sha256": "227a6502607cd9824eeeac20dcbeb73cb795d7f94601f236632d786a5ef0f663"
+  },
+  "verification.equivalence_checker": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/equivalence_checker.py",
+   "sha256": "af25b39019113cc5fc24ea7b7e07626daebae405b7195796a699ed5abfefd30c"
+  },
+  "verification.call_site_mapping": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/call_site_mapping.py",
+   "sha256": "c6af6c58e3d6cfd8a67ea049ee085c2573995af25824e516891b71efb20812ff"
+  },
+  "state.host_gas": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/state/host_gas.py",
+   "sha256": "6cc6809e70e8324a618d13f218ec54c8064fafe061d398ee10d33a8c7d44461d"
+  },
+  "verification.program_verifier": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/program_verifier.py",
+   "sha256": "7791aa0461b995a7972bf9a17755e7ca9f54ed318813668c5ecfbc76eb588a05"
+  },
+  "verification": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/__init__.py",
+   "sha256": "803917ca92356e0688f0d4ae557f0821d78843264062f5aa32b8e3148d60fb3b"
+  },
+  "verification.proof_cache": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/proof_cache.py",
+   "sha256": "8351ddf73a1a68bae3380d320bd1474d1ceafc768204fdcb909fa1f96d4748f5"
+  },
+  "verification.block_specialization": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/block_specialization.py",
+   "sha256": "cafae5a3c24e329856e3723910217d8295c2dd6f263aea504ff8a0c47858bd96"
+  },
+  "common.identity": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/identity.py",
+   "sha256": "db47a68342b2fd82f998f99288d6d5faadf31aef045a23fc413cde3fd487fa02"
+  },
+  "verification.cutpoint_relation": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/cutpoint_relation.py",
+   "sha256": "e544c6dbe7e357113abee10b3cdfe68727346619b7cdd76c9ee2f8394f14dc4a"
+  },
+  "verification.block_relation": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/block_relation.py",
+   "sha256": "684147222c8173cdc05ecedadf958bf5d3de34b19c8545415d2977ce3ecd684e"
+  },
+  "verification.linear_encoding": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/linear_encoding.py",
+   "sha256": "6751e31e9ddf30359559a4cd19ea96fbaebb7e3766f4187adc5970e84cd73bf7"
+  },
+  "verification.alpha_canon": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/alpha_canon.py",
+   "sha256": "3d26ecb32ba1dc4249ce3a58f63e4137f896e75e704cd155c571c78de2959c4d"
+  },
+  "common.oog_bridge": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/oog_bridge.py",
+   "sha256": "53a4dc80f9e6153e52037c1bee9c1537ee3e845d0a5eb04c1106baf39f519e78"
+  },
+  "verification.loop_induction": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/loop_induction.py",
+   "sha256": "65efeaee7e0fe2b226397c0609c73d3b3f583777bf12ebfd6264b01eb06bfe3e"
+  },
+  "verification.block_equivalence": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/verification/block_equivalence.py",
+   "sha256": "7c2c3cf0417b36a060a711756937224673c89db7e3e47c987ec7129744f560f6"
+  },
+  "common.isolated_sat": {
+   "path": "/artifact/recorded-runs/snap-paper-c68c4df/common/isolated_sat.py",
+   "sha256": "6cb15932da67503cfc231b48f95a936760dfbd7f343b5d430feaae4bf37c43cc"
+  }
+ },
+ "inner_wall_seconds": 0.4467435509432107,
+ "source_after": {
+  "sha256": "b5d8d104183872c177336c7825e70b632f5c6e7e2e1c4f160432b4dafa6f3e7e",
+  "files": 114
+ },
+ "proof_cache": "/artifact/recorded-runs/paper-v3-20261112/172/single-r2/single__LOG4__V2.worker.smt.sqlite3",
+ "python": "/artifact/.venv/bin/python",
+ "worker_sha256": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+ "harness_source_after": {
+  "worker.py": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+  "paper_modes.py": "2f6d835811096c95d6a20b98ef725b6eb23251205d87d9b1ddb907c52fc9e502",
+  "run_one.py": "098dcf5e9257d16ff1499deb38fb3f14c73f307c6bf4293e9cbb833eb49882cb",
+  "slices.py": "1c05def9530159afcd5c1ad61e213392a7f933c29082151538a3ea51b71a361b",
+  "single_cfg_merge.py": "5254f77b97b102a4fb4662c7a30aa0048a3639eb34502358fc33c42fac2097a6"
+ }
+}

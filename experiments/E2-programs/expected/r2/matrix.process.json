@@ -1,0 +1,1 @@
+{"pid": 16701, "state": "finished", "ended": 1794509967.0087175, "argv": ["harness/matrix.py", "--snap", "../snap-paper-c68c4df", "--fixtures", "../r4/fixtures", "--out", "172/prog-r2", "--cpus", "4-7", "--memory-budget", "5000", "--only", "prog/", "--names", "172/repeat-names.txt"]}

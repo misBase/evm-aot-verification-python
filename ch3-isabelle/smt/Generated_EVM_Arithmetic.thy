@@ -864,358 +864,448 @@ lemma exported_not_ufs:
   by (simp add: generated_not_defs)
 
 definition generated_mul_node_0 :: "smt_expr" where
-  "generated_mul_node_0 = BVVar 256 0"
+  "generated_mul_node_0 = BVConst 1 0"
 
 definition generated_mul_node_1 :: "smt_expr" where
-  "generated_mul_node_1 = BVExtract 255 192 generated_mul_node_0"
+  "generated_mul_node_1 = BVVar 256 1"
 
 definition generated_mul_node_2 :: "smt_expr" where
-  "generated_mul_node_2 = BVVar 256 1"
+  "generated_mul_node_2 = BVExtract 63 0 generated_mul_node_1"
 
 definition generated_mul_node_3 :: "smt_expr" where
-  "generated_mul_node_3 = BVExtract 63 0 generated_mul_node_2"
+  "generated_mul_node_3 = BVZeroExt 64 generated_mul_node_2"
 
 definition generated_mul_node_4 :: "smt_expr" where
-  "generated_mul_node_4 = BVBin BVMul generated_mul_node_1 generated_mul_node_3"
+  "generated_mul_node_4 = BVVar 256 0"
 
 definition generated_mul_node_5 :: "smt_expr" where
-  "generated_mul_node_5 = BVExtract 191 128 generated_mul_node_0"
+  "generated_mul_node_5 = BVExtract 255 192 generated_mul_node_4"
 
 definition generated_mul_node_6 :: "smt_expr" where
-  "generated_mul_node_6 = BVExtract 127 64 generated_mul_node_2"
+  "generated_mul_node_6 = BVZeroExt 64 generated_mul_node_5"
 
 definition generated_mul_node_7 :: "smt_expr" where
-  "generated_mul_node_7 = BVBin BVMul generated_mul_node_5 generated_mul_node_6"
+  "generated_mul_node_7 = BVBin BVMul generated_mul_node_3 generated_mul_node_6"
 
 definition generated_mul_node_8 :: "smt_expr" where
-  "generated_mul_node_8 = BVBin BVAdd generated_mul_node_4 generated_mul_node_7"
+  "generated_mul_node_8 = BVExtract 63 0 generated_mul_node_7"
 
 definition generated_mul_node_9 :: "smt_expr" where
-  "generated_mul_node_9 = BVExtract 63 0 generated_mul_node_0"
+  "generated_mul_node_9 = BVConcat generated_mul_node_0 generated_mul_node_8"
 
 definition generated_mul_node_10 :: "smt_expr" where
-  "generated_mul_node_10 = BVExtract 255 192 generated_mul_node_2"
+  "generated_mul_node_10 = BVExtract 127 64 generated_mul_node_1"
 
 definition generated_mul_node_11 :: "smt_expr" where
-  "generated_mul_node_11 = BVBin BVMul generated_mul_node_9 generated_mul_node_10"
+  "generated_mul_node_11 = BVZeroExt 64 generated_mul_node_10"
 
 definition generated_mul_node_12 :: "smt_expr" where
-  "generated_mul_node_12 = BVBin BVAdd generated_mul_node_8 generated_mul_node_11"
+  "generated_mul_node_12 = BVExtract 191 128 generated_mul_node_4"
 
 definition generated_mul_node_13 :: "smt_expr" where
-  "generated_mul_node_13 = BVExtract 127 64 generated_mul_node_0"
+  "generated_mul_node_13 = BVZeroExt 64 generated_mul_node_12"
 
 definition generated_mul_node_14 :: "smt_expr" where
-  "generated_mul_node_14 = BVExtract 191 128 generated_mul_node_2"
+  "generated_mul_node_14 = BVBin BVMul generated_mul_node_11 generated_mul_node_13"
 
 definition generated_mul_node_15 :: "smt_expr" where
-  "generated_mul_node_15 = BVBin BVMul generated_mul_node_13 generated_mul_node_14"
+  "generated_mul_node_15 = BVExtract 63 0 generated_mul_node_14"
 
 definition generated_mul_node_16 :: "smt_expr" where
-  "generated_mul_node_16 = BVBin BVAdd generated_mul_node_12 generated_mul_node_15"
+  "generated_mul_node_16 = BVConcat generated_mul_node_0 generated_mul_node_15"
 
 definition generated_mul_node_17 :: "smt_expr" where
-  "generated_mul_node_17 = BVConst 1 0"
+  "generated_mul_node_17 = BVExtract 191 128 generated_mul_node_1"
 
 definition generated_mul_node_18 :: "smt_expr" where
-  "generated_mul_node_18 = BVZeroExt 64 generated_mul_node_5"
+  "generated_mul_node_18 = BVZeroExt 64 generated_mul_node_17"
 
 definition generated_mul_node_19 :: "smt_expr" where
-  "generated_mul_node_19 = BVZeroExt 64 generated_mul_node_3"
+  "generated_mul_node_19 = BVExtract 127 64 generated_mul_node_4"
 
 definition generated_mul_node_20 :: "smt_expr" where
-  "generated_mul_node_20 = BVBin BVMul generated_mul_node_18 generated_mul_node_19"
+  "generated_mul_node_20 = BVZeroExt 64 generated_mul_node_19"
 
 definition generated_mul_node_21 :: "smt_expr" where
-  "generated_mul_node_21 = BVExtract 127 64 generated_mul_node_20"
+  "generated_mul_node_21 = BVBin BVMul generated_mul_node_18 generated_mul_node_20"
 
 definition generated_mul_node_22 :: "smt_expr" where
-  "generated_mul_node_22 = BVConcat generated_mul_node_17 generated_mul_node_21"
+  "generated_mul_node_22 = BVExtract 63 0 generated_mul_node_21"
 
 definition generated_mul_node_23 :: "smt_expr" where
-  "generated_mul_node_23 = BVConst 64 0"
+  "generated_mul_node_23 = BVConcat generated_mul_node_0 generated_mul_node_22"
 
 definition generated_mul_node_24 :: "smt_expr" where
-  "generated_mul_node_24 = BVConcat generated_mul_node_17 generated_mul_node_23"
+  "generated_mul_node_24 = BVExtract 255 192 generated_mul_node_1"
 
 definition generated_mul_node_25 :: "smt_expr" where
-  "generated_mul_node_25 = BVBin BVAdd generated_mul_node_22 generated_mul_node_24"
+  "generated_mul_node_25 = BVZeroExt 64 generated_mul_node_24"
 
 definition generated_mul_node_26 :: "smt_expr" where
-  "generated_mul_node_26 = BVExtract 63 0 generated_mul_node_20"
+  "generated_mul_node_26 = BVExtract 63 0 generated_mul_node_4"
 
 definition generated_mul_node_27 :: "smt_expr" where
-  "generated_mul_node_27 = BVConcat generated_mul_node_17 generated_mul_node_26"
+  "generated_mul_node_27 = BVZeroExt 64 generated_mul_node_26"
 
 definition generated_mul_node_28 :: "smt_expr" where
-  "generated_mul_node_28 = BVZeroExt 64 generated_mul_node_13"
+  "generated_mul_node_28 = BVBin BVMul generated_mul_node_25 generated_mul_node_27"
 
 definition generated_mul_node_29 :: "smt_expr" where
-  "generated_mul_node_29 = BVBin BVMul generated_mul_node_28 generated_mul_node_19"
+  "generated_mul_node_29 = BVExtract 63 0 generated_mul_node_28"
 
 definition generated_mul_node_30 :: "smt_expr" where
-  "generated_mul_node_30 = BVExtract 127 64 generated_mul_node_29"
+  "generated_mul_node_30 = BVConcat generated_mul_node_0 generated_mul_node_29"
 
 definition generated_mul_node_31 :: "smt_expr" where
-  "generated_mul_node_31 = BVConcat generated_mul_node_17 generated_mul_node_30"
+  "generated_mul_node_31 = BVBin BVMul generated_mul_node_18 generated_mul_node_27"
 
 definition generated_mul_node_32 :: "smt_expr" where
-  "generated_mul_node_32 = BVBin BVAdd generated_mul_node_31 generated_mul_node_24"
+  "generated_mul_node_32 = BVExtract 127 64 generated_mul_node_31"
 
 definition generated_mul_node_33 :: "smt_expr" where
-  "generated_mul_node_33 = BVExtract 63 0 generated_mul_node_29"
+  "generated_mul_node_33 = BVConcat generated_mul_node_0 generated_mul_node_32"
 
 definition generated_mul_node_34 :: "smt_expr" where
-  "generated_mul_node_34 = BVConcat generated_mul_node_17 generated_mul_node_33"
+  "generated_mul_node_34 = BVConst 64 0"
 
 definition generated_mul_node_35 :: "smt_expr" where
-  "generated_mul_node_35 = BVZeroExt 64 generated_mul_node_9"
+  "generated_mul_node_35 = BVConcat generated_mul_node_0 generated_mul_node_34"
 
 definition generated_mul_node_36 :: "smt_expr" where
-  "generated_mul_node_36 = BVBin BVMul generated_mul_node_35 generated_mul_node_19"
+  "generated_mul_node_36 = BVBin BVAdd generated_mul_node_33 generated_mul_node_35"
 
 definition generated_mul_node_37 :: "smt_expr" where
-  "generated_mul_node_37 = BVExtract 127 64 generated_mul_node_36"
+  "generated_mul_node_37 = BVExtract 63 0 generated_mul_node_31"
 
 definition generated_mul_node_38 :: "smt_expr" where
-  "generated_mul_node_38 = BVConcat generated_mul_node_17 generated_mul_node_37"
+  "generated_mul_node_38 = BVConcat generated_mul_node_0 generated_mul_node_37"
 
 definition generated_mul_node_39 :: "smt_expr" where
-  "generated_mul_node_39 = BVBin BVAdd generated_mul_node_34 generated_mul_node_38"
+  "generated_mul_node_39 = BVBin BVMul generated_mul_node_11 generated_mul_node_27"
 
 definition generated_mul_node_40 :: "smt_expr" where
-  "generated_mul_node_40 = BVConcat generated_mul_node_23 generated_mul_node_17"
+  "generated_mul_node_40 = BVExtract 127 64 generated_mul_node_39"
 
 definition generated_mul_node_41 :: "smt_expr" where
-  "generated_mul_node_41 = BVBin BVAdd generated_mul_node_39 generated_mul_node_40"
+  "generated_mul_node_41 = BVConcat generated_mul_node_0 generated_mul_node_40"
 
 definition generated_mul_node_42 :: "smt_expr" where
-  "generated_mul_node_42 = BVExtract 64 64 generated_mul_node_41"
+  "generated_mul_node_42 = BVBin BVAdd generated_mul_node_41 generated_mul_node_35"
 
 definition generated_mul_node_43 :: "smt_expr" where
-  "generated_mul_node_43 = BVConcat generated_mul_node_23 generated_mul_node_42"
+  "generated_mul_node_43 = BVExtract 63 0 generated_mul_node_39"
 
 definition generated_mul_node_44 :: "smt_expr" where
-  "generated_mul_node_44 = BVBin BVAdd generated_mul_node_32 generated_mul_node_43"
+  "generated_mul_node_44 = BVConcat generated_mul_node_0 generated_mul_node_43"
 
 definition generated_mul_node_45 :: "smt_expr" where
-  "generated_mul_node_45 = BVExtract 63 0 generated_mul_node_44"
+  "generated_mul_node_45 = BVBin BVMul generated_mul_node_3 generated_mul_node_27"
 
 definition generated_mul_node_46 :: "smt_expr" where
-  "generated_mul_node_46 = BVConcat generated_mul_node_17 generated_mul_node_45"
+  "generated_mul_node_46 = BVExtract 127 64 generated_mul_node_45"
 
 definition generated_mul_node_47 :: "smt_expr" where
-  "generated_mul_node_47 = BVBin BVAdd generated_mul_node_27 generated_mul_node_46"
+  "generated_mul_node_47 = BVConcat generated_mul_node_0 generated_mul_node_46"
 
 definition generated_mul_node_48 :: "smt_expr" where
-  "generated_mul_node_48 = BVBin BVAdd generated_mul_node_47 generated_mul_node_40"
+  "generated_mul_node_48 = BVBin BVAdd generated_mul_node_44 generated_mul_node_47"
 
 definition generated_mul_node_49 :: "smt_expr" where
-  "generated_mul_node_49 = BVExtract 64 64 generated_mul_node_48"
+  "generated_mul_node_49 = BVConcat generated_mul_node_34 generated_mul_node_0"
 
 definition generated_mul_node_50 :: "smt_expr" where
-  "generated_mul_node_50 = BVConcat generated_mul_node_23 generated_mul_node_49"
+  "generated_mul_node_50 = BVBin BVAdd generated_mul_node_48 generated_mul_node_49"
 
 definition generated_mul_node_51 :: "smt_expr" where
-  "generated_mul_node_51 = BVBin BVAdd generated_mul_node_25 generated_mul_node_50"
+  "generated_mul_node_51 = BVExtract 64 64 generated_mul_node_50"
 
 definition generated_mul_node_52 :: "smt_expr" where
-  "generated_mul_node_52 = BVExtract 63 0 generated_mul_node_51"
+  "generated_mul_node_52 = BVConcat generated_mul_node_34 generated_mul_node_51"
 
 definition generated_mul_node_53 :: "smt_expr" where
-  "generated_mul_node_53 = BVBin BVAdd generated_mul_node_16 generated_mul_node_52"
+  "generated_mul_node_53 = BVBin BVAdd generated_mul_node_42 generated_mul_node_52"
 
 definition generated_mul_node_54 :: "smt_expr" where
-  "generated_mul_node_54 = BVZeroExt 64 generated_mul_node_6"
+  "generated_mul_node_54 = BVExtract 63 0 generated_mul_node_53"
 
 definition generated_mul_node_55 :: "smt_expr" where
-  "generated_mul_node_55 = BVBin BVMul generated_mul_node_28 generated_mul_node_54"
+  "generated_mul_node_55 = BVConcat generated_mul_node_0 generated_mul_node_54"
 
 definition generated_mul_node_56 :: "smt_expr" where
-  "generated_mul_node_56 = BVExtract 127 64 generated_mul_node_55"
+  "generated_mul_node_56 = BVBin BVAdd generated_mul_node_38 generated_mul_node_55"
 
 definition generated_mul_node_57 :: "smt_expr" where
-  "generated_mul_node_57 = BVConcat generated_mul_node_17 generated_mul_node_56"
+  "generated_mul_node_57 = BVBin BVAdd generated_mul_node_56 generated_mul_node_49"
 
 definition generated_mul_node_58 :: "smt_expr" where
-  "generated_mul_node_58 = BVBin BVAdd generated_mul_node_57 generated_mul_node_24"
+  "generated_mul_node_58 = BVExtract 64 64 generated_mul_node_57"
 
 definition generated_mul_node_59 :: "smt_expr" where
-  "generated_mul_node_59 = BVExtract 63 0 generated_mul_node_55"
+  "generated_mul_node_59 = BVConcat generated_mul_node_34 generated_mul_node_58"
 
 definition generated_mul_node_60 :: "smt_expr" where
-  "generated_mul_node_60 = BVConcat generated_mul_node_17 generated_mul_node_59"
+  "generated_mul_node_60 = BVBin BVAdd generated_mul_node_36 generated_mul_node_59"
 
 definition generated_mul_node_61 :: "smt_expr" where
-  "generated_mul_node_61 = BVBin BVMul generated_mul_node_35 generated_mul_node_54"
+  "generated_mul_node_61 = BVExtract 63 0 generated_mul_node_60"
 
 definition generated_mul_node_62 :: "smt_expr" where
-  "generated_mul_node_62 = BVExtract 127 64 generated_mul_node_61"
+  "generated_mul_node_62 = BVConcat generated_mul_node_0 generated_mul_node_61"
 
 definition generated_mul_node_63 :: "smt_expr" where
-  "generated_mul_node_63 = BVConcat generated_mul_node_17 generated_mul_node_62"
+  "generated_mul_node_63 = BVBin BVAdd generated_mul_node_30 generated_mul_node_62"
 
 definition generated_mul_node_64 :: "smt_expr" where
-  "generated_mul_node_64 = BVBin BVAdd generated_mul_node_63 generated_mul_node_24"
+  "generated_mul_node_64 = BVBin BVAdd generated_mul_node_63 generated_mul_node_49"
 
 definition generated_mul_node_65 :: "smt_expr" where
-  "generated_mul_node_65 = BVExtract 63 0 generated_mul_node_61"
+  "generated_mul_node_65 = BVExtract 63 0 generated_mul_node_64"
 
 definition generated_mul_node_66 :: "smt_expr" where
-  "generated_mul_node_66 = BVConcat generated_mul_node_17 generated_mul_node_65"
+  "generated_mul_node_66 = BVConcat generated_mul_node_0 generated_mul_node_65"
 
 definition generated_mul_node_67 :: "smt_expr" where
-  "generated_mul_node_67 = BVExtract 63 0 generated_mul_node_41"
+  "generated_mul_node_67 = BVBin BVAdd generated_mul_node_23 generated_mul_node_66"
 
 definition generated_mul_node_68 :: "smt_expr" where
-  "generated_mul_node_68 = BVConcat generated_mul_node_17 generated_mul_node_67"
+  "generated_mul_node_68 = BVBin BVAdd generated_mul_node_67 generated_mul_node_49"
 
 definition generated_mul_node_69 :: "smt_expr" where
-  "generated_mul_node_69 = BVBin BVAdd generated_mul_node_66 generated_mul_node_68"
+  "generated_mul_node_69 = BVExtract 63 0 generated_mul_node_68"
 
 definition generated_mul_node_70 :: "smt_expr" where
-  "generated_mul_node_70 = BVBin BVAdd generated_mul_node_69 generated_mul_node_40"
+  "generated_mul_node_70 = BVConcat generated_mul_node_0 generated_mul_node_69"
 
 definition generated_mul_node_71 :: "smt_expr" where
-  "generated_mul_node_71 = BVExtract 64 64 generated_mul_node_70"
+  "generated_mul_node_71 = BVBin BVMul generated_mul_node_11 generated_mul_node_20"
 
 definition generated_mul_node_72 :: "smt_expr" where
-  "generated_mul_node_72 = BVConcat generated_mul_node_23 generated_mul_node_71"
+  "generated_mul_node_72 = BVExtract 127 64 generated_mul_node_71"
 
 definition generated_mul_node_73 :: "smt_expr" where
-  "generated_mul_node_73 = BVBin BVAdd generated_mul_node_64 generated_mul_node_72"
+  "generated_mul_node_73 = BVConcat generated_mul_node_0 generated_mul_node_72"
 
 definition generated_mul_node_74 :: "smt_expr" where
-  "generated_mul_node_74 = BVExtract 63 0 generated_mul_node_73"
+  "generated_mul_node_74 = BVBin BVAdd generated_mul_node_73 generated_mul_node_35"
 
 definition generated_mul_node_75 :: "smt_expr" where
-  "generated_mul_node_75 = BVConcat generated_mul_node_17 generated_mul_node_74"
+  "generated_mul_node_75 = BVExtract 63 0 generated_mul_node_71"
 
 definition generated_mul_node_76 :: "smt_expr" where
-  "generated_mul_node_76 = BVBin BVAdd generated_mul_node_60 generated_mul_node_75"
+  "generated_mul_node_76 = BVConcat generated_mul_node_0 generated_mul_node_75"
 
 definition generated_mul_node_77 :: "smt_expr" where
-  "generated_mul_node_77 = BVBin BVAdd generated_mul_node_76 generated_mul_node_40"
+  "generated_mul_node_77 = BVExtract 63 0 generated_mul_node_57"
 
 definition generated_mul_node_78 :: "smt_expr" where
-  "generated_mul_node_78 = BVExtract 64 64 generated_mul_node_77"
+  "generated_mul_node_78 = BVConcat generated_mul_node_0 generated_mul_node_77"
 
 definition generated_mul_node_79 :: "smt_expr" where
-  "generated_mul_node_79 = BVConcat generated_mul_node_23 generated_mul_node_78"
+  "generated_mul_node_79 = BVBin BVAdd generated_mul_node_76 generated_mul_node_78"
 
 definition generated_mul_node_80 :: "smt_expr" where
-  "generated_mul_node_80 = BVBin BVAdd generated_mul_node_58 generated_mul_node_79"
+  "generated_mul_node_80 = BVBin BVAdd generated_mul_node_79 generated_mul_node_49"
 
 definition generated_mul_node_81 :: "smt_expr" where
-  "generated_mul_node_81 = BVExtract 63 0 generated_mul_node_80"
+  "generated_mul_node_81 = BVExtract 64 64 generated_mul_node_80"
 
 definition generated_mul_node_82 :: "smt_expr" where
-  "generated_mul_node_82 = BVConcat generated_mul_node_17 generated_mul_node_81"
+  "generated_mul_node_82 = BVConcat generated_mul_node_34 generated_mul_node_81"
 
 definition generated_mul_node_83 :: "smt_expr" where
-  "generated_mul_node_83 = BVBin BVAdd generated_mul_node_82 generated_mul_node_24"
+  "generated_mul_node_83 = BVBin BVAdd generated_mul_node_74 generated_mul_node_82"
 
 definition generated_mul_node_84 :: "smt_expr" where
-  "generated_mul_node_84 = BVExtract 63 0 generated_mul_node_77"
+  "generated_mul_node_84 = BVExtract 63 0 generated_mul_node_83"
 
 definition generated_mul_node_85 :: "smt_expr" where
-  "generated_mul_node_85 = BVConcat generated_mul_node_17 generated_mul_node_84"
+  "generated_mul_node_85 = BVConcat generated_mul_node_0 generated_mul_node_84"
 
 definition generated_mul_node_86 :: "smt_expr" where
-  "generated_mul_node_86 = BVExtract 63 0 generated_mul_node_48"
+  "generated_mul_node_86 = BVBin BVAdd generated_mul_node_85 generated_mul_node_35"
 
 definition generated_mul_node_87 :: "smt_expr" where
-  "generated_mul_node_87 = BVConcat generated_mul_node_17 generated_mul_node_86"
+  "generated_mul_node_87 = BVExtract 63 0 generated_mul_node_80"
 
 definition generated_mul_node_88 :: "smt_expr" where
-  "generated_mul_node_88 = BVBin BVAdd generated_mul_node_85 generated_mul_node_87"
+  "generated_mul_node_88 = BVConcat generated_mul_node_0 generated_mul_node_87"
 
 definition generated_mul_node_89 :: "smt_expr" where
-  "generated_mul_node_89 = BVBin BVAdd generated_mul_node_88 generated_mul_node_40"
+  "generated_mul_node_89 = BVBin BVMul generated_mul_node_3 generated_mul_node_20"
 
 definition generated_mul_node_90 :: "smt_expr" where
-  "generated_mul_node_90 = BVExtract 64 64 generated_mul_node_89"
+  "generated_mul_node_90 = BVExtract 127 64 generated_mul_node_89"
 
 definition generated_mul_node_91 :: "smt_expr" where
-  "generated_mul_node_91 = BVConcat generated_mul_node_23 generated_mul_node_90"
+  "generated_mul_node_91 = BVConcat generated_mul_node_0 generated_mul_node_90"
 
 definition generated_mul_node_92 :: "smt_expr" where
-  "generated_mul_node_92 = BVBin BVAdd generated_mul_node_83 generated_mul_node_91"
+  "generated_mul_node_92 = BVBin BVAdd generated_mul_node_91 generated_mul_node_35"
 
 definition generated_mul_node_93 :: "smt_expr" where
-  "generated_mul_node_93 = BVExtract 63 0 generated_mul_node_92"
+  "generated_mul_node_93 = BVExtract 63 0 generated_mul_node_89"
 
 definition generated_mul_node_94 :: "smt_expr" where
-  "generated_mul_node_94 = BVBin BVAdd generated_mul_node_53 generated_mul_node_93"
+  "generated_mul_node_94 = BVConcat generated_mul_node_0 generated_mul_node_93"
 
 definition generated_mul_node_95 :: "smt_expr" where
-  "generated_mul_node_95 = BVZeroExt 64 generated_mul_node_14"
+  "generated_mul_node_95 = BVExtract 63 0 generated_mul_node_50"
 
 definition generated_mul_node_96 :: "smt_expr" where
-  "generated_mul_node_96 = BVBin BVMul generated_mul_node_35 generated_mul_node_95"
+  "generated_mul_node_96 = BVConcat generated_mul_node_0 generated_mul_node_95"
 
 definition generated_mul_node_97 :: "smt_expr" where
-  "generated_mul_node_97 = BVExtract 127 64 generated_mul_node_96"
+  "generated_mul_node_97 = BVBin BVAdd generated_mul_node_94 generated_mul_node_96"
 
 definition generated_mul_node_98 :: "smt_expr" where
-  "generated_mul_node_98 = BVConcat generated_mul_node_17 generated_mul_node_97"
+  "generated_mul_node_98 = BVBin BVAdd generated_mul_node_97 generated_mul_node_49"
 
 definition generated_mul_node_99 :: "smt_expr" where
-  "generated_mul_node_99 = BVBin BVAdd generated_mul_node_98 generated_mul_node_24"
+  "generated_mul_node_99 = BVExtract 64 64 generated_mul_node_98"
 
 definition generated_mul_node_100 :: "smt_expr" where
-  "generated_mul_node_100 = BVExtract 63 0 generated_mul_node_96"
+  "generated_mul_node_100 = BVConcat generated_mul_node_34 generated_mul_node_99"
 
 definition generated_mul_node_101 :: "smt_expr" where
-  "generated_mul_node_101 = BVConcat generated_mul_node_17 generated_mul_node_100"
+  "generated_mul_node_101 = BVBin BVAdd generated_mul_node_92 generated_mul_node_100"
 
 definition generated_mul_node_102 :: "smt_expr" where
-  "generated_mul_node_102 = BVExtract 63 0 generated_mul_node_89"
+  "generated_mul_node_102 = BVExtract 63 0 generated_mul_node_101"
 
 definition generated_mul_node_103 :: "smt_expr" where
-  "generated_mul_node_103 = BVConcat generated_mul_node_17 generated_mul_node_102"
+  "generated_mul_node_103 = BVConcat generated_mul_node_0 generated_mul_node_102"
 
 definition generated_mul_node_104 :: "smt_expr" where
-  "generated_mul_node_104 = BVBin BVAdd generated_mul_node_101 generated_mul_node_103"
+  "generated_mul_node_104 = BVBin BVAdd generated_mul_node_88 generated_mul_node_103"
 
 definition generated_mul_node_105 :: "smt_expr" where
-  "generated_mul_node_105 = BVBin BVAdd generated_mul_node_104 generated_mul_node_40"
+  "generated_mul_node_105 = BVBin BVAdd generated_mul_node_104 generated_mul_node_49"
 
 definition generated_mul_node_106 :: "smt_expr" where
   "generated_mul_node_106 = BVExtract 64 64 generated_mul_node_105"
 
 definition generated_mul_node_107 :: "smt_expr" where
-  "generated_mul_node_107 = BVConcat generated_mul_node_23 generated_mul_node_106"
+  "generated_mul_node_107 = BVConcat generated_mul_node_34 generated_mul_node_106"
 
 definition generated_mul_node_108 :: "smt_expr" where
-  "generated_mul_node_108 = BVBin BVAdd generated_mul_node_99 generated_mul_node_107"
+  "generated_mul_node_108 = BVBin BVAdd generated_mul_node_86 generated_mul_node_107"
 
 definition generated_mul_node_109 :: "smt_expr" where
   "generated_mul_node_109 = BVExtract 63 0 generated_mul_node_108"
 
 definition generated_mul_node_110 :: "smt_expr" where
-  "generated_mul_node_110 = BVBin BVAdd generated_mul_node_94 generated_mul_node_109"
+  "generated_mul_node_110 = BVConcat generated_mul_node_0 generated_mul_node_109"
 
 definition generated_mul_node_111 :: "smt_expr" where
-  "generated_mul_node_111 = BVExtract 63 0 generated_mul_node_105"
+  "generated_mul_node_111 = BVBin BVAdd generated_mul_node_70 generated_mul_node_110"
 
 definition generated_mul_node_112 :: "smt_expr" where
-  "generated_mul_node_112 = BVConcat generated_mul_node_110 generated_mul_node_111"
+  "generated_mul_node_112 = BVBin BVAdd generated_mul_node_111 generated_mul_node_49"
 
 definition generated_mul_node_113 :: "smt_expr" where
-  "generated_mul_node_113 = BVExtract 63 0 generated_mul_node_70"
+  "generated_mul_node_113 = BVExtract 63 0 generated_mul_node_112"
 
 definition generated_mul_node_114 :: "smt_expr" where
-  "generated_mul_node_114 = BVConcat generated_mul_node_112 generated_mul_node_113"
+  "generated_mul_node_114 = BVConcat generated_mul_node_0 generated_mul_node_113"
 
 definition generated_mul_node_115 :: "smt_expr" where
-  "generated_mul_node_115 = BVExtract 63 0 generated_mul_node_36"
+  "generated_mul_node_115 = BVBin BVAdd generated_mul_node_16 generated_mul_node_114"
 
 definition generated_mul_node_116 :: "smt_expr" where
-  "generated_mul_node_116 = BVConcat generated_mul_node_114 generated_mul_node_115"
+  "generated_mul_node_116 = BVBin BVAdd generated_mul_node_115 generated_mul_node_49"
+
+definition generated_mul_node_117 :: "smt_expr" where
+  "generated_mul_node_117 = BVExtract 63 0 generated_mul_node_116"
+
+definition generated_mul_node_118 :: "smt_expr" where
+  "generated_mul_node_118 = BVConcat generated_mul_node_0 generated_mul_node_117"
+
+definition generated_mul_node_119 :: "smt_expr" where
+  "generated_mul_node_119 = BVBin BVMul generated_mul_node_3 generated_mul_node_13"
+
+definition generated_mul_node_120 :: "smt_expr" where
+  "generated_mul_node_120 = BVExtract 127 64 generated_mul_node_119"
+
+definition generated_mul_node_121 :: "smt_expr" where
+  "generated_mul_node_121 = BVConcat generated_mul_node_0 generated_mul_node_120"
+
+definition generated_mul_node_122 :: "smt_expr" where
+  "generated_mul_node_122 = BVBin BVAdd generated_mul_node_121 generated_mul_node_35"
+
+definition generated_mul_node_123 :: "smt_expr" where
+  "generated_mul_node_123 = BVExtract 63 0 generated_mul_node_119"
+
+definition generated_mul_node_124 :: "smt_expr" where
+  "generated_mul_node_124 = BVConcat generated_mul_node_0 generated_mul_node_123"
+
+definition generated_mul_node_125 :: "smt_expr" where
+  "generated_mul_node_125 = BVExtract 63 0 generated_mul_node_105"
+
+definition generated_mul_node_126 :: "smt_expr" where
+  "generated_mul_node_126 = BVConcat generated_mul_node_0 generated_mul_node_125"
+
+definition generated_mul_node_127 :: "smt_expr" where
+  "generated_mul_node_127 = BVBin BVAdd generated_mul_node_124 generated_mul_node_126"
+
+definition generated_mul_node_128 :: "smt_expr" where
+  "generated_mul_node_128 = BVBin BVAdd generated_mul_node_127 generated_mul_node_49"
+
+definition generated_mul_node_129 :: "smt_expr" where
+  "generated_mul_node_129 = BVExtract 64 64 generated_mul_node_128"
+
+definition generated_mul_node_130 :: "smt_expr" where
+  "generated_mul_node_130 = BVConcat generated_mul_node_34 generated_mul_node_129"
+
+definition generated_mul_node_131 :: "smt_expr" where
+  "generated_mul_node_131 = BVBin BVAdd generated_mul_node_122 generated_mul_node_130"
+
+definition generated_mul_node_132 :: "smt_expr" where
+  "generated_mul_node_132 = BVExtract 63 0 generated_mul_node_131"
+
+definition generated_mul_node_133 :: "smt_expr" where
+  "generated_mul_node_133 = BVConcat generated_mul_node_0 generated_mul_node_132"
+
+definition generated_mul_node_134 :: "smt_expr" where
+  "generated_mul_node_134 = BVBin BVAdd generated_mul_node_118 generated_mul_node_133"
+
+definition generated_mul_node_135 :: "smt_expr" where
+  "generated_mul_node_135 = BVBin BVAdd generated_mul_node_134 generated_mul_node_49"
+
+definition generated_mul_node_136 :: "smt_expr" where
+  "generated_mul_node_136 = BVExtract 63 0 generated_mul_node_135"
+
+definition generated_mul_node_137 :: "smt_expr" where
+  "generated_mul_node_137 = BVConcat generated_mul_node_0 generated_mul_node_136"
+
+definition generated_mul_node_138 :: "smt_expr" where
+  "generated_mul_node_138 = BVBin BVAdd generated_mul_node_9 generated_mul_node_137"
+
+definition generated_mul_node_139 :: "smt_expr" where
+  "generated_mul_node_139 = BVBin BVAdd generated_mul_node_138 generated_mul_node_49"
+
+definition generated_mul_node_140 :: "smt_expr" where
+  "generated_mul_node_140 = BVExtract 63 0 generated_mul_node_139"
+
+definition generated_mul_node_141 :: "smt_expr" where
+  "generated_mul_node_141 = BVExtract 63 0 generated_mul_node_128"
+
+definition generated_mul_node_142 :: "smt_expr" where
+  "generated_mul_node_142 = BVConcat generated_mul_node_140 generated_mul_node_141"
+
+definition generated_mul_node_143 :: "smt_expr" where
+  "generated_mul_node_143 = BVExtract 63 0 generated_mul_node_98"
+
+definition generated_mul_node_144 :: "smt_expr" where
+  "generated_mul_node_144 = BVConcat generated_mul_node_142 generated_mul_node_143"
+
+definition generated_mul_node_145 :: "smt_expr" where
+  "generated_mul_node_145 = BVExtract 63 0 generated_mul_node_45"
+
+definition generated_mul_node_146 :: "smt_expr" where
+  "generated_mul_node_146 = BVConcat generated_mul_node_144 generated_mul_node_145"
 
 definition exported_mul :: "smt_expr" where
-  "exported_mul = generated_mul_node_116"
+  "exported_mul = generated_mul_node_146"
 
 lemmas generated_mul_defs =
   exported_mul_def
@@ -1336,6 +1426,36 @@ lemmas generated_mul_defs =
   generated_mul_node_114_def
   generated_mul_node_115_def
   generated_mul_node_116_def
+  generated_mul_node_117_def
+  generated_mul_node_118_def
+  generated_mul_node_119_def
+  generated_mul_node_120_def
+  generated_mul_node_121_def
+  generated_mul_node_122_def
+  generated_mul_node_123_def
+  generated_mul_node_124_def
+  generated_mul_node_125_def
+  generated_mul_node_126_def
+  generated_mul_node_127_def
+  generated_mul_node_128_def
+  generated_mul_node_129_def
+  generated_mul_node_130_def
+  generated_mul_node_131_def
+  generated_mul_node_132_def
+  generated_mul_node_133_def
+  generated_mul_node_134_def
+  generated_mul_node_135_def
+  generated_mul_node_136_def
+  generated_mul_node_137_def
+  generated_mul_node_138_def
+  generated_mul_node_139_def
+  generated_mul_node_140_def
+  generated_mul_node_141_def
+  generated_mul_node_142_def
+  generated_mul_node_143_def
+  generated_mul_node_144_def
+  generated_mul_node_145_def
+  generated_mul_node_146_def
 
 lemma exported_mul_type:
   "smt_type exported_mul = Some (SBV 256)"

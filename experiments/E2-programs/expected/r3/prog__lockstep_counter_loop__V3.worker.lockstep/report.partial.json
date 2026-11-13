@@ -1,0 +1,125 @@
+{
+  "kind": "progress",
+  "status": "inconclusive",
+  "diagnostics": {
+    "0": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=0, stack_depth=0, memory_size=0, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.7010288638994098,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 21992,
+          "started_at": 1794510903.5247457,
+          "finished_at": 1794510904.2504923,
+          "start_rss_mb": 69.1,
+          "peak_rss_mb": 69.1,
+          "end_rss_mb": 60.9,
+          "memory_budget_mb": 2000.0
+        }
+      ]
+    },
+    "2": {
+      "status": "proved",
+      "instances": [
+        {
+          "spec": "BlockSpecialization(pc=2, stack_depth=1, memory_size=0, free_memory_pointer=0, stack_constants=())",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.9767150760162622,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 21993,
+          "started_at": 1794510903.6492987,
+          "finished_at": 1794510904.6510346,
+          "start_rss_mb": 69.2,
+          "peak_rss_mb": 69.2,
+          "end_rss_mb": 60.9,
+          "memory_budget_mb": 2000.0
+        },
+        {
+          "spec": "BlockSpecialization(pc=2, stack_depth=1, memory_size=0, free_memory_pointer=0, stack_constants=((0, 0),))",
+          "status": "proved",
+          "reasons": [],
+          "contexts": 1,
+          "seconds": 0.834684805944562,
+          "queries": 9,
+          "failed_obligations": [],
+          "pid": 21992,
+          "started_at": 1794510904.6534524,
+          "finished_at": 1794510905.5125346,
+          "start_rss_mb": 60.9,
+          "peak_rss_mb": 61.2,
+          "end_rss_mb": 61.2,
+          "memory_budget_mb": 2000.0
+        }
+      ]
+    }
+  },
+  "closure_checks": [
+    {
+      "phase": "proof_instances",
+      "contexts": 3,
+      "proof_instances": 3,
+      "projection": "pi-v1-value-used"
+    }
+  ],
+  "timings": {
+    "analysis_and_setup": 0.016139212995767593,
+    "discovery": 0.10481351311318576,
+    "entry_H0": 0.7607262399978936
+  },
+  "running": [],
+  "reasons": [],
+  "attempted_instances": 3,
+  "recorded_local_theorems": 3,
+  "local_statistics_basis": "Recorded diagnostics; only status=verified establishes a consumed program certificate.",
+  "started_at_utc": "2026-11-12T19:15:01.653526+00:00",
+  "stem": "tests/data/lockstep_counter_loop",
+  "configuration": {
+    "gas_check": "full",
+    "gas_budget": 1000000000,
+    "num_inputs": 0,
+    "timeout_ms": 30000,
+    "node_seconds": 14400.0,
+    "first_pass_node_seconds": 300.0,
+    "max_parameter_values": 32,
+    "max_depth": 400,
+    "max_instances": 8192,
+    "wall_seconds": 599.9263084391132,
+    "hard_wall_seconds": 599.9263084391132,
+    "summaries": true,
+    "fallback": "none",
+    "discover_first": true,
+    "node_workers": 4,
+    "pair_workers_per_node": 1,
+    "results_dir": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r3/prog__lockstep_counter_loop__V3.worker.lockstep/results",
+    "node_memory_mb": 2000.0,
+    "status_dir": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r3/prog__lockstep_counter_loop__V3.worker.lockstep/workers",
+    "constant_insensitive": true,
+    "pushed_code_return_tags": false,
+    "terminal_constant_projection": false,
+    "context_constant_projection": false,
+    "instruction_hints": "/artifact/recorded-runs/paper-v3-20261112/hints/trace-lockstep_counter_loop.json"
+  },
+  "host": "Linux-3.10.0-1160.el7.x86_64-x86_64-with-glibc2.17",
+  "python": "3.13.7",
+  "workers": 1,
+  "program_sha256": {
+    ".json": "aa6cf176eca8393ed2c163758dc2d63fb5b9415a589a1977101a634cdd255a98",
+    ".hex": "47b1fb8b9379fd1043cf88de26a2c297736a247cc732cb3b3b610c90f5ac2925"
+  },
+  "revision": "c68c4dfc87515204e09a2d566554cd9b04c643d4",
+  "worktree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "total_source_blocks": 2,
+  "unvisited_policy": "Missing local statistics never establish unreachability or a program proof.",
+  "pair_workers": 1,
+  "proof_cache": "/artifact/recorded-runs/paper-v3-20261112/172/prog-r3/prog__lockstep_counter_loop__V3.worker.lockstep/cache.sqlite3",
+  "instruction_hints_sha256": "33e664bf9c62e4a8582b2013929bb258eb79e7633092acf2cdfd4c4030b5d47e",
+  "model_sources_sha256": "a6000cde69e33216c10f5572c93ce128be21c15953c1966217eac9e7d2da0b47"
+}

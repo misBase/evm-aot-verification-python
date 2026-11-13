@@ -101,7 +101,7 @@ class PathConfigurationTests(unittest.TestCase):
         os.environ.pop("EVM_SMT_CONFIG", None)
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        self.directory = Path(directory.name)
+        self.directory = Path(directory.name).resolve()  # macOS: /var is a symlink to /private/var
         self.config = self.directory / "settings" / "paths.json"
         self.config.parent.mkdir()
         patch("export_evm_smt.DEFAULT_CONFIG", self.config).start()

@@ -1,0 +1,57 @@
+{
+ "kind": "program",
+ "target": "tests/data/unbounded",
+ "config": "V2-O1",
+ "verified": false,
+ "result": "N/A",
+ "counterexample": false,
+ "snapshot": "/artifact/recorded-runs/snap-paper-c68c4df",
+ "source_before": {
+  "sha256": "b5d8d104183872c177336c7825e70b632f5c6e7e2e1c4f160432b4dafa6f3e7e",
+  "files": 114
+ },
+ "python_version": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
+ "z3_version": "4.15.4",
+ "harness_sha256": {
+  "worker.py": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+  "paper_modes.py": "2f6d835811096c95d6a20b98ef725b6eb23251205d87d9b1ddb907c52fc9e502",
+  "run_one.py": "098dcf5e9257d16ff1499deb38fb3f14c73f307c6bf4293e9cbb833eb49882cb",
+  "slices.py": "1c05def9530159afcd5c1ad61e213392a7f933c29082151538a3ea51b71a361b",
+  "single_cfg_merge.py": "5254f77b97b102a4fb4662c7a30aa0048a3639eb34502358fc33c42fac2097a6"
+ },
+ "input_missing_pair": [
+  ".hex"
+ ],
+ "input_pair_sha256": {
+  ".json": "31c65ce8aba8243aa54e33b9786eef956f2417c17755a3c0ea37f9c21bc65240"
+ },
+ "alias_of": null,
+ "message": "N/A: input IR/HEX pair is incomplete",
+ "truncated": [],
+ "modes": [],
+ "raw_status": "INPUT_MISSING_PAIR",
+ "reason": "input_missing_pair",
+ "requested": {
+  "gas_check": "off",
+  "max_depth": 400
+ },
+ "effective": {
+  "execution_started": false
+ },
+ "runtime_sources": {},
+ "inner_wall_seconds": 0.006227979902178049,
+ "source_after": {
+  "sha256": "b5d8d104183872c177336c7825e70b632f5c6e7e2e1c4f160432b4dafa6f3e7e",
+  "files": 114
+ },
+ "proof_cache": null,
+ "python": "/artifact/.venv/bin/python",
+ "worker_sha256": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+ "harness_source_after": {
+  "worker.py": "9f8151890ace3f5408667debc84afd682f0e53bfa9307d5469fd1c8b7126c2a2",
+  "paper_modes.py": "2f6d835811096c95d6a20b98ef725b6eb23251205d87d9b1ddb907c52fc9e502",
+  "run_one.py": "098dcf5e9257d16ff1499deb38fb3f14c73f307c6bf4293e9cbb833eb49882cb",
+  "slices.py": "1c05def9530159afcd5c1ad61e213392a7f933c29082151538a3ea51b71a361b",
+  "single_cfg_merge.py": "5254f77b97b102a4fb4662c7a30aa0048a3639eb34502358fc33c42fac2097a6"
+ }
+}
