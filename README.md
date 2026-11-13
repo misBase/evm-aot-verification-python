@@ -8,8 +8,8 @@ section.
 |---|---|---|
 | `ch3-isabelle/` | Chapter 3 | Isabelle/HOL semantics of EVM with the 4×64-bit U256 model, the SMT deep embedding (`smt2Isabelle`) and its consistency certificates, and the Z3 scripts of the U256 algorithms (see `ch3-isabelle/README.md`) |
 | `ch4-5-validator/` | Chapters 4–5 | The validator (Python, Z3, Capstone): EVM IR and x86-64 semantics, path-based validation, block-level and instruction-level lockstep, program certificates; unit and integration tests; evaluation inputs in `data/` |
-| `experiments/` | Section 6 | One directory per experiment (E1–E7), each with a README, `run.sh` and the recorded results in `expected/` |
-| `Makefile` | | Entry points: `make install`, `make smoke`, `make isabelle`, `make e1` … `make e7` |
+| `experiments/` | Section 6 and supplementary experiments | One directory per experiment (E1–E7), each with a README, `run.sh` and recorded results (`expected/`, or `analysis/` for E7) |
+| `Makefile` | | Entry points: `make install`, `make smoke`, `make isabelle`, `make paper`, `make extra` |
 | `Dockerfile` | | Pinned Linux environment for Chapters 4–5 and the experiments |
 
 ## Requirements
@@ -48,27 +48,49 @@ experiment job checks that pin before and after it runs.
 ```sh
 make smoke            # 10 jobs: instruction core ADD (V1, V2), program two_block (V1, V2, V2-O1, V2-O2, V3),
                       # ENSRegistry.owner slice (V2, V2-O1, V2-O2); all should be VERIFIED (about 1 minute)
-make tables           # the paper's recorded results as summary tables
+make tables           # recorded summary tables, with supplementary E3 results listed separately
 make e7               # re-runs the RQ3 ledger and figure data from recorded data; prints "matches expected"
 ```
 
 ## Reproducing the paper
 
-| Command | Paper | Time on the paper's hosts |
+| Command | Paper | Estimated runtime |
 |---|---|---|
-| `make isabelle` | Chapter 3: semantics session and SMT consistency certificates | see `ch3-isabelle/README.md` |
-| `make e1` | Table 3 (cores), Table 5, core-ablation figure | ~1 h |
-| `make e2` | Table 3 (small programs), program figure, Table 6 | ~2 h |
-| `make e3` | function-ablation figure | ~0.5 h |
-| `make e4` | Table 4, whole-contract figure | ~9 h |
-| `make e5` | extended-budget V3 results (all six contracts certified) | hours per contract |
-| `make e6` | shift-summary figure (from recorded measurements) | minutes |
-| `make e7` | Tables 7–8, V3 cost figures (from recorded data) | minutes |
+| `make isabelle` | Section 3 and Appendix A: Isabelle sessions, Z3 scripts and export consistency | see `ch3-isabelle/README.md` |
+| `make e1` | RQ1, Table 1 (microbenchmarks, V1/V2); RQ2, Table 2 and Fig. 6 | ~1 h |
+| `make e2` | RQ1, Table 1 (small programs) and Fig. 5; RQ2, Table 2 (small-program subset) | ~2 h |
+| `make e4` | RQ1, Table 1 (complete contracts under the 3600 s budget) | ~9 h |
+| `make e5` | RQ1, Table 1 (extended budget; all six contracts certified) | hours per contract |
+| `make e7` | RQ3, Fig. 7 and the Section 6.4 numbers (from recorded data) | minutes (analysis and plotting only) |
 
-Each `run.sh` accepts `CPUS` (taskset list) and `MEM` (sum of the concurrent jobs' memory caps, MiB); per-job
-limits are fixed by the experiment. Results are written to `experiments/<E>/results/` and summarized with
-`python experiments/common/summarize.py experiments/<E>/results`; compare with `expected/`. Outcome classes
-should agree; wall times depend on the host and on co-located jobs.
+Estimated runtime is the approximate elapsed time for each command after installation, using resources comparable
+to those listed under Requirements. Actual times depend on hardware and concurrent load. E6/E7 estimates cover
+processing the included records and generating figures. Collecting the profiling data requires separate
+certification and replay runs; a single E7 proof-instance replay can take minutes to hours.
+
+`make small` runs E1 and E2; `make paper` runs E1, E2, E4, E5 and E7. Section 3.5 (GeneralStateTests) has its own
+commands in `ch3-isabelle/state-tests/README.md`. V3's separately confirmed microbenchmark entry in Table 1
+(marked †) is not re-run by E1. See `experiments/README.md` for the input counts, configurations and evidence
+behind each paper result.
+
+## Supplementary experiments
+
+These analyses are retained in the artifact but are not reported as figures or tables in the paper.
+
+| Command | What it measures | Estimated runtime |
+|---|---|---|
+| `make e3` | O1/O2 ablation on four ENSRegistry function slices | ~0.5 h |
+| `make e6` | Shift-summary cost vs. target expansion; redraws a figure from recorded runs of an earlier snapshot | minutes (plotting only) |
+| `make e7` | Also renders supporting RQ3 figures on repeated proofs, scheduling, shared lemmas and route choices | minutes (analysis and plotting only) |
+
+`make extra` runs E3 and E6; `make all` runs the paper and supplementary experiments. The existing directory
+names and individual `e1`–`e7` commands are retained.
+
+E1–E4 accept `CPUS` (taskset list), `MEM` (sum of concurrent jobs' memory caps, MiB) and `OUT`; E5 accepts
+`CPUS`, `WORKERS`, `NODE_MB`, `POOL_NODE_MB` and `OUT`. E1–E5 write to `experiments/<E>/results/` by default;
+their scripts print summary tables for comparison with `expected/`. E6 redraws its figure in `E6-shift/figures/`;
+E7 rebuilds analyses and figures in `E7-v3-costs/results/` (or `OUT`). Per-job limits are described in each
+experiment's README. Outcome classes should agree; wall times depend on the host and on co-located jobs.
 
 ## Configurations
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# E7: where optimized V3 still spends its time (RQ3: Tables 7-8 and the V3 cost figures).
+# E7: where optimized V3 spends its time (RQ3: Fig. 7, Section 6.4 numbers and supplementary cost analyses).
 # Read-only: re-runs the whole-run ledger (A1) on the certification reports, rebuilds the figure data from the
 # recorded analyses and replay events, and renders the figures. Prints whether the results match expected.
 set -euo pipefail

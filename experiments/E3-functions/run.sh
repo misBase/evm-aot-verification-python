@@ -1,5 +1,5 @@
 #!/bin/bash
-# E3: admitted ENSRegistry function slices. RQ2 function-ablation figure.
+# E3: admitted ENSRegistry function slices. Supplementary O1/O2 ablation, not reported in the paper.
 # Usage: bash run.sh            (env: OUT=results dir, CPUS=0-7, MEM=12000 MiB = sum of concurrent jobs' memory caps)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)

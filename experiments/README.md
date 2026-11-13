@@ -21,8 +21,9 @@ separately and not re-run here) and Section 3 (`ch3-isabelle/`, `make isabelle`;
 
 ## Supplementary experiments (not reported in the paper)
 
-These complement RQ2 and RQ3. They run with the same harness and validator snapshot, and their results are
-recorded in the same way, but the paper does not cite them.
+These complement RQ2 and RQ3, but the paper does not cite their figures or tables. E3 uses the current experiment
+harness and validator snapshot; E6 redraws measurements from an earlier baseline-comparison snapshot. E7's
+supporting figures use its recorded profiling data. Their READMEs describe the scope of each analysis.
 
 | Dir / output | `make` | Relation to the paper | What it measures | Time |
 |---|---|---|---|---|

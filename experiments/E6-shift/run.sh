@@ -1,5 +1,5 @@
 #!/bin/bash
-# E6: summary cost vs. target expansion on the SHR family (RQ2, shift-summary figure).
+# E6: summary cost vs. target expansion on the SHR family. Supplementary figure, not reported in the paper.
 # Regenerates the figure from the recorded measurements in expected/ (see README for the measurement scope).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)

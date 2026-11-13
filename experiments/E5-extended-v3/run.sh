@@ -1,5 +1,5 @@
 #!/bin/bash
-# E5: V3 (mixed mode) on the complete contracts with an extended budget: complete program certificates.
+# E5: V3 (mixed mode) on complete contracts with an extended budget. RQ1 Table 1 and Section 6.2 wall times.
 # Usage: bash run.sh [CONTRACT ...]     (default: all six)
 #   env: OUT=results dir, WORKERS=node workers (13), NODE_MB=per-node memory cap (6000; Pool uses POOL_NODE_MB=9000),
 #        CPUS=taskset CPU list (0-14)

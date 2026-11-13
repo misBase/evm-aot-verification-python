@@ -1,6 +1,8 @@
-# E3: Function slices (RQ2)
+# E3: Function slices (supplementary)
 
-**Paper:** function-ablation figure.
+**Relation to the paper:** supplementary O1/O2 ablation on a real contract, complementing RQ2. The current paper
+reports instruction-core and small-program ablations (Table 2 and Fig. 6), not these function slices. E3 is
+included in `make extra` and `make all`; it is not run by `make paper` or `make small`.
 
 **Inputs:** the ENSRegistry functions `owner`, `resolver`, `setOwner` and `setSubnodeOwner`, each as a slice of the
 complete contract pinned to its selector and calldata size. These four are the candidates admitted by the

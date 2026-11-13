@@ -33,6 +33,25 @@ make e7                      # or: bash run.sh
 A few minutes. It re-runs A1 on the reports, rebuilds `figure-data.json` from `analysis/` and `runs/`, renders the
 figures, and reports whether each result matches `expected` (the recorded analyses).
 
+`make paper` includes E7. The same command also renders its supplementary figures; no new proof-instance
+replays are needed to regenerate them.
+
+| Output in `results/figures/` | Paper / supplementary use |
+|---|---|
+| `figure-data.json`, `v3-cost-tail.pdf/.png` | Fig. 7(a) data: five contracts; the paper uses its own layout for this panel |
+| `v3-cost-where-4cat-5c.pdf/.png` | Fig. 7(b): five contracts, four categories (H2 / Local / Shared lemmas / Other) |
+| `v3-cost-mechanisms.pdf/.png` | Controlled context, stack-depth and memory-size variants discussed in Section 6.4; the figure itself is supplementary |
+| `v3-cost-where.pdf/.png` | Supplementary detailed cost categories, original four-contract cohort |
+| `v3-cost-repetition.pdf/.png` | Supplementary repeated proofs and unknown memory size |
+| `v3-cost-schedule.pdf/.png` | Supplementary scheduling simulations |
+| `v3-cost-lemma.pdf/.png` | Supplementary shared-lemma duplication |
+| `v3-cost-routing.pdf/.png` | Supplementary proof-route comparisons |
+
+The original four-contract cost data and supporting analyses remain unchanged. The paper's cost composition
+uses `where_with_safe` and `sample_sizes_with_safe` in `figure-data.json` (40 replays, eight per contract).
+Local combines obligation solving and construction; Shared lemmas combines shared-lemma and instruction-chain
+proofs. These are weighted shares of node proof time, not whole-contract elapsed time.
+
 Replaying instances (`tools/run.py ... tools/replay.py ...`) needs the discovery output of a certification run
 (E5) and takes from minutes to hours per instance; the recorded replays are in `runs/` and `analysis/`.
 

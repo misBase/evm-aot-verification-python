@@ -1,6 +1,7 @@
 # E4: Complete contracts under the comparison budget
 
-**Paper:** Table 4 (complete-contract outcomes), whole-contract figure.
+**Paper:** RQ1, Table 1, row "Real-world complex (3600 s)" (V1 0/6, V2 1/6, V3 1/6), and the ENSRegistry
+wall times and peak RSS quoted in Section 6.2. There is no separate whole-contract figure in the current paper.
 
 **Inputs:** ENSRegistry, Permit2, Safe, CErc20, Uniswap V4 PoolManager and Aave Pool
 (`ch4-5-validator/data/contracts/`, IR and x86-64 machine code as produced by the AOT compiler).
@@ -27,5 +28,7 @@ python ../common/summarize.py expected
 python ../common/summarize.py results
 ```
 
-The paper reports each cell as "round 1/round 2". Under this budget V2 and V3 complete ENSRegistry (V2 within
-about 150–180 s of the limit); completing the other contracts takes the longer budget of E5.
+The recorded summary prints each cell as "round 1/round 2"; both rounds have the same outcome for every
+contract/configuration pair. Table 1 reports the completion counts, and the Section 6.2 ENSRegistry wall times
+are medians over the two rounds. Under this budget V2 and V3 complete only ENSRegistry (V2 within about
+150–180 s of the limit); completing the other contracts takes the longer budget of E5.
