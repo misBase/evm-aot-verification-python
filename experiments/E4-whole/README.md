@@ -27,5 +27,5 @@ python ../common/summarize.py expected
 python ../common/summarize.py results
 ```
 
-The paper reports each cell as "round 1/round 2". Under this budget V3 completes ENSRegistry; completing the other
-contracts takes the longer budget of E5.
+The paper reports each cell as "round 1/round 2". Under this budget V2 and V3 complete ENSRegistry (V2 within
+about 150–180 s of the limit); completing the other contracts takes the longer budget of E5.
