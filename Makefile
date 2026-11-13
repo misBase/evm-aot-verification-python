@@ -68,11 +68,11 @@ small: e1 e2 e3
 all: e1 e2 e3 e4 e5 e6 e7
 
 clean:      # results, generated figures and caches of local runs
-	rm -rf $(EXP)/smoke-results $(EXP)/*/results $(EXP)/E6-shift/figures
+	rm -rf $(EXP)/smoke-results $(EXP)/*/results $(EXP)/E6-shift/figures ch3-isabelle/state-tests/*/target
 	find . -name __pycache__ -prune -exec rm -rf {} + ; find . -name .pytest_cache -prune -exec rm -rf {} +
 
 distclean: clean   # also the Python environment and the validator snapshot created by `make install`
-	rm -rf $(VALIDATOR)/.venv .validator-git
+	rm -rf $(VALIDATOR)/.venv .validator-git ch3-isabelle/state-tests/tests
 
 tables:
 	@for e in E1-cores E2-programs E3-functions E4-whole; do \

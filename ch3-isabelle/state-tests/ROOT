@@ -1,0 +1,15 @@
+(* The word-based EVM semantics from which export1/src/EVM_Execute.rs was generated, with the fixes in FIXES.md.
+   EVM_semantics_test holds the regression lemmas of those fixes (checked by evaluation). *)
+session EVM_StateTests in "theory" = HOL +
+  options [timeout = 600]
+  sessions
+    "HOL-Library"
+    "HOL-Data_Structures"
+  theories
+    EVM_state
+    EVM_syntax
+    EVM_semantics
+    EVMCommType
+    Keccak
+    WordOld
+    EVM_semantics_test

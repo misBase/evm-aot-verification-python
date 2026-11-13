@@ -1,0 +1,8 @@
+[package]
+name = "evm_execute_runner_stage2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+isabelle_exported = { path = "../export1" }
+num-bigint = "0.4"
