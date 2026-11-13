@@ -7,7 +7,7 @@ vectors; mismatches caused by the semantics were fixed in the Isabelle rules and
 | Path | Contents |
 |---|---|
 | `theory/` | The semantics the Rust code was generated from (256-bit words as `word`), with the fixes of `FIXES.md`. `EVM_semantics_test.thy` holds a regression lemma for each fix, checked by evaluation. Session `EVM_StateTests` (`ROOT`) |
-| `export1/src/EVM_Execute.rs` | The generated Rust code (`execute_evm_bytecode` and everything it depends on), crate `isabelle_exported` |
+| `export1/src/EVM_Execute.rs` | The generated Rust code (`execute_evm_bytecode` and everything it depends on), crate `isabelle_exported`; produced from `theory/EVM_semantics.thy` with the Isabelle-to-Rust code generator [Isabelle2Rust](https://github.com/OpenSourceVerif/Isabelle2Rust) and checked in as generated |
 | `runner/` | Command-line driver: builds the pre-state, calls `execute_evm_bytecode`, prints the resulting state |
 | `harness/`, `compare_state_test.py`, `compare_state_suite.py` | Load the test vectors, drive the runner per post-state, and compare status, output, gas, storage and balances with the expected values |
 | `fixtures/`, `run_smoke.py` | One hand-written vector for a quick check |
